@@ -66,7 +66,7 @@ class DeviceTextTest {
   ) = presence(
     entry = entry,
     name = "NAS-Basement",
-    detail = "nas.local:8642",
+    detail = verbatim("nas.local:8642"),
     health = health,
     connected = connected,
     status = status,

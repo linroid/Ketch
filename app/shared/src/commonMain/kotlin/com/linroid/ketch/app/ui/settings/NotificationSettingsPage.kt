@@ -287,7 +287,7 @@ private fun DeviceMutesGroup(
           description = if (entry is EmbeddedInstance) {
             stringResource(Res.string.settings_notifications_this_device)
           } else {
-            entry.detail
+            entry.detail.resolve()
           },
           leading = {
             DevicePennant(

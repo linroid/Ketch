@@ -23,7 +23,6 @@ import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.StartTimeDialog
 import com.linroid.ketch.app.components.parseSpeedInput
 import com.linroid.ketch.app.i18n.resolve
-import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedUnit
 import com.linroid.ketch.app.state.TaskRow
@@ -95,7 +94,7 @@ private fun RemoveDialog(dialog: RowDialog.Remove, runner: RowActionRunner) {
   val first = rows.first()
   val pulse by runner.state.pulse.state.collectAsState()
   val free = pulse.devices.firstOrNull { it.deviceId == first.key.deviceId }?.disk?.usableBytes
-  val device = if (first.device.capabilities.isRemote) first.device.name else localDeviceNoun()
+  val device = first.device.name
   RemoveTasksDialog(
     plan = remember(rows) { RemovalPlan.of(rows, canTrash = rows.all(runner::canTrash)) },
     deviceName = device,

@@ -9,6 +9,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -158,7 +159,8 @@ class DeviceActionsTest {
     runCurrent()
     val local = f.state.instances.value.first { it.deviceId == LOCAL_DEVICE_ID }
 
-    f.state.toggleSlowLane(presence(local, "This Mac", "MacBook Pro", DeviceHealth.Local()))
+    val device = presence(local, "MacBook Pro", verbatim("This Mac"), DeviceHealth.Local())
+    f.state.toggleSlowLane(device)
     runCurrent()
 
     assertEquals(SpeedMode.SlowLane, f.speed.mode.value)

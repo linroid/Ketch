@@ -28,6 +28,7 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DeviceScope
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
@@ -779,7 +780,8 @@ internal class DesktopCommands(
     val speedMode = controller.speedMode ?: return
     val previous = speedMode.settings.value.mode
     if (previous == mode) return
-    val device = localDeviceNoun()
+    val device = state.instances.value.firstOrNull { it is EmbeddedInstance }?.displayName
+      ?: localDeviceNoun()
     controller.scope.launch {
       try {
         speedMode.setMode(mode)

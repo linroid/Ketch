@@ -41,8 +41,9 @@ import kotlin.time.Instant
  * page and the tray. [InstanceManager.presence] lists one per device.
  *
  * @property entry the device; [api] reaches it.
- * @property name name to show, such as "This Mac" or "NAS-Basement" (see [displayName]).
- * @property detail secondary text: the embedded device's host name, else `host:port`.
+ * @property name name to show, such as "Lin's MacBook Pro" or "NAS-Basement" (see
+ *   [displayName]).
+ * @property detail secondary text: "This Mac" for the embedded device, else `host:port`.
  * @property health how well the app is connected to it; [DeviceHealth.Offline] also while it is
  *   not [connected] on purpose, which callers tell apart to show "Not connected".
  * @property connected whether the app keeps a connection to it now; `false` for a remote device
@@ -71,7 +72,7 @@ import kotlin.time.Instant
 data class DevicePresence(
   val entry: InstanceEntry,
   val name: UiText,
-  val detail: String,
+  val detail: UiText,
   val health: DeviceHealth,
   val connected: Boolean,
   val watched: Boolean,
