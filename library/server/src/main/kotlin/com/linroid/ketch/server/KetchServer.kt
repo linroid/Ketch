@@ -180,6 +180,11 @@ import kotlin.coroutines.cancellation.CancellationException
  * files `deleteFiles` removes. Anything else gets `403 Forbidden` with a `path_rejected`
  * `ErrorResponse`. Symbolic links count as the place they point to.
  *
+ * With an [apiToken] and no [allowedDirectories], callers may choose any folder, as owners pick
+ * folders on their other devices, but not one where a new file can take over the account:
+ * [protectedDirectories] and hidden entries such as `~/.ssh` are refused the same way, unless
+ * they lie in the download directory. A new download still never replaces an existing file.
+ *
  * ## Request bodies
  *
  * JSON bodies must be `application/json` (`415` otherwise) and are read up to 1 MiB, or 32 MiB
@@ -191,7 +196,9 @@ import kotlin.coroutines.cancellation.CancellationException
  * With an [apiToken] and a [pairingApprover], a device can ask for the token instead of having
  * someone type it: the pairing endpoints take no token, [pairingApprover] decides, and the
  * device polls until it has the answer or the request expires after two minutes. One request
- * per address, and four in all, wait at a time. Web pages are refused, since with a token
+ * per address, and four in all, wait at a time. An address whose request was denied or left
+ * unanswered must wait before asking again, longer each time, and many such requests from any
+ * addresses pause pairing for a while (`429` `pairing_paused`). Web pages are refused, since with a token
  * [corsAllowedHosts] may let them call the API. The server advertises `pairing=1` over mDNS
  * when it takes requests.
  *
@@ -251,6 +258,9 @@ import kotlin.coroutines.cancellation.CancellationException
  * @param allowedDirectories folders, besides the download directory, that callers may save
  *   downloads to and delete files from. Without an [apiToken] callers are always kept to the
  *   download directory and these folders; with one, only when this list is not empty.
+ * @param protectedDirectories folders callers with the [apiToken] may not save to or delete
+ *   from when [allowedDirectories] is empty; [systemProtectedDirectories] by default, to which
+ *   apps add their own data and configuration folders
  * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery; Android callers must supply
  *   an Android implementation, since the default registrar is compiled for the JVM
@@ -269,6 +279,7 @@ class KetchServer(
   private val corsAllowedHosts: List<String> = emptyList(),
   private val allowedHosts: List<String> = emptyList(),
   allowedDirectories: List<String> = emptyList(),
+  protectedDirectories: List<String> = systemProtectedDirectories(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
   pairingApprover: PairingApprover? = null,
@@ -286,7 +297,8 @@ class KetchServer(
   private val destinations = DestinationGuard(
     ketch,
     allowedDirectories,
-    enabled = apiToken == null || allowedDirectories.isNotEmpty(),
+    confined = apiToken == null || allowedDirectories.isNotEmpty(),
+    protectedDirectories = protectedDirectories,
   )
   private val throttle = AuthThrottle()
   private val connectionStreams = ConnectionStreams()

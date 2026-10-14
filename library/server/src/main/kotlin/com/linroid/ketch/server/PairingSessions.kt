@@ -21,7 +21,9 @@ import kotlin.time.Duration.Companion.minutes
 /**
  * The pairing requests a [KetchServer] waits on: each asks [approver] for up to [timeout], and
  * its answer stays readable for [retention] afterwards. Only one request per address and
- * [MAX_PENDING] in all wait at a time, so a device on the network cannot flood the owner.
+ * [MAX_PENDING] in all wait at a time, so a device on the network cannot flood the owner, and
+ * addresses whose requests the owner turned down or left unanswered wait before asking again
+ * ([backoff]).
  *
  * @param token the access token an allowed request receives.
  * @param scope runs the requests; cancelling it withdraws them.
@@ -32,6 +34,7 @@ internal class PairingSessions(
   private val scope: CoroutineScope,
   private val timeout: Duration = PAIRING_TIMEOUT,
   private val retention: Duration = ANSWER_RETENTION,
+  private val backoff: PairingBackoff = PairingBackoff(),
 ) {
   private val log = KetchLogger("Pairing")
   private val mutex = Mutex()
@@ -43,21 +46,34 @@ internal class PairingSessions(
     var job: Job? = null
   }
 
-  /**
-   * Asks the owner about [request] from [address]. Returns `null` without asking while a
-   * request from [address], or [MAX_PENDING] requests in all, wait for an answer.
-   */
-  suspend fun open(request: PairingRequest, address: String): PairingTicket? {
+  /** What [open] made of a request. */
+  sealed interface Opened {
+    /** The owner is asked; the device polls with [ticket]. */
+    class Asking(val ticket: PairingTicket) : Opened
+
+    /** Not asked: a request from the address, or [MAX_PENDING] in all, wait for an answer. */
+    data object Busy : Opened
+
+    /** Not asked: the address, or every address, must wait [retryAfter] after turned-down ones. */
+    class Later(val retryAfter: Duration) : Opened
+  }
+
+  /** Asks the owner about [request] from [address], unless it has to wait. */
+  suspend fun open(request: PairingRequest, address: String): Opened {
     val id = newId()
     mutex.withLock {
+      backoff.waitFor(address)?.let { wait ->
+        log.i { "Pairing from $address refused for ${wait.inWholeSeconds}s after turned-down ones" }
+        return Opened.Later(wait)
+      }
       val waiting = sessions.values.filter { it.state == PairingState.PENDING }
-      if (waiting.size >= MAX_PENDING || waiting.any { it.address == address }) return null
+      if (waiting.size >= MAX_PENDING || waiting.any { it.address == address }) return Opened.Busy
       val session = Session(address)
       sessions[id] = session
       session.job = scope.launch { decide(id, session, request) }
     }
     log.i { "Pairing requested by \"${request.name}\" from $address" }
-    return PairingTicket(id, timeout.inWholeSeconds)
+    return Opened.Asking(PairingTicket(id, timeout.inWholeSeconds))
   }
 
   /** Where the request [id] stands, or `null` when there is none, or no longer. */
@@ -89,6 +105,7 @@ internal class PairingSessions(
       false -> PairingState.DENIED
       null -> PairingState.EXPIRED
     }
+    if (allowed != true) backoff.recordStrike(session.address)
     log.i { "Pairing with \"${request.name}\" from ${session.address}: ${session.state}" }
     delay(retention)
     mutex.withLock { sessions.remove(id) }

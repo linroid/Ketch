@@ -158,6 +158,7 @@
   <string name="connect_approval_denied">%1$s 拒絕了配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_expired">%1$s 未及時回應配對要求。請重新傳送要求，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_busy">%1$s 正在回應此裝置的另一個要求。請稍後再試，或輸入該裝置的存取碼。</string>
+  <string name="connect_approval_paused">%1$s 暫時不接受此裝置的配對要求。請稍後再試，或輸入該裝置的存取碼。</string>
   <string name="connect_approval_ask_again">重新傳送要求</string>
   <string name="connect_added_badge">已新增</string>
   <string name="connect_share_instead">想從其他裝置控制%1$s嗎？</string>

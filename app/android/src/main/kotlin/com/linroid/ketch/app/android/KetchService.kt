@@ -58,6 +58,7 @@ import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.server.KetchServer
+import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
@@ -247,6 +248,8 @@ class KetchService : Service() {
             },
             allowedHosts = serverConfig.allowedHosts,
             allowedDirectories = serverConfig.allowedDirectories,
+            // The app's own files: its settings, database and token.
+            protectedDirectories = systemProtectedDirectories() + dataDir.path,
             mdnsEnabled = serverConfig.mdnsEnabled,
             mdnsRegistrar = AndroidMdnsRegistrar(),
             pairingApprover = { request, address ->

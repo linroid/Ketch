@@ -158,6 +158,7 @@
   <string name="connect_approval_denied">%1$s에서 이 기기를 허용하지 않았습니다. 다시 요청하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_expired">%1$s에서 응답이 없었습니다. 다시 요청하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_busy">%1$s에서 이 기기의 다른 요청에 응답하는 중입니다. 잠시 후 다시 시도하거나 액세스 코드를 입력하세요.</string>
+  <string name="connect_approval_paused">%1$s에서 지금은 이 기기의 페어링 요청을 받지 않습니다. 나중에 다시 시도하거나 액세스 코드를 입력하세요.</string>
   <string name="connect_approval_ask_again">다시 요청</string>
   <string name="connect_added_badge">추가됨</string>
   <string name="connect_share_instead">다른 기기에서 %1$s을(를) 제어하고 싶나요?</string>

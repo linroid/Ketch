@@ -109,6 +109,15 @@ class RemotePairingTest {
   }
 
   @Test
+  fun turnedDownTooOften_isPaused() = runTest {
+    pairing { _, _ ->
+      json("""{"error":"pairing_paused","message":"Try again in 30s"}""", HttpStatusCode.TooManyRequests)
+    }.use {
+      assertEquals(PairingResult.Paused, it.request(request))
+    }
+  }
+
+  @Test
   fun refused_throwsServerCodeAndMessage() = runTest {
     val body = """{"error":"origin_not_allowed","message":"Web pages cannot pair"}"""
     pairing { _, _ -> json(body, HttpStatusCode.Forbidden) }.use {

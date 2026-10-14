@@ -55,6 +55,7 @@ import ketch.app.shared.generated.resources.connect_approval_ask_again
 import ketch.app.shared.generated.resources.connect_approval_busy
 import ketch.app.shared.generated.resources.connect_approval_denied
 import ketch.app.shared.generated.resources.connect_approval_expired
+import ketch.app.shared.generated.resources.connect_approval_paused
 import ketch.app.shared.generated.resources.connect_code_label
 import ketch.app.shared.generated.resources.connect_code_link_rejected
 import ketch.app.shared.generated.resources.connect_code_placeholder
@@ -294,6 +295,7 @@ internal fun ConnectProblemNotice(
       text = stringResource(
         when (problem.reason) {
           PairingResult.Busy -> Res.string.connect_approval_busy
+          PairingResult.Paused -> Res.string.connect_approval_paused
           PairingResult.Expired -> Res.string.connect_approval_expired
           else -> Res.string.connect_approval_denied
         },

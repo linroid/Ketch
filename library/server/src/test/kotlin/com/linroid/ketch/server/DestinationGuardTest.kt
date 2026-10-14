@@ -142,6 +142,87 @@ class DestinationGuardTest {
   }
 
   @Test
+  fun `POST with a token never names an existing file`() = testApplication {
+    File(outside, "file.zip").writeText("keep")
+    val client = serve(
+      createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+      apiToken = TOKEN,
+    )
+
+    val response = client.createTask("${outside.path}/file.zip")
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(File(outside, "file (1).zip").path, task.request.destination?.value)
+  }
+
+  @Test
+  fun `POST with a token into a protected folder is refused`() = testApplication {
+    val appData = File(temp, "Library").apply { mkdirs() }
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN, protectedDirectories = listOf(appData.path))
+
+    assertRejected(client.createTask("${appData.path}/LaunchAgents/evil.plist"))
+    assertRejected(client.createTask("${temp.path}/library/LaunchAgents/evil.plist"))
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `POST with a token into a hidden folder is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN)
+
+    assertRejected(client.createTask("${outside.path}/.ssh/authorized_keys"))
+    assertRejected(client.createTask("${outside.path}/.zshrc"))
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `POST with a token into a download folder inside a protected one is accepted`() =
+    testApplication {
+      val appData = File(temp, "app-data")
+      val inside = File(appData, "downloads").apply { mkdirs() }
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = inside.path)),
+        apiToken = TOKEN,
+        protectedDirectories = listOf(appData.path),
+      )
+
+      assertEquals(HttpStatusCode.Created, client.createTask("file.zip").status)
+      assertRejected(client.createTask("${appData.path}/file.zip"))
+    }
+
+  @Test
+  fun `DELETE with a token and deleteFiles of a task in a protected folder is refused`() =
+    testApplication {
+      val appData = File(temp, "app-data").apply { mkdirs() }
+      val task = SavedTask(File(appData, "file.zip").path)
+      val client = serve(
+        OneTaskKetch(task, downloads),
+        apiToken = TOKEN,
+        protectedDirectories = listOf(appData.path),
+      )
+
+      assertRejected(client.delete("/api/tasks/${task.taskId}?deleteFiles=true"))
+      assertTrue(task.removals.isEmpty())
+    }
+
+  @Test
+  fun `POST with a token to a granted folder URI passes unchanged`() = testApplication {
+    val client = serve(
+      createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+      apiToken = TOKEN,
+    )
+    val uri = "content://com.android.externalstorage.documents/tree/primary%3AMovies"
+
+    val response = client.createTask(uri)
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(uri, task.request.destination?.value)
+  }
+
+  @Test
   fun `POST with a token and allowed folders keeps callers to them`() = testApplication {
     val client = serve(
       createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
@@ -226,9 +307,15 @@ class DestinationGuardTest {
     ketch: KetchApi,
     apiToken: String? = null,
     allowedDirectories: List<String> = emptyList(),
+    protectedDirectories: List<String> = emptyList(),
   ): HttpClient {
     application {
-      val server = KetchServer(ketch, apiToken = apiToken, allowedDirectories = allowedDirectories)
+      val server = KetchServer(
+        ketch,
+        apiToken = apiToken,
+        allowedDirectories = allowedDirectories,
+        protectedDirectories = protectedDirectories,
+      )
       with(server) { configureServer() }
     }
     return createClient {

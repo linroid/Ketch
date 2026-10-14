@@ -1032,7 +1032,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   advertises `pairing=1` is asked instead of typing its code (`ConnectForm.pair`,
   `RemotePairing`): both devices show the same four digits, and the shared device asks its
   owner in `PairingApprovalHost`, from the tray (desktop) or with Allow and Don't allow
-  notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front
+  notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front;
+  Allow there needs the phone unlocked (`setAuthenticationRequired`), and before Android 12,
+  which cannot require it, only Don't allow is offered and the app asks
 - Android 17 blocks the local network until `ACCESS_LOCAL_NETWORK` is granted: `NearbyAccess`
   asks before searching for or connecting to a device (13 to 16 ask `NEARBY_WIFI_DEVICES` only to
   search), and `MainActivity` asks once a remote device is saved or this device is shared, and
@@ -1281,8 +1283,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `deleteFiles=true` (checked against `DownloadTask.outputPath`); anything else is 403
   `path_rejected`. A request sent again with a task's `requestId` keeps that task's destination
   when it names the same place (`DestinationPathPolicy.confinesTo`), as the task's own file would
-  otherwise give it a new name. With a token and no list, callers may save anywhere, as the apps
-  let owners type any folder on a remote device
+  otherwise give it a new name. With a token and no list, callers may choose any folder, as the
+  apps let owners type any folder on a remote device, except where a new file can take over the
+  account: `KetchServer.protectedDirectories` (`systemProtectedDirectories()`: system folders,
+  `~/Library`, `AppData`; the apps and `ketch server` add their config or data directory, the
+  desktop app its own install folder) and hidden entries such as `~/.ssh`, unless inside the
+  download directory (`DestinationPathPolicy`'s `excluded` and `refuseHidden`, checked below
+  the root that holds a path, ignoring case). A new download still never replaces a file
 - `POST /api/tasks` takes `checksum` as text (`"sha256:<hex>"`; a malformed one is 400), and
   task views carry it in `request` and the verified one in `Completed.checksum`; a mismatch is a
   `checksum_mismatch` error. `RemoteKetch.download` refuses a checksum for servers without
@@ -1303,8 +1310,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Pairing: with a token and a `PairingApprover`, `POST /api/pairing` (no token) asks the owner
   for the token and `GET /api/pairing/{id}` returns it once allowed; requests expire after two
   minutes, one per address and four in all wait, and web pages (`Origin` http/https/null) are
-  refused because CORS may admit them with a token. mDNS TXT adds `pairing=1`. The apps pass
-  an approver backed by `PairingRequests`; the CLI passes none
+  refused because CORS may admit them with a token. A request denied or left unanswered is a
+  strike against its address (`PairingBackoff`, an IPv6 address counting as its /64): it waits
+  30 s before asking again, doubling per strike up to an hour, forgotten after an hour without
+  one; five strikes from any addresses within 10 minutes stop all requests for 10 minutes. Both
+  answer 429 `pairing_paused` with `Retry-After` (`PairingResult.Paused` in `RemotePairing`),
+  where a waiting request answers `pairing_busy`; withdrawing is no strike. mDNS TXT adds
+  `pairing=1`. The apps pass an approver backed by `PairingRequests`; the CLI passes none
 - Remote backend (`RemoteKetch`) communicates via HTTP + SSE. Against servers listing
   `events.stream` it reads `/api/stream`, whose task snapshot replaces `GET /api/tasks`: every
   task's lifecycle and state at once, progress every `progressInterval` (1 s by default, `null`

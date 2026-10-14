@@ -12,6 +12,7 @@ import io.ktor.server.plugins.origin
 import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import kotlinx.serialization.json.Json
@@ -43,14 +44,20 @@ internal fun Route.pairingRoutes(sessions: PairingSessions) {
       code = body.code,
       os = body.os?.let { shownText(it, MAX_OS_LENGTH) }?.ifEmpty { null },
     )
-    val ticket = sessions.open(request, call.request.origin.remoteAddress)
-    if (ticket == null) {
-      call.respond(
+    when (val opened = sessions.open(request, call.request.origin.remoteAddress)) {
+      is PairingSessions.Opened.Asking -> call.respond(HttpStatusCode.Accepted, opened.ticket)
+      PairingSessions.Opened.Busy -> call.respond(
         HttpStatusCode.TooManyRequests,
         ErrorResponse("pairing_busy", "Another pairing request is waiting for an answer"),
       )
-    } else {
-      call.respond(HttpStatusCode.Accepted, ticket)
+      is PairingSessions.Opened.Later -> {
+        val seconds = opened.retryAfter.inWholeSeconds.coerceAtLeast(1)
+        call.response.header(HttpHeaders.RetryAfter, seconds)
+        call.respond(
+          HttpStatusCode.TooManyRequests,
+          ErrorResponse("pairing_paused", "Pairing requests are paused; try again in ${seconds}s"),
+        )
+      }
     }
   }
 

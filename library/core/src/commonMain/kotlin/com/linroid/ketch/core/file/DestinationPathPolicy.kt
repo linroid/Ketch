@@ -18,14 +18,29 @@ import okio.Path.Companion.toPath
  * an Android `content://` tree, are compared as text: one is inside a root URI when it equals it
  * or continues it after a `/`.
  *
+ * A root may be broad, such as a file system root, with [excluded] folders and, with
+ * [refuseHidden], hidden entries refused below it: a path inside one of those is outside that
+ * root, though it may still be inside another, narrower root. So the download directory stays
+ * usable when it lies in a hidden or excluded folder. Excluded folders and hidden entries are
+ * compared ignoring case, as file systems that ignore it would otherwise let a path in.
+ *
  * @param roots folders, as absolute paths or URIs; relative paths are resolved against the
  *   current directory
+ * @param excluded folders refused below a root that contains them, such as the user's
+ *   application data, where a new file can make the system run code
+ * @param refuseHidden whether to refuse paths with an entry whose name starts with `.` below
+ *   their root, such as `~/.ssh` or `~/.zshrc`
  */
-class DestinationPathPolicy(roots: List<String>) {
+class DestinationPathPolicy(
+  roots: List<String>,
+  excluded: List<String> = emptyList(),
+  private val refuseHidden: Boolean = false,
+) {
   private val fileSystem = platformFileSystem
   private val currentDirectory: Path by lazy { fileSystem.canonicalize(".".toPath()) }
   private val rootUris = roots.filter(::isUri).map { it.trimEnd('/') }
   private val rootPaths = roots.filterNot(::isUri).mapNotNull { realPath(it.toPath()) }
+  private val excludedPaths = excluded.filterNot(::isUri).mapNotNull { realPath(it.toPath()) }
 
   /** Whether [path], a file or folder as a path or URI, is one of the roots or inside one. */
   fun contains(path: String): Boolean {
@@ -35,7 +50,18 @@ class DestinationPathPolicy(roots: List<String>) {
 
   private fun contains(path: Path): Boolean {
     val real = realPath(path) ?: return false
-    return rootPaths.any { real.isWithin(it) }
+    return rootPaths.any { root -> real.isWithin(root) && !refusedBelow(real, root) }
+  }
+
+  /** Whether [real], inside [root], is in an excluded folder or a hidden entry below [root]. */
+  private fun refusedBelow(real: Path, root: Path): Boolean {
+    val below = real.segments.drop(root.segments.size)
+    if (refuseHidden && below.any { it.startsWith('.') }) return true
+    return excludedPaths.any { excluded ->
+      excluded.segments.size > root.segments.size &&
+        excluded.isWithin(root, ignoreCase = true) &&
+        real.isWithin(excluded, ignoreCase = true)
+    }
   }
 
   /**
@@ -202,6 +228,7 @@ private fun isUri(value: String): Boolean = "://" in value
 /** A number in a free name, as `OutputPathReservations` picks it: the `1` of `name (1).ext`. */
 private val FREE_NAME_NUMBER = Regex("""\((\d+)\)""")
 
-private fun Path.isWithin(root: Path): Boolean =
-  this.root == root.root && segments.size >= root.segments.size &&
-    segments.subList(0, root.segments.size) == root.segments
+private fun Path.isWithin(root: Path, ignoreCase: Boolean = false): Boolean =
+  this.root.toString().equals(root.root.toString(), ignoreCase) &&
+    segments.size >= root.segments.size &&
+    root.segments.indices.all { segments[it].equals(root.segments[it], ignoreCase) }

@@ -717,6 +717,7 @@ private fun createInstanceManager(
           },
           allowedHosts = serverConfig.allowedHosts,
           allowedDirectories = serverConfig.allowedDirectories,
+          protectedDirectories = sharedServerProtectedDirectories(configDir),
           mdnsEnabled = serverConfig.mdnsEnabled,
           pairingApprover = { request, address ->
             pairingRequests.ask(request.name, request.code, request.os, address)

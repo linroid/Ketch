@@ -514,8 +514,11 @@ Anything else gets `403 Forbidden` with a `path_rejected` error. Paths are compa
 resolved and symbolic links are followed, so a link inside a folder that points elsewhere counts
 as elsewhere.
 
-With a token, clients may save anywhere, as the Ketch apps let you type any folder on another
-device. Set `--allowed-dirs` or `allowedDirectories` to keep them to these folders too.
+With a token, clients may choose any folder, as the Ketch apps let you type any folder on another
+device, but never one where a new file could take over your account: system folders, `~/Library`
+on macOS, `AppData` on Windows, the config directory, and hidden files and folders such as
+`~/.ssh`, unless they are inside the download folder. An existing file is still never
+overwritten. Set `--allowed-dirs` or `allowedDirectories` to keep clients to these folders too.
 
 File names a client gives are cleaned like the names sites suggest: only the part after the last
 `/` or `\` is kept, and characters Windows forbids become `_`.

@@ -164,6 +164,7 @@
   <string name="connect_approval_denied">%1$s n'a pas autorisé cet appareil. Redemandez, ou saisissez son code d'accès.</string>
   <string name="connect_approval_expired">Personne n'a répondu sur %1$s. Redemandez, ou saisissez son code d'accès.</string>
   <string name="connect_approval_busy">%1$s répond à une autre demande de cet appareil. Réessayez dans un instant, ou saisissez son code d'accès.</string>
+  <string name="connect_approval_paused">%1$s n'accepte pas de demandes d'association de cet appareil pour le moment. Réessayez plus tard, ou saisissez son code d'accès.</string>
   <string name="connect_approval_ask_again">Redemander</string>
   <string name="connect_added_badge">Ajouté</string>
   <string name="connect_share_instead">Vous voulez contrôler %1$s depuis un autre appareil ?</string>

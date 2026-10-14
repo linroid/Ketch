@@ -158,6 +158,7 @@
   <string name="connect_approval_denied">%1$sでこのデバイスは許可されませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
   <string name="connect_approval_expired">%1$sで応答がありませんでした。もう一度依頼するか、アクセスコードを入力してください。</string>
   <string name="connect_approval_busy">%1$sはこのデバイスからの別のリクエストに対応中です。しばらくしてからもう一度試すか、アクセスコードを入力してください。</string>
+  <string name="connect_approval_paused">%1$sは現在このデバイスからのペアリングリクエストを受け付けていません。しばらくしてからもう一度お試しいただくか、アクセスコードを入力してください。</string>
   <string name="connect_approval_ask_again">もう一度依頼</string>
   <string name="connect_added_badge">追加済み</string>
   <string name="connect_share_instead">別のデバイスから%1$sを操作しますか？</string>

@@ -1,5 +1,6 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PairingRequest
 import com.linroid.ketch.endpoints.model.PairingState
 import com.linroid.ketch.endpoints.model.PairingStatus
@@ -36,8 +37,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -109,6 +110,19 @@ class PairingRoutesTest {
     val ticket = client.ask().body<PairingTicket>()
 
     assertEquals(PairingStatus(PairingState.DENIED), client.answer(ticket.id))
+  }
+
+  @Test
+  fun `denied address waits before it may ask again`() = testApplication {
+    val client = pairingServer(approver = { _, _ -> false })
+    val ticket = client.ask().body<PairingTicket>()
+    client.answer(ticket.id)
+
+    val again = client.ask()
+
+    assertEquals(HttpStatusCode.TooManyRequests, again.status)
+    assertEquals("pairing_paused", again.body<ErrorResponse>().error)
+    assertNotNull(again.headers[HttpHeaders.RetryAfter])
   }
 
   @Test
@@ -250,7 +264,8 @@ class PairingRoutesTest {
         timeout = 50.milliseconds,
         retention = 5.seconds,
       )
-      val ticket = assertNotNull(sessions.open(request, "192.168.1.30"))
+      val ticket = assertIs<PairingSessions.Opened.Asking>(sessions.open(request, "192.168.1.30"))
+        .ticket
 
       val status = withTimeout(5.seconds) {
         var status = sessions.status(ticket.id)
@@ -274,10 +289,10 @@ class PairingRoutesTest {
       val sessions = PairingSessions({ _, _ -> awaitCancellation() }, TOKEN, scope)
 
       repeat(PairingSessions.MAX_PENDING) {
-        assertNotNull(sessions.open(request, "192.168.1.${30 + it}"))
+        assertIs<PairingSessions.Opened.Asking>(sessions.open(request, "192.168.1.${30 + it}"))
       }
 
-      assertNull(sessions.open(request, "192.168.1.99"))
+      assertEquals(PairingSessions.Opened.Busy, sessions.open(request, "192.168.1.99"))
     } finally {
       scope.cancel()
     }

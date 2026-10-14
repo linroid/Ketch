@@ -226,6 +226,7 @@
   <string name="connect_approval_denied">%1$s didn't allow this device. Ask again, or enter its access code.</string>
   <string name="connect_approval_expired">No one answered on %1$s. Ask again, or enter its access code.</string>
   <string name="connect_approval_busy">%1$s is answering another request from this device. Try again shortly, or enter its access code.</string>
+  <string name="connect_approval_paused">%1$s isn't taking pairing requests from this device right now. Try again later, or enter its access code.</string>
   <string name="connect_approval_ask_again">Ask again</string>
   <!-- At the end of a device found on the network that is added already. -->
   <string name="connect_added_badge">Added</string>

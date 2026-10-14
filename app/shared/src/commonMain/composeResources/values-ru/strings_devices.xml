@@ -176,6 +176,7 @@
   <string name="connect_approval_denied">На %1$s не разрешили доступ этому устройству. Запросите снова или введите код доступа.</string>
   <string name="connect_approval_expired">На %1$s никто не ответил. Запросите снова или введите код доступа.</string>
   <string name="connect_approval_busy">%1$s отвечает на другой запрос с этого устройства. Повторите чуть позже или введите код доступа.</string>
+  <string name="connect_approval_paused">%1$s сейчас не принимает запросы на сопряжение с этого устройства. Повторите попытку позже или введите код доступа.</string>
   <string name="connect_approval_ask_again">Запросить снова</string>
   <string name="connect_added_badge">Добавлено</string>
   <string name="connect_share_instead">Хотите управлять загрузками %1$s с другого устройства?</string>

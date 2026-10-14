@@ -44,6 +44,7 @@ import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
+import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
 import com.linroid.ketch.torrent.TorrentUploadPolicy
@@ -577,6 +578,8 @@ private fun runServer(args: Array<String>): Int {
     corsAllowedHosts = serverConfig.corsAllowedHosts,
     allowedHosts = serverConfig.allowedHosts,
     allowedDirectories = serverConfig.allowedDirectories,
+    // The config directory holds the settings, database and token.
+    protectedDirectories = systemProtectedDirectories() + defaultConfigDir(),
     mdnsEnabled = serverConfig.mdnsEnabled,
     // Health checks wait for the saved tasks, which serveDaemon restores once it listens.
     ready = false,

@@ -303,6 +303,10 @@ class AndroidNotifier(
   /**
    * Asks about [ask], a device that wants this one's access code, with [copy] and Allow and
    * Don't allow buttons; a tap opens the app, which asks too. [cancelPairing] withdraws it.
+   *
+   * Allow needs the device unlocked, so someone holding a locked phone cannot let their own
+   * device in. Before Android 12, which cannot require that, Allow is left out and the owner
+   * allows it in the app.
    */
   suspend fun showPairing(ask: PairingAsk, copy: NotificationCopy) {
     if (!manager.areNotificationsEnabled()) {
@@ -312,13 +316,19 @@ class AndroidNotifier(
     val tag = pairingTag(ask.id)
     val allow = Res.string.pairing_request_allow.text().load()
     val deny = Res.string.pairing_request_deny.text().load()
-    val notification = builder(CHANNEL_PAIRING, copy)
+    val builder = builder(CHANNEL_PAIRING, copy)
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setTimeoutAfter(PAIRING_TIMEOUT_MS)
       .setContentIntent(showIntent(tag))
       .addAction(0, deny, pairingIntent(ask.id, ACTION_PAIRING_DENY))
-      .addAction(0, allow, pairingIntent(ask.id, ACTION_PAIRING_ALLOW))
-      .build()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      builder.addAction(
+        NotificationCompat.Action.Builder(0, allow, pairingIntent(ask.id, ACTION_PAIRING_ALLOW))
+          .setAuthenticationRequired(true)
+          .build(),
+      )
+    }
+    val notification = builder.build()
     post(tag, ID_PAIRING, notification)
   }
 

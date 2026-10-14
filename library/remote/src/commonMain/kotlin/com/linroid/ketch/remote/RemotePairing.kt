@@ -88,7 +88,10 @@ class RemotePairing internal constructor(
     }
     when (response.status) {
       HttpStatusCode.Accepted -> Unit
-      HttpStatusCode.TooManyRequests -> return PairingResult.Busy
+      HttpStatusCode.TooManyRequests -> {
+        val paused = response.toRemoteApiException().errorCode == PAIRING_PAUSED
+        return if (paused) PairingResult.Paused else PairingResult.Busy
+      }
       HttpStatusCode.NotFound,
       HttpStatusCode.MethodNotAllowed,
       HttpStatusCode.NotImplemented -> return PairingResult.Unsupported
@@ -145,6 +148,9 @@ class RemotePairing internal constructor(
   private companion object {
     val POLL_INTERVAL: Duration = 1.seconds
     val REQUEST_TIMEOUT: Duration = 15.seconds
+
+    /** The error code of a server that takes no requests from this device for a while. */
+    const val PAIRING_PAUSED = "pairing_paused"
   }
 }
 
@@ -167,4 +173,10 @@ sealed interface PairingResult {
 
   /** Another request from this device, or too many in all, wait for the owner. */
   data object Busy : PairingResult
+
+  /**
+   * The server takes no requests from this device for a while, as the owner turned down or left
+   * unanswered earlier ones, from it or from many devices. Ask for its access code instead.
+   */
+  data object Paused : PairingResult
 }

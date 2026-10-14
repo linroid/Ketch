@@ -158,6 +158,7 @@
   <string name="connect_approval_denied">%1$s 拒绝了配对请求。请重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_expired">%1$s 未及时响应配对请求。请重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_busy">%1$s 正在处理此设备的另一个请求。请稍后再试，或输入其访问码。</string>
+  <string name="connect_approval_paused">%1$s 暂时不接受此设备的配对请求。请稍后再试，或输入该设备的访问码。</string>
   <string name="connect_approval_ask_again">重新请求</string>
   <string name="connect_added_badge">已添加</string>
   <string name="connect_share_instead">想从其他设备控制%1$s？</string>

@@ -84,7 +84,8 @@ Mount both: without a mount, Docker keeps them in an anonymous volume that is ea
 the container is recreated. Clients can only save to `/downloads` and the folders in
 `KETCH_ALLOWED_DIRS`; mount those too, for example `-v /srv/media:/media -e
 KETCH_ALLOWED_DIRS=/media`. With a token and no list, clients may save anywhere in the
-container; see [save folders](../cli/README.md#save-folders).
+container but `/config`, system folders and hidden ones; see
+[save folders](../cli/README.md#save-folders).
 
 ## Users and permissions
 

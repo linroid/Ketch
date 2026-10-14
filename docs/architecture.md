@@ -411,7 +411,9 @@ lists the routes.
   the download directory and `allowedDirectories` (`DestinationGuard` over core's
   `DestinationPathPolicy`) for new tasks' destinations, resume destinations, the
   `defaultDirectory` of `PUT /api/config` and `deleteFiles=true`. Anything else is
-  `403 path_rejected`.
+  `403 path_rejected`. With a token and no list they may choose any folder but
+  `protectedDirectories` (system folders, the user's application data, the app's own data) and
+  hidden entries, outside the download directory; a new download never replaces a file.
 - **Request bodies**: JSON only (`415` otherwise), at most 1 MiB, or 32 MiB for a new task and
   16 MiB for uploaded content (`413` beyond).
 - **Host check**: without a token, requests must name this machine in `Host` (loopback, an
@@ -420,8 +422,11 @@ lists the routes.
   (`CrossOriginGuard`); with one, `corsAllowedHosts` lists the origins that get CORS.
 - **Pairing**: with a token and a `PairingApprover`, a device can ask for the token
   (`POST /api/pairing`, then poll `GET /api/pairing/{id}`). The approver decides within two
-  minutes; one request per address and four in all may wait. Web pages are refused. The apps'
-  servers pass an approver that asks their owner; `ketch server` takes no requests.
+  minutes; one request per address and four in all may wait. An address whose request was
+  denied or left unanswered waits 30 s before asking again, doubling each time, and five such
+  requests within 10 minutes pause pairing for 10 minutes (`PairingBackoff`). Web pages are
+  refused. The apps' servers pass an approver that asks their owner; `ketch server` takes no
+  requests.
 - **Discovery**: advertised on the LAN over mDNS as `_ketch._tcp` unless disabled, with TXT
   `token=none|required`, and `pairing=1` when it takes pairing requests.
 
