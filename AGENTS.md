@@ -1030,11 +1030,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   device; the Add device sheet and the connect page (shown while no device is active, as on the
   web) take a pairing link, an address or a device found on the network. A found device that
   advertises `pairing=1` is asked instead of typing its code (`ConnectForm.pair`,
-  `RemotePairing`): both devices show the same four digits, and the shared device asks its
-  owner in `PairingApprovalHost`, from the tray (desktop) or with Allow and Don't allow
-  notification buttons (Android, `AndroidNotifier.CHANNEL_PAIRING`) while it is not in front;
-  Allow there needs the phone unlocked (`setAuthenticationRequired`), and before Android 12,
-  which cannot require it, only Don't allow is offered and the app asks
+  `RemotePairing`): both devices show the same four digits, and the shared device's owner
+  answers only in Settings › Sharing (`PairingRequestCards`, which sets
+  `AppState.pairingRequestsShown` while its window is in front). Elsewhere in the app a sticky
+  toast with Review opens Sharing; while the app is not in front the hosts notify
+  (`PairingNotices.follow`: desktop's tray, `NotificationClick.Pairing`; Android's
+  `AndroidNotifier.CHANNEL_PAIRING`, with Don't allow only, tapped through
+  `AndroidNotifier.opensSharing`), on arrival or once the app leaves the front
 - Android 17 blocks the local network until `ACCESS_LOCAL_NETWORK` is granted: `NearbyAccess`
   asks before searching for or connecting to a device (13 to 16 ask `NEARBY_WIFI_DEVICES` only to
   search), and `MainActivity` asks once a remote device is saved or this device is shared, and

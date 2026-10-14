@@ -62,8 +62,9 @@ import kotlin.time.Instant
  * - [CHANNEL_DONE]: finished downloads with Show and Share, grouped once more than
  *   [GROUP_AFTER] show. Tapping one saved on this device opens its file.
  * - [CHANNEL_FAILED]: failed downloads with Retry.
- * - [CHANNEL_PAIRING]: devices that want this one's access code, with Allow and Don't allow,
- *   which start [service] with [ACTION_PAIRING_ALLOW] and [ACTION_PAIRING_DENY].
+ * - [CHANNEL_PAIRING]: devices that want this one's access code, answered in Settings ›
+ *   Sharing, which a tap opens ([opensSharing]); Don't allow starts [service] with
+ *   [ACTION_PAIRING_DENY].
  * - [CHANNEL_REQUESTS]: the app's messages that ask for a notification, such as Discover waiting
  *   for the user's OK to open a website, as long as the message shows.
  *
@@ -301,12 +302,9 @@ class AndroidNotifier(
   }
 
   /**
-   * Asks about [ask], a device that wants this one's access code, with [copy] and Allow and
-   * Don't allow buttons; a tap opens the app, which asks too. [cancelPairing] withdraws it.
-   *
-   * Allow needs the device unlocked, so someone holding a locked phone cannot let their own
-   * device in. Before Android 12, which cannot require that, Allow is left out and the owner
-   * allows it in the app.
+   * Tells about [ask], a device that wants this one's access code, with [copy]. A tap opens
+   * Settings › Sharing, the only place the owner allows it, so nobody holding a locked phone
+   * lets their own device in; Don't allow turns it away from here. [cancelPairing] withdraws it.
    */
   suspend fun showPairing(ask: PairingAsk, copy: NotificationCopy) {
     if (!manager.areNotificationsEnabled()) {
@@ -314,21 +312,13 @@ class AndroidNotifier(
       return
     }
     val tag = pairingTag(ask.id)
-    val allow = Res.string.pairing_request_allow.text().load()
     val deny = Res.string.pairing_request_deny.text().load()
-    val builder = builder(CHANNEL_PAIRING, copy)
+    val notification = builder(CHANNEL_PAIRING, copy)
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setTimeoutAfter(PAIRING_TIMEOUT_MS)
-      .setContentIntent(showIntent(tag))
+      .setContentIntent(sharingIntent(tag))
       .addAction(0, deny, pairingIntent(ask.id, ACTION_PAIRING_DENY))
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      builder.addAction(
-        NotificationCompat.Action.Builder(0, allow, pairingIntent(ask.id, ACTION_PAIRING_ALLOW))
-          .setAuthenticationRequired(true)
-          .build(),
-      )
-    }
-    val notification = builder.build()
+      .build()
     post(tag, ID_PAIRING, notification)
   }
 
@@ -431,6 +421,13 @@ class AndroidNotifier(
     return PendingIntent.getActivity(context, requestCode(tag, action), intent, FLAGS)
   }
 
+  private fun sharingIntent(tag: String): PendingIntent {
+    val intent = Intent(context, activity)
+      .setAction(ACTION_SHARING)
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    return PendingIntent.getActivity(context, requestCode(tag, ACTION_SHARING), intent, FLAGS)
+  }
+
   private fun messageIntent(tag: String, message: AppMessage): PendingIntent {
     val intent = Intent(context, activity)
       .setAction(ACTION_MESSAGE)
@@ -494,9 +491,6 @@ class AndroidNotifier(
     /** Channel of devices that want this one's access code. */
     const val CHANNEL_PAIRING: String = "pairing_requests"
 
-    /** Asks the service to let in the device of the pairing request in [pairingIdOf]. */
-    const val ACTION_PAIRING_ALLOW: String = "com.linroid.ketch.app.action.PAIRING_ALLOW"
-
     /** Asks the service to turn away the device of the pairing request in [pairingIdOf]. */
     const val ACTION_PAIRING_DENY: String = "com.linroid.ketch.app.action.PAIRING_DENY"
     /** Channel of the app's messages that wait for the user. */
@@ -522,6 +516,7 @@ class AndroidNotifier(
     private const val ACTION_SHOW = "com.linroid.ketch.app.action.SHOW"
     private const val ACTION_RETRY = "com.linroid.ketch.app.action.RETRY"
     private const val ACTION_MESSAGE = "com.linroid.ketch.app.action.MESSAGE"
+    private const val ACTION_SHARING = "com.linroid.ketch.app.action.SHARING"
     private const val ACTION_OPEN_FILE = "openFile"
     private const val EXTRA_TASK_KEY = "taskKey"
     private const val EXTRA_STATUS_FILTER = "statusFilter"
@@ -563,7 +558,10 @@ class AndroidNotifier(
       )
     }
 
-    /** The pairing request whose Allow or Don't allow started the service with [intent]. */
+    /** Whether [intent] comes from a tap on a pairing notification, which opens Sharing. */
+    fun opensSharing(intent: Intent?): Boolean = intent?.action == ACTION_SHARING
+
+    /** The pairing request whose Don't allow started the service with [intent]. */
     fun pairingIdOf(intent: Intent?): Long? =
       intent?.takeIf { it.hasExtra(EXTRA_PAIRING_ID) }?.getLongExtra(EXTRA_PAIRING_ID, 0L)
     /** The message whose notification was tapped to open [intent], or `null` when it is not one. */

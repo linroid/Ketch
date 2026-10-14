@@ -54,7 +54,6 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.connect.ConnectHost
-import com.linroid.ketch.app.ui.connect.PairingApprovalHost
 import com.linroid.ketch.app.ui.connect.ConnectLanding
 import com.linroid.ketch.app.ui.connections.ConnectionsScreen
 import com.linroid.ketch.app.ui.devices.DevicesScreen
@@ -299,7 +298,6 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     )
   }
   ConnectHost(appState)
-  PairingApprovalHost(appState)
   ReleaseNotesHost(appState)
 }
 

@@ -52,6 +52,7 @@ import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.ReleaseNotesRequest
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.TaskOrigin
@@ -165,6 +166,7 @@ import ketch.app.shared.generated.resources.notify_download_complete
 import ketch.app.shared.generated.resources.notify_download_failed
 import ketch.app.shared.generated.resources.notify_downloads_finished
 import ketch.app.shared.generated.resources.notify_on_device
+import ketch.app.shared.generated.resources.notify_pairing_title
 import ketch.app.shared.generated.resources.row_files
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -276,6 +278,12 @@ class AppState(
   /** AI discovery sessions, their searches and the requests to open websites they wait on. */
   val aiDiscover: AiDiscoverController =
     AiDiscoverController(aiSettings, scope, discoverHistory, clock, devices = ::discoverDevices)
+
+  /**
+   * Whether Settings › Sharing of this device shows its pairing requests in a window in front,
+   * as the page reports it; elsewhere a toast leads there.
+   */
+  var pairingRequestsShown by mutableStateOf(false)
 
   /** How many requests to open a website wait for the user's answer, for Discover's badge. */
   val discoverWaitingCount: Int get() = aiDiscover.approvals.size
@@ -613,6 +621,7 @@ class AppState(
       }
     }
     scope.launch { announceApprovals() }
+    scope.launch { announcePairingRequests() }
     scope.launch {
       incoming.failures.collect {
         postError(Res.string.feedback_open_failed.text(it.label), detail = it.reason)
@@ -902,6 +911,39 @@ class AppState(
         ).id
       }
     }
+  }
+
+  /**
+   * Posts a toast for each device that asks to pair with this one while Settings › Sharing does
+   * not show it in a window in front, with Review, which opens Sharing, where the owner answers.
+   * Once the request is answered or ends, or Sharing shows it, the toast leaves the screen and
+   * the activity history. The hosts notify about requests while the app is not in front
+   * ([com.linroid.ketch.app.feedback.PairingNotices]), so the toasts never do.
+   */
+  private suspend fun announcePairingRequests() {
+    val requests = instanceManager.pairingRequests
+    val toasts = mutableMapOf<Long, Long>()
+    combine(requests.pending, snapshotFlow { pairingRequestsShown }, ::Pair)
+      .collect { (asks, shown) ->
+        val waiting = asks.mapTo(HashSet()) { it.id }
+        toasts.keys.filter { it !in waiting || shown }.forEach { id ->
+          toasts.remove(id)?.let(messages::withdraw)
+        }
+        if (shown) return@collect
+        for (ask in asks) {
+          if (ask.id in toasts) continue
+          toasts[ask.id] = messages.post(
+            level = MessageLevel.Info,
+            title = Res.string.notify_pairing_title.text(ask.name, localDeviceNounInSentence()),
+            actions = listOf(
+              MessageAction(Res.string.action_review.text()) {
+                openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+              },
+            ),
+            toast = ToastMode.Sticky,
+          ).id
+        }
+      }
   }
 
   /** Shows [key] in the inspector, or clears it with `null`. */

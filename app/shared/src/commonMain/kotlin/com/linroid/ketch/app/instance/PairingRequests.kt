@@ -54,18 +54,4 @@ class PairingRequests {
   fun answer(id: Long, allow: Boolean) {
     state.value.firstOrNull { it.id == id }?.answer?.complete(allow)
   }
-
-  /**
-   * Calls [onArrived] for each request that starts waiting and [onLeft] with the id of each that
-   * stops, answered or withdrawn, until cancelled; for notifications about them.
-   */
-  suspend fun watch(onArrived: suspend (PairingAsk) -> Unit, onLeft: (Long) -> Unit) {
-    var waiting = emptySet<Long>()
-    pending.collect { asks ->
-      val ids = asks.mapTo(HashSet()) { it.id }
-      (waiting - ids).forEach(onLeft)
-      asks.filter { it.id !in waiting }.forEach { onArrived(it) }
-      waiting = ids
-    }
-  }
 }

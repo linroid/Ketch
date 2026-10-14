@@ -41,21 +41,4 @@ class PairingRequestsTest {
 
     assertEquals(emptyList(), requests.pending.value)
   }
-
-  @Test
-  fun watch_reportsRequestsAsTheyArriveAndLeave() = runTest {
-    val requests = PairingRequests()
-    val arrived = mutableListOf<String>()
-    val left = mutableListOf<Long>()
-    backgroundScope.launch { requests.watch({ arrived += it.name }, { left += it }) }
-    backgroundScope.launch { requests.ask("Pixel 9", "4821", null, "192.168.1.30") }
-    runCurrent()
-    val ask = requests.pending.value.single()
-
-    requests.answer(ask.id, allow = true)
-    runCurrent()
-
-    assertEquals(listOf("Pixel 9"), arrived)
-    assertEquals(listOf(ask.id), left)
-  }
 }

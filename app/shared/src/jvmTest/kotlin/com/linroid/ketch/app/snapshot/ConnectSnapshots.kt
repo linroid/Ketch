@@ -18,7 +18,7 @@ import com.linroid.ketch.app.ui.connect.ConnectForm
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
 import com.linroid.ketch.app.ui.connect.DeviceConnector
 import com.linroid.ketch.app.ui.connect.NearbySearch
-import com.linroid.ketch.app.ui.connect.PairingApprovalDialog
+import com.linroid.ketch.app.ui.connect.PairingRequestCard
 import com.linroid.ketch.app.ui.connect.PairingClient
 import com.linroid.ketch.app.ui.connect.PairingDialog
 import com.linroid.ketch.app.ui.connect.ProbeResult
@@ -163,7 +163,7 @@ class ConnectSnapshots {
       SnapshotSize.Desktop to SnapshotTheme.Dark,
       SnapshotSize.Phone to SnapshotTheme.Light,
     )) {
-      snapshot("pairing-request", size, theme) { PairingApprovalDialog(ask, onAnswer = {}) }
+      snapshot("pairing-request", size, theme) { PairingRequestCard(ask, onAnswer = {}) }
     }
   }
 

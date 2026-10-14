@@ -39,6 +39,7 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessageNotifications
+import com.linroid.ketch.app.feedback.PairingNotices
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.NotificationLink
@@ -530,8 +531,16 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val activityEvents = remember {
     reportDesktopActivity(controller, notifier, successFeedback, ::inFront)
   }
-  // Pairing requests ask in the main window; from the tray while it is not in front.
-  remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
+  // Pairing requests are answered in Settings › Sharing; the tray tells about them while the
+  // app is not in front.
+  LaunchedEffect(controller, notifier) {
+    PairingNotices.follow(
+      requests = controller.instanceManager.pairingRequests,
+      inFront = snapshotFlow { inFront() },
+      post = { ask -> notifier.postPairing(pairingNotificationCopy(ask)) },
+      withdraw = {},
+    )
+  }
   remember { keepAwake(controller) }
   LaunchedEffect(controller, notifier) {
     // Such as Discover waiting for an OK, which would wait unseen while the window is away.
@@ -914,6 +923,9 @@ private suspend fun openNotification(
       behavior.showWindow()
       MessageNotifications.open(controller.messages, click.id, click.postedAt)
     }
+    // Settings opens in a window of its own.
+    NotificationClick.Pairing ->
+      controller.state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
     NotificationClick.App -> behavior.showWindow()
   }
 }
@@ -1043,23 +1055,6 @@ private fun reportDesktopActivity(
     }
   }
   return toasts.receiveAsFlow()
-}
-
-/**
- * Posts a notification from the tray for each pairing request that arrives while the main window
- * is not [inFront], where the app asks about it, so the owner comes to answer.
- */
-private fun notifyPairingRequests(
-  controller: AppController,
-  notifier: TrayNotifier,
-  inFront: () -> Boolean,
-) {
-  controller.scope.launch {
-    controller.instanceManager.pairingRequests.watch(
-      onArrived = { ask -> if (!inFront()) notifier.post(pairingNotificationCopy(ask)) },
-      onLeft = {},
-    )
-  }
 }
 
 /**

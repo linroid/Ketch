@@ -49,6 +49,7 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.ui.connect.PairingRequestCards
 import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.state.portError
 import com.linroid.ketch.app.theme.KetchTheme
@@ -152,6 +153,7 @@ fun SharingSettings(state: AppState, device: InstanceEntry) {
     manager.stopServer()
     manager.startServer()
   }
+  PairingRequestCards(state)
   PairCard(
     name = device.label,
     serverState = serverState,

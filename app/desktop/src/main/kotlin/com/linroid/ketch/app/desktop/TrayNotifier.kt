@@ -32,7 +32,10 @@ internal sealed interface NotificationClick {
   /** The notification of the app message [id], posted at [postedAt]. */
   data class Message(val id: Long, val postedAt: Instant) : NotificationClick
 
-  /** A notification about nothing in particular, such as a pairing request: shows the window. */
+  /** A notification about a device asking to pair: opens Settings › Sharing, which answers. */
+  data object Pairing : NotificationClick
+
+  /** A notification about nothing in particular: shows the window. */
   data object App : NotificationClick
 }
 
@@ -102,12 +105,14 @@ class TrayNotifier(
   // A tray notification stays until the system hides it.
   override fun withdraw(id: Long) = Unit
 
-  /**
-   * Posts [copy], which is about no [ActivityEvent], such as a pairing request; clicking it shows
-   * the window.
-   */
+  /** Posts [copy], which is about no [ActivityEvent]; clicking it shows the window. */
   fun post(copy: NotificationCopy, type: Notification.Type = Notification.Type.Info) {
     post(copy, type, NotificationClick.App, "app")
+  }
+
+  /** Posts [copy], about a device asking to pair; clicking it opens Settings › Sharing. */
+  fun postPairing(copy: NotificationCopy) {
+    post(copy, Notification.Type.Info, NotificationClick.Pairing, "pairing")
   }
 
   /**

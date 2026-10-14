@@ -47,7 +47,9 @@ import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
+import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.config.AppearanceConfig
 import kotlinx.coroutines.Job
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
   private val model: MainModel by viewModels()
   private var notificationLink: NotificationLink? by mutableStateOf(null)
   private var messageTap: MessageTap? by mutableStateOf(null)
+  private var sharingRequested by mutableStateOf(false)
   private val ketchApplication get() = application as KetchApplication
   private val requestNotificationPermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
@@ -129,6 +132,12 @@ class MainActivity : ComponentActivity() {
         MessageNotifications.open(controller.messages, tap.id, tap.postedAt)
         messageTap = null
       }
+      val sharing = sharingRequested
+      LaunchedEffect(controller, sharing) {
+        if (!sharing) return@LaunchedEffect
+        controller.state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+        sharingRequested = false
+      }
       CompositionLocalProvider(LocalAppUpdates provides model.updates) {
         App(
           controller,
@@ -161,6 +170,10 @@ class MainActivity : ComponentActivity() {
    * handled: a `.torrent` file, a `magnet:` link or a `ketch://pair` link.
    */
   private fun handleIntent(intent: Intent?) {
+    if (AndroidNotifier.opensSharing(intent)) {
+      sharingRequested = true
+      return
+    }
     val tap = AndroidNotifier.messageTapOf(intent)
     if (tap != null) {
       messageTap = tap
