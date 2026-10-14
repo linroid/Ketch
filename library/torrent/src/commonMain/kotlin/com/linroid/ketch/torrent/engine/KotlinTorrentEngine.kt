@@ -218,8 +218,11 @@ internal class KotlinTorrentEngine(
   }
   private val connectionBudget = TorrentConnectionBudget(utpFallback, config.maxConnections)
   private val network = TorrentPeerEncryption(connectionBudget, config.encryption)
-  // A quarter of the budget for handshakes still to name their torrent; the rest stays free.
-  private val handshakes = TorrentHandshakeGate({ (connectionBudget.limit / 4).coerceIn(8, 64) })
+  // Handshakes still to name their torrent: a quarter of the budget (8 to 64), never more than
+  // half, so dials always find slots, even under a budget of one.
+  private val handshakes = TorrentHandshakeGate({
+    minOf((connectionBudget.limit / 4).coerceIn(8, 64), connectionBudget.limit / 2)
+  })
   private val udpMutex = Mutex()
   // Guarded by udpMutex.
   private val udpPorts = mutableMapOf<String, TorrentUdpPort>()

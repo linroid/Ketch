@@ -207,9 +207,12 @@ internal class UtpSocket private constructor(
     flush(now)
   }
 
-  /** [ack] names a packet of ours: from just before [firstSeq] to the last one sent. */
+  /**
+   * [ack] names our stream: from just before [firstSeq], as libtorrent and our dialers ack the
+   * SYN answer, through [seqNr], as BEP 29 has the initiator ack its sequence.
+   */
   private fun acknowledgesOurStream(ack: Int): Boolean =
-    ((ack - utpSeq(firstSeq, -1)) and 0xffff) <= ((seqNr - firstSeq) and 0xffff)
+    ((ack - utpSeq(firstSeq, -1)) and 0xffff) <= ((seqNr - firstSeq) and 0xffff) + 1
 
   /** Retransmits on timeout, keeps the mapping alive and closes; call often (every 100 ms). */
   fun tick(now: Long) {

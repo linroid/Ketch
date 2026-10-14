@@ -785,7 +785,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   that take part carry the BEP 11 flag `0x08`, and the swarm summary counts relays, requests
   and connects. V2 and hybrid sessions do not punch yet
 - Incoming connections still in their handshake (`dispatchIncoming`, 15 s) pass
-  `TorrentHandshakeGate`: a quarter of the connection budget (8 to 64) at once and 4 per host
+  `TorrentHandshakeGate`: a quarter of the connection budget (8 to 64, at most half) at once
+  and 4 per host
   (an IPv6 /64; loopback only counts against the total), so peers that connect and send nothing
   never take the slots our dials need
 - Public v2/hybrid download, selection, limits, pause/resume and TaskStore restart are implemented.

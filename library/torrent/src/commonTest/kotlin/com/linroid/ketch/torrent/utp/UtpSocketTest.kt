@@ -272,6 +272,22 @@ class UtpSocketTest {
   }
 
   @Test
+  fun accepted_confirmsOnAnAckOfTheAnswersOwnSequence() {
+    // BEP 29 initiators ack the STATE's sequence itself, libtorrent the one before it.
+    val syn = UtpPacket(UtpType.SYN, 7, 0, 0, 1_000_000, 1, 0)
+    val socket = UtpSocket.accept(syn, {}, 0, UtpOptions(), initialSeq = 100)
+
+    socket.receive(UtpPacket(UtpType.DATA, 8, 0, 0, 1_000_000, 2, 101,
+      payload = ByteArray(10)), 0)
+    assertFalse(socket.confirmed)
+    socket.receive(UtpPacket(UtpType.DATA, 8, 0, 0, 1_000_000, 2, 100,
+      payload = ByteArray(10)), 0)
+
+    assertTrue(socket.confirmed)
+    assertEquals(10L, socket.available)
+  }
+
+  @Test
   fun dialer_acknowledgesTheAnswerAtOnce_soTheResponderConfirms() {
     val network = Network()
     val a = network.connect()
