@@ -11,6 +11,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
@@ -72,6 +74,14 @@ class AuthThrottleTest {
     assertNotNull(right.headers[HttpHeaders.RetryAfter])
     // Requests without a token are not throttled, so they get the usual challenge.
     assertEquals(HttpStatusCode.Unauthorized, client.get("/api/status").status)
+  }
+
+  @Test
+  fun `Retry-After rounds the wait up to whole seconds`() {
+    assertEquals(30, retryAfterSeconds(29.2.seconds))
+    assertEquals(30, retryAfterSeconds(30.seconds))
+    assertEquals(1, retryAfterSeconds(100.milliseconds))
+    assertEquals(1, retryAfterSeconds(Duration.ZERO))
   }
 
   private companion object {

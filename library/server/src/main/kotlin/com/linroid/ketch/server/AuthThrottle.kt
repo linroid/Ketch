@@ -10,8 +10,10 @@ import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import java.security.MessageDigest
+import kotlin.math.ceil
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.DurationUnit
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
@@ -77,16 +79,24 @@ internal fun authThrottling(throttle: AuthThrottle): ApplicationPlugin<Unit> =
       val address = call.request.origin.remoteAddress
       val wait = throttle.retryAfter(address) ?: return@onCall
       log.w { "Refused a token from $address: too many wrong tokens" }
-      call.response.header(HttpHeaders.RetryAfter, wait.inWholeSeconds.coerceAtLeast(1))
+      val seconds = retryAfterSeconds(wait)
+      call.response.header(HttpHeaders.RetryAfter, seconds)
       call.respond(
         HttpStatusCode.TooManyRequests,
         ErrorResponse(
           "too_many_attempts",
-          "Too many wrong access tokens; try again in ${wait.inWholeSeconds.coerceAtLeast(1)}s",
+          "Too many wrong access tokens; try again in ${seconds}s",
         ),
       )
     }
   }
+
+/**
+ * [wait] as the whole seconds of a `Retry-After` header: rounded up, so a client that waits as
+ * long as it is told is not turned away again, and at least one.
+ */
+internal fun retryAfterSeconds(wait: Duration): Long =
+  ceil(wait.toDouble(DurationUnit.SECONDS)).toLong().coerceAtLeast(1)
 
 /**
  * Checks bearer tokens against [expected] in time that does not depend on where they differ,
