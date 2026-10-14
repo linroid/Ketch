@@ -256,6 +256,8 @@ internal class TorrentV2Uploader private constructor(
     peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>,
   ) {
     loading.remove(result.index)
+    // The read is over: a later one of this piece is paid again, whoever asks.
+    for (view in peers.values) if (view.paidRead == result.index) view.paidRead = -1
     when (val outcome = result.outcome) {
       is TorrentV2PieceStore.ReadOutcome.Read -> {
         cache.put(result.index, outcome.buffer)

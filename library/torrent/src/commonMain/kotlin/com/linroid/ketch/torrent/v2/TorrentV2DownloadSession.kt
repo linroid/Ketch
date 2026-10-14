@@ -655,11 +655,12 @@ internal class TorrentV2DownloadSession private constructor(
           TorrentV2CommitWorker.run(store) { worker ->
             // Proofs above the piece layer are cached per file, charged to the session state. A
             // piece read back to prove its blocks, and every answer, is upload work: both upload
-            // limits pay for it.
+            // limits admit and pay for it.
             val hashServer = TorrentV2HashServer(document, layout, memory,
               canRead = { runtime.uploadRate.canCharge(uploadRate) },
               chargeRead = { bytes -> runtime.uploadRate.charge(bytes, uploadRate) },
-              chargeAnswer = { bytes -> runtime.uploadRate.charge(bytes, uploadRate) })
+              chargeAnswer = { bytes -> runtime.uploadRate.charge(bytes, uploadRate) },
+              canAnswer = { runtime.uploadRate.canCharge(uploadRate) })
             // What peers ask of us, pieces and proofs alike, stays within the upload partition.
             TorrentV2ServeWorker.run(store, hashServer, runtime.uploadBuffers) { serve ->
               TorrentV2SessionLoop.download(layout, store.selectedIds(), store, pool, worker,

@@ -115,9 +115,12 @@ internal fun peerHashProof(
  * repeated requests never read a piece again. Reading one back is upload work: [canRead] is
  * asked first and, when it refuses, the request is rejected without reading; a piece that was
  * read pays its bytes to [chargeRead], and a read that fails or never happens pays nothing.
- * Every answer pays its bytes to [chargeAnswer], so hashes count against the upload limits. Each [respond] also does at most the work its caller allows, in bytes
+ * Every answer is asked of [canAnswer] first and pays its bytes to [chargeAnswer], so hashes
+ * stay within the upload limits. Each [respond] also does at most the work its caller allows, in bytes
  * read back and hashes folded ([PeerServeCredit.HASH_COST] each), and reports what it did in
- * [lastWork], so a peer pays for the work its requests cause. One caller at a time (the serve
+ * [lastWork], so a peer pays for the work its requests cause. Building a file's cached levels is
+ * the one exception: it may run past the limit, as long as some is left, and the peer owes the
+ * rest, since a file whose levels could never be built could never be proved. One caller at a time (the serve
  * worker).
  */
 internal class TorrentV2HashServer(
@@ -130,6 +133,7 @@ internal class TorrentV2HashServer(
   private val canRead: suspend () -> Boolean = { true },
   private val chargeRead: suspend (bytes: Long) -> Unit = {},
   private val chargeAnswer: suspend (bytes: Long) -> Unit = {},
+  private val canAnswer: suspend () -> Boolean = { true },
 ) {
   private class Upper(
     /** Nodes from the cache's first level up to the root's, each level's hashes in a row. */
@@ -183,6 +187,7 @@ internal class TorrentV2HashServer(
     check(!closed) { "Hash server is closed" }
     lastWork = 0
     workLimit = maxWork
+    if (!canAnswer()) return null
     val answer = try {
       prove(selector, bounds, piece)
     } catch (_: WorkLimitException) {
@@ -290,6 +295,9 @@ internal class TorrentV2HashServer(
     }
     if (lease == null) return null
     try {
+      // Folding the piece layer once, then each level above it; owed past the limit (see above).
+      if (lastWork >= workLimit) throw WorkLimitException()
+      lastWork += (pieces + sizes.sum()) * PeerServeCredit.HASH_COST
       val levels = mutableListOf<ByteString>()
       var row = (0 until sizes.first()).map { fold(layer, bounds.pieceLayer, from, it) }
       for (level in from..bounds.height) {

@@ -313,6 +313,43 @@ class PeerHashServingTest {
   }
 
   @Test
+  fun buildingTheCachedLevels_isWorkThePeerOwes() = runTest {
+    // Levels from 4 come from the cache; level 5 needs it.
+    val server = TorrentV2HashServer(document, layout, TorrentBufferBudget(1_000_000),
+      groupBits = 2)
+    val selector = selector(0, 5, 0, 8, 2)
+    val bounds = assertNotNull(peerHashServeBounds(document, layout, selector))
+
+    // Nothing left: the levels are not built.
+    assertNull(server.respond(selector, bounds, maxWork = 0, piece = reader()))
+    assertEquals(0, server.cacheBytes)
+    // Some left: built whatever they take, and owed.
+    assertNotNull(server.respond(selector, bounds, maxWork = 64, piece = reader()))
+    val built = server.lastWork
+    assertTrue(built >= 38 * PeerServeCredit.HASH_COST, "work $built")
+    // Built once: the next answer costs nothing more.
+    assertNotNull(server.respond(selector, bounds, maxWork = 64, piece = reader()))
+    assertEquals(0, server.lastWork)
+    server.close()
+  }
+
+  @Test
+  fun refusedByTheUploadLimits_answersNothingAndPaysNothing() = runTest {
+    var admit = false
+    val answers = mutableListOf<Long>()
+    val server = TorrentV2HashServer(document, layout, TorrentBufferBudget(1_000_000),
+      canAnswer = { admit }, chargeAnswer = { answers += it })
+    val selector = selector(0, 2, 0, 32, 5)
+
+    assertNull(serve(server, selector))
+    assertTrue(answers.isEmpty())
+    admit = true
+    assertEquals(expected(0, selector), serve(server, selector))
+    assertEquals(1, answers.size)
+    server.close()
+  }
+
+  @Test
   fun rejectsCrossPieceBlockRange() {
     // Leaves 0 to 7 belong to pieces 0 and 1.
     assertNull(peerHashServeBounds(document, layout, selector(0, 0, 0, 8, 4)))

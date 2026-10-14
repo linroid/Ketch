@@ -22,7 +22,8 @@ import com.linroid.ketch.torrent.v2.peer.peerHashServeBounds
  * work the limits pay for, and the work it takes, folding hashes and reading pieces back, comes
  * out of the peer's [TorrentV2PeerView.serveCredit]: each request reserves at most
  * [MAX_PROOF_WORK] of it (and a piece more below the piece layer), gives back what the worker
- * did not use, and is rejected once the peer has spent its share. Peers wait for an answer to
+ * did not use or owes what building a file's cached levels took past it, and is rejected once
+ * the peer has spent its share. Peers wait for an answer to
  * every request, so answers the actor has no room for yet wait in the peer's view, in order, and
  * go out on later passes.
  */
@@ -56,9 +57,12 @@ internal class TorrentV2HashRequests(
     }
     val wanted = MAX_PROOF_WORK + if (bounds.blockPath) layout.pieceLength else 0
     val maxWork = minOf(view.serveCredit.available, wanted)
-    if (maxWork < PeerServeCredit.HASH_COST || !view.serveCredit.tryCharge(maxWork) ||
-      !checkNotNull(serve).trySubmit(
+    if (maxWork < PeerServeCredit.HASH_COST || !view.serveCredit.tryCharge(maxWork)) {
+      return reject(view, selector)
+    }
+    if (!checkNotNull(serve).trySubmit(
         TorrentV2ServeWorker.Job.Proof(peer, selector, bounds, maxWork))) {
+      view.serveCredit.refund(maxWork)
       return reject(view, selector)
     }
     view.hashPending++
@@ -75,7 +79,7 @@ internal class TorrentV2HashRequests(
       result.close()
       return TorrentV2Uploader.Verdict.KEEP
     }
-    view.serveCredit.refund(result.maxWork - result.work)
+    settle(view, result.maxWork, result.work)
     return answer(view, result.command())
   }
 
@@ -85,7 +89,7 @@ internal class TorrentV2HashRequests(
     peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>,
   ): TorrentV2Uploader.Verdict {
     val view = peers[result.peer] ?: return TorrentV2Uploader.Verdict.KEEP
-    view.serveCredit.refund(result.maxWork - result.work)
+    settle(view, result.maxWork, result.work)
     answered(view)
     return reject(view, result.selector)
   }
@@ -112,6 +116,12 @@ internal class TorrentV2HashRequests(
   /** Some peer has answers waiting for room in its actor's queue. */
   fun waiting(peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>): Boolean =
     peers.values.any { it.hashAnswers.isNotEmpty() }
+
+  /** Gives back what a proof reserved and did not use, or charges what it owed past it. */
+  private fun settle(view: TorrentV2PeerView, reserved: Long, work: Long) {
+    if (work <= reserved) view.serveCredit.refund(reserved - work)
+    else view.serveCredit.charge(work - reserved)
+  }
 
   private fun answered(view: TorrentV2PeerView) {
     check(view.hashPending > 0) { "Unknown hash answer" }
