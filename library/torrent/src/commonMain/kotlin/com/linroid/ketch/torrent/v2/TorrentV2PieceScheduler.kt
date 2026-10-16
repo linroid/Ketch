@@ -171,7 +171,7 @@ internal class TorrentV2PieceScheduler private constructor(
    * piece left is being fetched, a piece peers assemble that no web seed fetches yet; whichever
    * verifies it first stores it. Null when there is none, or no buffer is free.
    */
-  fun claimWebSeed(): WebSeedClaim? {
+  fun claimWebSeed(eligible: (Int) -> Boolean = { true }): WebSeedClaim? {
     check(!closed)
     var free = -1
     var anyFree = false
@@ -179,7 +179,7 @@ internal class TorrentV2PieceScheduler private constructor(
     val count = verified.size
     for (step in 0 until count) {
       val index = (webSeedCursor + step) % count
-      if (!wanted[index] || verified[index]) continue
+      if (!wanted[index] || verified[index] || !eligible(index)) continue
       if (!isBusy(index)) {
         anyFree = true
         if (activeCount < maxActive) free = index
@@ -209,14 +209,16 @@ internal class TorrentV2PieceScheduler private constructor(
    * the [fetchers] (peers and seeds), and its later pieces only buffers that leave half the budget
    * free and active slots below the limit, so peers keep pieces to fetch and buffers to fetch them
    * with. An endgame duplicate is never extended, and the cursor stays on the run's first piece,
-   * so pieces a failed run gives back are fetched next. Empty when there is nothing to fetch.
+   * so pieces a failed run gives back are fetched next. Only pieces [eligible] accepts, those the
+   * seed can serve, are claimed. Empty when there is nothing to fetch.
    */
   fun claimWebSeedRun(
     fetchers: Int,
     maxPieces: Int = WEB_SEED_RUN_PIECES,
     maxBytes: Int = WEB_SEED_RUN_BYTES,
+    eligible: (Int) -> Boolean = { true },
   ): List<WebSeedClaim> {
-    val first = claimWebSeed() ?: return emptyList()
+    val first = claimWebSeed(eligible) ?: return emptyList()
     // A duplicate of a piece peers assemble: the endgame.
     if (first.index in assemblies) return listOf(first)
     val run = mutableListOf(first)
@@ -225,7 +227,8 @@ internal class TorrentV2PieceScheduler private constructor(
     var bytes = first.bytes.size
     var index = first.index + 1
     while (run.size < minOf(maxPieces, share) && index < verified.size) {
-      if (!wanted[index] || verified[index] || isBusy(index) || activeCount >= maxActive) break
+      if (!wanted[index] || verified[index] || isBusy(index) || activeCount >= maxActive ||
+        !eligible(index)) break
       val length = layout.v2Piece(index.toLong()).length.toInt()
       val reserved = length + 512
       if (bytes + length > maxBytes ||

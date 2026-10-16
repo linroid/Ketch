@@ -157,9 +157,9 @@ class TorrentV2WebSeedTest {
       for ((url, range) in mirror.requests) {
         assertTrue(checkNotNull(range).last < mirrorFiles(fixture).getValue(url).size)
       }
-      // Every piece in one run: a range request per file, each file whole.
-      assertEquals(files.indices.map { 0L..<files[it].second.toLong() },
-        mirror.requests.map { it.second })
+      // Every piece in one run: a range request per file, each file whole, side by side.
+      assertEquals(files.indices.map { 0L..<files[it].second.toLong() }.sortedBy { it.last },
+        mirror.requests.map { checkNotNull(it.second) }.sortedBy { it.last })
       // Mirrors pay the task's limit as peers do.
       assertEquals(files.sumOf { it.second }.toLong(), run.throttled)
     }
@@ -265,7 +265,9 @@ class TorrentV2WebSeedTest {
     download(fixture, mirror) { run ->
       assertEquals(TorrentSessionState.STOPPED, run.state)
       assertIs<IllegalStateException>(run.failure)
-      assertEquals(WebSeedWorker.MAX_FAILURES, mirror.requests.size)
+      // Each missing file is asked once; the seed goes once nothing is left it can serve.
+      assertTrue(mirror.requests.size <= WebSeedWorker.MAX_FAILURES)
+      assertEquals(mirror.requests.size, mirror.requests.map { it.first }.toSet().size)
     }
   }
 

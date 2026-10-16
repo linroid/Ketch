@@ -190,6 +190,19 @@ internal class TorrentPieceScheduler(
     searches.remove(peer)
   }
 
+  /** [peer] no longer has [indices]: a web seed that cannot serve them. */
+  suspend fun withdraw(peer: Int, indices: Collection<Int>): Unit = mutex.withLock {
+    val pieces = availability[peer] ?: return@withLock
+    for (index in indices) {
+      if (index !in 0 until pieceCount || !pieces[index]) continue
+      pieces[index] = false
+      rarity[index]--
+      held[peer] = (held[peer] ?: 1) - 1
+      if (wanted[index] && !verified[index]) wantedFrom[peer] = (wantedFrom[peer] ?: 1) - 1
+    }
+    searches.remove(peer)
+  }
+
   /**
    * Applies a single HAVE without rebuilding this peer's availability. A peer may announce
    * before any bitfield, and may repeat announcements, so absent state starts empty and a
@@ -347,10 +360,12 @@ internal class TorrentPieceScheduler(
    */
   suspend fun claimRun(peer: Int, maxPieces: Int, maxBytes: Int): List<Claim> = mutex.withLock {
     check(peer !in claims)
+    // A seed has every piece but those it could not serve ([withdraw]).
+    val has = availability[peer]
     var first = -1
     for (index in 0 until pieceCount) {
       if (wanted[index] && !verified[index] && openPieces[index] == null &&
-        seedOwned[index] == 0) {
+        seedOwned[index] == 0 && has?.get(index) != false) {
         first = index
         break
       }
@@ -358,7 +373,7 @@ internal class TorrentPieceScheduler(
     if (first < 0 && remaining <= availability.size) {
       for (index in 0 until pieceCount) {
         val fetchers = seedOwned[index] + if (openPieces[index] != null) 1 else 0
-        if (wanted[index] && !verified[index] && fetchers < 2) {
+        if (wanted[index] && !verified[index] && fetchers < 2 && has?.get(index) != false) {
           first = index
           break
         }
@@ -375,7 +390,7 @@ internal class TorrentPieceScheduler(
     var index = first + 1
     while (run.size < minOf(maxPieces, share) && index < pieceCount) {
       if (!wanted[index] || verified[index] || openPieces[index] != null ||
-        seedOwned[index] > 0) break
+        seedOwned[index] > 0 || has?.get(index) == false) break
       val size = pieceSize(index)
       if (bytes + size > maxBytes ||
         budget.capacity - budget.allocated - size < budget.capacity / 2) break

@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.ConnectionDirection
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.torrent.RecordingConnections
 import com.linroid.ketch.torrent.crypto.sha1Digest
@@ -19,11 +20,17 @@ import com.linroid.ketch.torrent.storage.torrentFileSystem
 import com.linroid.ketch.torrent.v1.TorrentSwarm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.FileSystem
+import okio.IOException
 import okio.Path
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -183,21 +190,26 @@ class TorrentWebSeedTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         val mirror = MirrorEngine(mirrorFiles)
+        val overlap = OverlapEngine(mirror)
         // Without a trailing slash, the URL still names the folder.
         withStore(multiFile("http://mirror.test/pub")) { store, output ->
-          runSwarm(store, mirror)
+          runSwarm(store, overlap)
           assertTrue(store.completed())
           for ((path, bytes) in parts) {
             assertContentEquals(bytes, torrentFileSystem.read(output / path) { readByteArray() })
           }
           // The empty file is never asked for.
           assertTrue(mirror.requests.none { it.first.endsWith("/empty") })
-          // One run over every piece: a range request per file, each file whole.
-          assertEquals(listOf(
-            "http://mirror.test/pub/my%20set/a%20b.bin" to 0L..19_999L,
+          // One run over every piece: a range request per file, each file whole. The first goes
+          // alone; once the mirror answers, the others go out together.
+          assertEquals("http://mirror.test/pub/my%20set/a%20b.bin" to 0L..19_999L,
+            mirror.requests.first())
+          assertEquals(setOf(
             "http://mirror.test/pub/my%20set/dir/%C3%BCn%C3%AF.bin" to 0L..29_999L,
             "http://mirror.test/pub/my%20set/c.bin" to 0L..39_999L,
-          ), mirror.requests)
+          ), mirror.requests.drop(1).toSet())
+          assertEquals(3, mirror.requests.size)
+          assertEquals(2, overlap.most)
         }
       }
     }
@@ -386,14 +398,78 @@ class TorrentWebSeedTest {
         val mirror = MirrorEngine(emptyMap(), missing = setOf("http://mirror.test/data"))
         withStore(metadata) { store, _ ->
           assertFailsWith<IllegalStateException> { runSwarm(store, mirror) }
-          assertEquals(WebSeedWorker.MAX_FAILURES, mirror.requests.size)
+          // The file is missing: asked once, the seed has nothing left it can serve.
+          assertEquals(1, mirror.requests.size)
           assertFalse(store.completed())
         }
       }
     }
   }
 
+  @Test
+  fun staleFile_isLeftToTheOtherSeed() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        // One mirror has since lost c.bin, as archive.org items lose regenerated files.
+        val stale = "http://mirror.test/pub/my%20set/c.bin"
+        val partial = MirrorEngine(mirrorFiles, missing = setOf(stale))
+        val full = MirrorEngine(mirrorFiles)
+        val seeds = listOf("http://mirror0.test/pub", "http://mirror1.test/pub")
+        withStore(multiFile(seeds)) { store, output ->
+          runSwarm(store, partial, full)
+          assertTrue(store.completed())
+          for ((path, bytes) in parts) {
+            assertContentEquals(bytes, torrentFileSystem.read(output / path) { readByteArray() })
+          }
+          // Never asked for the lost file again.
+          assertTrue(partial.requests.count { it.first == stale } <= 1)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun unservable_onlyLastingAnswersAndCorruptPieces() {
+    val pieces = setOf(3, 4)
+    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, KetchError.Http(404))))
+    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, KetchError.Http(416))))
+    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, KetchError.Unsupported())))
+    assertEquals(setOf(7), unservable(CorruptWebSeedPiece(7)))
+    // A busy server, a timeout or a dropped connection may pass.
+    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, KetchError.Http(503))))
+    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, KetchError.Network())))
+    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces,
+      IOException("Web seed response ended early"))))
+  }
+
   private companion object {
     const val PIECE = 16_384
+  }
+}
+
+/** Holds each request of [engine] a moment, counting the most that were under way at once. */
+@OptIn(ExperimentalAtomicApi::class)
+private class OverlapEngine(private val engine: HttpEngine) : HttpEngine by engine {
+  private val running = AtomicInt(0)
+  private val peak = AtomicInt(0)
+  val most: Int get() = peak.load()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    val now = running.incrementAndFetch()
+    while (true) {
+      val seen = peak.load()
+      if (now <= seen || peak.compareAndSet(seen, now)) break
+    }
+    try {
+      delay(200)
+      engine.download(url, range, headers, onData)
+    } finally {
+      running.decrementAndFetch()
+    }
   }
 }

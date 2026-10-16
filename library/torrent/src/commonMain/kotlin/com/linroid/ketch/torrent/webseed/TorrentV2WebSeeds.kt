@@ -16,6 +16,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Maps v2 and hybrid pieces onto the files of one web seed (BEP 19). A v2 piece lies in a single
@@ -69,6 +71,7 @@ internal class WebSeedV2Layout private constructor(
  * seed reports each piece [Event.Done] once the store verified and wrote it, or gave it back. The
  * store verifies a mirror's piece against the piece layers as it does a peer's.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2WebSeeds private constructor(
   private val layouts: List<WebSeedV2Layout>,
   val urls: List<String>,
@@ -93,8 +96,14 @@ internal class TorrentV2WebSeeds private constructor(
     })
   }
 
+  // The pieces each seed cannot serve, which its workers report and the loop reads.
+  private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
+
   /** What the seeds tell the session loop. */
   val updates: ReceiveChannel<Event> get() = events
+
+  /** Whether [seed] may be asked for piece [index]: false once it could not serve it. */
+  fun serves(seed: Int, index: Int): Boolean = index !in unservable[seed].load()
 
   sealed interface Event {
     /** [seed] waits for a piece. */
@@ -177,6 +186,14 @@ internal class TorrentV2WebSeeds private constructor(
     override suspend fun release(piece: TorrentV2PieceScheduler.WebSeedClaim, verified: Boolean) {
       events.trySend(Event.Done(seed, piece.index, verified))
       piece.lease.close()
+    }
+
+    override suspend fun unavailable(indices: Set<Int>) {
+      val pieces = unservable[seed]
+      while (true) {
+        val current = pieces.load()
+        if (pieces.compareAndSet(current, current + indices)) break
+      }
     }
 
     override suspend fun stop() {

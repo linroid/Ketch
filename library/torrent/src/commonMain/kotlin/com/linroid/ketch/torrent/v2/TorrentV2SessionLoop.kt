@@ -338,11 +338,12 @@ internal object TorrentV2SessionLoop {
         }
         if (mirrors != null && idleMirrors.isNotEmpty() && !complete &&
           (pieces.version != mirrorVersion || nowMs() >= mirrorRetryAt)) {
-          while (idleMirrors.isNotEmpty()) {
-            // Runs leave their share of the free pieces to the peers and the other seeds.
-            val run = pieces.claimWebSeedRun(fetchers = peers.size + mirrorsRunning)
-            if (run.isEmpty()) break
-            val seed = idleMirrors.first()
+          for (seed in idleMirrors.toList()) {
+            // Runs leave their share of the free pieces to the peers and the other seeds, and
+            // skip those this seed could not serve.
+            val run = pieces.claimWebSeedRun(fetchers = peers.size + mirrorsRunning,
+              eligible = { mirrors.serves(seed, it) })
+            if (run.isEmpty()) continue
             idleMirrors.remove(seed)
             if (!mirrors.assign(seed, run)) for (claim in run) {
               claim.lease.close()
