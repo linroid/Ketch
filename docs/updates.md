@@ -243,9 +243,21 @@ handed to Android's installer through a private FileProvider with a temporary re
 
 Build the GitHub APK with `:app:android:assembleDirectRelease` and the Play bundle with
 `:app:android:bundlePlayRelease`. The release workflow ships the direct APK under its existing
-asset name, and the Play bundle as `ketch-android-<version>-play.aab`. Keep the application ID, the signing key and an increasing `-PversionCode`, so
-installed APKs can upgrade; a debug-signed build cannot install the release-signed APK as an
-update. See [Google Play signing](app-store-listing.md#google-play) for channel changes.
+asset name, and the Play bundle as `ketch-android-<version>-play.aab`. Keep the application ID,
+the signing key and an increasing `-PversionCode`, so installed APKs can upgrade. See
+[Google Play signing](app-store-listing.md#google-play) for channel changes.
+
+The release key comes from the `ANDROID_KEYSTORE_*` variables, or from the untracked
+`local.properties`, and debug builds are signed with it too, so they install over a release
+build and keep its data. Without it, debug builds use Android's debug key and cannot replace a
+release-signed install:
+
+```properties
+ketch.signing.storeFile=/absolute/path/to/ketch-release.jks
+ketch.signing.storePassword=...
+ketch.signing.keyAlias=release
+ketch.signing.keyPassword=...
+```
 
 ### Release notes details
 
