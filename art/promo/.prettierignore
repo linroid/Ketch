@@ -1,0 +1,22 @@
+# Prettier formats the code (npm run format): TypeScript and the Node scripts. Data files keep
+# the shape their generators and readers expect, and prose is wrapped by hand.
+
+# installed or generated (see .gitignore)
+node_modules/
+out/
+build/
+.venv/
+public/
+src/manifest*.json
+
+# data with its own writers: retime.mjs, update-facts.mjs and the music keep their style
+src/*.json
+scripts/assets/locales.json
+package.json
+package-lock.json
+
+# prose, wrapped by hand at 100 columns
+*.md
+
+# the extension popup's page template: markup the renderer injects as it is
+tools/extension-popup/*.html

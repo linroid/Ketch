@@ -1,0 +1,8 @@
+# Python packages for make_music.py, pinned so the music renders byte for byte the same.
+# make-music.sh installs them into art/promo/.venv (Python 3.10 or later).
+numpy==2.5.3
+scipy==1.18.1
+# Optional: compiles the per-sample filters, about 7 s for the whole film instead of about a
+# minute. Delete these two lines where no numba wheel exists: the output is the same.
+numba==0.68.0
+llvmlite==0.50.0

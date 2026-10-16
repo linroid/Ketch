@@ -49,6 +49,7 @@ import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.LocalClock
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
@@ -126,6 +127,7 @@ fun AppShell(
   CompositionLocalProvider(
     LocalAppState provides appState,
     LocalClock provides appState.clock,
+    LocalTimeSource provides appState.timeSource,
     LocalFileLogger provides fileLogger,
     LocalDeviceTypes provides rememberDeviceTypes(appState),
   ) {

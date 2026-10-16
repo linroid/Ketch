@@ -41,6 +41,7 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.LocalClock
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.isDark
@@ -214,6 +215,7 @@ internal fun SettingsWindow(
     CompositionLocalProvider(
       LocalAppState provides controller.state,
       LocalClock provides controller.state.clock,
+      LocalTimeSource provides controller.state.timeSource,
       LocalFileLogger provides fileLogger,
       LocalDesktopHooks provides hooks,
       LocalIntegrationStatus provides integration.status,

@@ -1,0 +1,8 @@
+{
+  "$comment": "The locales the real-UI assets are rendered in: the same ones as LOCALES in src/locale.tsx. snapshotLocale is what render-ui.sh passes to Gradle as -PsnapshotLocale (null: none, the harness's en-US); it must match a PromoLocale tag in PromoSnapshots.kt. extensionLocale is the browser extension's _locales folder the popup is rendered with. See docs/ASSETS.md.",
+  "default": "en",
+  "locales": {
+    "en": {"snapshotLocale": null, "extensionLocale": "en"},
+    "zh-Hans": {"snapshotLocale": "zh-Hans", "extensionLocale": "zh_CN"}
+  }
+}

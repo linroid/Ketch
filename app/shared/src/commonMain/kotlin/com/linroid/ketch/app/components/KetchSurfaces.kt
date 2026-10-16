@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchTheme
 import kotlin.time.Duration.Companion.milliseconds
@@ -319,16 +320,18 @@ internal fun rememberPressScale(interactions: MutableInteractionSource): Float {
 /**
  * Whether a control's focus came from the keyboard. Clicking a control focuses it too, and
  * only keyboard focus shows a ring, like the web's `:focus-visible`.
+ *
+ * @param timeSource measures the time from a press to the focus it gives.
  */
 @Stable
-internal class FocusVisibility {
+internal class FocusVisibility(private val timeSource: TimeSource) {
   var visible: Boolean by mutableStateOf(false)
     private set
 
   private var lastPointerDown: TimeMark? = null
 
   fun onPointerDown() {
-    lastPointerDown = TimeSource.Monotonic.markNow()
+    lastPointerDown = timeSource.markNow()
     visible = false
   }
 
@@ -339,7 +342,10 @@ internal class FocusVisibility {
 }
 
 @Composable
-internal fun rememberFocusVisibility(): FocusVisibility = remember { FocusVisibility() }
+internal fun rememberFocusVisibility(): FocusVisibility {
+  val timeSource = LocalTimeSource.current
+  return remember(timeSource) { FocusVisibility(timeSource) }
+}
 
 /**
  * Feeds [state] with pointer presses and the focus of the focusable that follows in the chain,

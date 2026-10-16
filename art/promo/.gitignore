@@ -1,0 +1,20 @@
+# Everything below is installed or generated, and rebuilt by the npm scripts (README.md).
+
+# npm install
+node_modules/
+
+# Renders and bundles: npm run film / npm run stills / remotion bundle
+out/
+build/
+
+# Real-UI assets and their manifests: npm run assets (scripts/assets/, docs/ASSETS.md).
+# `npm install` writes empty manifests (scripts/ensure-manifests.mjs) so a fresh clone builds.
+public/clips/
+public/stills/
+src/manifest*.json
+
+# Music bed: npm run music (audio/); the cue sheet next to it stays in git.
+public/audio/*.wav
+.venv/
+__pycache__/
+*.pyc

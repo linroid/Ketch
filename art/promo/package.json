@@ -1,0 +1,45 @@
+{
+  "name": "ketch-promo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The Ketch promo film, built with Remotion. See README.md.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "node scripts/ensure-manifests.mjs",
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "node scripts/check.mjs",
+    "check:film": "node scripts/check-film.mjs",
+    "stills": "node scripts/stills.mjs",
+    "film": "scripts/render-film.sh en",
+    "film:all": "scripts/render-film.sh all",
+    "film:4k60": "scripts/render-film.sh --4k60 all",
+    "facts": "node scripts/update-facts.mjs",
+    "retime": "node scripts/retime.mjs",
+    "assets": "scripts/assets/render-ui.sh",
+    "music": "audio/make-music.sh"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.532",
+    "@remotion/cli": "4.0.532",
+    "@remotion/fonts": "4.0.532",
+    "@remotion/media": "4.0.532",
+    "@remotion/motion-blur": "4.0.532",
+    "@remotion/noise": "4.0.532",
+    "@remotion/paths": "4.0.532",
+    "@remotion/renderer": "4.0.532",
+    "@remotion/transitions": "4.0.532",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "prettier": "3.9.9",
+    "typescript": "^5.9"
+  }
+}

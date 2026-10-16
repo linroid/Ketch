@@ -44,6 +44,7 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.theme.KetchColors
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
@@ -59,7 +60,6 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * How long a toast stays: 4 s, or 8 s when it has actions to reach; `null` when it stays until
@@ -126,13 +126,14 @@ fun KetchToast(
   val currentDismiss by rememberUpdatedState(onDismiss)
   val interactions = remember { MutableInteractionSource() }
   val hovered = interactions.collectIsHoveredAsState()
+  val timeSource = LocalTimeSource.current
   if (duration != null) {
     LaunchedEffect(duration) {
       var remaining: Duration = duration
       // Counts down while the pointer is off the toast; hovering stops the count until it leaves.
       snapshotFlow { hovered.value }.collectLatest { hovering ->
         if (hovering) return@collectLatest
-        val start = TimeSource.Monotonic.markNow()
+        val start = timeSource.markNow()
         try {
           delay(remaining)
         } finally {

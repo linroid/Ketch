@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Opaque full-bleed square for platforms that apply their own mask: the iOS
+    app icon, and the web app's maskable and Apple touch icons. The glyph stays
+    inside the maskable safe zone. The other icons frame this same artwork.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FFB25B"/>
+      <stop offset="1" stop-color="#E0482B"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="330" cy="140" r="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sail" x1="0" y1="220" x2="0" y2="781" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFF0E4"/>
+    </linearGradient>
+    <linearGradient id="mizzen" x1="0" y1="372" x2="0" y2="660" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF1D6"/>
+      <stop offset="1" stop-color="#FFD39A"/>
+    </linearGradient>
+    <linearGradient id="hull" x1="0" y1="686" x2="0" y2="781" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFF0E4"/>
+    </linearGradient>
+    <!-- Drop shadow from basic primitives; Skia's SVG renderer has no feDropShadow -->
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22"/>
+      <feOffset dy="14" result="blur"/>
+      <feFlood flood-color="#7A1E0C" flood-opacity="0.35"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#tile)"/>
+  <rect width="1024" height="1024" fill="url(#sheen)"/>
+  <g filter="url(#lift)">
+    <!-- Main sail (taller, forward), in six segments -->
+    <path d="M325.2,228.5Q346.4,253.9 366.4,280L318,280L318,231Q318,220 325.2,228.5Z" fill="url(#sail)"/>
+    <path d="M318,296L378.5,296Q400.6,325.5 421,356L318,356L318,296Z" fill="url(#sail)"/>
+    <path d="M318,372L431.6,372Q450.9,401.6 468.8,432L318,432L318,372Z" fill="url(#sail)"/>
+    <path d="M318,448L478.1,448Q495,477.6 510.5,508L318,508L318,448Z" fill="url(#sail)"/>
+    <path d="M318,524L518.6,524Q533.3,553.6 546.8,584L318,584L318,524Z" fill="url(#sail)"/>
+    <path d="M318,600L553.7,600Q566.5,629.6 578,660L318,660L318,600Z" fill="url(#sail)"/>
+    <!-- Mizzen sail (shorter, aft), on the same segment rows -->
+    <path d="M611.1,380.2Q632.6,405.5 652.1,432L604,432L604,382.8Q604,372 611.1,380.2Z" fill="url(#mizzen)" fill-opacity="0.85"/>
+    <path d="M604,448L663.7,448Q684.3,477.3 702.7,508L604,508L604,448Z" fill="url(#mizzen)" fill-opacity="0.85"/>
+    <path d="M604,524L712,524Q728.8,553.4 743.5,584L604,584L604,524Z" fill="url(#mizzen)" fill-opacity="0.85"/>
+    <path d="M604,600L751,600Q764.4,629.4 776,660L604,660L604,600Z" fill="url(#mizzen)" fill-opacity="0.85"/>
+    <!-- Hull -->
+    <path d="M241.2,686L789.9,686Q816,686 798.8,705.1C742.2,760.1 651,781 530.7,781C409.9,781 313.9,766.4 232.7,706.2Q208,686 241.2,686Z" fill="url(#hull)"/>
+  </g>
+</svg>

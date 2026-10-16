@@ -237,10 +237,11 @@ val InstanceEntry.deviceId: String
  * @param discoverHistory keeps the Discover sessions between runs of the app.
  * @param listDispatcher where the task list samples task changes and builds its rows, off the
  *   main thread by default.
- * @param timeSource clock that measures the rate of each connection.
  * @property incoming downloads and pairing links opened from outside the app; the shell asks
  *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
+ * @property timeSource measures elapsed time: the rate of each connection and, through
+ *   [LocalTimeSource], the composables' timers.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppState(
@@ -255,7 +256,7 @@ class AppState(
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
   listDispatcher: CoroutineDispatcher = Dispatchers.Default,
-  timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
+  val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()

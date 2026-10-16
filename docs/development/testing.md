@@ -144,8 +144,9 @@ the AWT event thread on virtual time. Each frame a scene renders lets 16 ms pass
 test lets that much time pass instead of sleeping, and the delays, debounces and Undo windows of
 the app and the scene wait for it, so no test waits for the wall clock. Environments hand the
 clock to `InstanceManager` (`context`) and `AppController` (`context`, `listDispatcher`,
-`timeSource`), and every string is read once per test JVM before the first scene, since a
-first read loads its file on another thread. Code that runs on another dispatcher, reads
+`timeSource`, which the shell provides to composables as `LocalTimeSource`), and every string is
+read once per test JVM before the first scene, since a first read loads its file on another
+thread. Code that runs on another dispatcher, reads
 `TimeSource.Monotonic` or uses `withTimeout` in a composable (Compose times those out on the wall
 clock) still follows the wall clock.
 

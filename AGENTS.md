@@ -479,7 +479,8 @@ cli/          # CLI: downloads plus `server`, `mcp` and `ai-discover` (JVM; Graa
   and uses the controls in `components/` and `KetchIcon`. `DesignTokenUsageTest` fails when
   code outside `theme/` and `components/` adds literal radii, colors or text sizes,
   `MaterialTheme.` or Material icons; keep its allowlist (`design-token-allowlist.txt`) empty.
-  Composables read the time from `LocalClock`, never `Clock.System`
+  Composables read the time from `LocalClock`, never `Clock.System`, and measure elapsed time
+  with `LocalTimeSource`, never `TimeSource.Monotonic`
 - Localization: the apps follow the system language, or the one chosen in Settings → General
   (`AppLanguages`; Android 13+ and iOS keep it in their per-app setting), and fall back to
   English; the languages are listed in

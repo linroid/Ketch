@@ -202,6 +202,11 @@ tasks.named<Test>("jvmTest") {
     outputs.cacheIf { false }
     systemProperty("ketch.snapshots", "true")
     systemProperty("ketch.snapshots.dir", layout.buildDirectory.dir("snapshots").get().asFile.path)
+    // `-PsnapshotTheme=light` records the promo film's assets for its light version
+    // (PromoSnapshots, art/promo/docs/ASSETS.md); dark without it.
+    providers.gradleProperty("snapshotTheme").orNull?.let {
+      systemProperty("ketch.snapshots.theme", it)
+    }
     // No window, no Dock icon and no reading the real clipboard.
     systemProperty("java.awt.headless", "true")
   }

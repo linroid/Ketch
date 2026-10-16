@@ -1,0 +1,12 @@
+<!-- tools/extension-popup/render.mjs puts this before popup.html's first script: the mock runs
+     first and stands in for the browser and the Ketch server (mock-chrome.js), and the switch
+     does not animate, so a capture never catches it moving. -->
+<script src="mock-chrome.js"></script>
+<style>input.switch, input.switch::after { transition: none !important; }</style>
+<!-- TEMPORARY: remove once the extension ships the fix; see popup.css
+     (app/browser-extension/src/popup/popup.css, `.add`). In Chinese (any CJK language) the
+     popup's Download button (下载) shrinks beside the link field and wraps one character per
+     line, a bug of the extension itself. Until the fix ships, the film shows the popup with it
+     applied; it changes nothing in English, where the button already fits on one line.
+     docs/ASSETS.md, "Known issues in the assets". -->
+<style>.add > button { flex: none; white-space: nowrap; }</style>

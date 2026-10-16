@@ -25,6 +25,11 @@ import kotlin.time.TimeSource
  * The host that creates it closes it with [close]; [rememberAppController] does that for apps
  * that keep it in a composition.
  *
+ * The app's state keeps time through `context`, `listDispatcher`, `timeSource` and `clock`. A test
+ * that passes a virtual clock for all four, such as a `TestCoroutineScheduler`'s dispatcher and
+ * `timeSource`, and one for [InstanceManager] too, runs the task list's sampling, the pulse, the
+ * speed history and the connection rates on virtual time.
+ *
  * @param instanceManager the devices; the host owns it and closes it after this controller.
  * @param aiProviderFactory builds the AI discovery engine; `null` where it cannot run.
  * @param incoming downloads opened from outside the app.
@@ -32,14 +37,15 @@ import kotlin.time.TimeSource
  * @param speedMode speed mode of the embedded device when the host owns one, such as the
  *   service whose notification switches it, so the app and the host never fight over the speed
  *   limit; `null` when the host keeps none. Its mode also feeds the devices' presence.
- * @param clock current time of the task list and the speed history.
+ * @param clock current time of the task list, the speed history and the messages.
  * @param unreadableFiles files the host moved aside because it could not read them, such as
  *   `config.toml`, which the app reports to the user once.
  * @param discoverHistory keeps the Discover sessions between runs; the host owns it, one per
  *   process, and closes it after this controller.
  * @param listDispatcher where the task list samples task changes and builds its rows, off the
  *   main thread by default.
- * @param timeSource clock that measures the rate of each connection.
+ * @param timeSource measures elapsed time: the rate of each connection and the composables'
+ *   timers (see [LocalTimeSource]).
  */
 class AppController(
   val instanceManager: InstanceManager,
@@ -77,6 +83,7 @@ class AppController(
     appSettings = appSettings,
     aiSettings = aiSettings,
     incoming = incoming,
+    messages = MessageCenter(clock = clock),
     speedMode = speedMode,
     clock = clock,
     unreadableFiles = unreadableFiles,

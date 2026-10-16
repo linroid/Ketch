@@ -26,6 +26,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.AiConnectionTest
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.state.parseHostList
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.AiSettings
@@ -101,7 +102,6 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 import kotlin.time.TimeMark
-import kotlin.time.TimeSource
 
 /**
  * The content filter, page access, provider, credentials and web search for AI discovery, from
@@ -263,6 +263,7 @@ fun AiDiscoverySettings(state: AppState) {
         enabled = editable,
       )
     }
+    val timeSource = LocalTimeSource.current
     // How long the last test took, measured from the click.
     var testStarted by remember { mutableStateOf<TimeMark?>(null) }
     var testTook by remember { mutableStateOf<Duration?>(null) }
@@ -289,7 +290,7 @@ fun AiDiscoverySettings(state: AppState) {
           onClick = {
             // Leaving the field saves what was just typed.
             focusManager.clearFocus()
-            testStarted = TimeSource.Monotonic.markNow()
+            testStarted = timeSource.markNow()
             testTook = null
             state.launchCommand { ai.testConnection(ai.settings) }
           },
