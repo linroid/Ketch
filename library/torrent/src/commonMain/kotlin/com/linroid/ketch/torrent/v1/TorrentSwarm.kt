@@ -1142,8 +1142,13 @@ internal class TorrentSwarm(
       val need = limit - pending
       // Asked for in batches, each one scheduler call and one write.
       if (need <= 0 || pending > 0 && need < minOf(REFILL_BLOCKS, (limit + 7) / 8)) return
+      // Late once twice the time its queue takes at its rate has passed: other peers may then
+      // ask for the same blocks, so a slow peer never holds the download up.
+      val lateAfter = if (rate > 0) {
+        (2_000.0 * limit * PeerWire.BLOCK_SIZE / rate).toLong().coerceIn(MIN_LATE_MS, MAX_LATE_MS)
+      } else TorrentPieceScheduler.DEFAULT_LATE_MS
       // Asked of every piece a search looks at: no boxed lookup while nothing is refused.
-      val grant = scheduler.request(id, need) { index ->
+      val grant = scheduler.request(id, need, lateAfter) { index ->
         (refused.isEmpty() || index !in refused) && (!state.choking || state.allowsFast(index))
       }
       // Waiting for a piece buffer is our doing, not the peer's.
@@ -1258,6 +1263,9 @@ private const val MAX_CONNECTS_PER_MINUTE = 8
 private const val REQUEST_QUEUE = 500
 
 /** Block requests we keep outstanding with a v1 peer before its rate is known. */
+/** The least and most time a peer may take with blocks before others may ask for them too. */
+private const val MIN_LATE_MS = 4_000L
+private const val MAX_LATE_MS = 30_000L
 private const val INITIAL_PIPELINE = 16
 
 /** The fewest block requests we keep outstanding with a peer that serves any. */

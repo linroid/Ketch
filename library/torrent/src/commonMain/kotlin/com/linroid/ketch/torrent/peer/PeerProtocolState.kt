@@ -1,11 +1,14 @@
 package com.linroid.ketch.torrent.peer
 
+import com.linroid.ketch.torrent.monotonicClock
+
 /**
  * Per-connection availability and request ownership, independent of the swarm scheduler.
  *
  * With the Fast extension ([fast], BEP 6) a CHOKE keeps our requests: the peer rejects those it
  * will not serve, and may serve its allowed-fast pieces ([allowsFast]) while it chokes us. A
- * request we cancel is forgotten at once either way, so a late block or reject for it is ignored.
+ * request we cancel is forgotten at once either way, so a late block or reject for it is ignored:
+ * remembered for at least [CANCELED_TTL_MS], as a peer may already have queued what we cancel.
  */
 internal class PeerProtocolState(
   private val pieceCount: Int,
@@ -13,6 +16,7 @@ internal class PeerProtocolState(
   private val explicitRejects: Boolean = false,
   /** Both sides set the Fast extension bit; set before the first message is read. */
   val fast: Boolean = false,
+  private val nowMs: () -> Long = monotonicClock(),
 ) {
   init {
     require(pieceCount in 0..1_000_000 && maxPending in 1..MAX_PENDING)
@@ -26,7 +30,8 @@ internal class PeerProtocolState(
     private set
   private var availabilitySeen = false
   private val pending = mutableSetOf<PeerMessage.Request>()
-  private val canceled = linkedSetOf<PeerMessage.Request>()
+  // Requests we canceled or were answered, and when: a late copy of one is no violation.
+  private val canceled = linkedMapOf<PeerMessage.Request, Long>()
   /** A copy of the requests the peer has not answered; [pendingCount] and [isPending] copy none. */
   val requests: Set<PeerMessage.Request> get() = pending.toSet()
 
@@ -64,16 +69,22 @@ internal class PeerProtocolState(
 
   fun cancel(request: PeerMessage.Request) {
     if (explicitRejects) {
-      if (request in pending) canceled.add(request)
+      if (request in pending) canceled[request] = nowMs()
     } else if (pending.remove(request)) {
       remember(request)
     }
   }
 
   private fun remember(request: PeerMessage.Request) {
+    val now = nowMs()
     canceled.remove(request)
-    canceled.add(request)
-    while (canceled.size > maxPending * 2) canceled.remove(canceled.first())
+    canceled[request] = now
+    // Duplicate requests make cancels common, so a count alone forgot them within a few seconds.
+    while (canceled.size > maxPending * 2) {
+      val (oldest, at) = canceled.entries.first()
+      if (now - at < CANCELED_TTL_MS && canceled.size <= MAX_CANCELED) break
+      canceled.remove(oldest)
+    }
   }
 
   /** V2 cancellation still requires a response; unsolicited v2 pieces always fail. */
@@ -104,7 +115,7 @@ internal class PeerProtocolState(
       is PeerMessage.Piece -> {
         val request = PeerMessage.Request(message.index, message.begin, message.bytes.size)
         if (pending.remove(request)) {
-          if (explicitRejects) return !canceled.remove(request)
+          if (explicitRejects) return canceled.remove(request) == null
           remember(request)
           return true
         }
@@ -151,5 +162,11 @@ internal class PeerProtocolState(
 
     /** The deepest pipeline a connection may keep. */
     const val MAX_PENDING: Int = 2048
+
+    /** How long a request we canceled is remembered, at the least. */
+    const val CANCELED_TTL_MS: Long = 60_000
+
+    /** The most canceled requests remembered, whatever their age. */
+    const val MAX_CANCELED: Int = 8192
   }
 }
