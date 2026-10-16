@@ -326,23 +326,26 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
-      # The Xcode project's build phase runs Gradle, which reads the version from this variable.
-      # Linking the release framework needs more than the 4 GB heap gradle.properties gives the
-      # daemon; the runner has 7 GB.
+      # The Xcode project's build phase runs Gradle, which reads the version from
+      # ORG_GRADLE_PROJECT_VERSION_NAME, prerelease suffix included. CFBundleShortVersionString
+      # takes numbers and periods only, so MARKETING_VERSION drops the suffix (0.3.1-rc2 is
+      # 0.3.1). Linking the release framework needs more than the 4 GB heap gradle.properties
+      # gives the daemon; the runner has 7 GB.
       - name: Build app
-        run: >
-          ORG_GRADLE_PROJECT_VERSION_NAME=${KETCH_VERSION#v}
-          GRADLE_OPTS=-Dorg.gradle.jvmargs=-Xmx6g
-          xcodebuild build
-          -project app/ios/Ketch.xcodeproj
-          -target Ketch
-          -configuration Release
-          -sdk iphoneos
-          MARKETING_VERSION=${KETCH_VERSION#v}
-          CURRENT_PROJECT_VERSION=${{ github.run_number }}
-          CODE_SIGNING_ALLOWED=NO
-          CODE_SIGNING_REQUIRED=NO
-          CODE_SIGN_IDENTITY=
+        run: |
+          version=${KETCH_VERSION#v}
+          ORG_GRADLE_PROJECT_VERSION_NAME=$version \
+          GRADLE_OPTS=-Dorg.gradle.jvmargs=-Xmx6g \
+          xcodebuild build \
+            -project app/ios/Ketch.xcodeproj \
+            -target Ketch \
+            -configuration Release \
+            -sdk iphoneos \
+            MARKETING_VERSION=${version%%-*} \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=
 
       - name: Package IPA
         run: |
