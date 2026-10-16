@@ -1,10 +1,12 @@
 package com.linroid.ketch.app.ui.inspector
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
@@ -80,6 +82,26 @@ class InspectorModelTest {
 
     assertEquals(queued.content.detail, reason?.text)
     assertNull(reason?.action)
+  }
+
+  @Test
+  fun inspectorReason_startingMagnet_saysFindingPeers() = runTest {
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:45b3e332a3b991b3ff000513c4a135054775d73d")
+    val starting = row("m", DownloadState.Queued, request = magnet, features = KetchFeatures.ALL)
+
+    val reason = inspectorReason(starting, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals("Finding peers", reason?.text?.load())
+    assertNull(reason?.action)
+  }
+
+  @Test
+  fun inspectorReason_startingLink_saysStartingRatherThanTheSite() = runTest {
+    val starting = row("s", DownloadState.Queued, features = KetchFeatures.ALL)
+
+    val reason = inspectorReason(starting, slowLane = false, globalCap = SpeedLimit.Unlimited)
+
+    assertEquals("Starting", reason?.text?.load())
   }
 
   @Test
@@ -186,6 +208,24 @@ class InspectorModelTest {
       finishedDetail(row("y", yesterday), start, TimeZone.UTC)?.load()
     )
     assertNull(finishedDetail(row("u", unknown), start, TimeZone.UTC))
+  }
+
+  @Test
+  fun checksumDetail_verifiedOrWaiting_namesTheAlgorithm() = runTest {
+    val checksum = Checksum.parse("sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709")
+    val request = DownloadRequest("https://example.com/a.iso", checksum = checksum)
+    val verified = DownloadState.Completed("/d/a.iso", 10, checksum = checksum)
+
+    val (copied, text) = checksumDetail(verified, request)!!
+    assertEquals(checksum, copied)
+    assertEquals("SHA-1 · verified", text.load())
+    assertEquals(
+      "SHA-1 · checked when done",
+      checksumDetail(DownloadState.Queued, request)?.second?.load(),
+    )
+    assertNull(checksumDetail(DownloadState.Completed("/d/a.iso", 10), request))
+    assertNull(checksumDetail(DownloadState.Canceled, request))
+    assertNull(checksumDetail(DownloadState.Queued, DownloadRequest("https://example.com/b")))
   }
 
   @Test

@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.hours
 
 class RowActionTest {
   private val request = DownloadRequest("https://example.com/a.iso")
-  private val local = DeviceInfo(verbatim("This Mac"), RowCapabilities.local(canTrash = true))
+  private val local = DeviceInfo(verbatim("This Mac"), RowCapabilities.local())
   private val remote = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote())
   private val progress = DownloadProgress(10, 100, 5)
 
@@ -160,6 +160,14 @@ class RowActionTest {
   }
 
   @Test
+  fun taskActions_starting_pausesWithoutStartNow() {
+    val actions = taskActions(request, DownloadState.Queued, remote, starting = true)
+
+    assertEquals(RowAction.Pause, actions.primary)
+    assertTrue(RowAction.StartNow !in actions.menu)
+  }
+
+  @Test
   fun taskActions_preempted_primaryIsStartNow() {
     val preempted = DownloadState.Paused(progress, PauseReason.Preempted("urgent"))
 
@@ -171,20 +179,20 @@ class RowActionTest {
   }
 
   @Test
-  fun taskActions_completedLocal_opensAndTrashes() {
+  fun taskActions_completedLocal_opensAndRemoves() {
     val actions = taskActions(request, DownloadState.Completed("/tmp/a.iso"), local)
 
     assertEquals(RowAction.Open, actions.primary)
     assertEquals(listOf(RowAction.Open, RowAction.ShowInFolder), actions.hover)
-    assertEquals(RowAction.RemoveAndTrash, actions.menu.last())
+    assertEquals(RowAction.Remove, actions.menu.last())
   }
 
   @Test
-  fun taskActions_completedRemote_copiesPathAndDeletes() {
+  fun taskActions_completedRemote_copiesPathAndRemoves() {
     val actions = taskActions(request, DownloadState.Completed("/srv/a.iso"), remote)
 
     assertEquals(RowAction.CopyPath, actions.primary)
-    assertEquals(RowAction.RemoveAndDelete, actions.menu.last())
+    assertEquals(RowAction.Remove, actions.menu.last())
   }
 
   @Test

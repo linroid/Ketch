@@ -70,7 +70,8 @@ class PulseTextTest {
     val parts = countParts(counts, failures = 0)
 
     parts.forEach { part ->
-      assertEquals(part.filter.count(states), part.text.load().takeWhile { it.isDigit() }.toInt())
+      val count = states.count { part.filter.matches(it) }
+      assertEquals(count, part.text.load().takeWhile { it.isDigit() }.toInt())
     }
   }
 

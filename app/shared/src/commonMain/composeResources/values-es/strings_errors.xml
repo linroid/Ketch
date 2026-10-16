@@ -35,6 +35,11 @@
   <string name="error_corrupt_resume">El progreso guardado está dañado</string>
   <string name="error_corrupt_resume_hint">La parte descargada no se puede reutilizar.</string>
   <string name="error_corrupt_resume_hint_short">la parte descargada no se puede reutilizar</string>
+  <string name="error_checksum_mismatch">El archivo no coincide con su suma de verificación</string>
+  <string name="error_checksum_mismatch_hint">Su %1$s no coincide con la suma de verificación que escribiste, así que se eliminó. Descárgalo de nuevo o revisa la suma de verificación.</string>
+  <string name="error_checksum_mismatch_hint_short">su %1$s no coincide con la suma de verificación que escribiste</string>
+  <string name="error_checksum_mismatch_published_hint">Su %1$s no coincide con la que publicó el servidor, así que se eliminó. Pudo dañarse por el camino; descárgalo de nuevo.</string>
+  <string name="error_checksum_mismatch_published_hint_short">su %1$s no coincide con la del servidor</string>
   <string name="error_canceled">Cancelada</string>
   <string name="error_wrong_credentials">Usuario o contraseña incorrectos</string>
   <string name="error_wrong_credentials_hint">El servidor %1$s rechazó el inicio de sesión.</string>
@@ -45,10 +50,10 @@
   <string name="error_source">El servidor %1$s devolvió un error</string>
 
   <string name="error_http_sign_in">Hay que iniciar sesión (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s pide que inicies sesión. Envía la descarga desde la extensión del navegador de Ketch para que se incluyan tus cookies.</string>
-  <string name="error_http_sign_in_hint_short">%1$s pide que inicies sesión</string>
-  <string name="error_http_sign_in_hint_server">El servidor pide que inicies sesión. Envía la descarga desde la extensión del navegador de Ketch para que se incluyan tus cookies.</string>
-  <string name="error_http_sign_in_hint_server_short">el servidor pide que inicies sesión</string>
+  <string name="error_http_sign_in_hint">%1$s requiere iniciar sesión. Añádela desde la extensión del navegador de Ketch para enviar tus cookies.</string>
+  <string name="error_http_sign_in_hint_short">%1$s requiere iniciar sesión</string>
+  <string name="error_http_sign_in_hint_server">El servidor requiere iniciar sesión. Añádela desde la extensión del navegador de Ketch para enviar tus cookies.</string>
+  <string name="error_http_sign_in_hint_server_short">el servidor requiere iniciar sesión</string>
   <string name="error_http_forbidden">Acceso denegado (403)</string>
   <string name="error_http_forbidden_hint">Puede que el enlace haya caducado.</string>
   <string name="error_http_forbidden_hint_browser">Puede que el enlace haya caducado. Si lo enviaste desde %1$s, vuelve a enviarlo a Ketch desde la página original.</string>

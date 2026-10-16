@@ -23,6 +23,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
+import com.linroid.ketch.app.state.isStarting
 import com.linroid.ketch.app.state.taskActions
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_today_at
@@ -31,15 +32,18 @@ import ketch.app.shared.generated.resources.queue_position_ahead
 import ketch.app.shared.generated.resources.queue_position_next
 import ketch.app.shared.generated.resources.queue_starting
 import ketch.app.shared.generated.resources.row_canceled
+import ketch.app.shared.generated.resources.row_choose_files
 import ketch.app.shared.generated.resources.row_completed
 import ketch.app.shared.generated.resources.row_connections
 import ketch.app.shared.generated.resources.row_files
+import ketch.app.shared.generated.resources.row_finding_peers
 import ketch.app.shared.generated.resources.row_limited_by_slow_lane
 import ketch.app.shared.generated.resources.row_missing_file
 import ketch.app.shared.generated.resources.row_paused
 import ketch.app.shared.generated.resources.row_paused_preempted
 import ketch.app.shared.generated.resources.row_paused_shutdown
 import ketch.app.shared.generated.resources.row_saved_on
+import ketch.app.shared.generated.resources.row_seeding
 import ketch.app.shared.generated.resources.row_stalled_for
 import ketch.app.shared.generated.resources.row_starts_after
 import ketch.app.shared.generated.resources.row_starts_in
@@ -55,6 +59,7 @@ import ketch.app.shared.generated.resources.row_status_paused
 import ketch.app.shared.generated.resources.row_status_queued
 import ketch.app.shared.generated.resources.row_status_scheduled
 import ketch.app.shared.generated.resources.row_status_stalled
+import ketch.app.shared.generated.resources.row_status_starting
 import ketch.app.shared.generated.resources.row_took
 import ketch.app.shared.generated.resources.row_waiting_for_conditions
 import ketch.app.shared.generated.resources.size_progress
@@ -74,6 +79,12 @@ enum class RowStatus {
 
   /** Downloading, but no data arrived for more than 5 seconds. */
   Stalled,
+
+  /**
+   * Holds a slot but gets ready before any data arrives, such as a magnet link looking for its
+   * metadata; see [com.linroid.ketch.app.state.isStarting].
+   */
+  Starting,
   Paused,
   Queued,
   Scheduled,
@@ -163,6 +174,7 @@ fun rowContent(
 ): RowContent {
   val stalled = state is DownloadState.Downloading && stalledFor != null &&
     stalledFor > STALL_THRESHOLD
+  val starting = state.isStarting(queuePosition, context.features)
   val missing = fileMissing && !context.device.capabilities.isRemote
   val retryCount = context.config?.retryCount ?: 0
   val primary = taskActions(
@@ -171,6 +183,7 @@ fun rowContent(
     device = context.device,
     retryCount = retryCount,
     stalled = stalled,
+    starting = starting,
     fileMissing = missing,
   ).primary
   val added = formatAdded(createdAt, context.now, context.timeZone)
@@ -214,6 +227,7 @@ fun rowContent(
           is PauseReason.Preempted -> Res.string.row_paused_preempted.text()
           PauseReason.Shutdown -> Res.string.row_paused_shutdown.text()
           PauseReason.WaitingForCondition -> Res.string.row_waiting_for_conditions.text()
+          PauseReason.AwaitingFileSelection -> Res.string.row_choose_files.text()
           PauseReason.User -> listOfNotNull(Res.string.row_paused.text(), percent).joinText()
         },
         size = runningSize(state),
@@ -221,6 +235,13 @@ fun rowContent(
         progress = fraction(progress),
       )
     }
+    is DownloadState.Queued if starting -> RowContent(
+      status = RowStatus.Starting,
+      statusText = Res.string.row_status_starting.text(),
+      detail = startingReason(request) ?: host?.let(::verbatim) ?: Res.string.queue_starting.text(),
+      size = knownSize(request),
+      added = added,
+    )
     is DownloadState.Queued -> RowContent(
       status = RowStatus.Queued,
       statusText = Res.string.row_status_queued.text(),
@@ -272,13 +293,20 @@ fun formatAdded(createdAt: Instant, now: Instant, timeZone: TimeZone): UiText {
   }
 }
 
+/**
+ * What a [RowStatus.Starting] task waits for: "Finding peers" for a magnet link, which looks for
+ * its metadata; `null` for other links.
+ */
+internal fun startingReason(request: DownloadRequest): UiText? =
+  Res.string.row_finding_peers.text()
+    .takeIf { request.url.startsWith("magnet:", ignoreCase = true) }
+
 /** A downloading task counts as stalled once it has received no data for longer than this. */
 internal val STALL_THRESHOLD: Duration = 5.seconds
 
 /**
  * Why a queued task waits and, on a device that reports positions, where it is in line: "Waiting
- * to start · next in line", "Waiting for a free slot (2 of 2 in use) · 2 ahead", or "Starting"
- * once it holds a slot.
+ * to start · next in line" or "Waiting for a free slot (2 of 2 in use) · 2 ahead".
  */
 private fun queuedDetail(
   request: DownloadRequest,
@@ -289,7 +317,7 @@ private fun queuedDetail(
     ?: QueueReason.Next).text
   return when {
     KetchFeatures.QUEUE_POSITION !in context.features -> reason
-    queuePosition == null -> Res.string.queue_starting.text()
+    queuePosition == null -> reason
     queuePosition == 1 -> listOf(reason, Res.string.queue_position_next.text()).joinText()
     else -> {
       val ahead = Res.plurals.queue_position_ahead.text(queuePosition - 1)
@@ -307,11 +335,14 @@ private fun completedContent(
 ): RowContent {
   val device = context.device
   val size = state.totalBytes?.let(::sizeText)
+  // A torrent that shares its files says so first: "Seeding · 4.2 MB/s avg · example.com".
+  val seeding = Res.string.row_seeding.text().takeIf { state.sharing }
   val detail = when {
-    device.capabilities.isRemote -> Res.string.row_saved_on.text(device.name)
     missing -> Res.string.row_missing_file.text()
+    device.capabilities.isRemote ->
+      listOfNotNull(seeding, Res.string.row_saved_on.text(device.name)).joinText()
     else -> {
-      val parts = transferSummary(state).filter { it != size } +
+      val parts = listOfNotNull(seeding) + transferSummary(state).filter { it != size } +
         listOfNotNull(host?.let(::verbatim))
       if (parts.isEmpty()) Res.string.row_completed.text() else parts.joinText()
     }

@@ -91,6 +91,42 @@ class DestinationGuardTest {
     assertEquals(File(downloads, "file (1).zip").path, task.request.destination?.value)
   }
 
+  // The first submission's download may have created the file by the time the request is sent
+  // again, which would otherwise give it another name and make the two requests differ.
+  @Test
+  fun `POST without a token sent again with its request ID keeps the first destination`() =
+    testApplication {
+      File(downloads, "file.zip").writeText("keep")
+      val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+      val client = serve(ketch)
+      val id = "6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a"
+
+      val first = client.createTask("${downloads.path}/file.zip", id)
+      File(downloads, "file (1).zip").writeText("partial")
+      val again = client.createTask("${downloads.path}/file.zip", id)
+
+      assertEquals(HttpStatusCode.Created, again.status, again.bodyAsText())
+      val firstTask = json.decodeFromString<TaskSnapshot>(first.bodyAsText())
+      val againTask = json.decodeFromString<TaskSnapshot>(again.bodyAsText())
+      assertEquals(firstTask.taskId, againTask.taskId)
+      assertEquals(File(downloads, "file (1).zip").path, againTask.request.destination?.value)
+      assertEquals(1, ketch.tasks.value.size)
+    }
+
+  @Test
+  fun `POST without a token reusing a request ID for another file is refused`() =
+    testApplication {
+      val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+      val client = serve(ketch)
+      val id = "6f1c2b0e-8a1d-4c5e-9b7a-3d2f1e0c9b8a"
+
+      client.createTask("${downloads.path}/file.zip", id)
+      val other = client.createTask("${downloads.path}/other.zip", id)
+
+      assertEquals(HttpStatusCode.BadRequest, other.status)
+      assertEquals(1, ketch.tasks.value.size)
+    }
+
   @Test
   fun `POST with a token saves wherever the caller chooses`() = testApplication {
     val client = serve(
@@ -103,6 +139,97 @@ class DestinationGuardTest {
     assertEquals(HttpStatusCode.Created, response.status)
     val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
     assertEquals("${outside.path}/", task.request.destination?.value)
+  }
+
+  @Test
+  fun `POST with a token never names an existing file`() = testApplication {
+    File(outside, "file.zip").writeText("keep")
+    val client = serve(
+      createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+      apiToken = TOKEN,
+    )
+
+    val response = client.createTask("${outside.path}/file.zip")
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(File(outside, "file (1).zip").path, task.request.destination?.value)
+  }
+
+  @Test
+  fun `POST with a token into a protected folder is refused`() = testApplication {
+    val appData = File(temp, "Library").apply { mkdirs() }
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN, protectedDirectories = listOf(appData.path))
+
+    assertRejected(client.createTask("${appData.path}/LaunchAgents/evil.plist"))
+    assertRejected(client.createTask("${temp.path}/library/LaunchAgents/evil.plist"))
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `POST with a token into a hidden folder is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN)
+
+    assertRejected(client.createTask("${outside.path}/.ssh/authorized_keys"))
+    assertRejected(client.createTask("${outside.path}/.zshrc"))
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `POST with a token into a download folder inside a protected one is accepted`() =
+    testApplication {
+      val appData = File(temp, "app-data")
+      val inside = File(appData, "downloads").apply { mkdirs() }
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = inside.path)),
+        apiToken = TOKEN,
+        protectedDirectories = listOf(appData.path),
+      )
+
+      assertEquals(HttpStatusCode.Created, client.createTask("file.zip").status)
+      assertRejected(client.createTask("${appData.path}/file.zip"))
+    }
+
+  @Test
+  fun `DELETE with a token and deleteFiles of a task in a protected folder is refused`() =
+    testApplication {
+      val appData = File(temp, "app-data").apply { mkdirs() }
+      val task = SavedTask(File(appData, "file.zip").path)
+      val client = serve(
+        OneTaskKetch(task, downloads),
+        apiToken = TOKEN,
+        protectedDirectories = listOf(appData.path),
+      )
+
+      assertRejected(client.delete("/api/tasks/${task.taskId}?deleteFiles=true"))
+      assertTrue(task.removals.isEmpty())
+    }
+
+  @Test
+  fun `POST with a token to a granted folder URI passes unchanged`() = testApplication {
+    val client = serve(
+      createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+      apiToken = TOKEN,
+    )
+    val uri = "content://com.android.externalstorage.documents/tree/primary%3AMovies"
+
+    val response = client.createTask(uri)
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(uri, task.request.destination?.value)
+  }
+
+  @Test
+  fun `POST with a token to a file URI is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN)
+
+    assertRejected(client.createTask("file://${outside.path}/.zshrc"))
+    assertRejected(client.createTask("FILE://${outside.path}/file.zip"))
+    assertTrue(ketch.tasks.value.isEmpty())
   }
 
   @Test
@@ -190,9 +317,15 @@ class DestinationGuardTest {
     ketch: KetchApi,
     apiToken: String? = null,
     allowedDirectories: List<String> = emptyList(),
+    protectedDirectories: List<String> = emptyList(),
   ): HttpClient {
     application {
-      val server = KetchServer(ketch, apiToken = apiToken, allowedDirectories = allowedDirectories)
+      val server = KetchServer(
+        ketch,
+        apiToken = apiToken,
+        allowedDirectories = allowedDirectories,
+        protectedDirectories = protectedDirectories,
+      )
       with(server) { configureServer() }
     }
     return createClient {
@@ -201,10 +334,19 @@ class DestinationGuardTest {
     }
   }
 
-  private suspend fun HttpClient.createTask(destination: String?): HttpResponse =
+  private suspend fun HttpClient.createTask(
+    destination: String?,
+    requestId: String? = null,
+  ): HttpResponse =
     post("/api/tasks") {
       contentType(ContentType.Application.Json)
-      setBody(DownloadRequest("https://example.com/file.zip", destination?.let(::Destination)))
+      setBody(
+        DownloadRequest(
+          url = "https://example.com/file.zip",
+          destination = destination?.let(::Destination),
+          requestId = requestId,
+        )
+      )
     }
 
   private suspend fun assertRejected(response: HttpResponse) {

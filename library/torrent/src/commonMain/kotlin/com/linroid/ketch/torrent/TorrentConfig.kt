@@ -1,7 +1,6 @@
 package com.linroid.ketch.torrent
 
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
+import com.linroid.ketch.torrent.tracker.TRACKER_SCRAPE_WORKSPACE_BYTES
 
 /**
  * Configuration for the torrent engine.
@@ -10,20 +9,39 @@ import kotlin.time.Duration.Companion.seconds
  * @property maxActiveTorrents maximum number of torrents the engine runs at once, including
  *   seeding sessions. Further downloads wait for a slot (higher priority first, then arrival
  *   order) instead of failing, and a seeding session yields its slot to a waiting download.
- * @property metadataTimeoutSeconds timeout for magnet metadata
- *   resolution in seconds
  * @property connectionsPerTorrent peer cap for a task that sets no connections. A task's
  *   `DownloadRequest.connections` or `DownloadTask.setConnections` value replaces it, clamped to
  *   1..512 for v1 and 1..500 for v2. `DownloadConfig.maxConnectionsPerDownload` counts HTTP
  *   segments and does not apply to torrents; [maxConnections] bounds all torrents together.
- * @property enableUpload whether to seed after download completes
- * @property listenPort port for incoming peer connections; 0 for
- *   random port
+ * @property enableUpload whether to seed after download completes, for v1, v2 and hybrid
+ *   torrents; [uploadPolicy] replaces it when set
+ * @property listenPort port for incoming peer connections, over TCP, which DHT also uses over
+ *   UDP when it can; 0 lets the system pick a free port for each, at every start
  */
 data class TorrentConfig(
   val dhtEnabled: Boolean = true,
+  /**
+   * Whether the engine asks the home router (NAT-PMP, then UPnP) to forward the listen port, TCP
+   * and UDP, so peers behind other NATs can connect; the external port it gets is announced.
+   */
+  val portMapping: Boolean = true,
+  /**
+   * Protocol encryption (MSE/PE) for peer connections. [TorrentEncryption.PREFERRED] dials
+   * encrypted first and plaintext when a peer refuses, and accepts both.
+   */
+  val encryption: TorrentEncryption = TorrentEncryption.PREFERRED,
+  /**
+   * Whether peers are also reached over uTP (BEP 29): incoming on the UDP port DHT shares with
+   * the TCP listen port, and outgoing to peers that TCP cannot reach.
+   */
+  val utpEnabled: Boolean = true,
+  /**
+   * Whether public torrents are announced on the LAN, and peers other clients announce there
+   * dialed (Local Service Discovery, BEP 14, over IPv4 and IPv6 multicast), so devices at home
+   * share pieces directly. Private and tracker-only torrents never take part. Android, JVM only.
+   */
+  val localDiscovery: Boolean = true,
   val maxActiveTorrents: Int = 5,
-  val metadataTimeoutSeconds: Int = 120,
   val connectionsPerTorrent: Int = 100,
   val enableUpload: Boolean = false,
   val listenPort: Int = 0,
@@ -36,7 +54,10 @@ data class TorrentConfig(
     "router.bittorrent.com:6881", "router.utorrent.com:6881", "dht.transmissionbt.com:6881",
     "dht.libtorrent.org:25401"
   ),
-  /** Explicit policy; null preserves the legacy [enableUpload] setting. */
+  /**
+   * Whether v1, v2 and hybrid torrents upload verified pieces to peers, and whether they keep
+   * seeding once complete; null preserves the legacy [enableUpload] setting.
+   */
   val uploadPolicy: TorrentUploadPolicy? = null,
   /** Maximum metainfo bytes accepted from HTTP or peers. */
   val maxMetadataBytes: Int = 4 * 1024 * 1024,
@@ -67,17 +88,28 @@ data class TorrentConfig(
   /**
    * Extra `http`, `https` or `udp` announce URLs for public torrents, announced alongside each
    * torrent's own trackers rather than after them. Private torrents and tracker-only discovery
-   * never contact them. Invalid URLs are ignored, and at most 64 are used.
+   * never contact them. Invalid URLs are ignored, and at most 128 are used.
    */
   val additionalTrackers: List<String> = emptyList(),
-
+  /**
+   * `http` or `https` URLs of tracker lists to subscribe to, such as [DEFAULT_TRACKER_LISTS]:
+   * plain text with one announce URL per line. Each is downloaded when the source is created,
+   * unless [stateDirectory] holds a copy less than a day old, and again daily, from its jsDelivr
+   * mirror when a `raw.githubusercontent.com` URL fails. Their trackers, in list order, are used
+   * like [additionalTrackers], after them. Other URLs are ignored; empty subscribes to none.
+   */
+  val trackerListUrls: List<String> = emptyList(),
+  /**
+   * Upload cap shared by every torrent, in bytes per second; zero means unlimited. A piece read
+   * back from disk to prove its block hashes (BEP 52) counts against it like uploading it.
+   */
+  val uploadRateLimit: Long = 0,
 ) {
   init {
     require(maxActiveTorrents in 1..64) { "maxActiveTorrents must be in 1..64" }
     require(connectionsPerTorrent in 1..512)
     require(maxConnections in 1..4096)
     require(dhtBootstrap.size <= 64)
-    require(metadataTimeoutSeconds >= 0) { "metadata timeout must be non-negative" }
     require(listenPort in 0..65535) { "listenPort must be in 0..65535" }
     require(maxMetadataBytes in 1..4 * 1024 * 1024)
     require(maxBufferedBytes >= 16384) { "maxBufferedBytes must hold a protocol block" }
@@ -85,6 +117,7 @@ data class TorrentConfig(
     require(maxOpenPayloadFiles in 1..128)
     require(maxFilesPerTorrent in 1..100_000)
     require(maxPiecesPerTorrent in 1..1_000_000)
+    require(uploadRateLimit >= 0) { "uploadRateLimit must be non-negative" }
     require(maxBufferedBytes.toLong() + metadataExchangeBytes + maxCachedMetadataBytes +
       maxSessionStateBytes <=
       maxExchangeBytes.toLong()) {
@@ -104,7 +137,58 @@ data class TorrentConfig(
       TorrentUploadPolicy.DISABLED
     }
 
-  /** Metadata fetch timeout as a [Duration]. */
-  val metadataTimeout: Duration
-    get() = metadataTimeoutSeconds.seconds
+  companion object {
+    /** ngosang's list of the most reliable public trackers, refreshed daily. */
+    const val BEST_TRACKERS_URL: String =
+      "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
+
+    /** XIU2's collection of the best public trackers, refreshed daily. */
+    const val XIU2_BEST_TRACKERS_URL: String =
+      "https://raw.githubusercontent.com/XIU2/TrackersListCollection/master/best.txt"
+
+    /** The tracker lists the apps and CLI subscribe to by default. */
+    val DEFAULT_TRACKER_LISTS: List<String> = listOf(BEST_TRACKERS_URL, XIU2_BEST_TRACKERS_URL)
+    /**
+     * [BEST_TRACKERS_URL] as of 2026-10-07, used for that list until its first download succeeds,
+     * so a subscription works offline and where GitHub is unreachable.
+     */
+    val BEST_TRACKERS: List<String> = listOf(
+      "udp://tracker.opentrackr.org:1337/announce",
+      "udp://open.stealth.si:80/announce",
+      "udp://tracker.torrent.eu.org:451/announce",
+      "udp://open.demonii.com:1337/announce",
+      "udp://exodus.desync.com:6969/announce",
+      "udp://tracker.skynetcloud.site:6969/announce",
+      "udp://tracker.qu.ax:6969/announce",
+      "udp://tracker.bittor.pw:1337/announce",
+      "udp://tracker.tryhackx.org:6969/announce",
+      "udp://tracker.nyaa.vc:6969/announce",
+      "udp://tracker.corpscorp.online:80/announce",
+      "udp://explodie.org:6969/announce",
+      "udp://tracker.theoks.net:6969/announce",
+      "udp://tracker-udp.gbitt.info:80/announce",
+      "udp://tracker.ducks.party:1984/announce",
+      "udp://tracker.gmi.gd:6969/announce",
+      "udp://tracker.dler.org:6969/announce",
+      "udp://tracker2.dler.org:80/announce",
+      "http://tracker.dler.com:6969/announce",
+      "udp://retracker01-msk-virt.corbina.net:80/announce",
+    )
+  }
+}
+
+/**
+ * Whether peer connections use protocol encryption (MSE/PE): RC4 over a Diffie-Hellman key,
+ * which hides BitTorrent from traffic shaping and reaches peers that require it. It is
+ * obfuscation, not authentication.
+ */
+enum class TorrentEncryption {
+  /** Plaintext only: encrypted incoming connections are refused. */
+  DISABLED,
+
+  /** Dial encrypted first, plaintext when the peer refuses; accept both. */
+  PREFERRED,
+
+  /** RC4 only, both ways: peers that cannot encrypt are not used. */
+  REQUIRED,
 }

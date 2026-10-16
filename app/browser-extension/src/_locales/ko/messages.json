@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "다운로드 추가됨"
   },
-  "notify_fallback_browser": {
-    "message": "대신 브라우저에서 다운로드합니다"
-  },
-  "notify_fallback_magnet": {
-    "message": "다른 앱에서 마그넷 링크를 엽니다"
-  },
-  "notify_send_failed": {
-    "message": "$NAME$에 보낼 수 없음",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch로 다운로드할 수 없음"
   },
@@ -115,6 +101,9 @@
   },
   "error_app_connect_failed": {
     "message": "Ketch 앱에 연결하지 못했습니다"
+  },
+  "error_app_pick_unsupported": {
+    "message": "여기서 폴더를 선택하려면 Ketch 앱을 업데이트하세요"
   },
   "error_app_invalid_reply": {
     "message": "Ketch 앱이 잘못된 응답을 보냈습니다"
@@ -402,14 +391,6 @@
   "popup_add_button": {
     "message": "다운로드"
   },
-  "popup_added": {
-    "message": "$NAME$ 추가됨",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "http, https, ftp 또는 마그넷 링크를 입력하세요."
   },
@@ -616,20 +597,8 @@
   "error_media_unsupported": {
     "message": "이 Ketch는 미디어 재생목록을 지원하지 않습니다. 링크를 보내기 전에 업데이트하세요."
   },
-  "review_setting": {
-    "message": "보내기 전에 다운로드 검토"
-  },
-  "review_title": {
-    "message": "다운로드 검토"
-  },
-  "review_name": {
-    "message": "파일 이름 (선택 사항)"
-  },
   "review_folder": {
     "message": "선택한 기기의 폴더 (선택 사항)"
-  },
-  "review_detail": {
-    "message": "폴더를 비워 두면 기기의 기본 폴더를 사용합니다. 허용된 폴더는 서버가 관리합니다. 토렌트는 원래 파일 구조를 유지합니다. 이 페이지를 닫으면 일시 중지된 다운로드가 브라우저로 돌아갑니다."
   },
   "review_cancel": {
     "message": "취소"
@@ -642,5 +611,119 @@
   },
   "safari_detail": {
     "message": "Safari는 검토한 링크와 페이지 리소스를 설정된 Ketch 서버로 보냅니다. Ketch에서 공유를 켜고 여기에 주소와 액세스 토큰을 입력하세요. 자동 다운로드 캡처와 앱 실행은 사용할 수 없습니다."
+  },
+  "dialog_title": {
+    "message": "새 다운로드"
+  },
+  "dialog_name_label": {
+    "message": "파일 이름"
+  },
+  "dialog_send_to": {
+    "message": "보낼 곳"
+  },
+  "dialog_save_in": {
+    "message": "저장 위치"
+  },
+  "dialog_folder_default": {
+    "message": "기본 폴더"
+  },
+  "dialog_folder_browse": {
+    "message": "찾아보기…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "이 컴퓨터의 폴더 선택"
+  },
+  "dialog_device_checking": {
+    "message": "확인 중…"
+  },
+  "dialog_device_ready": {
+    "message": "준비됨"
+  },
+  "dialog_device_free": {
+    "message": "$SIZE$ 사용 가능",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "닫힘 · 보낼 때 시작"
+  },
+  "dialog_device_offline": {
+    "message": "연결할 수 없음"
+  },
+  "dialog_torrent_layout": {
+    "message": "토렌트는 자체 폴더 구조를 유지합니다."
+  },
+  "dialog_space_warning": {
+    "message": "$DEVICE$에 남은 공간이 $SIZE$뿐입니다.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "브라우저에서 다운로드"
+  },
+  "dialog_sending": {
+    "message": "보내는 중…"
+  },
+  "dialog_folder_auto": {
+    "message": "자동"
+  },
+  "dialog_folder_auto_match": {
+    "message": "자동 · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "기기가 선택합니다: 다운로드 폴더 또는 이 파일에 맞는 카테고리 폴더."
+  },
+  "dialog_folder_recent": {
+    "message": "최근 사용: $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "보내기 전에 다운로드 검토"
+  },
+  "notify_fallback_browser": {
+    "message": "대신 브라우저에서 다운로드합니다"
+  },
+  "notify_fallback_magnet": {
+    "message": "다른 앱에서 마그넷 링크를 엽니다"
+  },
+  "notify_send_failed": {
+    "message": "$NAME$에 보낼 수 없음",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$ 추가됨",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch가 이 확장 프로그램 사본을 허용하지 않습니다"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch는 Chrome 웹 스토어의 확장 프로그램이나, 릴리스의 chrome-unpacked 패키지를 '압축해제된 확장 프로그램을 로드합니다'로 로드한 경우에만 연결합니다. 그중 하나를 설치한 다음 다시 시도하세요."
   }
 }

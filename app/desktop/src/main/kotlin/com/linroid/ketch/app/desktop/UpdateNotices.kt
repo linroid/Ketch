@@ -1,14 +1,12 @@
 package com.linroid.ketch.app.desktop
 
-import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.ToastMode
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.platform.AppUpdates
+import com.linroid.ketch.app.platform.ReleaseNotesRequest
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.message_open_installer
 import ketch.app.desktop.generated.resources.message_restart
@@ -19,17 +17,18 @@ import ketch.app.desktop.generated.resources.message_update_failed_hint
 import ketch.app.desktop.generated.resources.message_update_installed
 import ketch.app.desktop.generated.resources.message_update_ready
 import ketch.app.desktop.generated.resources.message_whats_new
-import java.awt.Desktop
-import java.net.URI
-import kotlin.concurrent.thread
-
-private val log = KetchLogger("UpdateNotices")
 
 /**
  * Tells the user what [event] reports as a toast, with buttons that take [updates] to its next
- * step. The toasts that ask for a step stay until dismissed.
+ * step and What's new, which asks [showNotes] for the notes of the releases it concerns. The
+ * toasts that ask for a step stay until dismissed.
  */
-internal fun postUpdateNotice(event: UpdateEvent, messages: MessageCenter, updates: AppUpdates) {
+internal fun postUpdateNotice(
+  event: UpdateEvent,
+  messages: MessageCenter,
+  updates: AppUpdates,
+  showNotes: (ReleaseNotesRequest) -> Unit,
+) {
   when (event) {
     is UpdateEvent.Found -> {
       val update = event.update
@@ -39,7 +38,9 @@ internal fun postUpdateNotice(event: UpdateEvent, messages: MessageCenter, updat
         actions = listOfNotNull(
           MessageAction(Res.string.message_update.text(), updates::download)
             .takeIf { update.installable },
-          MessageAction(Res.string.message_whats_new.text()) { browse(update.notesUrl) },
+          MessageAction(Res.string.message_whats_new.text()) {
+            showNotes(ReleaseNotesRequest(update.version, since = updates.currentVersion))
+          },
         ),
         toast = ToastMode.Sticky,
       )
@@ -61,7 +62,9 @@ internal fun postUpdateNotice(event: UpdateEvent, messages: MessageCenter, updat
       level = MessageLevel.Success,
       title = Res.string.message_update_installed.text(event.version),
       actions = listOf(
-        MessageAction(Res.string.message_whats_new.text()) { browse(event.notesUrl) },
+        MessageAction(Res.string.message_whats_new.text()) {
+          showNotes(ReleaseNotesRequest(event.version, event.since))
+        },
       ),
     )
     is UpdateEvent.InstallFailed -> messages.post(
@@ -70,21 +73,5 @@ internal fun postUpdateNotice(event: UpdateEvent, messages: MessageCenter, updat
       detail = Res.string.message_update_failed_hint.text(),
       toast = ToastMode.Sticky,
     )
-  }
-}
-
-/** Opens [url] in the browser, off the calling thread; failures are logged. */
-internal fun browse(url: String) {
-  thread(isDaemon = true, name = "ketch-browse") {
-    try {
-      val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
-      if (desktop?.isSupported(Desktop.Action.BROWSE) == true) {
-        desktop.browse(URI(url))
-      } else {
-        ProcessBuilder("xdg-open", url).start()
-      }
-    } catch (e: Exception) {
-      log.w { "Couldn't open ${redactUrl(url)}: ${e.describeCauses()}" }
-    }
   }
 }

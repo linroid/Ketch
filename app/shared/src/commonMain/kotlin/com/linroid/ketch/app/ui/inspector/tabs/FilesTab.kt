@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,19 +10,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -30,17 +39,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.isSpecified
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchCheckbox
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchMenu
+import com.linroid.ketch.app.components.KetchRadio
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTooltip
 import com.linroid.ketch.app.components.LanePhase
 import com.linroid.ketch.app.components.LaneStripCanvas
 import com.linroid.ketch.app.components.LaneStripDefaults
 import com.linroid.ketch.app.components.lanePhase
+import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.joinText
@@ -49,62 +67,153 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.FileOrder
+import com.linroid.ketch.app.state.FileSelectionModel
+import com.linroid.ketch.app.state.FileSort
+import com.linroid.ketch.app.state.FileSortKey
+import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.TaskRow
+import com.linroid.ketch.app.state.awaitsFileSelection
+import com.linroid.ketch.app.state.selectionMode
+import com.linroid.ketch.app.state.sortedByFiles
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.files.fileSortItems
+import com.linroid.ketch.app.ui.list.TaskCommand
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_file_description
 import ketch.app.shared.generated.resources.inspector_file_description_no_share
 import ketch.app.shared.generated.resources.inspector_file_unnamed
 import ketch.app.shared.generated.resources.inspector_files_all_done
+import ketch.app.shared.generated.resources.inspector_files_apply
+import ketch.app.shared.generated.resources.inspector_files_choose
 import ketch.app.shared.generated.resources.inspector_files_done_of
 import ketch.app.shared.generated.resources.inspector_files_filter
+import ketch.app.shared.generated.resources.inspector_files_hint
+import ketch.app.shared.generated.resources.inspector_files_keep_one
 import ketch.app.shared.generated.resources.inspector_files_map
 import ketch.app.shared.generated.resources.inspector_files_no_match
 import ketch.app.shared.generated.resources.inspector_files_not_selected
 import ketch.app.shared.generated.resources.inspector_files_one_done
+import ketch.app.shared.generated.resources.inspector_files_pending
+import ketch.app.shared.generated.resources.inspector_files_reset
 import ketch.app.shared.generated.resources.inspector_files_sort
+import ketch.app.shared.generated.resources.inspector_files_start
 import ketch.app.shared.generated.resources.inspector_files_waiting
 import ketch.app.shared.generated.resources.inspector_percent_spoken
-import ketch.app.shared.generated.resources.inspector_sort_incomplete
-import ketch.app.shared.generated.resources.inspector_sort_name
-import ketch.app.shared.generated.resources.inspector_sort_size
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The Files tab of the inspector for a torrent: every file it downloads, with its size and
- * progress, under a map with one block per file sized by its bytes.
+ * The Files tab of the inspector for a task with several files or variants, such as a torrent:
+ * its files, with their size and progress, under a map with one block per file sized by its
+ * bytes.
  *
- * Names come from the torrent's resolved file list, by id; a file it does not name is "File 12".
- * The list is virtualized and the whole tab is at most [maxHeight] tall, so a torrent of
+ * Names come from the task's resolved file list, by id; for a torrent, a device listing
+ * [com.linroid.ketch.torrent.api.TorrentFeatures.CONTROL] is asked for them when the task has none
+ * ([FileSelectionModel.load]), and only a file neither names is "File 12". On a device listing
+ * [KetchFeatures.FILE_SELECTION] every file of a task that is not canceled is listed with a
+ * checkbox, or with a radio button when its source offers a single choice
+ * ([com.linroid.ketch.api.FileSelectionMode.SINGLE]): changes wait in a bar with Apply and Reset
+ * (Download for a task that waits for its files), and a failure is posted and undone.
+ *
+ * The list is virtualized and the whole tab is at most [maxHeight] tall, so a download of
  * thousands of files stays cheap; the summary, the sort and the map stay above it as it scrolls.
- * It sorts incomplete files first, by name or by size, and a filter field appears once there are
- * more than 20 files.
+ * Its order is remembered ([FileSortSurface.Inspector]), and a filter field appears once there
+ * are more than 20 files.
  *
  * @param maxHeight the tallest the tab may be, such as the inspector's height so the list fills
  *   it; 360 dp when unspecified.
  */
 @Composable
-fun FilesTab(row: TaskRow, modifier: Modifier = Modifier, maxHeight: Dp = Dp.Unspecified) {
-  // The sort, the filter and the list's state never carry over from another torrent.
-  key(row.key) { TorrentFiles(row, modifier, maxHeight) }
+fun FilesTab(
+  state: AppState,
+  row: TaskRow,
+  modifier: Modifier = Modifier,
+  maxHeight: Dp = Dp.Unspecified,
+) {
+  // Collected so the tab follows what a remote device reports it supports.
+  val presence by state.instanceManager.presence.collectAsState()
+  val deviceId = row.key.deviceId
+  val features = remember(presence, deviceId) { state.featuresOf(deviceId) }
+  // Only a torrent's files can be paged from its device's torrent controls.
+  val torrent = row.isTorrent
+  val controller = remember(presence, deviceId, torrent) {
+    if (torrent) state.torrentControllerOf(deviceId) else null
+  }
+  val selectable = filesSelectable(row, features)
+  val current by rememberUpdatedState(row)
+  // The checks, the filter and the list's state never carry over from another task.
+  key(row.key) {
+    val model = remember(controller) {
+      FileSelectionModel(row.task, controller, state::launchCommand) { e ->
+        val shown = current
+        state.messages.post(
+          level = MessageLevel.Error,
+          title = TaskCommand.ChooseFiles.failure(verbatim(shown.name), shown.device.name),
+          detail = e.message?.let(::verbatim),
+          taskKey = shown.key,
+          deviceId = shown.key.deviceId,
+          cause = e,
+        )
+      }
+    }
+    val needsNames = model.needsNames(row.request)
+    // Asked again as the task moves on, such as once a magnet's metadata arrives.
+    LaunchedEffect(needsNames, row.state::class, row.segments.isEmpty()) {
+      if (needsNames) model.load()
+    }
+    FilesTabContent(
+      row = row,
+      modifier = modifier,
+      maxHeight = maxHeight,
+      list = model.filesOf(row.request),
+      model = model.takeIf { selectable },
+      sort = state.appSettings.fileSort(FileSortSurface.Inspector),
+      onSort = { state.appSettings.saveFileSort(FileSortSurface.Inspector, it) },
+    )
+  }
 }
 
+/**
+ * [FilesTab]'s content for [row]: the files of [list] (else of the row's resolved file list) in
+ * [sort], each with a checkbox, or a radio button for a single choice, when [model] edits the
+ * choice.
+ */
 @Composable
-private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
+internal fun FilesTabContent(
+  row: TaskRow,
+  modifier: Modifier = Modifier,
+  maxHeight: Dp = Dp.Unspecified,
+  list: List<SourceFile>? = null,
+  model: FileSelectionModel? = null,
+  sort: FileSort = FileSortSurface.Inspector.default,
+  onSort: (FileSort) -> Unit = {},
+) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
   val density = KetchTheme.density
   val metrics = remember(spacing, density) { FileMetrics(spacing, density) }
-  val files = remember(row.segments, row.request, row.state) { torrentFiles(row) }
-  val listed = row.request.resolvedSource?.files?.size ?: 0
-  var sort by remember { mutableStateOf(FileSort.IncompleteFirst) }
+  val selectable = model != null
+  val single = row.request.selectionMode == FileSelectionMode.SINGLE
+  val files = remember(row.segments, row.request, row.state, list, selectable) {
+    taskFiles(row, list, selectable)
+  }
+  val waiting = row.state.awaitsFileSelection
+  // A task that waits starts from its source's default, which the files mark as selected.
+  val applied = remember(files) { files.filter { it.selected }.mapTo(HashSet()) { it.id } }
+  if (model != null) LaunchedEffect(model, applied) { model.sync(applied) }
+  val checked = model?.checked(applied) ?: applied
+  val chosen = remember(files) { files.filter { it.selected } }
+  val listed = list?.size ?: row.request.resolvedSource?.files?.size ?: 0
   var query by remember { mutableStateOf("") }
   val shown = remember(files, sort, query) { files.matching(query).sortedFor(sort) }
   val phase = row.state.lanePhase()
+  val orders = remember(selectable) {
+    FileSortSurface.Inspector.orders.filter { selectable || it != FileOrder.Selected }
+  }
 
   Column(
     modifier = modifier
@@ -120,7 +229,14 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
       )
       return@Column
     }
-    val (title, detail) = remember(files, listed) { filesSummary(files, listed) }
+    val (title, detail) = remember(chosen, listed, waiting, files) {
+      if (waiting) {
+        val total = files.sumOf { it.size.coerceAtLeast(0) }
+        Res.string.inspector_files_choose.text() to compactSizeText(total)
+      } else {
+        filesSummary(chosen, listed)
+      }
+    }
     val summary = @Composable { summaryModifier: Modifier ->
       Column(modifier = summaryModifier) {
         Text(
@@ -155,7 +271,7 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
           leadingIcon = KetchIcon.Search,
           modifier = Modifier.weight(1f),
         )
-        SortChip(sort = sort, onSort = { sort = it })
+        SortChip(sort = sort, orders = orders, onSort = onSort)
       }
     } else {
       Row(
@@ -164,19 +280,31 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
         modifier = Modifier.fillMaxWidth(),
       ) {
         summary(Modifier.weight(1f))
-        SortChip(sort = sort, onSort = { sort = it })
+        SortChip(sort = sort, orders = orders, onSort = onSort)
       }
     }
-    val blocks = remember(files) { files.blocks() }
-    val mapDescription = filesMapDescription(files).resolve()
-    LaneStripCanvas(
-      segments = blocks,
-      phase = phase,
-      progress = null,
-      height = LaneStripDefaults.MapHeight,
-      heads = false,
-      modifier = Modifier.clearAndSetSemantics { contentDescription = mapDescription },
-    )
+    if (!waiting && chosen.isNotEmpty()) {
+      val blocks = remember(chosen) { chosen.blocks() }
+      val mapDescription = filesMapDescription(chosen).resolve()
+      LaneStripCanvas(
+        segments = blocks,
+        phase = phase,
+        progress = null,
+        height = LaneStripDefaults.MapHeight,
+        heads = false,
+        modifier = Modifier.clearAndSetSemantics { contentDescription = mapDescription },
+      )
+    }
+    if (model != null) {
+      ChoiceBar(
+        model = model,
+        files = files,
+        checked = checked,
+        applied = applied,
+        waiting = waiting,
+        single = single,
+      )
+    }
     if (shown.isEmpty()) {
       Text(
         text = stringResource(Res.string.inspector_files_no_match, query.trim()),
@@ -190,7 +318,19 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
         val chips = maxWidth >= metrics.chipsFrom
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
           items(shown, key = { it.id }) { file ->
-            FileRow(file = file, phase = phase, metrics = metrics, chip = chips)
+            FileRow(
+              file = file,
+              phase = phase,
+              metrics = metrics,
+              chip = chips,
+              // Nothing downloads before the files are chosen.
+              progress = !waiting,
+              check = model?.let { m ->
+                FileCheck(checked = file.id in checked, single = single) {
+                  if (single) m.choose(file.id, applied) else m.toggle(listOf(file.id), applied)
+                }
+              },
+            )
           }
         }
       }
@@ -198,32 +338,118 @@ private fun TorrentFiles(row: TaskRow, modifier: Modifier, maxHeight: Dp) {
   }
 }
 
+/**
+ * Under the map while the checks differ from the files that download, or always for a task that
+ * waits for its files: how many files are checked and their size, with Reset and Apply
+ * (Download); then why a click changed nothing, or what Apply does to checked files.
+ */
 @Composable
-private fun SortChip(sort: FileSort, onSort: (FileSort) -> Unit) {
+private fun ChoiceBar(
+  model: FileSelectionModel,
+  files: List<TaskFile>,
+  checked: Set<String>,
+  applied: Set<String>,
+  waiting: Boolean,
+  single: Boolean,
+) {
+  val colors = KetchTheme.colors
+  val spacing = KetchTheme.spacing
+  val type = KetchTheme.typography
+  val dirty = model.isDirty(applied, waiting)
+  if (dirty) {
+    val bytes = remember(files, checked) {
+      files.filter { it.id in checked }.sumOf { it.size.coerceAtLeast(0) }
+    }
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+      modifier = Modifier
+        .fillMaxWidth()
+        .background(colors.surfaceSunken, KetchTheme.shapes.sm)
+        .padding(horizontal = spacing.s3, vertical = spacing.s2),
+    ) {
+      Text(
+        text = Res.plurals.inspector_files_pending
+          .text(checked.size, checked.size, compactSizeText(bytes)).resolve(),
+        style = type.numeral,
+        color = colors.textPrimary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f),
+      )
+      if (model.pending != null) {
+        KetchButton(
+          text = stringResource(Res.string.inspector_files_reset),
+          onClick = model::reset,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+          enabled = !model.applying,
+        )
+      }
+      KetchButton(
+        text = stringResource(
+          if (waiting) Res.string.inspector_files_start else Res.string.inspector_files_apply,
+        ),
+        onClick = { model.apply(applied) },
+        variant = KetchButtonVariant.Primary,
+        size = KetchButtonSize.Small,
+        loading = model.applying,
+      )
+    }
+  }
+  val note = when {
+    model.keepOne -> Res.string.inspector_files_keep_one
+    // About checked files, which a single choice has none of.
+    dirty && !waiting && !single -> Res.string.inspector_files_hint
+    else -> null
+  }
+  if (note != null) {
+    Text(
+      text = stringResource(note),
+      style = type.caption,
+      color = if (model.keepOne) colors.status.paused.color else colors.textSecondary,
+    )
+  }
+}
+
+@Composable
+private fun SortChip(sort: FileSort, orders: List<FileOrder>, onSort: (FileSort) -> Unit) {
   var open by remember { mutableStateOf(false) }
   Box {
     KetchChip(
-      label = sort.label.resolve(),
+      label = sort.order.label.resolve(),
       selected = false,
       onClick = { open = true },
       trailingIcon = KetchIcon.ChevronDown,
     )
     val title = stringResource(Res.string.inspector_files_sort)
     KetchMenu(expanded = open, onDismissRequest = { open = false }, title = title) {
-      for (option in FileSort.entries) {
-        item(label = option.label, onClick = { onSort(option) }, checked = option == sort)
-      }
+      fileSortItems(sort, orders, onSort)
     }
   }
 }
 
+/**
+ * A file's checkbox, or its radio button when it is one variant of a [single] choice: whether it
+ * is [checked], and what clicking it does.
+ */
+private class FileCheck(val checked: Boolean, val single: Boolean, val onToggle: () -> Unit)
+
 @Composable
-private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, chip: Boolean) {
+private fun FileRow(
+  file: TaskFile,
+  phase: LanePhase,
+  metrics: FileMetrics,
+  chip: Boolean,
+  progress: Boolean,
+  check: FileCheck?,
+) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
   val size = (if (file.size >= 0) compactSizeText(file.size) else verbatim(UNKNOWN)).resolve()
-  val percent = file.percent
+  val shows = progress && file.selected
+  val percent = file.percent.takeIf { shows }
   val name = file.label.resolve()
   val description = if (percent != null) {
     Res.string.inspector_file_description
@@ -231,6 +457,23 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
   } else {
     Res.string.inspector_file_description_no_share.text(name, size)
   }.resolve()
+  val toggle = when {
+    check == null -> Modifier
+    check.single -> Modifier
+      .clip(KetchTheme.shapes.sm)
+      .selectable(
+        selected = check.checked,
+        role = Role.RadioButton,
+        onClick = check.onToggle,
+      )
+    else -> Modifier
+      .clip(KetchTheme.shapes.sm)
+      .toggleable(
+        value = check.checked,
+        role = Role.Checkbox,
+        onValueChange = { check.onToggle() },
+      )
+  }
   KetchTooltip(text = file.pathText.resolve()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -238,10 +481,20 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
       modifier = Modifier
         .fillMaxWidth()
         .height(metrics.rowHeight)
+        .then(toggle)
         .clearAndSetSemantics { contentDescription = description },
     ) {
+      if (check?.single == true) {
+        KetchRadio(selected = check.checked, onClick = null, modifier = Modifier.size(spacing.s5))
+      } else if (check != null) {
+        KetchCheckbox(
+          checked = check.checked,
+          onCheckedChange = null,
+          modifier = Modifier.size(spacing.s5),
+        )
+      }
       if (chip) KetchFileTypeChip(fileName = name, size = KetchFileTypeChipDefaults.TableSize)
-      FileName(name, Modifier.weight(1f))
+      FileName(name, Modifier.weight(1f), dimmed = !file.selected)
       Text(
         text = size,
         style = type.numeral,
@@ -255,7 +508,7 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
         horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
         modifier = Modifier.width(metrics.progressWidth),
       ) {
-        if (!file.isDone && file.size > 0) {
+        if (shows && !file.isDone && file.size > 0) {
           val own = remember(file) { listOf(Segment(0, 0, file.size - 1, file.downloaded)) }
           LaneStripCanvas(
             segments = own,
@@ -267,13 +520,15 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
             modifier = Modifier.width(metrics.barWidth).clearAndSetSemantics {},
           )
         }
-        Text(
-          text = (percent?.let(::percentText) ?: verbatim(UNKNOWN)).resolve(),
-          style = type.numeral,
-          color = if (file.isDone) colors.textTertiary else colors.textPrimary,
-          textAlign = TextAlign.End,
-          maxLines = 1,
-        )
+        if (progress) {
+          Text(
+            text = (percent?.let(::percentText) ?: verbatim(UNKNOWN)).resolve(),
+            style = type.numeral,
+            color = if (file.isDone || !shows) colors.textTertiary else colors.textPrimary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+          )
+        }
       }
     }
   }
@@ -284,7 +539,7 @@ private fun FileRow(file: TorrentFile, phase: LanePhase, metrics: FileMetrics, c
  * its end, where episode numbers and extensions sit, stay readable.
  */
 @Composable
-private fun FileName(name: String, modifier: Modifier = Modifier) {
+private fun FileName(name: String, modifier: Modifier = Modifier, dimmed: Boolean = false) {
   val style = KetchTheme.typography.bodyS
   val measurer = rememberTextMeasurer()
   BoxWithConstraints(modifier) {
@@ -294,7 +549,13 @@ private fun FileName(name: String, modifier: Modifier = Modifier) {
         measurer.measure(text, style, maxLines = 1, softWrap = false).size.width <= width
       }
     }
-    Text(text = shown, style = style, color = KetchTheme.colors.textPrimary, maxLines = 1)
+    val colors = KetchTheme.colors
+    Text(
+      text = shown,
+      style = style,
+      color = if (dimmed) colors.textSecondary else colors.textPrimary,
+      maxLines = 1,
+    )
   }
 }
 
@@ -313,37 +574,26 @@ private class FileMetrics(spacing: KetchSpacing, density: KetchDensity) {
   val barWidth: Dp = spacing.s6
 }
 
-/** Orders of the Files tab. */
-internal enum class FileSort(private val resource: StringResource) {
-  /** Files still downloading first, then the torrent's order. */
-  IncompleteFirst(Res.string.inspector_sort_incomplete),
-  Name(Res.string.inspector_sort_name),
-
-  /** Largest first. */
-  Size(Res.string.inspector_sort_size);
-
-  /** What the sort menu calls it. */
-  val label: UiText get() = resource.text()
-}
-
 /**
- * One file of a torrent.
+ * One file or variant of a task, such as a file of a torrent.
  *
- * @property id the file's id in the torrent's resolved file list.
- * @property path its path in the torrent, folders included; `null` when the list names it not.
- * @property start where it begins in the torrent's bytes.
+ * @property id the file's id in the task's resolved file list.
+ * @property path its path in the download, folders included; `null` when the list names it not.
+ * @property start where it begins in the download's bytes.
  * @property size its size in bytes, `-1` when unknown.
  * @property downloaded bytes downloaded so far.
- * @property number its place in the torrent, counting from 1, which names an unnamed file.
+ * @property number its place in the list, counting from 1, which names an unnamed file.
+ * @property selected whether the task downloads it.
  */
 @Immutable
-internal data class TorrentFile(
+internal data class TaskFile(
   val id: String,
   val path: String?,
   val start: Long,
   val size: Long,
   val downloaded: Long,
   val number: Int = 0,
+  val selected: Boolean = true,
 ) {
   /** The file's own name, without its folders; `null` when unnamed. */
   val name: String?
@@ -371,19 +621,71 @@ internal data class TorrentFile(
 }
 
 /**
- * The files [row]'s torrent downloads, in torrent order: from its segments, one per selected
- * file, once it runs, or else from its resolved file list and selection. Names come from the
- * resolved list by id.
+ * Whether [row]'s source offers files or variants to choose: its resolved file list names some,
+ * or it is a torrent, whose names its device's torrent controls can list.
  */
-internal fun torrentFiles(row: TaskRow): List<TorrentFile> {
-  val source = row.request.resolvedSource?.files.orEmpty()
-  val names = source.associate { it.id to it.name }
+internal fun hasFileChoice(row: TaskRow): Boolean =
+  row.request.resolvedSource?.files.orEmpty().isNotEmpty() || row.isTorrent
+
+/**
+ * Whether the Files tab of [row] lets the user choose its files: its source offers a choice
+ * ([hasFileChoice]), its device, which reports [features], changes them
+ * ([KetchFeatures.FILE_SELECTION]), and the task is not canceled.
+ */
+internal fun filesSelectable(row: TaskRow, features: Set<String>): Boolean =
+  hasFileChoice(row) && KetchFeatures.FILE_SELECTION in features &&
+    row.state !is DownloadState.Canceled
+
+/**
+ * The files [row] downloads, in the source's order. A torrent's come from its segments, one per
+ * selected file, once it runs; otherwise they come from the resolved file list and the selection,
+ * whose default is every file, or the first variant of a single choice. Names come from [list],
+ * else the resolved list, by id. When [selectable], every file of the list is listed, those the
+ * task does not download too, with the progress of its torrent segment, or of the whole task for
+ * the one variant of a single choice.
+ */
+internal fun taskFiles(
+  row: TaskRow,
+  list: List<SourceFile>? = null,
+  selectable: Boolean = false,
+): List<TaskFile> {
+  val source = list ?: row.request.resolvedSource?.files.orEmpty()
   val completed = row.state is DownloadState.Completed
-  if (row.segments.isNotEmpty()) {
+  val chosenIds = chosenFiles(row, source)
+  if (selectable && source.isNotEmpty()) {
+    // Only a torrent's segments are its files.
+    val bySegment = if (row.isTorrent) row.segments.associateBy { it.index.toString() } else null
+    val single = row.request.selectionMode == FileSelectionMode.SINGLE
+    var offset = 0L
+    return source.mapIndexed { index, file ->
+      val chosen = chosenIds == null || file.id in chosenIds
+      val segment = bySegment?.get(file.id)
+      val size = segment?.totalBytes ?: file.size
+      val downloaded = when {
+        !chosen -> 0
+        completed && size >= 0 -> size
+        segment != null -> segment.downloadedBytes.coerceIn(0, size.coerceAtLeast(0))
+        single && !row.state.awaitsFileSelection ->
+          row.downloadedBytes.coerceIn(0, size.coerceAtLeast(0))
+        else -> 0
+      }
+      TaskFile(
+        id = file.id,
+        path = file.name,
+        start = segment?.start ?: offset,
+        size = size,
+        downloaded = downloaded,
+        number = index + 1,
+        selected = chosen,
+      ).also { offset += file.size.coerceAtLeast(0) }
+    }
+  }
+  val names = source.associate { it.id to it.name }
+  if (row.isTorrent && row.segments.isNotEmpty()) {
     return row.segments.sortedBy { it.start }.map { segment ->
       val id = segment.index.toString()
       val size = segment.totalBytes
-      TorrentFile(
+      TaskFile(
         id = id,
         path = names[id],
         start = segment.start,
@@ -393,11 +695,10 @@ internal fun torrentFiles(row: TaskRow): List<TorrentFile> {
       )
     }
   }
-  val selected = row.request.selectedFileIds
   var offset = 0L
-  return source.withIndex().filter { (_, file) -> selected.isEmpty() || file.id in selected }
+  return source.withIndex().filter { (_, file) -> chosenIds == null || file.id in chosenIds }
     .map { (index, file) ->
-      TorrentFile(
+      TaskFile(
         id = file.id,
         path = file.name,
         start = offset,
@@ -408,19 +709,45 @@ internal fun torrentFiles(row: TaskRow): List<TorrentFile> {
     }
 }
 
-/** How many files [torrentFiles] lists for [row], without building them. */
-internal fun torrentFileCount(row: TaskRow): Int {
-  if (row.segments.isNotEmpty()) return row.segments.size
-  val files = row.request.resolvedSource?.files.orEmpty()
+/**
+ * The files of [source] that [row] downloads, or starts from while it waits for a choice: its
+ * selection, else the first variant of a single choice; `null` for every file.
+ */
+private fun chosenFiles(row: TaskRow, source: List<SourceFile>): Set<String>? {
   val selected = row.request.selectedFileIds
-  return if (selected.isEmpty()) files.size else files.count { it.id in selected }
+  return when {
+    !row.state.awaitsFileSelection && selected.isNotEmpty() -> selected
+    row.request.selectionMode == FileSelectionMode.SINGLE ->
+      source.take(1).mapTo(HashSet()) { it.id }
+    else -> null
+  }
+}
+
+/** Bytes [this] task has downloaded, as its state reports them. */
+private val TaskRow.downloadedBytes: Long
+  get() = when (val state = state) {
+    is DownloadState.Downloading -> state.progress.downloadedBytes
+    is DownloadState.Paused -> state.progress.downloadedBytes
+    else -> 0
+  }
+
+/**
+ * How many files [taskFiles] lists for [row], without building them: every file of its
+ * resolved list when [selectable].
+ */
+internal fun taskFileCount(row: TaskRow, selectable: Boolean = false): Int {
+  val files = row.request.resolvedSource?.files.orEmpty()
+  if (selectable && files.isNotEmpty()) return files.size
+  if (row.isTorrent && row.segments.isNotEmpty()) return row.segments.size
+  val chosen = chosenFiles(row, files) ?: return files.size
+  return files.count { it.id in chosen }
 }
 
 /**
  * The two lines over the file list: how many files are done, such as "9 of 14 files done", and
- * their bytes, such as "3.2 of 7.9 GB", with the files the torrent [listed] but does not download.
+ * their bytes, such as "3.2 of 7.9 GB", with the files the task [listed] but does not download.
  */
-internal fun filesSummary(files: List<TorrentFile>, listed: Int): Pair<UiText, UiText> {
+internal fun filesSummary(files: List<TaskFile>, listed: Int): Pair<UiText, UiText> {
   val done = files.count { it.isDone }
   val count = files.size
   val title = when {
@@ -442,7 +769,7 @@ internal fun filesSummary(files: List<TorrentFile>, listed: Int): Pair<UiText, U
 }
 
 /** What the file map says to a screen reader: "300 files, 100 done, 33 percent". */
-private fun filesMapDescription(files: List<TorrentFile>): UiText {
+private fun filesMapDescription(files: List<TaskFile>): UiText {
   val known = files.filter { it.size > 0 }
   val total = known.sumOf { it.size }
   val downloaded = known.sumOf { it.downloaded.coerceIn(0, it.size) }
@@ -451,24 +778,29 @@ private fun filesMapDescription(files: List<TorrentFile>): UiText {
   return Res.plurals.inspector_files_map.text(files.size, files.size, done, percent)
 }
 
-/** These files in [sort] order. */
-internal fun List<TorrentFile>.sortedFor(sort: FileSort): List<TorrentFile> = when (sort) {
-  FileSort.IncompleteFirst -> sortedWith(compareBy({ it.isDone }, { it.start }))
-  FileSort.Name -> sortedWith(compareBy(nullsLast(String.CASE_INSENSITIVE_ORDER)) { it.path })
-  FileSort.Size -> sortedWith(compareByDescending<TorrentFile> { it.size }.thenBy { it.start })
-}
+/** These files in [sort] order; Selected first follows the files the task downloads. */
+internal fun List<TaskFile>.sortedFor(sort: FileSort): List<TaskFile> =
+  sortedByFiles(sort) { file ->
+    FileSortKey(
+      path = file.path,
+      size = file.size,
+      index = file.number - 1,
+      selected = file.selected,
+      progress = file.percent?.let { it / 100f },
+    )
+  }
 
 /** The files whose path contains [query], ignoring case; all of them for a blank query. */
-internal fun List<TorrentFile>.matching(query: String): List<TorrentFile> {
+internal fun List<TaskFile>.matching(query: String): List<TaskFile> {
   val text = query.trim()
   return if (text.isEmpty()) this else filter { it.path?.contains(text, ignoreCase = true) == true }
 }
 
 /**
- * One block per file of known, non-zero size, at its place in the torrent; neighbouring files
+ * One block per file of known, non-zero size, at its place in the download; neighbouring files
  * that are done share one block, which the map draws as one run anyway.
  */
-internal fun List<TorrentFile>.blocks(): List<Segment> {
+internal fun List<TaskFile>.blocks(): List<Segment> {
   val blocks = ArrayList<Segment>()
   for (file in sortedBy { it.start }) {
     if (file.size <= 0) continue
@@ -484,7 +816,7 @@ internal fun List<TorrentFile>.blocks(): List<Segment> {
   return blocks
 }
 
-/** Torrents with more files than this get a filter field. */
+/** Tasks with more files than this get a filter field. */
 internal const val FILTER_THRESHOLD: Int = 20
 
 /** What a size or share reads while it is unknown. */

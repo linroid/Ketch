@@ -102,6 +102,9 @@
   <string name="inspector_detail_connections">Conexões</string>
   <string name="inspector_detail_device">Dispositivo</string>
   <string name="inspector_detail_captured">Capturado</string>
+  <string name="inspector_detail_checksum">Soma de verificação</string>
+  <string name="inspector_checksum_verified">%1$s · verificada</string>
+  <string name="inspector_checksum_pending">%1$s · conferida ao terminar</string>
   <string name="inspector_section_advanced">Avançado</string>
   <string name="inspector_detail_task_id">ID da tarefa</string>
   <string name="inspector_detail_headers">Cabeçalhos</string>
@@ -119,6 +122,7 @@
   <string name="inspector_copy_failed_connections">Não foi possível copiar as conexões</string>
   <string name="inspector_copy_failed_device">Não foi possível copiar o dispositivo</string>
   <string name="inspector_copy_failed_captured">Não foi possível copiar a origem da captura</string>
+  <string name="inspector_copy_failed_checksum">Não foi possível copiar a soma de verificação</string>
   <string name="inspector_copy_failed_task_id">Não foi possível copiar o ID da tarefa</string>
   <string name="inspector_copy_failed_headers">Não foi possível copiar os cabeçalhos</string>
   <string name="inspector_copy_failed_property">Não foi possível copiar a propriedade</string>
@@ -162,8 +166,8 @@
     <item quantity="other">%1$d concluídas · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">Conexão única</string>
-  <string name="inspector_connections_live">Uma nova quantidade redivide os bytes restantes na hora.</string>
-  <string name="inspector_connections_on_resume">Uma nova quantidade vale quando o download for retomado.</string>
+  <string name="inspector_connections_live">Vale na hora.</string>
+  <string name="inspector_connections_on_resume">Vale quando o download for retomado.</string>
   <string name="inspector_lane_description">Conexão %1$d, %2$s, %3$s</string>
   <string name="inspector_percent_spoken">%1$d por cento</string>
 
@@ -188,10 +192,21 @@
   <string name="inspector_files_filter">Filtrar arquivos</string>
   <string name="inspector_files_no_match">Nenhum arquivo corresponde a “%1$s”</string>
   <string name="inspector_files_sort">Ordenar arquivos</string>
-  <string name="inspector_sort_incomplete">Incompletos primeiro</string>
-  <string name="inspector_sort_name">Nome</string>
-  <string name="inspector_sort_size">Tamanho</string>
   <string name="inspector_file_unnamed">Arquivo %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d arquivo · %2$s</item>
+    <item quantity="other">%1$d arquivos · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">Aplicar</string>
+  <string name="inspector_files_reset">Redefinir</string>
+  <string name="inspector_files_start">Baixar</string>
+  <string name="inspector_files_choose">Escolha os arquivos para baixar</string>
+  <string name="inspector_files_keep_one">Mantenha pelo menos um arquivo</string>
+  <string name="inspector_files_hint">Os arquivos marcados são baixados; os desmarcados ficam onde estão.</string>
+  <string name="inspector_seeding_status">Semeando · ↑ %1$s · %2$s enviados</string>
+  <string name="inspector_seeding_stop">Parar de semear</string>
+  <string name="inspector_seeding_start">Semear</string>
+  <string name="inspector_seeding_waiting">Aguardando para semear</string>
 </resources>

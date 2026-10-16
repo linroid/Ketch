@@ -11,6 +11,7 @@
   <string name="command_palette">Command palette</string>
   <string name="command_search">Search downloads</string>
   <string name="command_discover">Discover</string>
+  <string name="command_connections">Connections</string>
   <string name="command_devices">Devices</string>
   <string name="command_device_all">All devices</string>
   <string name="command_device_switcher">Switch device…</string>
@@ -40,7 +41,7 @@
   <string name="command_list_toggle">Pause or resume</string>
   <string name="command_list_open">Open</string>
   <string name="command_list_reveal">Show in folder</string>
-  <string name="command_list_remove">Remove from list</string>
+  <string name="command_list_remove">Remove</string>
   <string name="command_list_remove_and_trash">Remove and trash files…</string>
   <string name="command_list_copy_link">Copy link</string>
   <string name="command_list_copy_path">Copy file path</string>

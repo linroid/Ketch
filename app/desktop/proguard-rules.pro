@@ -46,6 +46,9 @@
 
 # JNA (the torrent engine's file system calls) binds its Java classes to native code by name.
 -keep class com.sun.jna.** { *; }
+# Native code calls JNA callbacks (MacDock's main queue function) through their one method.
+-keep interface * extends com.sun.jna.Callback { *; }
+-keepclassmembers class * implements com.sun.jna.Callback { *; }
 
 # Logs name states, errors and exceptions by their class names (DownloadState.logLabel,
 # describeCauses), which obfuscation would turn into single letters.

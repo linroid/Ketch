@@ -9,23 +9,36 @@
 <h1 align="center">Ketch</h1>
 
 <p align="center">
+  <b>English</b> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.es.md">Español</a> ·
+  <a href="README.ja.md">日本語</a> ·
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.fr.md">Français</a>
+</p>
+
+<p align="center">
   <b>A fast, open-source download manager for every device you own.</b><br>
-  macOS · Windows · Linux · Android · iOS · Web · Command line
+  macOS · Windows · Linux · Android · iOS · Web · Command line<br>
+  A Kotlin Multiplatform library you can embed in your own application.
 </p>
 
 <p align="center">
 
-[![Latest release](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
+[![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web app](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
+[![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Desktop](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
 
 </p>
 
 <p align="center">
   <a href="#download"><b>Download</b></a> ·
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>Watch demo</b></a> ·
   <a href="#features"><b>Features</b></a> ·
   <a href="#getting-started"><b>Getting started</b></a> ·
   <a href="docs/developers.md"><b>For developers</b></a>
@@ -39,13 +52,21 @@
   </picture>
 </p>
 
+<p align="center">
+  <a href="https://youtu.be/l8RCUYQfRrc"><b>▶ Watch Ketch in action</b></a>
+</p>
+
 Ketch splits every download across parallel connections, and shows each one as a live lane. It
 takes web links, FTP servers, torrents and magnet links in one place. Pair your laptop, phone and
 home server, and you can watch and control the downloads on all of them from any one of them.
 
+**Building your own app?** Embed the same download engine that powers Ketch's apps, with parallel
+downloads, pause and resume, queues and speed limits. The Kotlin Multiplatform library is
+available on Maven Central. [Start integrating Ketch →](docs/developers.md#quick-start)
+
 > [!WARNING]
-> 🚧 Ketch is in active development and only has release candidates so far. Expect rough edges,
-> and please [report what you find](https://github.com/linroid/Ketch/issues).
+> 🚧 Ketch is in active development and has not reached 1.0 yet. Expect rough edges, and please
+> [report what you find](https://github.com/linroid/Ketch/issues).
 
 ## Download
 
@@ -55,10 +76,11 @@ home server, and you can watch and control the downloads on all of them from any
 | Windows (x64, ARM64) | `.msi`, or the portable `.zip` that runs without installing, from the [latest release][release] ([about the portable app](docs/updates.md#the-portable-windows-app)) |
 | Linux (x64, ARM64) | `.deb` from the [latest release][release] |
 | Android 8.0+ | `.apk` from the [latest release][release] |
-| iOS 18+ | Build from source with Xcode ([`app/ios`](app/ios/)) |
+| iOS 15+ | Unsigned `.ipa` from the [latest release][release], to sideload with AltStore, SideStore or Sideloadly (they sign it with your Apple ID); or build from source with Xcode ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), to control Ketch running on another device |
-| Browser extension | Chrome, Edge, Brave, Firefox and others: `.zip` from the [latest release][release] ([how to install](app/browser-extension/README.md#installing)) |
+| Browser extension | Chrome, Edge, Brave and other Chromium browsers: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` from the extension's [releases](https://github.com/linroid/Ketch/releases) ([how to install](app/browser-extension/README.md#installing)) |
 | Command line and server | macOS, Linux and Windows: [install script](#run-ketch-on-a-server) or the [latest release][release] |
+| Docker | NAS and home servers on x64 and ARM64: `ghcr.io/linroid/ketch` ([guide](docs/docker.md), with TrueNAS and fnOS) |
 
 The desktop apps bring their own runtime, and the command line is a single native binary: neither
 needs Java. Both update themselves from the releases here: the desktop app from Settings → About,
@@ -75,16 +97,27 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   connections while the download runs.
 - **Several networks at once** — Spread one download over Wi-Fi, Ethernet and, on Android,
   cellular data ([how it works](docs/multiple-networks.md)).
+- **Proxies** — Download through the system's proxy, an HTTP or SOCKS5 proxy with a username and
+  password, or none, skipping the hosts you list; for one download too ([details](docs/proxy.md)).
 - **Pause and resume, even after a restart** — Ketch checks that the file on the server has not
-  changed before it continues, and retries failed connections on its own.
+  changed before it continues, and retries failed connections on its own. Until a download
+  finishes it is saved as `name.ketch`, so an unfinished file never looks complete.
 
 ### Every kind of link
 
 - **HTTP and HTTPS**, with the cookies and referrer of the page when the browser extension sends
   the download.
 - **FTP and FTPS**, with parallel connections and resume.
-- **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files, in an
-  engine written in pure Kotlin ([details](docs/torrent.md)).
+- **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files and
+  optional seeding, in an engine written in pure Kotlin. It speaks uTP and protocol encryption,
+  downloads from web seeds, forwards its port on your router and finds peers on your local
+  network ([details](docs/torrent.md)).
+- **Torrent files, chosen any time** — Choose a torrent's files before or while it downloads and
+  change them without starting over; a magnet link added before its details arrive waits for
+  your choice. Stop or restart seeding a finished torrent; the ones you keep sharing seed again
+  after Ketch restarts.
+- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
+  HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or
   the file manager lands in Ketch.
 
@@ -97,8 +130,14 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   keystroke, or open **All devices** to list every download in one table.
 - **Send downloads where they belong** — Add a link to any device, drop it on a device in the
   sidebar, or send or move a download to another device, without switching.
-- **Headless on a NAS or server** — `ketch server` runs the same engine with a REST API and the
-  web app built in, and the apps find it on your network.
+- **Headless on a NAS or server** — `ketch server`, also as a [Docker image](docs/docker.md),
+  runs the same engine with a REST API and the web app built in, and the apps find it on your
+  network.
+- **From a terminal** — `ketch add`, `list`, `pause`, `resume` and `watch` control the downloads
+  of the Ketch app or a server from a terminal or a script; `watch` prints JSON lines
+  ([CLI](cli/README.md#work-on-a-running-ketch)).
+- **Automation hooks** — Run a command or call a signed webhook when a download is added,
+  finishes or fails, from `ketch server` or the desktop app ([hooks](docs/hooks.md)).
 
 ### In control of your bandwidth
 
@@ -118,13 +157,20 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   copy.
 - **Keyboard first** on the desktop: `⌘K` (`Ctrl+K` on Windows and Linux) opens the command
   palette, and the shortcut sheet lists every key.
+- **Category folders** — Videos, music, documents and archives go to folders of their own inside
+  the download folder, by file type or website: start from the suggested ones under
+  **Settings → Downloads**, or set your own rules.
 - **Finished means openable** — Open a file, show it in its folder or drag it out, straight from
   the list.
 - **At home on each platform** — The menu bar or tray, notifications, Dock and taskbar progress
   on the desktop; downloads that keep running in the background on Android and on iOS 26.
-- **Your look, your language** — Light and dark themes with four accent colors, in English,
-  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch and Français
+- **Awake while it downloads** — The desktop and Android apps keep the system from going to sleep
+  on its own while downloads run; the screen can still turn off (**Settings → General**).
+- **Your look, your language** — Light and dark themes with seven accent colors, in English,
+  简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français and Русский
   ([translating](docs/development/localization.md)).
+- **Verified downloads** — Give a download a SHA-256, SHA-512, SHA-1 or MD5 checksum, and Ketch
+  checks the finished file against it, or against the checksum the server publishes.
 
 ### Find downloads with AI (preview)
 
@@ -135,8 +181,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   a website, unless you let it. Bring your own model: OpenAI, Anthropic, Gemini, Ollama or any
   OpenAI-compatible service. In the desktop and Android apps, and with
   `ketch ai-discover` ([setup](docs/ai-discovery.md)).
-- **MCP server** — `ketch mcp` lets AI assistants start, watch and manage your downloads through
-  the [Model Context Protocol](cli/README.md#mcp-server).
+- **MCP server** — `ketch mcp` lets AI assistants start, watch and manage the downloads of the
+  Ketch app or a server through the [Model Context Protocol](cli/README.md#mcp-server).
 
 ## Getting started
 
@@ -164,46 +210,41 @@ Start the server, with its REST API and web app on port 8642:
 ketch server
 ```
 
-Then add it in the apps under **Devices → Add device**, or open `http://<server address>:8642` in
-a browser. The command line also downloads on its own:
+On its first run it creates an access token and prints it once. Add the server in the apps under
+**Devices → Add device** with that token, or open `http://<server address>:8642` in a browser. The
+command line also downloads on its own:
 
 ```bash
 ketch https://example.com/file.zip
 ```
 
-Set an access code, the port and other options in a [config file](cli/README.md#configuration-file);
+Set your own token, the port and other options in a [config file](cli/README.md#configuration-file);
 the [CLI documentation](cli/README.md) lists every command.
+
+On a NAS, or anywhere Docker runs, start the image instead. The [Docker guide](docs/docker.md)
+covers its settings and has steps for TrueNAS and fnOS:
+
+```bash
+docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
+  -v /srv/ketch:/config -v /srv/downloads:/downloads \
+  -p 8642:8642 -p 16881:16881 -p 16881:16881/udp ghcr.io/linroid/ketch
+```
 
 ## Roadmap
 
 - **Distribution before v1.0.0** — Signed Windows releases, signed and notarized macOS releases,
-  browser-store extensions and verified installation/update paths
+  the extension in more browser stores and verified installation/update paths
   ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads from several mirrors at once, with checksums
 - **WebDAV** — Download from WebDAV servers, with resume
-- **HLS and DASH** — Download and merge HTTP Live Streaming and MPEG-DASH videos, choosing the
-  quality and its matching audio
+- **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
+  AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
-- **Checksums** — Check a download against a hash you provide, or one the server publishes
-- **Proxy** — Download through an HTTP or SOCKS5 proxy or the system proxy, with a bypass list
 - **Faster segmented downloads** — Connections that finish early take over the rest of the slower
   ones, so a download no longer waits on its slowest connection
-- **Stall detection and retry settings** — Reconnect when a connection stops sending data, and
-  choose timeouts and how often to retry, unlimited included
-- **Unfinished files look unfinished** — Downloads are written under a temporary name and get
-  their real name once complete
-- **Category folders** — Save videos, music, documents and archives to folders of their own, by
-  rules you set
-- **Torrent files, chosen any time** — Pick the files of a magnet link once its details arrive,
-  and change the selection while it downloads
-- **Keep awake** — Keep the computer from sleeping while downloads run, and optionally sleep or
-  shut down when they finish
-- **Automation hooks** — Run a command or call a webhook when a download finishes or fails
-- **Command line for running devices** — `ketch` and AI agents add, list, pause and watch the
-  downloads of the Ketch app or a server, instead of starting a second engine
-- **Docker image** — An official image for NAS and home servers on x64 and ARM, with a health
-  check and a fixed torrent port
+- **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
+  once the queue is empty
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own
@@ -211,9 +252,28 @@ the [CLI documentation](cli/README.md) lists every command.
 
 ## For developers
 
-Everything the apps do is built on Ketch's Kotlin Multiplatform library, which you can use in your
-own app: embed the download engine on Android, iOS, the JVM, Node.js or WASI, or control a Ketch
-server from Android, iOS, the JVM or the browser, through the same `KetchApi`.
+**Embed Ketch in your application.** Its Kotlin Multiplatform library gives you the same download
+engine used by the Ketch apps, with your own UI and application logic. Add the modules you need
+from Maven Central under `com.linroid.ketch`.
+
+Run the engine inside your Android, iOS or JVM app with `core` and `ktor`; Node.js and WASI can
+use `core` with a custom HTTP engine. Or use `remote` to control a Ketch server from Android,
+iOS, the JVM or the browser through the same `KetchApi`.
+
+```kotlin
+// build.gradle.kts: implementation("com.linroid.ketch:core:<version>")
+//                   implementation("com.linroid.ketch:ktor:<version>")
+val ketch = Ketch(httpEngine = KtorHttpEngine())
+ketch.start()
+
+val task = ketch.download(
+  DownloadRequest(
+    url = "https://example.com/file.zip",
+    destination = Destination("/path/to/downloads/"), // a trailing slash means a folder
+  ),
+)
+task.state.collect { println(it) }
+```
 
 - [Developer guide](docs/developers.md) — Modules, a quick start, the REST API and extending Ketch
 - [API reference](docs/api.md) — Installation, configuration, priorities, errors and logging
@@ -227,6 +287,7 @@ server from Android, iOS, the JVM or the browser, through the same `KetchApi`.
 - [BitTorrent](docs/torrent.md) — Torrent and magnet support and its limits
 - [Multiple networks](docs/multiple-networks.md) — Spreading downloads across network interfaces
 - [AI discovery](docs/ai-discovery.md) — Providers, keys, web search, page access, chats and history
+- [Automation hooks](docs/hooks.md) — Commands and webhooks run on download events
 - [Logging](docs/logging.md) — Where the logs are, and what to attach to a bug report
 
 ## Contributing

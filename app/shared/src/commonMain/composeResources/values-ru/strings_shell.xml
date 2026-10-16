@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">Загрузки</string>
   <string name="shell_destination_discover">Поиск</string>
+  <string name="shell_destination_connections">Подключения</string>
   <string name="shell_destination_devices">Устройства</string>
   <string name="shell_settings">Настройки</string>
   <string name="shell_devices">Устройства</string>
@@ -50,7 +51,6 @@
   <string name="shell_devices_online">%1$d из %2$d в сети</string>
 
   <string name="sidebar_all_devices_tooltip">Загрузки всех устройств</string>
-  <string name="sidebar_add_device">Добавить устройство</string>
   <string name="sidebar_device_menu">Меню устройства</string>
   <string name="sidebar_menu_pause_all">Приостановить все здесь</string>
   <string name="sidebar_menu_resume_all">Возобновить все здесь</string>
@@ -64,7 +64,7 @@
 
   <string name="switcher_overview">Обзор</string>
   <string name="switcher_add_device">Добавить устройство…</string>
-  <string name="switcher_find_on_network">Найти в сети</string>
+  <string name="switcher_find_on_network">Найти в локальной сети</string>
   <string name="switcher_share">Открыть доступ к загрузкам %1$s…</string>
 
   <string name="shell_device_button">%1$s, сменить устройство</string>
@@ -97,6 +97,7 @@
   <string name="banner_retrying">повторная попытка</string>
   <string name="banner_retry_now">Повторить сейчас</string>
   <string name="banner_switch_to">Переключиться на %1$s</string>
+  <string name="banner_pairing_on">Сопряжение включено ещё %1$s · устройства в вашей локальной сети могут запросить управление загрузками %2$s</string>
   <string name="banner_unauthorized">%1$s: нужен новый токен доступа</string>
   <string name="banner_enter_token">Ввести токен</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

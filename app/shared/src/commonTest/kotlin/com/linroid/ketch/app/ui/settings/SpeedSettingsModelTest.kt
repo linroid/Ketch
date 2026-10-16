@@ -3,8 +3,10 @@ package com.linroid.ketch.app.ui.settings
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
@@ -22,7 +24,9 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -31,12 +35,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 class SpeedSettingsModelTest {
 
   /** The embedded engine: it keeps the config it is given, or refuses it. */
   private class Engine(var config: DownloadConfig) : KetchApi {
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
+
     override val backendLabel = "This Mac"
     override val tasks = MutableStateFlow(emptyList<DownloadTask>())
     var refuse = false
@@ -44,10 +51,7 @@ class SpeedSettingsModelTest {
     override suspend fun download(request: DownloadRequest): DownloadTask =
       throw UnsupportedOperationException()
 
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-      throw UnsupportedOperationException()
-
-    override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
+    override suspend fun resolve(input: ResolveInput): ResolvedSource =
       throw UnsupportedOperationException()
 
     override suspend fun status(): KetchStatus = testStatus(backendLabel, config)

@@ -97,6 +97,9 @@
   <string name="inspector_detail_connections">接続数</string>
   <string name="inspector_detail_device">デバイス</string>
   <string name="inspector_detail_captured">取り込み元</string>
+  <string name="inspector_detail_checksum">チェックサム</string>
+  <string name="inspector_checksum_verified">%1$s · 検証済み</string>
+  <string name="inspector_checksum_pending">%1$s · 完了時に検証</string>
   <string name="inspector_section_advanced">高度な情報</string>
   <string name="inspector_detail_task_id">タスクID</string>
   <string name="inspector_detail_headers">ヘッダー</string>
@@ -114,6 +117,7 @@
   <string name="inspector_copy_failed_connections">接続数をコピーできませんでした</string>
   <string name="inspector_copy_failed_device">デバイスをコピーできませんでした</string>
   <string name="inspector_copy_failed_captured">取り込み元をコピーできませんでした</string>
+  <string name="inspector_copy_failed_checksum">チェックサムをコピーできませんでした</string>
   <string name="inspector_copy_failed_task_id">タスクIDをコピーできませんでした</string>
   <string name="inspector_copy_failed_headers">ヘッダーをコピーできませんでした</string>
   <string name="inspector_copy_failed_property">プロパティをコピーできませんでした</string>
@@ -152,8 +156,8 @@
     <item quantity="other">完了%1$d · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">単一接続</string>
-  <string name="inspector_connections_live">数を変更すると、残りのバイトがその場で再分割されます。</string>
-  <string name="inspector_connections_on_resume">数の変更は、ダウンロードの再開時に適用されます。</string>
+  <string name="inspector_connections_live">すぐに適用されます。</string>
+  <string name="inspector_connections_on_resume">ダウンロードの再開時に適用されます。</string>
   <string name="inspector_lane_description">接続%1$d、%2$s、%3$s</string>
   <string name="inspector_percent_spoken">%1$dパーセント</string>
 
@@ -174,10 +178,20 @@
   <string name="inspector_files_filter">ファイルを絞り込む</string>
   <string name="inspector_files_no_match">「%1$s」に一致するファイルはありません</string>
   <string name="inspector_files_sort">ファイルを並べ替え</string>
-  <string name="inspector_sort_incomplete">未完了を先に</string>
-  <string name="inspector_sort_name">名前</string>
-  <string name="inspector_sort_size">サイズ</string>
   <string name="inspector_file_unnamed">ファイル%1$d</string>
   <string name="inspector_file_description">%1$s、%2$s、%3$s</string>
   <string name="inspector_file_description_no_share">%1$s、%2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="other">%1$d個のファイル · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">適用</string>
+  <string name="inspector_files_reset">リセット</string>
+  <string name="inspector_files_start">ダウンロード</string>
+  <string name="inspector_files_choose">ダウンロードするファイルを選択してください</string>
+  <string name="inspector_files_keep_one">ファイルを1つ以上残してください</string>
+  <string name="inspector_files_hint">チェックしたファイルはダウンロードされ、チェックを外したファイルはそのまま残ります。</string>
+  <string name="inspector_seeding_status">シード中 · ↑ %1$s · %2$sアップロード済み</string>
+  <string name="inspector_seeding_stop">シードを停止</string>
+  <string name="inspector_seeding_start">シード</string>
+  <string name="inspector_seeding_waiting">シード待機中</string>
 </resources>

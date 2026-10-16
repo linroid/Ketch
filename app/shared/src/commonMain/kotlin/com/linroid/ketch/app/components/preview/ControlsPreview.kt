@@ -204,7 +204,7 @@ internal fun ControlsPreview(darkTheme: Boolean, density: DensityMode) {
         )
         divider()
         item(
-          label = verbatim("Remove from list"),
+          label = verbatim("Remove"),
           onClick = {},
           icon = KetchIcon.Trash,
           destructive = true,

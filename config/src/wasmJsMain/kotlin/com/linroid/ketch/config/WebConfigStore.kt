@@ -11,9 +11,7 @@ class WebConfigStore(
   override fun load(): KetchConfig {
     val content = window.localStorage.getItem(key)
       ?: return KetchConfig()
-    return ConfigStore.toml.decodeFromString(
-      KetchConfig.serializer(), content,
-    )
+    return ConfigStore.decode(content)
   }
 
   override fun save(config: KetchConfig) {

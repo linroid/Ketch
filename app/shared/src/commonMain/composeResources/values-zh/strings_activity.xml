@@ -14,7 +14,7 @@
   <string name="notify_channel_done">已完成的下载</string>
   <string name="notify_channel_failed">失败的下载</string>
   <string name="notify_channel_pairing">配对请求</string>
-  <string name="notify_pairing_title">%1$s 想要控制%2$s</string>
+  <string name="notify_pairing_title">%1$s 想要控制%2$s上的 Ketch</string>
   <string name="notify_pairing_body">仅当它显示 %1$s 时才允许。</string>
   <string name="notify_channel_requests">等待你确认的请求</string>
   <string name="notify_finished_group">已完成的下载</string>
@@ -73,7 +73,7 @@
   <string name="feedback_switch_failed">无法切换到 %1$s</string>
   <string name="feedback_reconnect_failed">无法重新连接到 %1$s</string>
   <string name="feedback_remove_device_failed">无法移除 %1$s</string>
-  <string name="feedback_discovery_failed">无法找到局域网中的 Ketch 服务器</string>
+  <string name="feedback_discovery_failed">无法发现局域网中的设备</string>
   <string name="feedback_settings_unreadable">无法读取设置，Ketch 已使用默认设置启动</string>
   <string name="feedback_downloads_unreadable">无法读取下载列表，Ketch 已使用空列表启动</string>
   <string name="feedback_unreadable_kept">旧文件已保留为 %1$s</string>
@@ -128,7 +128,7 @@
   </plurals>
   <string name="feedback_redownload_failed_one">无法在 %2$s 上重新下载 %1$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="other">无法重新下载 %1$d 个下载</item>
+    <item quantity="other">无法重新开始 %1$d 个下载</item>
   </plurals>
   <string name="feedback_started_now_one">已立即开始 %1$s</string>
   <plurals name="feedback_started_now">
@@ -170,9 +170,9 @@
   <plurals name="feedback_discard_failed">
     <item quantity="other">无法在 %2$s 上丢弃 %1$d 个下载的进度</item>
   </plurals>
-  <string name="feedback_undo_start_now_failed_one">无法在 %2$s 上撤销立即开始 %1$s</string>
+  <string name="feedback_undo_start_now_failed_one">无法在 %2$s 上撤销 %1$s 的“立即开始”</string>
   <plurals name="feedback_undo_start_now_failed">
-    <item quantity="other">无法在 %2$s 上撤销立即开始 %1$d 个下载</item>
+    <item quantity="other">无法在 %2$s 上撤销 %1$d 个下载的“立即开始”</item>
   </plurals>
   <string name="feedback_remove_failed_one">无法在 %2$s 上移除 %1$s</string>
   <plurals name="feedback_remove_failed">
@@ -193,6 +193,7 @@
   <string name="feedback_send_sign_in">登录信息将发送到 %1$s。</string>
 
   <string name="feedback_added">已添加 %1$s</string>
+  <string name="feedback_choose_files">选择要下载“%1$s”中的哪些文件</string>
   <plurals name="feedback_recovered">
     <item quantity="other">正在继续上次的 %1$d 个下载</item>
   </plurals>

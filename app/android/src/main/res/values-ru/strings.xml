@@ -4,7 +4,7 @@
   <string name="quick_add_no_link">Нет ссылки для скачивания</string>
 
   <string name="notifications_offer_title">Уведомления о загрузках и Поиске</string>
-  <string name="notifications_offer_message">Ketch сообщит о завершении загрузки или об ошибке, даже если вы пользуетесь другим приложением. Вы также получите уведомление, если Поиску потребуется разрешение на доступ к сайту.</string>
+  <string name="notifications_offer_message">Получайте уведомления о завершённых и неудачных загрузках, а также когда Поиску нужно ваше подтверждение, пока вы в других приложениях.</string>
   <string name="notifications_offer_allow">Разрешить</string>
   <string name="notifications_offer_not_now">Не сейчас</string>
 </resources>

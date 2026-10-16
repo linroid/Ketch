@@ -14,7 +14,7 @@
   <string name="notify_channel_done">完了したダウンロード</string>
   <string name="notify_channel_failed">失敗したダウンロード</string>
   <string name="notify_channel_pairing">ペアリングリクエスト</string>
-  <string name="notify_pairing_title">%1$sが%2$sの操作を求めています</string>
+  <string name="notify_pairing_title">%1$sが%2$sのKetchの操作を求めています</string>
   <string name="notify_pairing_body">%1$sと表示されている場合のみ許可してください。</string>
   <string name="notify_channel_requests">承認待ちのリクエスト</string>
   <string name="notify_finished_group">完了したダウンロード</string>
@@ -73,7 +73,7 @@
   <string name="feedback_switch_failed">%1$sに切り替えられませんでした</string>
   <string name="feedback_reconnect_failed">%1$sに再接続できませんでした</string>
   <string name="feedback_remove_device_failed">%1$sを削除できませんでした</string>
-  <string name="feedback_discovery_failed">LAN上のサーバーを検出できませんでした</string>
+  <string name="feedback_discovery_failed">ローカルネットワーク上のデバイスを検出できませんでした</string>
   <string name="feedback_settings_unreadable">設定を読み込めなかったため、デフォルトの設定でKetchを起動しました</string>
   <string name="feedback_downloads_unreadable">ダウンロードの一覧を読み込めなかったため、空の一覧でKetchを起動しました</string>
   <string name="feedback_unreadable_kept">以前のファイルは %1$s として保存されています</string>
@@ -128,7 +128,7 @@
   </plurals>
   <string name="feedback_redownload_failed_one">%2$sで%1$sを再ダウンロードできませんでした</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="other">%1$d件のダウンロードを再ダウンロードできませんでした</item>
+    <item quantity="other">%1$d件のダウンロードを最初からやり直せませんでした</item>
   </plurals>
   <string name="feedback_started_now_one">%1$sを今すぐ開始しました</string>
   <plurals name="feedback_started_now">
@@ -193,6 +193,7 @@
   <string name="feedback_send_sign_in">サインイン情報が%1$sに送信されます。</string>
 
   <string name="feedback_added">%1$sを追加しました</string>
+  <string name="feedback_choose_files">「%1$s」でダウンロードするファイルを選択してください</string>
   <plurals name="feedback_recovered">
     <item quantity="other">前回のセッションから%1$d件のダウンロードを再開しています</item>
   </plurals>

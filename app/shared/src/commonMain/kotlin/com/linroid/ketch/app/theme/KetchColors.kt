@@ -7,10 +7,13 @@ import androidx.compose.ui.graphics.luminance
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import ketch.app.shared.generated.resources.Res
-import ketch.app.shared.generated.resources.settings_accent_beacon
-import ketch.app.shared.generated.resources.settings_accent_fathom
-import ketch.app.shared.generated.resources.settings_accent_harbor
-import ketch.app.shared.generated.resources.settings_accent_signal
+import ketch.app.shared.generated.resources.settings_accent_blue
+import ketch.app.shared.generated.resources.settings_accent_green
+import ketch.app.shared.generated.resources.settings_accent_indigo
+import ketch.app.shared.generated.resources.settings_accent_orange
+import ketch.app.shared.generated.resources.settings_accent_pink
+import ketch.app.shared.generated.resources.settings_accent_purple
+import ketch.app.shared.generated.resources.settings_accent_teal
 import org.jetbrains.compose.resources.StringResource
 
 /**
@@ -53,6 +56,8 @@ import org.jetbrains.compose.resources.StringResource
  *   illustration, the completion sheen and the Add button's hover and drop fills may use it.
  * @property status colors of each download state.
  * @property lanes eight opaque lane colors: the accent ramp over [surfaceSunken].
+ * @property traffic colors of a connection that downloads or uploads, as the connections grid
+ *   draws them.
  * @property deviceHues hues a device pennant can get, picked by [deviceHue].
  * @property isDark whether these are the dark theme's colors.
  */
@@ -89,6 +94,7 @@ data class KetchColors(
   val brandEmber: List<Color>,
   val status: KetchStatusColors,
   val lanes: List<Color>,
+  val traffic: KetchTrafficColors,
   val deviceHues: List<FileTypeHue>,
   val isDark: Boolean,
 ) {
@@ -143,12 +149,41 @@ data class KetchStatusColors(
   val seeding: KetchStatusColor,
 )
 
-/** Accent palettes, chosen in Settings → General → Accent. */
+/**
+ * Colors of live connections by how busy they are, each a ramp of [LEVELS] opaque steps over
+ * `surfaceSunken`, from a trickle to 2 MB/s and more.
+ *
+ * @property download the accent, as [KetchStatusColors.downloading], so a connection that
+ *   downloads matches the download speed everywhere.
+ * @property upload the seeding teal, as [KetchStatusColors.seeding]; with the Teal, Green and
+ *   Blue accents, which it would look like, the Purple accent's fill instead.
+ * @property uploadSoft the faint fill inside an uploading connection's ring.
+ */
+@Immutable
+data class KetchTrafficColors(
+  val download: List<Color>,
+  val upload: List<Color>,
+  val uploadSoft: Color,
+) {
+  companion object {
+    /** Number of busy levels; level 0, idle, has no color of its own. */
+    const val LEVELS: Int = 4
+  }
+}
+
+/**
+ * Accent palettes, each named after its color, chosen in Settings → General → Accent. They are
+ * listed around the color wheel from the default, [Indigo]. There is no red, yellow or gray: the
+ * accent colors downloads, which would then look failed, paused or queued.
+ */
 enum class KetchAccent(private val nameResource: StringResource) {
-  Signal(Res.string.settings_accent_signal),
-  Harbor(Res.string.settings_accent_harbor),
-  Fathom(Res.string.settings_accent_fathom),
-  Beacon(Res.string.settings_accent_beacon);
+  Indigo(Res.string.settings_accent_indigo),
+  Purple(Res.string.settings_accent_purple),
+  Pink(Res.string.settings_accent_pink),
+  Orange(Res.string.settings_accent_orange),
+  Green(Res.string.settings_accent_green),
+  Teal(Res.string.settings_accent_teal),
+  Blue(Res.string.settings_accent_blue);
 
   /** The palette's name, as Settings shows it under its swatch. */
   val displayName: UiText get() = nameResource.text()
@@ -159,6 +194,9 @@ internal object KetchPalette {
   val ScrimInk = Color(0xFF0B0D12)
   val EmberStart = Color(0xFFFFB25B)
   val EmberEnd = Color(0xFFE0482B)
+
+  /** Alphas of the traffic color in each busy level, from the quietest. */
+  val TrafficAlphas = listOf(0.38f, 0.58f, 0.80f, 1f)
 
   /** Alphas of the accent in successive lanes. */
   val LaneAlphas = listOf(1f, 0.72f, 0.88f, 0.60f, 0.94f, 0.66f, 0.80f, 0.54f)
@@ -171,25 +209,40 @@ internal object KetchPalette {
   class AccentTone(val fill: Color, val text: Color, val soft: Color)
 
   fun accentTone(accent: KetchAccent, dark: Boolean): AccentTone = when (accent) {
-    KetchAccent.Signal -> if (dark) {
+    KetchAccent.Indigo -> if (dark) {
       AccentTone(Color(0xFF5563F0), Color(0xFF8E9BFF), Color(0xFF1D2140))
     } else {
       AccentTone(Color(0xFF4F5DE4), Color(0xFF3C47B7), Color(0xFFECEEFE))
     }
-    KetchAccent.Harbor -> if (dark) {
-      AccentTone(Color(0xFF00818D), Color(0xFF4FD1DB), Color(0xFF0D2E33))
+    KetchAccent.Purple -> if (dark) {
+      AccentTone(Color(0xFF8A3FD1), Color(0xFFC79BFF), Color(0xFF271A3B))
     } else {
-      AccentTone(Color(0xFF00818D), Color(0xFF006A74), Color(0xFFDDF5F7))
+      AccentTone(Color(0xFF8A3FD1), Color(0xFF7232B0), Color(0xFFF2E9FC))
     }
-    KetchAccent.Fathom -> if (dark) {
+    KetchAccent.Pink -> if (dark) {
+      AccentTone(Color(0xFFC8317A), Color(0xFFFF8EC2), Color(0xFF361526))
+    } else {
+      AccentTone(Color(0xFFC8317A), Color(0xFFA82664), Color(0xFFFCE6F0))
+    }
+    KetchAccent.Orange -> if (dark) {
+      AccentTone(Color(0xFFC9431C), Color(0xFFFF9A6B), Color(0xFF34160D))
+    } else {
+      AccentTone(Color(0xFFC9431C), Color(0xFFA8370F), Color(0xFFFFE9E0))
+    }
+    KetchAccent.Green -> if (dark) {
       AccentTone(Color(0xFF007F35), Color(0xFF5FD08A), Color(0xFF0E2C1A))
     } else {
       AccentTone(Color(0xFF007F35), Color(0xFF00692C), Color(0xFFDCF3E3))
     }
-    KetchAccent.Beacon -> if (dark) {
-      AccentTone(Color(0xFFC9431C), Color(0xFFFF9A6B), Color(0xFF34160D))
+    KetchAccent.Teal -> if (dark) {
+      AccentTone(Color(0xFF00818D), Color(0xFF4FD1DB), Color(0xFF0D2E33))
     } else {
-      AccentTone(Color(0xFFC9431C), Color(0xFFA8370F), Color(0xFFFFE9E0))
+      AccentTone(Color(0xFF00818D), Color(0xFF006A74), Color(0xFFDDF5F7))
+    }
+    KetchAccent.Blue -> if (dark) {
+      AccentTone(Color(0xFF1A6FDB), Color(0xFF7EB6FF), Color(0xFF11243D))
+    } else {
+      AccentTone(Color(0xFF1A6FDB), Color(0xFF155BB5), Color(0xFFE3EEFD))
     }
   }
 }
@@ -223,11 +276,11 @@ enum class FileTypeHue(val light: Color, val dark: Color) {
 }
 
 /** Light theme colors with [accent]. */
-fun lightKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors =
+fun lightKetchColors(accent: KetchAccent = KetchAccent.Indigo): KetchColors =
   ketchColors(accent, isDark = false)
 
 /** Dark theme colors with [accent]. */
-fun darkKetchColors(accent: KetchAccent = KetchAccent.Signal): KetchColors =
+fun darkKetchColors(accent: KetchAccent = KetchAccent.Indigo): KetchColors =
   ketchColors(accent, isDark = true)
 
 /** The colors of [accent]; each neutral is written as `pick(light, dark)`. */
@@ -238,6 +291,7 @@ private fun ketchColors(accent: KetchAccent, isDark: Boolean): KetchColors {
   val surface = pick(Color(0xFFFFFFFF), Color(0xFF16181D))
   val surfaceSunken = pick(Color(0xFFF4F6FA), Color(0xFF101217))
   val textTertiary = pick(Color(0xFF667080), Color(0xFF858D9C))
+  val seeding = pick(Color(0xFF00747F), Color(0xFF4FD1DB))
   fun status(color: Color): KetchStatusColor {
     return KetchStatusColor(color, color.copy(alpha = 0.10f).compositeOver(surface))
   }
@@ -292,13 +346,41 @@ private fun ketchColors(accent: KetchAccent, isDark: Boolean): KetchColors {
       completed = status(pick(Color(0xFF1B7540), Color(0xFF45C27A))),
       failed = status(pick(Color(0xFFBE2F44), Color(0xFFFF6B6B))),
       canceled = status(textTertiary),
-      seeding = status(pick(Color(0xFF00747F), Color(0xFF4FD1DB))),
+      seeding = status(seeding),
     ),
     lanes = laneColors(tone.fill, surfaceSunken),
+    traffic = trafficColors(accent, isDark, tone.fill, seeding, surfaceSunken),
     deviceHues = KetchPalette.DeviceHues,
     isDark = isDark,
   )
 }
+
+/**
+ * The traffic ramps: downloads in the accent [fill], uploads in the [seeding] teal unless the
+ * accent itself is teal, green or blue, which would be hard to tell from it.
+ */
+private fun trafficColors(
+  accent: KetchAccent,
+  isDark: Boolean,
+  fill: Color,
+  seeding: Color,
+  track: Color,
+): KetchTrafficColors {
+  val upload = when (accent) {
+    KetchAccent.Teal, KetchAccent.Green, KetchAccent.Blue ->
+      KetchPalette.accentTone(KetchAccent.Purple, isDark).fill
+    else -> seeding
+  }
+  fun ramp(color: Color) =
+    KetchPalette.TrafficAlphas.map { color.copy(alpha = it).compositeOver(track) }
+  return KetchTrafficColors(
+    download = ramp(fill),
+    upload = ramp(upload),
+    uploadSoft = upload.copy(alpha = UPLOAD_SOFT_ALPHA).compositeOver(track),
+  )
+}
+
+private const val UPLOAD_SOFT_ALPHA = 0.16f
 
 private fun laneColors(color: Color, track: Color): List<Color> =
   KetchPalette.LaneAlphas.map { color.copy(alpha = it).compositeOver(track) }

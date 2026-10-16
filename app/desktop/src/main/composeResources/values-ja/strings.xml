@@ -19,6 +19,7 @@
   <string name="tray_recent">最近のダウンロード</string>
   <string name="tray_show_ketch">Ketchを表示</string>
   <string name="tray_speed">速度</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">表示</string>
   <string name="tray_enter_token">トークンを入力…</string>
   <string name="tray_retry_now">今すぐ再試行</string>
@@ -58,7 +59,7 @@
   <string name="message_update_ready">Ketch %1$sをインストールする準備ができました</string>
   <string name="message_update_installed">Ketch %1$sにアップデートしました</string>
   <string name="message_update_failed">Ketch %1$sにアップデートできませんでした</string>
-  <string name="message_update_failed_hint">ログフォルダのupdate.logに原因が記録されています。</string>
+  <string name="message_update_failed_hint">ログフォルダのupdate.logを確認してください。</string>
   <string name="message_update">アップデート</string>
   <string name="message_restart">再起動</string>
   <string name="message_open_installer">インストーラを開く</string>
@@ -76,6 +77,11 @@
     <item quantity="other">%1$d件のリンクをコピーしました</item>
   </plurals>
   <string name="message_window_error">問題が発生しました</string>
+  <string name="message_downloads_run_by">%1$s（プロセス %2$d）がこのコンピュータのダウンロードを実行しています</string>
+  <string name="message_downloads_run_elsewhere">別のKetchプロセスがこのコンピュータのダウンロードを実行しています</string>
+  <string name="message_downloads_run_hint">停止してからKetchを終了して開き直すと、ここで実行できます</string>
+  <string name="message_command_stopped">%1$sが停止しました</string>
+  <string name="message_command_stopped_hint">Ketchを終了して開き直すと、このコンピュータのダウンロードをここで実行できます</string>
   <string name="open_torrent_title">トレントファイルを開く</string>
 
   <string name="close_keep_running_title">バックグラウンドでダウンロードを続けますか？</string>
@@ -118,4 +124,6 @@
   </plurals>
 
   <string name="settings_window_title">設定</string>
+
+  <string name="keep_awake_reason">ダウンロード中</string>
 </resources>

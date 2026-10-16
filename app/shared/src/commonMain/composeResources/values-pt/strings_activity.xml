@@ -15,7 +15,7 @@
   <string name="notify_channel_done">Downloads concluídos</string>
   <string name="notify_channel_failed">Downloads com falha</string>
   <string name="notify_channel_pairing">Pedidos de pareamento</string>
-  <string name="notify_pairing_title">%1$s quer controlar %2$s</string>
+  <string name="notify_pairing_title">%1$s quer controlar o Ketch em %2$s</string>
   <string name="notify_pairing_body">Permita só se ele mostrar %1$s.</string>
   <string name="notify_channel_requests">Solicitações de aprovação</string>
   <string name="notify_finished_group">Downloads concluídos</string>
@@ -80,7 +80,7 @@
   <string name="feedback_switch_failed">Não foi possível mudar para %1$s</string>
   <string name="feedback_reconnect_failed">Não foi possível reconectar a %1$s</string>
   <string name="feedback_remove_device_failed">Não foi possível remover %1$s</string>
-  <string name="feedback_discovery_failed">Falha ao procurar servidores na rede local</string>
+  <string name="feedback_discovery_failed">Falha ao procurar dispositivos na rede local</string>
   <string name="feedback_settings_unreadable">Não foi possível ler suas configurações, então o Ketch iniciou com os padrões</string>
   <string name="feedback_downloads_unreadable">Não foi possível ler a lista de downloads, então o Ketch iniciou com uma lista vazia</string>
   <string name="feedback_unreadable_kept">O arquivo antigo foi mantido como %1$s</string>
@@ -149,8 +149,8 @@
   </plurals>
   <string name="feedback_redownload_failed_one">Não foi possível baixar %1$s novamente (%2$s)</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Não foi possível baixar %1$d download novamente</item>
-    <item quantity="other">Não foi possível baixar %1$d downloads novamente</item>
+    <item quantity="one">Não foi possível reiniciar %1$d download</item>
+    <item quantity="other">Não foi possível reiniciar %1$d downloads</item>
   </plurals>
   <string name="feedback_started_now_one">%1$s iniciado agora</string>
   <plurals name="feedback_started_now">
@@ -226,6 +226,7 @@
   <string name="feedback_send_sign_in">Os dados de login serão enviados para %1$s.</string>
 
   <string name="feedback_added">%1$s adicionado</string>
+  <string name="feedback_choose_files">Escolha quais arquivos de “%1$s” baixar</string>
   <plurals name="feedback_recovered">
     <item quantity="one">Retomando %1$d download da sua última sessão</item>
     <item quantity="other">Retomando %1$d downloads da sua última sessão</item>

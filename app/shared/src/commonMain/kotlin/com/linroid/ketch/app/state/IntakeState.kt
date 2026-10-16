@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -21,11 +22,13 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.categoryFor
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.app.components.startTimeText
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -68,6 +71,7 @@ import ketch.app.shared.generated.resources.device_any_in_sentence
 import ketch.app.shared.generated.resources.duration_minutes
 import ketch.app.shared.generated.resources.intake_add_failed
 import ketch.app.shared.generated.resources.intake_apply_failed
+import ketch.app.shared.generated.resources.intake_checksum_invalid
 import ketch.app.shared.generated.resources.intake_choose_files
 import ketch.app.shared.generated.resources.intake_file_list_failed
 import ketch.app.shared.generated.resources.intake_file_list_failed_unnamed
@@ -232,6 +236,12 @@ class IntakeEntry internal constructor(source: IntakeSource) {
 
   /** Whether the row is added despite a problem, or a torrent without its file list. */
   var addAnyway: Boolean by mutableStateOf(false)
+
+  /**
+   * Whether a torrent added without its file list downloads every file once the list arrives,
+   * rather than waiting for a choice as [addAnyway] alone does.
+   */
+  var allFiles: Boolean by mutableStateOf(false)
 
   /** Name typed for the file; blank lets the source decide. */
   var fileName: String by mutableStateOf("")
@@ -637,6 +647,9 @@ class IntakeSession internal constructor(
   // The retried task's headers as the Advanced fields give them back, to tell a real change.
   private var boundHeaders: Map<String, String> = emptyMap()
 
+  // The retried task's checksum, to tell a real change.
+  private var boundChecksum: Checksum? = null
+
   /** Typed or pasted text. */
   var text: TextFieldValue by mutableStateOf(TextFieldValue())
     private set
@@ -704,6 +717,12 @@ class IntakeSession internal constructor(
   /** Headers of the Advanced section. */
   val headers: IntakeHeaders = IntakeHeaders()
 
+  /**
+   * Checksum typed in the Advanced section, such as `sha256:…`, a base64 digest or a bare hex
+   * digest; blank checks nothing. Only used while [offersChecksum].
+   */
+  var checksumText: String by mutableStateOf("")
+
   /** Whether the Advanced section is open; remembered between sheets. */
   var advancedOpen: Boolean by mutableStateOf(state.appSettings.ui.intakeAdvancedOpen)
     private set
@@ -749,8 +768,56 @@ class IntakeSession internal constructor(
   /** What the sheet does with the clipboard; see [AppSettingsController.clipboardMode]. */
   val clipboardMode: ClipboardMode get() = state.appSettings.clipboardMode
 
+  /** How the torrent picker orders a torrent's files, as last chosen there. */
+  internal var torrentSort: FileSort
+    get() = state.appSettings.fileSort(FileSortSurface.Intake)
+    set(value) = state.appSettings.saveFileSort(FileSortSurface.Intake, value)
+
+  /** What [target] reports it supports, as its status says, else as the app last heard. */
+  private fun targetFeatures(): Set<String> =
+    targetStatus?.features ?: target?.let { state.featuresOf(it.deviceId) }.orEmpty()
+
+  /**
+   * Whether the Advanced section offers a checksum: for a single link that is not a torrent,
+   * added or retried on a device that verifies checksums ([KetchFeatures.CHECKSUM]).
+   */
+  val offersChecksum: Boolean
+    get() {
+      if (mode == IntakeMode.Edit) return false
+      val entry = single ?: return false
+      return entry.source is IntakeSource.Link && !entry.isTorrent &&
+        KetchFeatures.CHECKSUM in targetFeatures()
+    }
+
+  /** The checksum the download is verified against: [checksumText] once it reads as one. */
+  val checksum: Checksum?
+    get() = if (offersChecksum) Checksum.parseOrNull(checksumText) else null
+
+  /** Why [checksumText] is not a checksum, which keeps the sheet from submitting; else `null`. */
+  val checksumError: UiText?
+    get() {
+      if (!offersChecksum || checksumText.isBlank()) return null
+      if (Checksum.parseOrNull(checksumText) != null) return null
+      return Res.string.intake_checksum_invalid.text()
+    }
+
   /** The default directory of [target]. */
   val defaultFolder: String? get() = targetStatus?.system?.downloadDirectory
+
+  /**
+   * The category folder of [target] that [single] is saved in, inside [defaultFolder], when no
+   * [folder] is chosen and one of the target's [DownloadConfig.categories] takes it; `null`
+   * otherwise. A guess while the link is checked: the server may still name the file differently.
+   */
+  val categoryFolder: String?
+    get() {
+      if (folder != null) return null
+      val entry = single ?: return null
+      val status = targetStatus ?: return null
+      if (KetchFeatures.CATEGORY_FOLDERS !in status.features) return null
+      val host = entry.url?.let(::urlHost)
+      return status.config.categoryFor(entry.name, entry.resolved?.contentType, host)?.folder
+    }
 
   /** Path separator of [target]. */
   val separator: String get() = targetStatus?.system?.separator ?: "/"
@@ -853,7 +920,8 @@ class IntakeSession internal constructor(
     get() {
       val current = boundRequest ?: return false
       val entry = entries.singleOrNull() ?: return false
-      return entry.url != current.url || effectiveHeaders(entry) != boundHeaders
+      return entry.url != current.url || effectiveHeaders(entry) != boundHeaders ||
+        offersChecksum && checksum != boundChecksum
     }
 
   /**
@@ -965,7 +1033,7 @@ class IntakeSession internal constructor(
 
   /** Whether the main button can be pressed. */
   val canSubmit: Boolean
-    get() = !submitting && when (mode) {
+    get() = !submitting && checksumError == null && when (mode) {
       IntakeMode.Edit -> task != null
       IntakeMode.Retry -> task != null && entries.size == 1
       IntakeMode.Add -> allFailed || addableLinks > 0
@@ -1109,6 +1177,7 @@ class IntakeSession internal constructor(
   fun retry(entry: IntakeEntry) {
     entry.wanted = true
     entry.addAnyway = false
+    entry.allFiles = false
     launchResolve(entry)
   }
 
@@ -1371,6 +1440,11 @@ class IntakeSession internal constructor(
     } else {
       selection
     }
+    // A link added anyway before its files were known, such as a magnet still looking for its
+    // file list, waits for a choice on devices that can, should it turn out to have several
+    // files or variants; with one, or when asked for all of them, it downloads at once.
+    val awaitsFiles = entry.addAnyway && !entry.allFiles && resolved?.files.isNullOrEmpty() &&
+      KetchFeatures.AWAIT_FILE_SELECTION in targetFeatures()
     val name = entry.fileName.trim().ifEmpty { null }
       ?: (entry.source as? IntakeSource.Link)?.fileName
     val urls = when (val source = entry.source) {
@@ -1396,6 +1470,8 @@ class IntakeSession internal constructor(
           schedule = schedule,
           selectedFileIds = selectedIds,
           resolvedSource = resolved.takeIf { index == 0 },
+          awaitFileSelection = awaitsFiles,
+          checksum = checksum.takeIf { entry == single },
         )
       } catch (e: IllegalArgumentException) {
         log.w { "Couldn't build a request for ${redactUrl(url)}: ${e.describeCauses()}" }
@@ -1597,6 +1673,10 @@ class IntakeSession internal constructor(
       headers.fill(current.headers)
       boundHeaders = headers.toMap()
       if (current.headers.isNotEmpty()) advancedOpen = true
+      // So does its checksum, which may be what failed.
+      boundChecksum = current.checksum
+      checksumText = current.checksum?.toString().orEmpty()
+      if (current.checksum != null) advancedOpen = true
       request.seeds.forEach { seedsByUrl[it.url] = it.copy(headers = emptyMap()) }
     }
   }
@@ -1740,7 +1820,7 @@ class IntakeSession internal constructor(
         }
       }
     }
-    return api.resolveContent(file.readBytes(MAX_DROPPED_FILE_BYTES), file.name)
+    return api.resolve(file.readBytes(MAX_DROPPED_FILE_BYTES), file.name)
   }
 
   private fun watch(target: InstanceEntry) {

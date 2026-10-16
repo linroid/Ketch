@@ -126,6 +126,24 @@ class SettingsSnapshots {
   }
 
   @Test
+  fun downloadsPage_categoryFolders_listsSuggestedAndOpensOne() {
+    for (theme in SnapshotTheme.entries) {
+      windowSnapshot(
+        name = "settings-downloads-categories",
+        size = TallWindowSize,
+        theme = theme,
+        target = SettingsTarget(SettingsTarget.Page.Downloads),
+        interact = {
+          clickOnText("Use suggested")
+          settle()
+          clickOnText("Video")
+          settle()
+        },
+      )
+    }
+  }
+
+  @Test
   fun settingsWindow_genericOpen_reopensTheLastPage() {
     windowSnapshot(
       name = "settings-resume",
@@ -255,7 +273,10 @@ class SettingsSnapshots {
 
   private companion object {
     /** The Settings window's size until the user resizes it. */
-    val WindowSize = SnapshotSize(860.dp, 640.dp, KetchDensity.Compact)
+    val WindowSize = SnapshotSize(720.dp, 580.dp, KetchDensity.Compact)
+
+    /** The Settings window stretched to show a whole page. */
+    val TallWindowSize = SnapshotSize(720.dp, 1400.dp, KetchDensity.Compact)
 
     /** The smallest the Settings window gets. */
     val MinWindowSize = SnapshotSize(640.dp, 480.dp, KetchDensity.Compact)
@@ -268,7 +289,7 @@ class SettingsSnapshots {
 
     /** The device chip in the list of pages, at the window size. */
     val DeviceChipX = 150.dp
-    val DeviceChipY = 298.dp
+    val DeviceChipY = 318.dp
 
     const val NAS_ID = "nas.local:8642"
 

@@ -1,0 +1,1923 @@
+public final class com/linroid/ketch/api/ActiveConnection {
+	public static final field Companion Lcom/linroid/ketch/api/ActiveConnection$Companion;
+	public fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;)V
+	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component13 ()J
+	public final fun component14 ()Lkotlin/time/Instant;
+	public final fun component15 ()Lcom/linroid/ketch/api/PeerDetails;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/Boolean;
+	public final fun component6 ()Lcom/linroid/ketch/api/ConnectionDirection;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/Integer;
+	public final fun component9 ()Lcom/linroid/ketch/api/ConnectionRoute;
+	public final fun copy (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;)Lcom/linroid/ketch/api/ActiveConnection;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ActiveConnection;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;ILjava/lang/Object;)Lcom/linroid/ketch/api/ActiveConnection;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDirection ()Lcom/linroid/ketch/api/ConnectionDirection;
+	public final fun getDownloadBps ()J
+	public final fun getDownloadedBytes ()J
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getId ()J
+	public final fun getOpenedAt ()Lkotlin/time/Instant;
+	public final fun getPeer ()Lcom/linroid/ketch/api/PeerDetails;
+	public final fun getPort ()Ljava/lang/Integer;
+	public final fun getProtocol ()Ljava/lang/String;
+	public final fun getRoute ()Lcom/linroid/ketch/api/ConnectionRoute;
+	public final fun getSecure ()Ljava/lang/Boolean;
+	public final fun getSource ()Ljava/lang/String;
+	public final fun getTaskId ()Ljava/lang/String;
+	public final fun getUploadBps ()J
+	public final fun getUploadedBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/ActiveConnection$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/ActiveConnection$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/ActiveConnection;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/ActiveConnection;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ActiveConnection$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ActiveConnections {
+	public static final field Companion Lcom/linroid/ketch/api/ActiveConnections$Companion;
+	public static final field DEFAULT_LIMIT I
+	public static final field MAX_LIMIT I
+	public fun <init> (Lkotlin/time/Instant;Ljava/util/List;IJJJ)V
+	public synthetic fun <init> (Lkotlin/time/Instant;Ljava/util/List;IJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lkotlin/time/Instant;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()I
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun copy (Lkotlin/time/Instant;Ljava/util/List;IJJJ)Lcom/linroid/ketch/api/ActiveConnections;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ActiveConnections;Lkotlin/time/Instant;Ljava/util/List;IJJJILjava/lang/Object;)Lcom/linroid/ketch/api/ActiveConnections;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConnections ()Ljava/util/List;
+	public final fun getDownloadBps ()J
+	public final fun getDropped ()J
+	public final fun getSampledAt ()Lkotlin/time/Instant;
+	public final fun getTotal ()I
+	public final fun getUploadBps ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/ActiveConnections$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/ActiveConnections$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/ActiveConnections;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/ActiveConnections;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ActiveConnections$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Checksum {
+	public static final field Companion Lcom/linroid/ketch/api/Checksum$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;)Lcom/linroid/ketch/api/Checksum;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/Checksum;Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/Checksum;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlgorithm ()Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun matches ([B)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/Checksum$Companion {
+	public final fun of (Lcom/linroid/ketch/api/ChecksumAlgorithm;[B)Lcom/linroid/ketch/api/Checksum;
+	public final fun parse (Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;)Lcom/linroid/ketch/api/Checksum;
+	public final fun parse (Ljava/lang/String;)Lcom/linroid/ketch/api/Checksum;
+	public final fun parseOrNull (Ljava/lang/String;)Lcom/linroid/ketch/api/Checksum;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ChecksumAlgorithm : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/ChecksumAlgorithm$Companion;
+	public static final field MD5 Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public static final field SHA_1 Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public static final field SHA_256 Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public static final field SHA_512 Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public final fun getByteCount ()I
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public static fun values ()[Lcom/linroid/ketch/api/ChecksumAlgorithm;
+}
+
+public final class com/linroid/ketch/api/ChecksumAlgorithm$Companion {
+	public final fun named (Ljava/lang/String;)Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ConnectionDirection : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/ConnectionDirection$Companion;
+	public static final field INCOMING Lcom/linroid/ketch/api/ConnectionDirection;
+	public static final field OUTGOING Lcom/linroid/ketch/api/ConnectionDirection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/ConnectionDirection;
+	public static fun values ()[Lcom/linroid/ketch/api/ConnectionDirection;
+}
+
+public final class com/linroid/ketch/api/ConnectionDirection$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ConnectionRoute : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/ConnectionRoute$Companion;
+	public static final field DIRECT Lcom/linroid/ketch/api/ConnectionRoute;
+	public static final field HTTP_PROXY Lcom/linroid/ketch/api/ConnectionRoute;
+	public static final field SOCKS5_PROXY Lcom/linroid/ketch/api/ConnectionRoute;
+	public static final field UNKNOWN Lcom/linroid/ketch/api/ConnectionRoute;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/ConnectionRoute;
+	public static fun values ()[Lcom/linroid/ketch/api/ConnectionRoute;
+}
+
+public final class com/linroid/ketch/api/ConnectionRoute$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/linroid/ketch/api/ControlKey {
+	public abstract fun getName ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/Destination {
+	public static final field Companion Lcom/linroid/ketch/api/Destination$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/linroid/ketch/api/Destination;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/Destination$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Destination$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-DR7Jrcc (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-3A7oBy0 (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Destination$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Destination_androidKt {
+	public static final fun isDirectory-i-hCwbc (Ljava/lang/String;)Z
+	public static final fun isFile-i-hCwbc (Ljava/lang/String;)Z
+	public static final fun isName-i-hCwbc (Ljava/lang/String;)Z
+}
+
+public final class com/linroid/ketch/api/DownloadCategory {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/linroid/ketch/api/DownloadCategory;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadCategory;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadCategory;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getFolder ()Ljava/lang/String;
+	public final fun getHosts ()Ljava/util/List;
+	public final fun getMimeTypes ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun matches (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadCategory$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadCategory$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadCategory;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadCategory;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadCategoryKt {
+	public static final fun categoryFor (Lcom/linroid/ketch/api/DownloadConfig;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/linroid/ketch/api/DownloadCategory;
+}
+
+public abstract class com/linroid/ketch/api/DownloadCondition {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadCondition$Companion;
+	public synthetic fun <init> (ILkotlinx/serialization/internal/SerializationConstructorMarker;)V
+	public abstract fun isMet ()Lkotlinx/coroutines/flow/Flow;
+	public static final synthetic fun write$Self (Lcom/linroid/ketch/api/DownloadCondition;Lkotlinx/serialization/encoding/CompositeEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;)V
+}
+
+public final class com/linroid/ketch/api/DownloadCondition$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadCondition$Test : com/linroid/ketch/api/DownloadCondition {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadCondition$Test$Companion;
+	public fun <init> ()V
+	public fun <init> (Lkotlinx/coroutines/flow/Flow;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/flow/Flow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lkotlinx/coroutines/flow/Flow;
+	public final fun copy (Lkotlinx/coroutines/flow/Flow;)Lcom/linroid/ketch/api/DownloadCondition$Test;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadCondition$Test;Lkotlinx/coroutines/flow/Flow;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadCondition$Test;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFlow ()Lkotlinx/coroutines/flow/Flow;
+	public fun hashCode ()I
+	public fun isMet ()Lkotlinx/coroutines/flow/Flow;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadCondition$Test$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadCondition$Test$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadCondition$Test;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadCondition$Test;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadCondition$Test$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadConfig {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadConfig$Companion;
+	public static final field MIN_SPEED_WINDOW_MS J
+	public fun <init> ()V
+	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()I
+	public final fun component11-3Xq65sA ()J
+	public final fun component12 ()I
+	public final fun component13 ()I
+	public final fun component14 ()I
+	public final fun component15 ()Lcom/linroid/ketch/api/Proxy;
+	public final fun component16 ()Ljava/util/List;
+	public final fun component2 ()I
+	public final fun component3 ()J
+	public final fun component4 ()Z
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()J
+	public final fun component9 ()J
+	public final fun copy-Xkg0QqQ (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;)Lcom/linroid/ketch/api/DownloadConfig;
+	public static synthetic fun copy-Xkg0QqQ$default (Lcom/linroid/ketch/api/DownloadConfig;Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBufferSize ()I
+	public final fun getCategories ()Ljava/util/List;
+	public final fun getDefaultDirectory ()Ljava/lang/String;
+	public final fun getIdleTimeoutMs ()J
+	public final fun getMaxConcurrentDownloads ()I
+	public final fun getMaxConnectionsPerDownload ()I
+	public final fun getMaxConnectionsPerHost ()I
+	public final fun getMaxRetryDelayMs ()J
+	public final fun getMinSpeed ()J
+	public final fun getProgressIntervalMs ()J
+	public final fun getProxy ()Lcom/linroid/ketch/api/Proxy;
+	public final fun getRetryCount ()I
+	public final fun getRetryDelayMs ()J
+	public final fun getSaveIntervalMs ()J
+	public final fun getSpeedLimit-3Xq65sA ()J
+	public final fun getUnlimitedRetries ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadConfig$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadConfig$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadConfig;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadConfig;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadConfig$Companion {
+	public final fun getDefault ()Lcom/linroid/ketch/api/DownloadConfig;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadPriority : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadPriority$Companion;
+	public static final field HIGH Lcom/linroid/ketch/api/DownloadPriority;
+	public static final field LOW Lcom/linroid/ketch/api/DownloadPriority;
+	public static final field NORMAL Lcom/linroid/ketch/api/DownloadPriority;
+	public static final field URGENT Lcom/linroid/ketch/api/DownloadPriority;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/DownloadPriority;
+	public static fun values ()[Lcom/linroid/ketch/api/DownloadPriority;
+}
+
+public final class com/linroid/ketch/api/DownloadPriority$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadProgress {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadProgress$Companion;
+	public fun <init> (JJJ)V
+	public synthetic fun <init> (JJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun copy (JJJ)Lcom/linroid/ketch/api/DownloadProgress;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadProgress;JJJILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadProgress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBytesPerSecond ()J
+	public final fun getDownloadedBytes ()J
+	public final fun getPercent ()F
+	public final fun getTotalBytes ()J
+	public fun hashCode ()I
+	public final fun isComplete ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadProgress$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadProgress$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadProgress;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadProgress;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadProgress$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadRequest {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadRequest$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/util/List;
+	public final fun component11 ()Lcom/linroid/ketch/api/ResolvedSource;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Lcom/linroid/ketch/api/Proxy;
+	public final fun component14 ()Z
+	public final fun component15 ()Lcom/linroid/ketch/api/Checksum;
+	public final fun component2-jWx8kFM ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun component4 ()Ljava/util/Map;
+	public final fun component5 ()Ljava/util/Map;
+	public final fun component6-3Xq65sA ()J
+	public final fun component7 ()Lcom/linroid/ketch/api/DownloadPriority;
+	public final fun component8 ()Lcom/linroid/ketch/api/DownloadSchedule;
+	public final fun component9 ()Ljava/util/Set;
+	public final fun copy-C1rT4yw (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;)Lcom/linroid/ketch/api/DownloadRequest;
+	public static synthetic fun copy-C1rT4yw$default (Lcom/linroid/ketch/api/DownloadRequest;Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAwaitFileSelection ()Z
+	public final fun getChecksum ()Lcom/linroid/ketch/api/Checksum;
+	public final fun getConditions ()Ljava/util/List;
+	public final fun getConnections ()I
+	public final fun getDestination-jWx8kFM ()Ljava/lang/String;
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getPriority ()Lcom/linroid/ketch/api/DownloadPriority;
+	public final fun getProperties ()Ljava/util/Map;
+	public final fun getProxy ()Lcom/linroid/ketch/api/Proxy;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getResolvedSource ()Lcom/linroid/ketch/api/ResolvedSource;
+	public final fun getSchedule ()Lcom/linroid/ketch/api/DownloadSchedule;
+	public final fun getSelectedFileIds ()Ljava/util/Set;
+	public final fun getSpeedLimit-3Xq65sA ()J
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadRequest$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadRequest$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadRequest;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadRequest;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadRequest$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract class com/linroid/ketch/api/DownloadSchedule {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadSchedule$Companion;
+	public synthetic fun <init> (ILkotlinx/serialization/internal/SerializationConstructorMarker;)V
+	public static final synthetic fun write$Self (Lcom/linroid/ketch/api/DownloadSchedule;Lkotlinx/serialization/encoding/CompositeEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;)V
+}
+
+public final class com/linroid/ketch/api/DownloadSchedule$AfterDelay : com/linroid/ketch/api/DownloadSchedule {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay$Companion;
+	public synthetic fun <init> (JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-UwyO8pc ()J
+	public final fun copy-LRDsOJo (J)Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay;
+	public static synthetic fun copy-LRDsOJo$default (Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay;JILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDelay-UwyO8pc ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadSchedule$AfterDelay$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadSchedule$AfterDelay;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadSchedule$AfterDelay$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadSchedule$AtTime : com/linroid/ketch/api/DownloadSchedule {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadSchedule$AtTime$Companion;
+	public fun <init> (Lkotlin/time/Instant;)V
+	public final fun component1 ()Lkotlin/time/Instant;
+	public final fun copy (Lkotlin/time/Instant;)Lcom/linroid/ketch/api/DownloadSchedule$AtTime;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadSchedule$AtTime;Lkotlin/time/Instant;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadSchedule$AtTime;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStartAt ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadSchedule$AtTime$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadSchedule$AtTime$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadSchedule$AtTime;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadSchedule$AtTime;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadSchedule$AtTime$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadSchedule$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadSchedule$Immediate : com/linroid/ketch/api/DownloadSchedule {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadSchedule$Immediate;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class com/linroid/ketch/api/DownloadState {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadState$Companion;
+	public synthetic fun <init> (ILkotlinx/serialization/internal/SerializationConstructorMarker;)V
+	public final fun isActive ()Z
+	public final fun isTerminal ()Z
+	public static final synthetic fun write$Self (Lcom/linroid/ketch/api/DownloadState;Lkotlinx/serialization/encoding/CompositeEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;)V
+}
+
+public final class com/linroid/ketch/api/DownloadState$Canceled : com/linroid/ketch/api/DownloadState {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Canceled;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Completed : com/linroid/ketch/api/DownloadState {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadState$Completed$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Long;Lkotlin/time/Duration;Lkotlin/time/Instant;ZLcom/linroid/ketch/api/Checksum;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Long;Lkotlin/time/Duration;Lkotlin/time/Instant;ZLcom/linroid/ketch/api/Checksum;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun component3-FghU774 ()Lkotlin/time/Duration;
+	public final fun component4 ()Lkotlin/time/Instant;
+	public final fun component5 ()Z
+	public final fun component6 ()Lcom/linroid/ketch/api/Checksum;
+	public final fun copy-fUqyM7Y (Ljava/lang/String;Ljava/lang/Long;Lkotlin/time/Duration;Lkotlin/time/Instant;ZLcom/linroid/ketch/api/Checksum;)Lcom/linroid/ketch/api/DownloadState$Completed;
+	public static synthetic fun copy-fUqyM7Y$default (Lcom/linroid/ketch/api/DownloadState$Completed;Ljava/lang/String;Ljava/lang/Long;Lkotlin/time/Duration;Lkotlin/time/Instant;ZLcom/linroid/ketch/api/Checksum;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadState$Completed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChecksum ()Lcom/linroid/ketch/api/Checksum;
+	public final fun getCompletedAt ()Lkotlin/time/Instant;
+	public final fun getDownloadTime-FghU774 ()Lkotlin/time/Duration;
+	public final fun getOutputPath ()Ljava/lang/String;
+	public final fun getSharing ()Z
+	public final fun getTotalBytes ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadState$Completed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Completed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadState$Completed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadState$Completed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Completed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Downloading : com/linroid/ketch/api/DownloadState {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadState$Downloading$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/DownloadProgress;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/DownloadProgress;
+	public final fun copy (Lcom/linroid/ketch/api/DownloadProgress;)Lcom/linroid/ketch/api/DownloadState$Downloading;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadState$Downloading;Lcom/linroid/ketch/api/DownloadProgress;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadState$Downloading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgress ()Lcom/linroid/ketch/api/DownloadProgress;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadState$Downloading$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Downloading$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadState$Downloading;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadState$Downloading;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Downloading$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Failed : com/linroid/ketch/api/DownloadState {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadState$Failed$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/KetchError;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/KetchError;
+	public final fun copy (Lcom/linroid/ketch/api/KetchError;)Lcom/linroid/ketch/api/DownloadState$Failed;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadState$Failed;Lcom/linroid/ketch/api/KetchError;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadState$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/linroid/ketch/api/KetchError;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadState$Failed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Failed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadState$Failed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadState$Failed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Failed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Paused : com/linroid/ketch/api/DownloadState {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadState$Paused$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/DownloadProgress;Lcom/linroid/ketch/api/PauseReason;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/DownloadProgress;Lcom/linroid/ketch/api/PauseReason;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/DownloadProgress;
+	public final fun component2 ()Lcom/linroid/ketch/api/PauseReason;
+	public final fun copy (Lcom/linroid/ketch/api/DownloadProgress;Lcom/linroid/ketch/api/PauseReason;)Lcom/linroid/ketch/api/DownloadState$Paused;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadState$Paused;Lcom/linroid/ketch/api/DownloadProgress;Lcom/linroid/ketch/api/PauseReason;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadState$Paused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgress ()Lcom/linroid/ketch/api/DownloadProgress;
+	public final fun getReason ()Lcom/linroid/ketch/api/PauseReason;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadState$Paused$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Paused$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadState$Paused;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadState$Paused;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Paused$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Queued : com/linroid/ketch/api/DownloadState {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Queued;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Scheduled : com/linroid/ketch/api/DownloadState {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadState$Scheduled$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/DownloadSchedule;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/DownloadSchedule;
+	public final fun copy (Lcom/linroid/ketch/api/DownloadSchedule;)Lcom/linroid/ketch/api/DownloadState$Scheduled;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/DownloadState$Scheduled;Lcom/linroid/ketch/api/DownloadSchedule;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadState$Scheduled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSchedule ()Lcom/linroid/ketch/api/DownloadSchedule;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/DownloadState$Scheduled$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/DownloadState$Scheduled$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/DownloadState$Scheduled;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/DownloadState$Scheduled;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/DownloadState$Scheduled$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/linroid/ketch/api/DownloadTask {
+	public static final field Companion Lcom/linroid/ketch/api/DownloadTask$Companion;
+	public static final field MAX_FILE_ID_LENGTH I
+	public static final field MAX_SELECTED_FILES I
+	public fun await-IoAF18A (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun cancel (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getCreatedAt ()Lkotlin/time/Instant;
+	public fun getOutputPath ()Ljava/lang/String;
+	public fun getQueuePosition ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getRequest ()Lcom/linroid/ketch/api/DownloadRequest;
+	public abstract fun getRequestState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getSegments ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getTaskId ()Ljava/lang/String;
+	public abstract fun pause (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun remove (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun remove$default (Lcom/linroid/ketch/api/DownloadTask;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun reschedule (Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun reschedule$default (Lcom/linroid/ketch/api/DownloadTask;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/List;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun resume-fK3SEAU (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun resume-fK3SEAU$default (Lcom/linroid/ketch/api/DownloadTask;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun selectFiles (Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setConnections (ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setPriority (Lcom/linroid/ketch/api/DownloadPriority;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setSpeedLimit-p9gqIZc (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/DownloadTask$Companion {
+	public static final field MAX_FILE_ID_LENGTH I
+	public static final field MAX_SELECTED_FILES I
+}
+
+public final class com/linroid/ketch/api/DownloadTask$DefaultImpls {
+	public static fun await-IoAF18A (Lcom/linroid/ketch/api/DownloadTask;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getOutputPath (Lcom/linroid/ketch/api/DownloadTask;)Ljava/lang/String;
+	public static fun getQueuePosition (Lcom/linroid/ketch/api/DownloadTask;)Lkotlinx/coroutines/flow/StateFlow;
+	public static synthetic fun remove$default (Lcom/linroid/ketch/api/DownloadTask;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun reschedule$default (Lcom/linroid/ketch/api/DownloadTask;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/List;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun resume-fK3SEAU$default (Lcom/linroid/ketch/api/DownloadTask;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun selectFiles (Lcom/linroid/ketch/api/DownloadTask;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/FileOrder : java/lang/Enum {
+	public static final field EXTENSION Lcom/linroid/ketch/api/FileOrder;
+	public static final field NAME Lcom/linroid/ketch/api/FileOrder;
+	public static final field SELECTED Lcom/linroid/ketch/api/FileOrder;
+	public static final field SIZE Lcom/linroid/ketch/api/FileOrder;
+	public static final field SOURCE Lcom/linroid/ketch/api/FileOrder;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/FileOrder;
+	public static fun values ()[Lcom/linroid/ketch/api/FileOrder;
+}
+
+public final class com/linroid/ketch/api/FileOrderingKt {
+	public static final fun fileExtension (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun sortedByFileOrder (Ljava/util/List;Lcom/linroid/ketch/api/FileOrder;ZLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public static synthetic fun sortedByFileOrder$default (Ljava/util/List;Lcom/linroid/ketch/api/FileOrder;ZLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/util/List;
+}
+
+public final class com/linroid/ketch/api/FileSelectionMode : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/FileSelectionMode$Companion;
+	public static final field MULTIPLE Lcom/linroid/ketch/api/FileSelectionMode;
+	public static final field SINGLE Lcom/linroid/ketch/api/FileSelectionMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/FileSelectionMode;
+	public static fun values ()[Lcom/linroid/ketch/api/FileSelectionMode;
+}
+
+public final class com/linroid/ketch/api/FileSelectionMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/linroid/ketch/api/Interest {
+	public static final field Companion Lcom/linroid/ketch/api/Interest$Companion;
+	public abstract fun getValueSerializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Interest$Companion {
+	public final fun getDEFAULT_INTERVAL-UwyO8pc ()J
+}
+
+public final class com/linroid/ketch/api/Interest$Connections : com/linroid/ketch/api/Interest {
+	public static final field Companion Lcom/linroid/ketch/api/Interest$Connections$Companion;
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/linroid/ketch/api/Interest$Connections;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/Interest$Connections;IILjava/lang/Object;)Lcom/linroid/ketch/api/Interest$Connections;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLimit ()I
+	public fun getValueSerializer ()Lkotlinx/serialization/KSerializer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/Interest$Connections$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Interest$Connections$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/Interest$Connections;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/Interest$Connections;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Interest$Connections$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Interest$Segments : com/linroid/ketch/api/Interest {
+	public static final field Companion Lcom/linroid/ketch/api/Interest$Segments$Companion;
+	public fun <init> (Ljava/util/Set;)V
+	public final fun component1 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/Set;)Lcom/linroid/ketch/api/Interest$Segments;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/Interest$Segments;Ljava/util/Set;ILjava/lang/Object;)Lcom/linroid/ketch/api/Interest$Segments;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTaskIds ()Ljava/util/Set;
+	public fun getValueSerializer ()Lkotlinx/serialization/KSerializer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/Interest$Segments$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Interest$Segments$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/Interest$Segments;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/Interest$Segments;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Interest$Segments$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Interest$Stats : com/linroid/ketch/api/Interest {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Interest$Stats;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueSerializer ()Lkotlinx/serialization/KSerializer;
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface annotation class com/linroid/ketch/api/InternalKetchApi : java/lang/annotation/Annotation {
+}
+
+public abstract interface class com/linroid/ketch/api/KetchApi {
+	public static final field Companion Lcom/linroid/ketch/api/KetchApi$Companion;
+	public abstract fun close ()V
+	public fun controller (Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
+	public abstract fun download (Lcom/linroid/ketch/api/DownloadRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getBackendLabel ()Ljava/lang/String;
+	public abstract fun getTasks ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun networkInterfaces (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun resolve (Lcom/linroid/ketch/api/ResolveInput;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun selectNetworkInterfaces (Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun subscribe-HG0u8IE (Lcom/linroid/ketch/api/Interest;J)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun subscribe-HG0u8IE$default (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/Interest;JILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun updateConfig (Lcom/linroid/ketch/api/DownloadConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/KetchApi$Companion {
+	public final fun getREVISION ()Ljava/lang/String;
+	public final fun getVERSION ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/KetchApi$DefaultImpls {
+	public static fun controller (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
+	public static fun networkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun selectNetworkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun subscribe-HG0u8IE$default (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/Interest;JILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public abstract class com/linroid/ketch/api/KetchError : java/lang/Exception {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Companion;
+	public synthetic fun <init> (ILjava/lang/String;Lkotlinx/serialization/internal/SerializationConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getCause ()Ljava/lang/Throwable;
+	public fun getMessage ()Ljava/lang/String;
+	public final fun isRetryable ()Z
+	public static final synthetic fun write$Self (Lcom/linroid/ketch/api/KetchError;Lkotlinx/serialization/encoding/CompositeEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;)V
+}
+
+public final class com/linroid/ketch/api/KetchError$AuthenticationFailed : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$AuthenticationFailed$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$AuthenticationFailed;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$AuthenticationFailed;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$AuthenticationFailed;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getSourceType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$AuthenticationFailed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$AuthenticationFailed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$AuthenticationFailed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$AuthenticationFailed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$AuthenticationFailed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Canceled : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Canceled$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$Canceled;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$Canceled;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$Canceled;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$Canceled$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$Canceled$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$Canceled;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$Canceled;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Canceled$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$ChecksumMismatch : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$ChecksumMismatch$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/Throwable;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/Throwable;
+	public final fun copy (Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$ChecksumMismatch;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$ChecksumMismatch;Lcom/linroid/ketch/api/ChecksumAlgorithm;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$ChecksumMismatch;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActual ()Ljava/lang/String;
+	public final fun getAlgorithm ()Lcom/linroid/ketch/api/ChecksumAlgorithm;
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getExpected ()Ljava/lang/String;
+	public final fun getPublished ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$ChecksumMismatch$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$ChecksumMismatch$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$ChecksumMismatch;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$ChecksumMismatch;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$ChecksumMismatch$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public final fun tolerantSerializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$CorruptResumeState : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$CorruptResumeState$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$CorruptResumeState;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$CorruptResumeState;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$CorruptResumeState;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getDetail ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$CorruptResumeState$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$CorruptResumeState$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$CorruptResumeState;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$CorruptResumeState;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$CorruptResumeState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Disk : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Disk$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$Disk;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$Disk;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$Disk;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$Disk$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$Disk$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$Disk;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$Disk;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Disk$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$FileChanged : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$FileChanged$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$FileChanged;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$FileChanged;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$FileChanged;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$FileChanged$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$FileChanged$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$FileChanged;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$FileChanged;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$FileChanged$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Http : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Http$Companion;
+	public fun <init> (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Ljava/lang/Throwable;
+	public final fun copy (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$Http;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$Http;ILjava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$Http;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getCode ()I
+	public final fun getRateLimitRemaining ()Ljava/lang/Long;
+	public final fun getRetryAfterSeconds ()Ljava/lang/Long;
+	public final fun getStatusMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$Http$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$Http$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$Http;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$Http;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Http$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Network : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Network$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$Network;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$Network;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$Network;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$Network$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$Network$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$Network;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$Network;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Network$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$SourceError : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$SourceError$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;Ljava/lang/String;)Lcom/linroid/ketch/api/KetchError$SourceError;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$SourceError;Ljava/lang/String;Ljava/lang/Throwable;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$SourceError;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getSourceType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$SourceError$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$SourceError$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$SourceError;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$SourceError;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$SourceError$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Unknown : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Unknown$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Throwable;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/Throwable;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/Throwable;Ljava/lang/String;)Lcom/linroid/ketch/api/KetchError$Unknown;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$Unknown;Ljava/lang/Throwable;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public final fun getErrorMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$Unknown$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$Unknown$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$Unknown;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$Unknown;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Unknown$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Unsupported : com/linroid/ketch/api/KetchError {
+	public static final field Companion Lcom/linroid/ketch/api/KetchError$Unsupported$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/linroid/ketch/api/KetchError$Unsupported;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchError$Unsupported;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchError$Unsupported;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchError$Unsupported$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchError$Unsupported$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchError$Unsupported;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchError$Unsupported;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchError$Unsupported$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchFeatures {
+	public static final field ACTIVE_CONNECTIONS Ljava/lang/String;
+	public static final field AUTO_CONNECTIONS Ljava/lang/String;
+	public static final field AWAIT_FILE_SELECTION Ljava/lang/String;
+	public static final field CATEGORY_FOLDERS Ljava/lang/String;
+	public static final field CHECKSUM Ljava/lang/String;
+	public static final field FILE_SELECTION Ljava/lang/String;
+	public static final field FINITE_DASH Ljava/lang/String;
+	public static final field FINITE_HLS Ljava/lang/String;
+	public static final field FINITE_MEDIA Ljava/lang/String;
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchFeatures;
+	public static final field PROXY Ljava/lang/String;
+	public static final field QUEUE_POSITION Ljava/lang/String;
+	public static final field REQUEST_ID Ljava/lang/String;
+	public static final field TRANSFER_TIMEOUTS Ljava/lang/String;
+	public final fun getALL ()Ljava/util/Set;
+}
+
+public abstract interface annotation class com/linroid/ketch/api/KetchImplementationApi : java/lang/annotation/Annotation {
+}
+
+public final class com/linroid/ketch/api/KetchStats {
+	public static final field Companion Lcom/linroid/ketch/api/KetchStats$Companion;
+	public fun <init> ()V
+	public fun <init> (JJJJII)V
+	public synthetic fun <init> (JJJJIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()I
+	public final fun component6 ()I
+	public final fun copy (JJJJII)Lcom/linroid/ketch/api/KetchStats;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchStats;JJJJIIILjava/lang/Object;)Lcom/linroid/ketch/api/KetchStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDownloadBps ()J
+	public final fun getDownloadedBytes ()J
+	public final fun getDownloading ()I
+	public final fun getRemainingBytes ()J
+	public final fun getTotalBytes ()J
+	public final fun getUnknownSizes ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchStats$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchStats$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchStats;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchStats;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchStats$Companion {
+	public final fun of (Ljava/lang/Iterable;)Lcom/linroid/ketch/api/KetchStats;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchStatus {
+	public static final field Companion Lcom/linroid/ketch/api/KetchStatus$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/linroid/ketch/api/DownloadConfig;Lcom/linroid/ketch/api/SystemInfo;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/linroid/ketch/api/DownloadConfig;Lcom/linroid/ketch/api/SystemInfo;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()J
+	public final fun component5 ()Lcom/linroid/ketch/api/DownloadConfig;
+	public final fun component6 ()Lcom/linroid/ketch/api/SystemInfo;
+	public final fun component7 ()Ljava/util/Set;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/linroid/ketch/api/DownloadConfig;Lcom/linroid/ketch/api/SystemInfo;Ljava/util/Set;)Lcom/linroid/ketch/api/KetchStatus;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/KetchStatus;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/linroid/ketch/api/DownloadConfig;Lcom/linroid/ketch/api/SystemInfo;Ljava/util/Set;ILjava/lang/Object;)Lcom/linroid/ketch/api/KetchStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfig ()Lcom/linroid/ketch/api/DownloadConfig;
+	public final fun getFeatures ()Ljava/util/Set;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getRevision ()Ljava/lang/String;
+	public final fun getSystem ()Lcom/linroid/ketch/api/SystemInfo;
+	public final fun getUptime ()J
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/KetchStatus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/KetchStatus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/KetchStatus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/KetchStatus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/KetchStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NaturalOrder : java/util/Comparator {
+	public static final field INSTANCE Lcom/linroid/ketch/api/NaturalOrder;
+	public synthetic fun compare (Ljava/lang/Object;Ljava/lang/Object;)I
+	public fun compare (Ljava/lang/String;Ljava/lang/String;)I
+}
+
+public final class com/linroid/ketch/api/NetworkInterfaceConfig {
+	public static final field Companion Lcom/linroid/ketch/api/NetworkInterfaceConfig$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/linroid/ketch/api/NetworkInterfaceConfig;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/NetworkInterfaceConfig;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/NetworkInterfaceConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInterfaceIds ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/NetworkInterfaceConfig$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/NetworkInterfaceConfig$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/NetworkInterfaceConfig;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/NetworkInterfaceConfig;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkInterfaceConfig$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkInterfaceInfo {
+	public static final field Companion Lcom/linroid/ketch/api/NetworkInterfaceInfo$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Lcom/linroid/ketch/api/NetworkKind;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/NetworkInterfaceInfo;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/linroid/ketch/api/NetworkKind;ILjava/lang/Object;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAddresses ()Ljava/util/List;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getKind ()Lcom/linroid/ketch/api/NetworkKind;
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/NetworkInterfaceInfo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/NetworkInterfaceInfo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/NetworkInterfaceInfo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/NetworkInterfaceInfo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkInterfaceInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkInterfaces {
+	public static final field Companion Lcom/linroid/ketch/api/NetworkInterfaces$Companion;
+	public fun <init> ()V
+	public fun <init> (ZLjava/util/List;Lcom/linroid/ketch/api/NetworkInterfaceConfig;)V
+	public synthetic fun <init> (ZLjava/util/List;Lcom/linroid/ketch/api/NetworkInterfaceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/linroid/ketch/api/NetworkInterfaceConfig;
+	public final fun copy (ZLjava/util/List;Lcom/linroid/ketch/api/NetworkInterfaceConfig;)Lcom/linroid/ketch/api/NetworkInterfaces;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/NetworkInterfaces;ZLjava/util/List;Lcom/linroid/ketch/api/NetworkInterfaceConfig;ILjava/lang/Object;)Lcom/linroid/ketch/api/NetworkInterfaces;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailable ()Ljava/util/List;
+	public final fun getConfig ()Lcom/linroid/ketch/api/NetworkInterfaceConfig;
+	public final fun getSupported ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/NetworkInterfaces$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/NetworkInterfaces$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/NetworkInterfaces;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/NetworkInterfaces;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkInterfaces$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/NetworkKind : java/lang/Enum {
+	public static final field BLUETOOTH Lcom/linroid/ketch/api/NetworkKind;
+	public static final field CELLULAR Lcom/linroid/ketch/api/NetworkKind;
+	public static final field Companion Lcom/linroid/ketch/api/NetworkKind$Companion;
+	public static final field ETHERNET Lcom/linroid/ketch/api/NetworkKind;
+	public static final field OTHER Lcom/linroid/ketch/api/NetworkKind;
+	public static final field VPN Lcom/linroid/ketch/api/NetworkKind;
+	public static final field WIFI Lcom/linroid/ketch/api/NetworkKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/NetworkKind;
+	public static fun values ()[Lcom/linroid/ketch/api/NetworkKind;
+}
+
+public final class com/linroid/ketch/api/NetworkKind$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract class com/linroid/ketch/api/PauseReason {
+	public static final field Companion Lcom/linroid/ketch/api/PauseReason$Companion;
+}
+
+public final class com/linroid/ketch/api/PauseReason$AwaitingFileSelection : com/linroid/ketch/api/PauseReason {
+	public static final field INSTANCE Lcom/linroid/ketch/api/PauseReason$AwaitingFileSelection;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/PauseReason$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/PauseReason$Preempted : com/linroid/ketch/api/PauseReason {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/linroid/ketch/api/PauseReason$Preempted;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/PauseReason$Preempted;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/PauseReason$Preempted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getByTaskId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/PauseReason$Shutdown : com/linroid/ketch/api/PauseReason {
+	public static final field INSTANCE Lcom/linroid/ketch/api/PauseReason$Shutdown;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/PauseReason$User : com/linroid/ketch/api/PauseReason {
+	public static final field INSTANCE Lcom/linroid/ketch/api/PauseReason$User;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/PauseReason$WaitingForCondition : com/linroid/ketch/api/PauseReason {
+	public static final field INSTANCE Lcom/linroid/ketch/api/PauseReason$WaitingForCondition;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/PeerDetails {
+	public static final field Companion Lcom/linroid/ketch/api/PeerDetails$Companion;
+	public fun <init> (Ljava/lang/String;ZZZ)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;ZZZ)Lcom/linroid/ketch/api/PeerDetails;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;ZZZILjava/lang/Object;)Lcom/linroid/ketch/api/PeerDetails;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPeerChoking ()Z
+	public final fun getPeerInterested ()Z
+	public final fun getUploadSlot ()Z
+	public final fun getWire ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/PeerDetails$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/PeerDetails$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/PeerDetails;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/PeerDetails;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/PeerDetails$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/linroid/ketch/api/Proxy {
+	public static final field Companion Lcom/linroid/ketch/api/Proxy$Companion;
+}
+
+public final class com/linroid/ketch/api/Proxy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Proxy$Direct : com/linroid/ketch/api/Proxy {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Proxy$Direct;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/Proxy$Manual : com/linroid/ketch/api/Proxy {
+	public static final field Companion Lcom/linroid/ketch/api/Proxy$Manual$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bypasses (Ljava/lang/String;)Z
+	public final fun component1 ()Lcom/linroid/ketch/api/ProxyAddress;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;)Lcom/linroid/ketch/api/Proxy$Manual;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/Proxy$Manual;Lcom/linroid/ketch/api/ProxyAddress;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/Proxy$Manual;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAddress ()Lcom/linroid/ketch/api/ProxyAddress;
+	public final fun getBypass ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/Proxy$Manual$Companion {
+	public final fun isValidBypass (Ljava/lang/String;)Z
+}
+
+public final class com/linroid/ketch/api/Proxy$System : com/linroid/ketch/api/Proxy {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Proxy$System;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/ProxyAddress {
+	public static final field Companion Lcom/linroid/ketch/api/ProxyAddress$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/ProxyAddress$Type;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/ProxyAddress$Type;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/ProxyAddress$Type;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Lcom/linroid/ketch/api/ProxyAddress$Type;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)Lcom/linroid/ketch/api/ProxyAddress;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ProxyAddress;Lcom/linroid/ketch/api/ProxyAddress$Type;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/ProxyAddress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getPassword ()Ljava/lang/String;
+	public final fun getPort ()I
+	public final fun getType ()Lcom/linroid/ketch/api/ProxyAddress$Type;
+	public final fun getUrl ()Ljava/lang/String;
+	public final fun getUsername ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/ProxyAddress$Companion {
+	public final fun parse (Ljava/lang/String;)Lcom/linroid/ketch/api/ProxyAddress;
+}
+
+public final class com/linroid/ketch/api/ProxyAddress$Type : java/lang/Enum {
+	public static final field HTTP Lcom/linroid/ketch/api/ProxyAddress$Type;
+	public static final field SOCKS5 Lcom/linroid/ketch/api/ProxyAddress$Type;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/ProxyAddress$Type;
+	public static fun values ()[Lcom/linroid/ketch/api/ProxyAddress$Type;
+}
+
+public final class com/linroid/ketch/api/ProxyBypass {
+	public static final field INSTANCE Lcom/linroid/ketch/api/ProxyBypass;
+	public final fun bypasses (Ljava/util/List;Ljava/lang/String;)Z
+	public final fun isLoopback (Ljava/lang/String;)Z
+	public final fun isValid (Ljava/lang/String;)Z
+	public final fun matches (Ljava/lang/String;Ljava/lang/String;)Z
+}
+
+public abstract interface class com/linroid/ketch/api/ResolveInput {
+}
+
+public final class com/linroid/ketch/api/ResolveInput$Content : com/linroid/ketch/api/ResolveInput {
+	public static final field Companion Lcom/linroid/ketch/api/ResolveInput$Content$Companion;
+	public static final field MAX_CONTENT_BYTES J
+	public fun <init> ([BLjava/lang/String;)V
+	public synthetic fun <init> ([BLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBytes ()[B
+	public final fun getFileName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/ResolveInput$Content$Companion {
+}
+
+public final class com/linroid/ketch/api/ResolveInput$Url : com/linroid/ketch/api/ResolveInput {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/util/Map;)Lcom/linroid/ketch/api/ResolveInput$Url;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ResolveInput$Url;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/linroid/ketch/api/ResolveInput$Url;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/ResolveInputKt {
+	public static final fun resolve (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun resolve (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun resolve$default (Lcom/linroid/ketch/api/KetchApi;[BLjava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/ResolvedSource {
+	public static final field Companion Lcom/linroid/ketch/api/ResolvedSource$Companion;
+	public static final field MAX_VIEW_METADATA_CHARS I
+	public static final field METAINFO_KEY Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;JZLjava/lang/String;ILjava/util/Map;Ljava/util/List;Lcom/linroid/ketch/api/FileSelectionMode;Ljava/lang/String;Lcom/linroid/ketch/api/Checksum;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JZLjava/lang/String;ILjava/util/Map;Ljava/util/List;Lcom/linroid/ketch/api/FileSelectionMode;Ljava/lang/String;Lcom/linroid/ketch/api/Checksum;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Lcom/linroid/ketch/api/Checksum;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()I
+	public final fun component7 ()Ljava/util/Map;
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()Lcom/linroid/ketch/api/FileSelectionMode;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;JZLjava/lang/String;ILjava/util/Map;Ljava/util/List;Lcom/linroid/ketch/api/FileSelectionMode;Ljava/lang/String;Lcom/linroid/ketch/api/Checksum;)Lcom/linroid/ketch/api/ResolvedSource;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Ljava/lang/String;JZLjava/lang/String;ILjava/util/Map;Ljava/util/List;Lcom/linroid/ketch/api/FileSelectionMode;Ljava/lang/String;Lcom/linroid/ketch/api/Checksum;ILjava/lang/Object;)Lcom/linroid/ketch/api/ResolvedSource;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChecksum ()Lcom/linroid/ketch/api/Checksum;
+	public final fun getContentType ()Ljava/lang/String;
+	public final fun getFiles ()Ljava/util/List;
+	public final fun getMaxSegments ()I
+	public final fun getMetadata ()Ljava/util/Map;
+	public final fun getSelectionMode ()Lcom/linroid/ketch/api/FileSelectionMode;
+	public final fun getSourceType ()Ljava/lang/String;
+	public final fun getSuggestedFileName ()Ljava/lang/String;
+	public final fun getSupportsResume ()Z
+	public final fun getTotalBytes ()J
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/ResolvedSource$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/ResolvedSource$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/ResolvedSource;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/ResolvedSource;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ResolvedSource$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/ResolvedSourceKt {
+	public static final fun defaultSelection (Lcom/linroid/ketch/api/ResolvedSource;)Ljava/util/Set;
+	public static final fun withoutBulkMetadata (Lcom/linroid/ketch/api/ResolvedSource;)Lcom/linroid/ketch/api/ResolvedSource;
+}
+
+public final class com/linroid/ketch/api/Segment {
+	public static final field Companion Lcom/linroid/ketch/api/Segment$Companion;
+	public fun <init> (IJJJ)V
+	public synthetic fun <init> (IJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun copy (IJJJ)Lcom/linroid/ketch/api/Segment;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/Segment;IJJJILjava/lang/Object;)Lcom/linroid/ketch/api/Segment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCurrentOffset ()J
+	public final fun getDownloadedBytes ()J
+	public final fun getEnd ()J
+	public final fun getIndex ()I
+	public final fun getRemainingBytes ()J
+	public final fun getStart ()J
+	public final fun getTotalBytes ()J
+	public fun hashCode ()I
+	public final fun isComplete ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/Segment$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Segment$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/Segment;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/Segment;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Segment$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SourceFile {
+	public static final field Companion Lcom/linroid/ketch/api/SourceFile$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun component4 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;JLjava/util/Map;)Lcom/linroid/ketch/api/SourceFile;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/SourceFile;Ljava/lang/String;Ljava/lang/String;JLjava/util/Map;ILjava/lang/Object;)Lcom/linroid/ketch/api/SourceFile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getMetadata ()Ljava/util/Map;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getSize ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/SourceFile$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/SourceFile$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/SourceFile;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/SourceFile;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SourceFile$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedLimit {
+	public static final field Companion Lcom/linroid/ketch/api/SpeedLimit$Companion;
+	public static final synthetic fun box-impl (J)Lcom/linroid/ketch/api/SpeedLimit;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getBytesPerSecond ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public static final fun isUnlimited-impl (J)Z
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class com/linroid/ketch/api/SpeedLimit$Companion {
+	public final fun getUnlimited-3Xq65sA ()J
+	public final fun kbps-Brh3pi0 (J)J
+	public final fun mbps-Brh3pi0 (J)J
+	public final fun of-Brh3pi0 (J)J
+	public final fun parse-oWBhX9s (Ljava/lang/String;)Lcom/linroid/ketch/api/SpeedLimit;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SystemInfo {
+	public static final field Companion Lcom/linroid/ketch/api/SystemInfo$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJJJLjava/lang/String;Ljava/lang/String;JJJ)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJJJLjava/lang/String;Ljava/lang/String;JJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component13 ()J
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()I
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()J
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJJJLjava/lang/String;Ljava/lang/String;JJJ)Lcom/linroid/ketch/api/SystemInfo;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/SystemInfo;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJJJLjava/lang/String;Ljava/lang/String;JJJILjava/lang/Object;)Lcom/linroid/ketch/api/SystemInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArch ()Ljava/lang/String;
+	public final fun getAvailableProcessors ()I
+	public final fun getDefaultDownloadDirectory ()Ljava/lang/String;
+	public final fun getDownloadDirectory ()Ljava/lang/String;
+	public final fun getFreeMemory ()J
+	public final fun getFreeSpace ()J
+	public final fun getJavaVersion ()Ljava/lang/String;
+	public final fun getMaxMemory ()J
+	public final fun getOs ()Ljava/lang/String;
+	public final fun getSeparator ()Ljava/lang/String;
+	public final fun getTotalMemory ()J
+	public final fun getTotalSpace ()J
+	public final fun getUsableSpace ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/SystemInfo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/SystemInfo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/SystemInfo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/SystemInfo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SystemInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/log/KetchLogger {
+	public static final field Companion Lcom/linroid/ketch/api/log/KetchLogger$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun d (Lkotlin/jvm/functions/Function0;)V
+	public final fun e (Ljava/lang/Throwable;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun e$default (Lcom/linroid/ketch/api/log/KetchLogger;Ljava/lang/Throwable;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
+	public final fun getTag ()Ljava/lang/String;
+	public final fun i (Lkotlin/jvm/functions/Function0;)V
+	public final fun v (Lkotlin/jvm/functions/Function0;)V
+	public final fun w (Ljava/lang/Throwable;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun w$default (Lcom/linroid/ketch/api/log/KetchLogger;Ljava/lang/Throwable;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
+}
+
+public final class com/linroid/ketch/api/log/KetchLogger$Companion {
+	public final fun getLogger ()Lcom/linroid/ketch/api/log/Logger;
+	public final fun setLogger (Lcom/linroid/ketch/api/log/Logger;)V
+}
+
+public final class com/linroid/ketch/api/log/LogFormatKt {
+	public static final fun describeCauses (Ljava/lang/Throwable;)Ljava/lang/String;
+	public static final fun formatLogLine (Lcom/linroid/ketch/api/log/LogLevel;Ljava/lang/String;Ljava/lang/Throwable;)Ljava/lang/String;
+	public static synthetic fun formatLogLine$default (Lcom/linroid/ketch/api/log/LogLevel;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun redactUrl (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun redactUrlsIn (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/log/LogLevel : java/lang/Enum {
+	public static final field DEBUG Lcom/linroid/ketch/api/log/LogLevel;
+	public static final field ERROR Lcom/linroid/ketch/api/log/LogLevel;
+	public static final field INFO Lcom/linroid/ketch/api/log/LogLevel;
+	public static final field VERBOSE Lcom/linroid/ketch/api/log/LogLevel;
+	public static final field WARN Lcom/linroid/ketch/api/log/LogLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/log/LogLevel;
+	public static fun values ()[Lcom/linroid/ketch/api/log/LogLevel;
+}
+
+public abstract interface class com/linroid/ketch/api/log/Logger {
+	public static final field Companion Lcom/linroid/ketch/api/log/Logger$Companion;
+	public abstract fun d (Ljava/lang/String;)V
+	public abstract fun e (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public static synthetic fun e$default (Lcom/linroid/ketch/api/log/Logger;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)V
+	public abstract fun i (Ljava/lang/String;)V
+	public fun isLoggable (Lcom/linroid/ketch/api/log/LogLevel;)Z
+	public abstract fun v (Ljava/lang/String;)V
+	public abstract fun w (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public static synthetic fun w$default (Lcom/linroid/ketch/api/log/Logger;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)V
+}
+
+public final class com/linroid/ketch/api/log/Logger$Companion {
+	public final fun combine ([Lcom/linroid/ketch/api/log/Logger;)Lcom/linroid/ketch/api/log/Logger;
+	public final fun console (Lcom/linroid/ketch/api/log/LogLevel;)Lcom/linroid/ketch/api/log/Logger;
+	public static synthetic fun console$default (Lcom/linroid/ketch/api/log/Logger$Companion;Lcom/linroid/ketch/api/log/LogLevel;ILjava/lang/Object;)Lcom/linroid/ketch/api/log/Logger;
+	public final fun getNone ()Lcom/linroid/ketch/api/log/Logger;
+}
+
+public final class com/linroid/ketch/api/log/Logger$DefaultImpls {
+	public static synthetic fun e$default (Lcom/linroid/ketch/api/log/Logger;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)V
+	public static fun isLoggable (Lcom/linroid/ketch/api/log/Logger;Lcom/linroid/ketch/api/log/LogLevel;)Z
+	public static synthetic fun w$default (Lcom/linroid/ketch/api/log/Logger;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)V
+}
+

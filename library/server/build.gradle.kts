@@ -6,6 +6,7 @@ plugins {
 dependencies {
   api(projects.library.core)
   api(projects.library.endpoints)
+  api(projects.library.torrentApi)
   implementation(projects.library.ktor)
   implementation(projects.library.sqlite)
 
@@ -24,6 +25,7 @@ dependencies {
 
   testImplementation(libs.kotlin.test)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(projects.library.remote)
   testImplementation(libs.ktor.serverTestHost)
   testImplementation(libs.ktor.client.cio)
   testImplementation(libs.ktor.client.contentNegotiation)

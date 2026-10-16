@@ -13,6 +13,7 @@ import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.theme.KetchDensity
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_downloads_folders
+import ketch.app.shared.generated.resources.settings_sharing_auto_start
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.getString
 import kotlin.test.Test
@@ -68,14 +69,22 @@ class SettingsSearchRenderTest {
     const val FRAMES = 30
 
     /** What the desktop app offers; the web's and phones' entries are not on its pages. */
-    val Shown = setOf(null, SettingsFeature.Desktop, SettingsFeature.SetupChecklist)
+    val Shown = setOf(
+      null,
+      SettingsFeature.Desktop,
+      SettingsFeature.SetupChecklist,
+      SettingsFeature.KeepAwake
+    )
 
     /**
-     * Settings that only show sometimes: the add sheet's folders once there are any, and the
-     * Sharing rows under its collapsed Advanced section.
+     * Settings that only show sometimes: the add sheet's folders once there are any, the
+     * Sharing rows under its collapsed Advanced section, and starting sharing with Ketch, which
+     * shows while sharing.
      */
     val Conditional: Set<String> = runBlocking {
-      (AdvancedRows + Res.string.settings_downloads_folders).map { getString(it) }.toSet()
+      val rows = AdvancedRows + Res.string.settings_downloads_folders +
+        Res.string.settings_sharing_auto_start
+      rows.map { getString(it) }.toSet()
     }
   }
 }

@@ -2,7 +2,26 @@ package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.core.engine.resolve
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -117,18 +136,66 @@ class TorrentDownloadSourceResolveTest {
   }
 
   @Test
-  fun resolve_magnetUri_timeoutReturnsNull_throwsNetworkError() =
-    runTest {
-      fakeEngine.fetchMetadataResult = null
+  fun resolve_magnetWithoutMetadata_looksAgainUntilFound() = runTest {
+    fakeEngine.fetchMetadataResults.addAll(listOf(null, null))
+    fakeEngine.fetchMetadataResult = singleFileMetadata()
+    val resolved = source.resolve("magnet:?xt=urn:btih:$sampleHash")
+    assertEquals("test.txt", resolved.suggestedFileName)
+    assertEquals(3, fakeEngine.fetchMetadataCalls)
+  }
 
-      val error = assertFailsWith<KetchError.Network> {
-        source.resolve(
-          "magnet:?xt=urn:btih:$sampleHash",
-          emptyMap(),
-        )
+  @Test
+  fun resolve_v2MagnetNotFoundWhileInfoIsLogged_looksAgain() = runTest {
+    withContext(Dispatchers.Default) {
+      val lines = Channel<String>(Channel.UNLIMITED)
+      KetchLogger.setLogger(object : Logger {
+        override fun v(message: String) = Unit
+        override fun d(message: String) = Unit
+        override fun i(message: String) { lines.trySend(message) }
+        override fun w(message: String, throwable: Throwable?) = Unit
+        override fun e(message: String, throwable: Throwable?) = Unit
+        override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
+      })
+      // No DHT, LAN discovery or trackers: each lookup finds nothing and times out.
+      val real = TorrentDownloadSource(TorrentConfig(dhtEnabled = false, portMapping = false,
+        localDiscovery = false)).apply { magnetLookupTime = 200.milliseconds }
+      val resolving = async { real.resolve("magnet:?xt=urn:btmh:1220${"ab".repeat(32)}") }
+      try {
+        withTimeout(20_000) {
+          var lookups = 0
+          while (lookups < 2) {
+            if ("No metadata for magnet ${"ab".repeat(6)}" in lines.receive()) lookups++
+          }
+        }
+        assertTrue(resolving.isActive)
+      } finally {
+        KetchLogger.setLogger(Logger.None)
+        resolving.cancelAndJoin()
+        real.close()
       }
-      assertNotNull(error.cause)
     }
+  }
+
+  @Test
+  fun resolve_magnetWithOtherNetworkError_fails() = runTest {
+    fakeEngine.fetchMetadataError = KetchError.Network(IOException("port in use"))
+    assertFailsWith<KetchError.Network> {
+      source.resolve("magnet:?xt=urn:btih:$sampleHash")
+    }
+    assertEquals(1, fakeEngine.fetchMetadataCalls)
+  }
+
+  @Test
+  fun resolve_magnetWithoutMetadata_looksUntilTheCallerStops() = runTest {
+    fakeEngine.fetchMetadataResult = null
+
+    val resolved = withTimeoutOrNull(10.minutes) {
+      source.resolve("magnet:?xt=urn:btih:$sampleHash")
+    }
+
+    assertNull(resolved)
+    assertTrue(fakeEngine.fetchMetadataCalls > 1)
+  }
 
   @Test
   fun resolve_magnetUri_engineError_wrapsAsSourceError() = runTest {
@@ -160,7 +227,7 @@ class TorrentDownloadSourceResolveTest {
       ),
     ))
 
-    val resolved = source.resolveContent(content, "pack.torrent")
+    val resolved = source.resolve(ResolveInput.Content(content, "pack.torrent"))
 
     val hash = TorrentMetadata.fromBencode(content).infoHash.hex
     assertEquals("torrent:$hash", resolved.url)
@@ -174,9 +241,80 @@ class TorrentDownloadSourceResolveTest {
   }
 
   @Test
+  fun resolveContent_v2MetainfoWithAWebSocketTracker_resolves() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("a.bin" to 40_000), hybrid = true)
+    val tiers = listOf(listOf("wss://tracker.test/announce"), listOf("udp://t.test:1"))
+    val content = withTrackers(fixture.metainfo, tiers)
+
+    val resolved = source.resolve(ResolveInput.Content(content, "pack.torrent"))
+
+    assertEquals(fixture.document.info.hash.hex, resolved.metadata["infoHash"])
+    assertEquals(listOf(listOf("udp://t.test:1")), sourceTrackerTiers(content, 4 * 1024 * 1024))
+  }
+
+  /** [metainfo] with an `announce-list` of [tiers] first, which sorts before `info`. */
+  private fun withTrackers(metainfo: ByteArray, tiers: List<List<String>>): ByteArray =
+    "d13:announce-list".encodeToByteArray() + Bencode.encode(tiers) +
+      metainfo.copyOfRange(1, metainfo.size)
+
+  @Test
+  fun resolveContent_privateTorrentWithoutAUsableTracker_refused() = runTest {
+    val v2 = TorrentV2Fixture.build(listOf("a.bin" to 40_000), privateTorrent = true).metainfo
+    val v1 = Bencode.encode(mapOf("info" to mapOf("name" to "a.bin", "length" to 1L,
+      "piece length" to 16_384L, "pieces" to ByteArray(20), "private" to 1L)))
+    val webSocket = listOf(listOf("wss://tracker.test/announce"))
+    for (metainfo in listOf(v2, v1)) {
+      // Its peers come only from trackers, and Ketch cannot announce to a WebSocket one.
+      val content = withTrackers(metainfo, webSocket)
+      val error = assertFailsWith<KetchError.SourceError> {
+        source.resolve(ResolveInput.Content(content, "private.torrent"))
+      }
+      assertTrue("no http, https or udp tracker" in error.cause?.message.orEmpty())
+      // A saved task's metainfo still reads.
+      TorrentFileTable.parse(content, TorrentConfig())
+      source.resolve(ResolveInput.Content(
+        withTrackers(metainfo, webSocket + listOf(listOf("udp://t.test:1"))), "private.torrent"))
+    }
+  }
+
+  @Test
+  fun resolveMetainfo_trackerOnlyWithoutAUsableTracker_refused() {
+    val metainfo = withTrackers(TorrentV2Fixture.build(listOf("a.bin" to 40_000)).metainfo,
+      listOf(listOf("wss://tracker.test/announce")))
+    assertFailsWith<IllegalArgumentException> {
+      source.resolveMetainfo(metainfo, TorrentDiscoveryPrivacy.TRACKER_ONLY)
+    }
+    source.resolveMetainfo(metainfo, TorrentDiscoveryPrivacy.PUBLIC)
+    // A web seed finds the content without peers.
+    val seeded = TorrentV2Fixture.build(listOf("a.bin" to 40_000),
+      webSeeds = listOf("https://mirror.test/")).metainfo
+    source.resolveMetainfo(seeded, TorrentDiscoveryPrivacy.TRACKER_ONLY)
+  }
+
+  @Test
+  fun resolveContent_unsafeNamesAndPadding_listsTheStoredFiles() = runTest {
+    val content = Bencode.encode(mapOf("info" to mapOf(
+      "name" to "Show: Part 2", "piece length" to 4L, "pieces" to ByteArray(40),
+      "files" to listOf(
+        mapOf("length" to 3L, "path" to listOf("Who?.flac")),
+        mapOf("attr" to "p", "length" to 1L, "path" to listOf(".pad", "1")),
+        mapOf("length" to 4L, "path" to listOf("b"))
+      )
+    )))
+
+    val resolved = source.resolve(ResolveInput.Content(content, "show.torrent"))
+
+    assertEquals(listOf("0", "2"), resolved.files.map { it.id })
+    assertEquals(listOf("Show_ Part 2/Who_.flac", "Show_ Part 2/b"),
+      resolved.files.map { it.name })
+    // The padding is never downloaded.
+    assertEquals(7L, resolved.totalBytes)
+  }
+
+  @Test
   fun resolveContent_malformedBytes_throwsSourceError() = runTest {
     val error = assertFailsWith<KetchError.SourceError> {
-      source.resolveContent("d8:announce".encodeToByteArray(), "broken.torrent")
+      source.resolve(ResolveInput.Content("d8:announce".encodeToByteArray(), "broken.torrent"))
     }
     assertEquals("torrent", error.sourceType)
   }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connections_search">搜索端点、下载和协议</string>
+  <string name="connections_filter_all">全部</string>
+  <string name="connections_column_endpoint">端点</string>
+  <string name="connections_column_device">设备</string>
+  <string name="connections_column_task">下载</string>
+  <string name="connections_column_protocol">协议</string>
+  <string name="connections_column_route">路由</string>
+  <string name="connections_column_peer">节点</string>
+  <string name="connections_column_down">下行</string>
+  <string name="connections_column_up">上行</string>
+  <string name="connections_column_received">已接收</string>
+  <string name="connections_column_sent">已发送</string>
+  <string name="connections_column_open">持续时间</string>
+  <string name="connections_route_direct">直连</string>
+  <string name="connections_route_http_proxy">HTTP 代理</string>
+  <string name="connections_route_socks_proxy">SOCKS5 代理</string>
+  <string name="connections_peer_choked">已阻塞</string>
+  <string name="connections_peer_unchoked">未阻塞</string>
+  <string name="connections_peer_uploading">上传中</string>
+  <string name="connections_empty_body">下载进行或做种时，连接会显示在这里。</string>
+  <string name="connections_no_match">没有匹配的连接</string>
+  <string name="connections_unsupported_title">此设备不报告其连接</string>
+  <string name="connections_unsupported_body">在该设备上更新 Ketch 后即可在此查看。</string>
+  <plurals name="connections_more">
+    <item quantity="other">另有 %1$d 个较慢的连接未列出</item>
+  </plurals>
+</resources>

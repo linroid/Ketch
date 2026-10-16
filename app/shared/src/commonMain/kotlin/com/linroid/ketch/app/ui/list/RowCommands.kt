@@ -24,6 +24,9 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.util.errorDetails
 import com.linroid.ketch.app.util.referer
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentRevision
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.downloads_copied_details
 import ketch.app.shared.generated.resources.downloads_copied_error
@@ -38,6 +41,7 @@ import ketch.app.shared.generated.resources.downloads_copy_failed_links
 import ketch.app.shared.generated.resources.downloads_copy_failed_path
 import ketch.app.shared.generated.resources.downloads_copy_failed_paths
 import ketch.app.shared.generated.resources.downloads_failed_connections
+import ketch.app.shared.generated.resources.downloads_failed_files
 import ketch.app.shared.generated.resources.downloads_failed_open
 import ketch.app.shared.generated.resources.downloads_failed_pause
 import ketch.app.shared.generated.resources.downloads_failed_priority
@@ -46,6 +50,7 @@ import ketch.app.shared.generated.resources.downloads_failed_reschedule
 import ketch.app.shared.generated.resources.downloads_failed_resume
 import ketch.app.shared.generated.resources.downloads_failed_retry
 import ketch.app.shared.generated.resources.downloads_failed_reveal
+import ketch.app.shared.generated.resources.downloads_failed_seeding
 import ketch.app.shared.generated.resources.downloads_failed_speed_limit
 import ketch.app.shared.generated.resources.downloads_open_source_failed
 import kotlinx.coroutines.CoroutineScope
@@ -53,6 +58,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * A command the Downloads list runs on tasks, as [AppState.pending] holds it and as a failure
@@ -71,7 +78,15 @@ internal enum class TaskCommand(val key: String, private val failure: StringReso
   SpeedLimit("speed-limit", Res.string.downloads_failed_speed_limit),
   Priority("priority", Res.string.downloads_failed_priority),
   Connections("connections", Res.string.downloads_failed_connections),
-  Reschedule("reschedule", Res.string.downloads_failed_reschedule);
+  Reschedule("reschedule", Res.string.downloads_failed_reschedule),
+
+  /** Changes which of a torrent's files download. */
+  ChooseFiles("choose-files", Res.string.downloads_failed_files),
+
+  /** Starts a torrent that waits for its files with every file. */
+  DownloadAllFiles("download-all-files", Res.string.downloads_failed_files),
+  StopSeeding("stop-seeding", Res.string.downloads_failed_seeding),
+  Seed("seed", Res.string.downloads_failed_seeding);
 
   /**
    * The failure of this command on [what], a task's name or a number of downloads, on [device]:
@@ -141,13 +156,14 @@ internal class RowCommands(
     RowAction.CopyLink, RowAction.CopyError, RowAction.CopyDetails -> clipboard != null
     RowAction.OpenSourcePage -> sourcePage(row) != null
     RowAction.FindAnotherSource -> row.device.capabilities.canDiscover
+    RowAction.StopSeeding, RowAction.Seed -> state.torrentControllerOf(row.key.deviceId) != null
     else -> true
   }
 
   /**
-   * Runs [action] on [row]. Actions that open a panel, a menu or a dialog, such as
-   * [RowAction.SpeedLimit] or [RowAction.RemoveAndDelete], belong to the caller and do nothing
-   * here. [RowAction.StopAndDiscard] discards at once, so the caller confirms it first.
+   * Runs [action] on [row]. Actions that open a panel or a menu, such as [RowAction.SpeedLimit],
+   * belong to the caller and do nothing here. [RowAction.StopAndDiscard] and [RowAction.Remove]
+   * act at once, so the caller confirms them first where it should.
    */
   fun run(action: RowAction, row: TaskRow) {
     val task = row.task
@@ -185,6 +201,10 @@ internal class RowCommands(
       RowAction.CopyDetails -> (row.state as? DownloadState.Failed)?.let { failed ->
         copy(CopiedText.Details) { listOf(errorDetails(failed.error, row.request, task.taskId)) }
       }
+      RowAction.ChooseFiles -> state.chooseFiles(row.key)
+      RowAction.DownloadAllFiles -> command(row, TaskCommand.DownloadAllFiles) { resume() }
+      RowAction.StopSeeding -> setSeeding(row, seeding = false)
+      RowAction.Seed -> setSeeding(row, seeding = true)
       RowAction.EditLink,
       RowAction.RetryWithOptions,
       RowAction.EnterCredentials -> state.openIntake(retryRequest(row))
@@ -197,9 +217,7 @@ internal class RowCommands(
       RowAction.Priority,
       RowAction.StartLater,
       RowAction.SendTo,
-      RowAction.Details,
-      RowAction.RemoveAndTrash,
-      RowAction.RemoveAndDelete -> Unit
+      RowAction.Details -> Unit
     }
   }
 
@@ -218,6 +236,24 @@ internal class RowCommands(
   /** Starts [row]'s task at [schedule]. */
   fun reschedule(row: TaskRow, schedule: DownloadSchedule): Job =
     command(row, TaskCommand.Reschedule) { reschedule(schedule) }
+
+  /**
+   * Starts ([seeding] `true`) or stops sharing the files of [row]'s finished torrent, through
+   * its device's [TorrentController], guarded by [revision] (read from the device when `null`)
+   * under a new idempotency key.
+   */
+  fun setSeeding(row: TaskRow, seeding: Boolean, revision: TorrentRevision? = null): Job {
+    val command = if (seeding) TaskCommand.Seed else TaskCommand.StopSeeding
+    val app = state
+    return command(row, command) {
+      // Rows offer it only on devices with a controller, and only for tasks that exist.
+      val controller = app.torrentControllerOf(row.key.deviceId)
+        ?: throw UnsupportedOperationException()
+      val current = revision ?: controller.snapshot(taskId)?.revision
+        ?: throw IllegalStateException()
+      controller.setSeeding(taskId, seeding, TorrentCommandContext(newCommandKey(), current))
+    }
+  }
 
   private fun command(
     row: TaskRow,
@@ -317,3 +353,7 @@ private val WEB_SCHEMES = listOf("https://", "http://")
 /** Where [row]'s file is or goes: its output, else a destination that names a path. */
 private fun folderPath(row: TaskRow): String? =
   row.outputFile ?: row.request.destination?.takeUnless(Destination::isName)?.value
+
+/** A new idempotency key for a [TorrentController] command. */
+@OptIn(ExperimentalUuidApi::class)
+internal fun newCommandKey(): String = Uuid.random().toString()

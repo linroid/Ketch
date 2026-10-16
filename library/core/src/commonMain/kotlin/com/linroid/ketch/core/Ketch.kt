@@ -1,27 +1,38 @@
 package com.linroid.ketch.core
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.defaultSelection
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
+import com.linroid.ketch.core.engine.ConnectionRegistry
+import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DelegatingSpeedLimiter
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
@@ -30,35 +41,65 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RequestHeaders
+import com.linroid.ketch.core.engine.SINGLE_CHOICE_MESSAGE
+import com.linroid.ketch.core.engine.SelectionDelivery
+import com.linroid.ketch.core.engine.SelectionPlan
+import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.SourceExtension
+import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.requireDownloadDirectory
+import com.linroid.ketch.core.task.ControlCommand
+import com.linroid.ketch.core.task.ControlLedgerException
+import com.linroid.ketch.core.task.ControlOutcome
+import com.linroid.ketch.core.task.ControlRevision
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.RealDownloadTask
+import com.linroid.ketch.core.task.TaskCommandRecord
+import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskController
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
+import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import com.linroid.ketch.core.media.MediaDownloadSource
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -67,29 +108,34 @@ import kotlin.uuid.Uuid
 /**
  * Core in-process implementation of [KetchApi]. No HTTP involved.
  *
- * @param httpEngine the HTTP engine for HTTP/HTTPS downloads
+ * @param httpEngine the HTTP engine for HTTP/HTTPS downloads. Proxies other than the system's
+ *   need one that [supports them][HttpEngine.supportsProxies]; with any other, downloads given
+ *   one fail with [KetchError.Unsupported]
  * @param taskStore persistent storage for task records
  * @param config initial global download configuration; replace it at
  *   runtime with [updateConfig]
  * @param name user-visible instance name included in [status]
  * @param fileNameResolver strategy for resolving download file names
  * @param additionalSources extra [DownloadSource] implementations
- *   (e.g., torrent, media). HTTP is always included as a fallback.
+ *   (e.g., FTP, media). HTTP is always included as a fallback. A source may contribute typed
+ *   controllers and lifecycle hooks through [DownloadSource.attach].
  * @param logger logging backend
- * @param dispatchers dedicated dispatchers for task management,
- *   network operations, and file I/O. The default pools have a fixed
- *   size: network transfers suspend instead of blocking a thread, so the
- *   pool size does not limit how many connections a download can use.
+ * @param dispatchers dispatchers for task management, network operations and file I/O; by
+ *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
+ *   are bounded, but network transfers suspend instead of blocking a thread, so their size does
+ *   not limit how many connections a download can use. [close] closes dispatchers passed here
+ *   once its coroutines have finished, never [KetchDispatchers.Default].
  */
+@OptIn(ExperimentalAtomicApi::class)
 class Ketch(
   private val httpEngine: HttpEngine,
   private val taskStore: TaskStore = InMemoryTaskStore(),
   config: DownloadConfig = DownloadConfig.Default,
   private val name: String = "Ketch",
   private val fileNameResolver: FileNameResolver = DefaultFileNameResolver(),
-  additionalSources: List<DownloadSource> = emptyList(),
+  additionalSources: List<DownloadSource<*>> = emptyList(),
   logger: Logger = Logger.None,
-  private val dispatchers: KetchDispatchers = KetchDispatchers(),
+  internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -107,8 +153,26 @@ class Ketch(
   private val httpSource = HttpDownloadSource(httpEngine)
 
   private val sourceResolver = SourceResolver(
-    additionalSources + listOf(MediaDownloadSource(httpEngine), httpSource),
+    additionalSources + httpSource,
   )
+
+  /** Set once [start] started the sources' extensions. */
+  private val extensionsStarted = AtomicBoolean(false)
+
+  private val features: Set<String> = buildSet {
+    add(KetchFeatures.AUTO_CONNECTIONS)
+    add(KetchFeatures.QUEUE_POSITION)
+    add(KetchFeatures.REQUEST_ID)
+    if (httpEngine.supportsProxies) add(KetchFeatures.PROXY)
+    add(KetchFeatures.CATEGORY_FOLDERS)
+    add(KetchFeatures.TRANSFER_TIMEOUTS)
+    add(KetchFeatures.ACTIVE_CONNECTIONS)
+    add(KetchFeatures.CHECKSUM)
+    additionalSources.forEach { addAll(it.features) }
+    if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
+      add(KetchFeatures.FINITE_MEDIA)
+    }
+  }
 
   override val backendLabel: String = "Core"
 
@@ -117,12 +181,16 @@ class Ketch(
   /** Scope for task coordination (scheduling, queue, state). */
   private val scope = CoroutineScope(SupervisorJob() + dispatchers.main.limitedParallelism(1))
 
+  /** Live connections of every task, sampled on [scope] while observed. */
+  private val connectionRegistry = ConnectionRegistry(scope)
+
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
     config = { currentConfig },
     fileNameResolver = fileNameResolver,
     globalLimiter = globalLimiter,
     dispatchers = dispatchers,
+    connections = connectionRegistry::reporter,
   )
 
   private val queue = DownloadQueue(
@@ -163,20 +231,30 @@ class Ketch(
    * downloads has been reached.
    *
    * @throws IllegalArgumentException if a header in [DownloadRequest.headers] cannot be sent
-   *   (see [RequestHeaders.requireValid])
+   *   (see [RequestHeaders.requireValid]), or the request selects several variants of a
+   *   [DownloadRequest.resolvedSource] offering a single choice
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
+    requireProxySupport(request.proxy)
+    requireChecksumSupport(request)
+    require(
+      request.resolvedSource?.selectionMode != FileSelectionMode.SINGLE ||
+        request.selectedFileIds.size <= 1
+    ) { SINGLE_CHOICE_MESSAGE }
     if (request.requestId == null) return createDownload(request)
     return submissionsMutex.withLock {
       val existing = tasks.value.find { it.request.requestId == request.requestId }
       if (existing != null) {
-        // Live task controls are mutable; metadata and conditions are not persisted.
+        // Live task controls, the file selection included, are mutable; metadata and conditions
+        // are not persisted.
         require(existing.request.copy(
           connections = request.connections,
           speedLimit = request.speedLimit,
           priority = request.priority,
           schedule = request.schedule,
+          selectedFileIds = request.selectedFileIds,
+          awaitFileSelection = request.awaitFileSelection,
           resolvedSource = null,
           conditions = emptyList(),
         ) == request.copy(resolvedSource = null, conditions = emptyList())) {
@@ -221,27 +299,23 @@ class Ketch(
     return task
   }
 
-  override suspend fun resolve(
-    url: String,
-    properties: Map<String, String>,
-  ): ResolvedSource {
-    log.i { "Resolving URL: ${redactUrl(url)}" }
-    val source = sourceResolver.resolve(url)
-    return source.resolve(url, properties, currentConfig)
-  }
-
-  override suspend fun resolveContent(
-    content: ByteArray,
-    fileName: String?,
-  ): ResolvedSource {
-    log.i { "Resolving content: fileName=$fileName, size=${content.size}" }
-    val source = sourceResolver.resolveContent(content, fileName)
-    return source.resolveContent(content, fileName)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource {
+    log.i {
+      when (input) {
+        is ResolveInput.Url -> "Resolving URL: ${redactUrl(input.url)}"
+        is ResolveInput.Content ->
+          "Resolving content: fileName=${input.fileName}, size=${input.bytes.size}"
+      }
+    }
+    return sourceResolver.resolve(input).resolve(input, currentConfig)
   }
 
   override suspend fun start() {
     log.i { "Start" }
     loadTasks()
+    if (extensionsStarted.compareAndSet(false, true)) {
+      extensions.forEach { (_, extension) -> extension.start() }
+    }
   }
 
   override suspend fun status(): KetchStatus {
@@ -253,7 +327,7 @@ class Ketch(
       uptime = startMark.elapsedNow().inWholeSeconds,
       config = config,
       system = currentSystemInfo(config.defaultDirectory),
-      features = KetchFeatures.ALL,
+      features = features,
     )
   }
 
@@ -286,7 +360,16 @@ class Ketch(
       handle: TaskHandle,
       destination: Destination?,
     ) {
-      if (handle.mutableState.value is DownloadState.Failed) {
+      val state = handle.mutableState.value
+      if (state is DownloadState.Paused && state.reason == PauseReason.AwaitingFileSelection) {
+        if (destination != null) {
+          log.d { "Ignoring the destination of taskId=${handle.taskId}, which waits for files" }
+        }
+        log.i { "Resuming taskId=${handle.taskId} with its default files" }
+        selectFiles(handle, fileIds = null)
+        return
+      }
+      if (state is DownloadState.Failed) {
         coordinator.awaitCompletion(handle.taskId)
       }
       queue.enqueue(handle, preferResume = true, destination = destination)
@@ -306,21 +389,13 @@ class Ketch(
       coordinator.cancel(handle, deletePartialFile = deleteFiles)
       queue.dequeue(taskId)
       try {
-        coordinator.release(handle)
+        coordinator.cleanup(handle, deleteFiles)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Throwable) {
-        log.w(e) { "Release failed for taskId=$taskId" }
+        log.w(e) { "Cleanup failed for taskId=$taskId" }
       }
-      if (deleteFiles) {
-        try {
-          coordinator.cleanup(handle)
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Throwable) {
-          log.w(e) { "Cleanup failed for taskId=$taskId" }
-        }
-      }
+      connectionRegistry.closeTask(taskId)
       taskStore.remove(taskId)
       monitorMutex.withLock { taskMonitors.remove(taskId)?.cancel() }
       tasksMutex.withLock {
@@ -343,6 +418,64 @@ class Ketch(
       queue.setPriority(taskId, priority)
     }
 
+    override suspend fun selectFiles(
+      handle: TaskHandle,
+      fileIds: Set<String>?,
+      command: ControlCommand?,
+    ): ControlOutcome {
+      val taskId = handle.taskId
+      while (true) {
+        val state = handle.mutableState.value
+        if (state is DownloadState.Canceled) {
+          throw IllegalStateException("Canceled downloads cannot change their files")
+        }
+        // Joins happen before the control lock is taken: a finishing or stopping execution
+        // must be able to end, and an execution that already stopped must be gone before the
+        // task starts again.
+        when {
+          state is DownloadState.Completed || state is DownloadState.Failed ||
+            state.isAwaitingFiles() -> coordinator.awaitCompletion(taskId)
+          state is DownloadState.Paused -> coordinator.awaitStopping(taskId)
+          else -> {}
+        }
+        if (coordinator.isFinishing(taskId)) coordinator.awaitCompletion(taskId)
+        val outcome = handle.controlLock.withLock { applySelection(handle, fileIds, command) }
+        // Null when the execution was finishing: join it, then plan again.
+        if (outcome != null) return outcome
+      }
+    }
+
+    override suspend fun setSharing(
+      handle: TaskHandle,
+      sharing: Boolean,
+      command: ControlCommand,
+    ): ControlOutcome = handle.controlLock.withLock {
+      val taskId = handle.taskId
+      val record = handle.record.value
+      val ledger = openLedger(record, command)
+      ledger.replay?.let { return@withLock it }
+      if (handle.mutableState.value !is DownloadState.Completed ||
+        record.state != TaskState.COMPLETED
+      ) {
+        throw IllegalStateException("Only completed downloads can be shared")
+      }
+      val generation = record.control?.selectionGeneration ?: 0
+      val revision = command.reserve(generation, sharing)
+      val entry = ledger.entry(command, revision, generation, sharing)
+      handle.record.update {
+        it.copy(
+          control = (it.control ?: TaskControl()).copy(
+            sharing = sharing,
+            commands = ledger.entries + entry,
+          ),
+          updatedAt = Clock.System.now(),
+        )
+      }
+      command.afterSave()
+      log.i { "Sharing intent of taskId=$taskId: $sharing" }
+      ControlOutcome(generation, sharing, revision, replayed = false)
+    }
+
     override suspend fun reschedule(
       handle: TaskHandle,
       schedule: DownloadSchedule,
@@ -362,6 +495,340 @@ class Ketch(
     }
   }
 
+  /** What the sources' extensions see and do of this instance's tasks. */
+  private val host = object : SourceHost {
+    override val tasks: StateFlow<List<DownloadTask>> get() = this@Ketch.tasks
+
+    override val scope: CoroutineScope get() = this@Ketch.scope
+
+    // A task removed meanwhile keeps its last record, so readers racing a removal never fail.
+    override fun connections(task: DownloadTask): ConnectionReporter =
+      connectionRegistry.reporter(task.taskId)
+
+    override fun record(task: DownloadTask): TaskRecord? =
+      (task as? RealDownloadTask)?.record?.value
+
+    override suspend fun selectFiles(
+      task: DownloadTask,
+      fileIds: Set<String>,
+      command: ControlCommand,
+    ): ControlOutcome = taskController.selectFiles(requireHandle(task), fileIds, command)
+
+    override suspend fun setSharing(
+      task: DownloadTask,
+      sharing: Boolean,
+      command: ControlCommand,
+    ): ControlOutcome = taskController.setSharing(requireHandle(task), sharing, command)
+
+    override suspend fun showSharing(task: DownloadTask, sharing: Boolean) {
+      val handle = handleOf(task) ?: return
+      val current = handle.mutableState.value as? DownloadState.Completed ?: return
+      if (current.sharing == sharing) return
+      val updated = current.copy(sharing = sharing)
+      if (handle.mutableState.compareAndSet(current, updated)) {
+        log.i {
+          if (sharing) "Sharing taskId=${task.taskId}" else "Stopped sharing taskId=${task.taskId}"
+        }
+        // The queue skips a completion whose state was replaced meanwhile, and a later copy may
+        // equal the state it skipped, so the copy releases the slot itself. Releasing is
+        // idempotent, and a task that started again since is never touched.
+        queue.onTaskCompleted(task.taskId, updated)
+      }
+    }
+
+    override suspend fun saveSharingIntent(
+      task: DownloadTask,
+      sharing: Boolean,
+      onlyIf: () -> Boolean,
+    ) {
+      val handle = handleOf(task) ?: return
+      handle.controlLock.withLock {
+        val record = handle.record.value
+        if ((record.control?.sharing ?: false) == sharing) return@withLock
+        if (sharing && record.state != TaskState.COMPLETED) return@withLock
+        if (!onlyIf()) return@withLock
+        handle.record.update {
+          it.copy(
+            control = (it.control ?: TaskControl()).copy(sharing = sharing),
+            updatedAt = Clock.System.now(),
+          )
+        }
+        log.d { "Saved sharing intent of taskId=${handle.taskId}: $sharing" }
+      }
+    }
+  }
+
+  /** [task] when it is a task of this instance. */
+  private fun handleOf(task: DownloadTask): RealDownloadTask? =
+    (task as? RealDownloadTask)?.takeIf { real -> _tasks.value.any { it === real } }
+
+  private fun requireHandle(task: DownloadTask): RealDownloadTask =
+    handleOf(task) ?: throw IllegalArgumentException("Unknown download")
+
+  /**
+   * The extensions of the sources that offer one, with the type of their source. Declared after
+   * everything [host] uses, as the sources attach while this instance is created.
+   */
+  private val extensions: List<Pair<String, SourceExtension>> =
+    additionalSources.mapNotNull { source -> source.attach(host)?.let { source.type to it } }
+
+  /** The extension of the source of type [sourceType], if it has one. */
+  private fun extensionOf(sourceType: String?): SourceExtension? =
+    extensions.firstOrNull { it.first == sourceType }?.second
+
+  /** The controller the first source extension offering one for [key] contributes. */
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
+
+  /**
+   * Validates, saves and applies a file selection; the caller holds the task's control lock.
+   * Saves the selection, its size, the new segment layout and the next generation in one record
+   * write, then hands it to the running execution, starts a task that waited for it or that
+   * gains files after it completed, or updates the state a stopped task shows. Returns `null`
+   * when the execution is finishing and the caller must join it and try again.
+   */
+  private suspend fun applySelection(
+    handle: TaskHandle,
+    fileIds: Set<String>?,
+    command: ControlCommand?,
+  ): ControlOutcome? {
+    val taskId = handle.taskId
+    if (coordinator.isFinishing(taskId)) return null
+    val record = handle.record.value
+    val state = handle.mutableState.value
+    if (state is DownloadState.Canceled) {
+      throw IllegalStateException("Canceled downloads cannot change their files")
+    }
+    val control = record.control ?: TaskControl()
+    val ledger = command?.let { openLedger(record, it) }
+    ledger?.replay?.let { return it }
+    val source = selectionSource(record)
+    val plan = source.planFor(
+      record,
+      choiceFor(record, fileIds),
+      completed = state is DownloadState.Completed,
+    )
+    val awaiting = record.awaitsFileSelection()
+    if (!plan.changed && !awaiting) {
+      log.d { "Selection of taskId=$taskId is unchanged" }
+      if (command == null || ledger == null) {
+        return ControlOutcome(control.selectionGeneration, control.sharing, null, replayed = false)
+      }
+      val revision = command.reserve(control.selectionGeneration, control.sharing)
+      val entry = ledger.entry(command, revision, control.selectionGeneration, sharing = null)
+      handle.record.update {
+        it.copy(
+          control = (it.control ?: TaskControl()).copy(commands = ledger.entries + entry),
+          updatedAt = Clock.System.now(),
+        )
+      }
+      command.afterSave()
+      return ControlOutcome(
+        control.selectionGeneration, control.sharing, revision, replayed = false,
+      )
+    }
+    val running = coordinator.isActive(taskId)
+    val reopen = !running && state is DownloadState.Completed && plan.expands
+    val generation = control.selectionGeneration + if (plan.changed) 1 else 0
+    val revision = command?.reserve(generation, control.sharing)
+    val entry = if (command != null && ledger != null && revision != null) {
+      ledger.entry(command, revision, generation, sharing = null)
+    } else {
+      null
+    }
+    val now = Clock.System.now()
+    handle.record.update { r ->
+      r.copy(
+        request = r.request.copy(selectedFileIds = plan.fileIds),
+        totalBytes = plan.totalBytes,
+        segments = when {
+          reopen -> plan.segments ?: emptyList()
+          // A task that never started (or waits for files) starts fresh: segments would make it
+          // resume without an output path.
+          r.outputPath == null -> r.segments
+          else -> plan.segments ?: r.segments
+        },
+        state = if (reopen || awaiting) TaskState.QUEUED else r.state,
+        completedAt = if (reopen) null else r.completedAt,
+        control = (r.control ?: TaskControl()).let { c ->
+          c.copy(
+            selectionGeneration = generation,
+            commands = if (ledger != null && entry != null) ledger.entries + entry else c.commands,
+          )
+        },
+        updatedAt = now,
+      )
+    }
+    command?.afterSave()
+    val delivery = if (running) {
+      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
+    } else {
+      SelectionDelivery.NOT_RUNNING
+    }
+    when {
+      delivery == SelectionDelivery.DELIVERED -> {
+        // Show the new size now: a transfer that moves no bytes reports no progress to carry it.
+        val current = handle.mutableState.value
+        if (current is DownloadState.Downloading) {
+          val downloaded = plan.segments?.sumOf { it.downloadedBytes }
+            ?: current.progress.downloadedBytes.coerceAtMost(plan.totalBytes)
+          handle.mutableState.compareAndSet(
+            current,
+            current.copy(
+              progress = current.progress.copy(
+                downloadedBytes = downloaded,
+                totalBytes = plan.totalBytes,
+              ),
+            ),
+          )
+        }
+      }
+      // Cannot happen while the lock is held, as an execution only starts finishing under it.
+      delivery == SelectionDelivery.FINISHING -> return null
+      reopen || awaiting -> {
+        queue.dequeue(taskId)
+        handle.mutableState.value = DownloadState.Queued
+        queue.enqueue(handle, preferResume = true)
+      }
+      else -> {
+        if (state is DownloadState.Completed && plan.changed) {
+          // What the source shares follows the smaller selection rather than reopening.
+          val task = handle as? DownloadTask
+          if (task != null) extensionOf(source.type)?.selectionChanged(task, plan.fileIds)
+        }
+        showStopped(handle, plan, handle.record.value.segments)
+      }
+    }
+    log.i {
+      "Selected files for taskId=$taskId: files=${plan.fileIds.size}, " +
+        "totalBytes=${plan.totalBytes}, generation=$generation" +
+        if (reopen) ", reopened" else ""
+    }
+    return ControlOutcome(generation, control.sharing, revision, replayed = false)
+  }
+
+  /**
+   * The entries of [record]'s retry ledger still inside the retry window, and the outcome of an
+   * exact retry of [command] if the ledger holds one. Otherwise runs the command's precondition
+   * and refuses it while the ledger is full. The caller holds the task's control lock.
+   */
+  private suspend fun openLedger(record: TaskRecord, command: ControlCommand): Ledger {
+    val control = record.control ?: TaskControl()
+    val nowMs = Clock.System.now().toEpochMilliseconds()
+    val entries = control.commands.filter { it.recordedAtMs >= nowMs - LEDGER_WINDOW_MS }
+    entries.firstOrNull { it.key == command.key }?.let { entry ->
+      if (entry.digest != command.digest) {
+        throw ControlLedgerException(
+          ControlLedgerException.Reason.KEY_REUSED,
+          "This idempotency key was used for another command",
+        )
+      }
+      val outcome = ControlOutcome(
+        generation = entry.selectionGeneration,
+        sharing = entry.sharing ?: control.sharing,
+        revision = ControlRevision(entry.epoch, entry.sequence),
+        replayed = true,
+      )
+      return Ledger(entries, outcome)
+    }
+    command.precondition()
+    if (entries.size >= TaskControl.MAX_COMMANDS) {
+      throw ControlLedgerException(
+        ControlLedgerException.Reason.FULL,
+        "Too many recent commands for this download; try again later",
+      )
+    }
+    return Ledger(entries, null)
+  }
+
+  /** A task's retry ledger inside the retry window, with the outcome of an exact retry. */
+  private class Ledger(val entries: List<TaskCommandRecord>, val replay: ControlOutcome?) {
+    fun entry(
+      command: ControlCommand,
+      revision: ControlRevision,
+      generation: Long,
+      sharing: Boolean?,
+    ) = TaskCommandRecord(
+      key = command.key,
+      digest = command.digest,
+      epoch = revision.epoch,
+      sequence = revision.sequence,
+      selectionGeneration = generation,
+      sharing = sharing,
+      recordedAtMs = Clock.System.now().toEpochMilliseconds(),
+    )
+  }
+
+  /**
+   * The files to plan for [record]: [fileIds] as given, unless its source offers a single choice
+   * ([FileSelectionMode.SINGLE]), which takes exactly one ID and its
+   * [default][defaultSelection], the first variant, in place of every file (`null`). The mode
+   * comes from the resolution the task kept, else the request's [ResolvedSource]; unknown, the
+   * source decides.
+   *
+   * @throws IllegalArgumentException when several IDs are given for a single choice
+   */
+  private fun choiceFor(record: TaskRecord, fileIds: Set<String>?): Set<String>? {
+    val resolved = record.resolvedSource ?: record.request.resolvedSource
+    if (resolved?.selectionMode != FileSelectionMode.SINGLE) return fileIds
+    if (fileIds == null) return resolved.defaultSelection().ifEmpty { null }
+    require(fileIds.size == 1) { SINGLE_CHOICE_MESSAGE }
+    return fileIds
+  }
+
+  /** [DownloadSource.planSelection] of [fileIds] for [record], with the state it saved. */
+  private suspend fun <S : Any> DownloadSource<S>.planFor(
+    record: TaskRecord,
+    fileIds: Set<String>?,
+    completed: Boolean,
+  ): SelectionPlan = planSelection(
+    SelectionRequest(
+      taskId = record.taskId,
+      fileIds = fileIds,
+      current = record.request.selectedFileIds,
+      sourceState = record.sourceState?.let { decodeState(it) },
+      resolved = record.resolvedSource ?: record.request.resolvedSource,
+      segments = record.segments,
+      outputPath = record.outputPath,
+      completed = completed,
+    )
+  )
+
+  /** The source that plans [record]'s selection: its own, else its request's, else its URL's. */
+  private fun selectionSource(record: TaskRecord): DownloadSource<*> {
+    val url = record.request.url
+    record.sourceType?.let { return sourceResolver.resolveByType(it, url) }
+    record.request.resolvedSource?.let {
+      return sourceResolver.resolveByType(it.sourceType, it.url)
+    }
+    return sourceResolver.resolve(url)
+  }
+
+  /**
+   * Shows a saved selection on a task that is not running: a completed task's new size, or a
+   * paused one's saved [segments] and progress. Other states read the record when they start.
+   */
+  private fun showStopped(handle: TaskHandle, plan: SelectionPlan, segments: List<Segment>?) {
+    handle.mutableState.update { current ->
+      when (current) {
+        is DownloadState.Completed -> current.copy(totalBytes = plan.totalBytes)
+        is DownloadState.Paused -> current.copy(
+          progress = DownloadProgress(
+            segments?.sumOf { it.downloadedBytes } ?: 0L,
+            plan.totalBytes
+          ),
+        )
+        else -> current
+      }
+    }
+    if (segments != null && handle.mutableState.value is DownloadState.Paused) {
+      handle.mutableSegments.value = segments
+    }
+  }
+
+  private fun DownloadState.isAwaitingFiles(): Boolean =
+    this is DownloadState.Paused && reason == PauseReason.AwaitingFileSelection
+
   // -- Internal task lifecycle --
 
   /**
@@ -374,7 +841,8 @@ class Ketch(
    *   default to met after deserialization)
    * - `QUEUED` / `DOWNLOADING` -> enqueued for immediate download; this includes tasks
    *   that were paused for [PauseReason.Preempted] or [PauseReason.Shutdown]
-   * - `PAUSED` -> stays [DownloadState.Paused] for [PauseReason.User]
+   * - `PAUSED` -> stays [DownloadState.Paused] for [PauseReason.User], or for
+   *   [PauseReason.AwaitingFileSelection] when the record waits for a file selection
    * - `COMPLETED` -> [DownloadState.Completed], with the saved finish time
    * - `FAILED` -> [DownloadState.Failed]
    * - `CANCELED` -> [DownloadState.Canceled]
@@ -401,7 +869,10 @@ class Ketch(
         }
       }
 
-      _tasks.value = loaded
+      // Downloads added while the records loaded, such as through a server that already
+      // listens, are saved after the snapshot and stay in the list.
+      val recordIds = records.map { it.taskId }.toSet()
+      _tasks.value = loaded + currentTasks.filter { it.taskId !in recordIds }
     }
   }
 
@@ -428,7 +899,7 @@ class Ketch(
       else -> {} // PAUSED, COMPLETED, FAILED, CANCELED — no action
     }
 
-    monitorTaskState(record.taskId, task.state)
+    monitorTaskState(task)
     return task
   }
 
@@ -441,13 +912,19 @@ class Ketch(
       TaskState.QUEUED,
       TaskState.DOWNLOADING -> DownloadState.Queued
 
-      TaskState.PAUSED -> DownloadState.Paused(record.savedProgress())
+      TaskState.PAUSED -> DownloadState.Paused(
+        record.savedProgress(),
+        if (record.awaitsFileSelection()) PauseReason.AwaitingFileSelection else PauseReason.User
+      )
 
       TaskState.COMPLETED -> DownloadState.Completed(
         outputPath = record.outputPath ?: "",
         totalBytes = record.totalBytes.takeIf { it >= 0 },
         downloadTime = record.downloadTime,
         completedAt = record.completedAt,
+        sharing = false,
+        // Only a matching file completes; a published digest is not saved.
+        checksum = record.request.checksum,
       )
 
       TaskState.FAILED -> DownloadState.Failed(
@@ -458,10 +935,9 @@ class Ketch(
     }
   }
 
-  private suspend fun monitorTaskState(
-    taskId: String,
-    stateFlow: StateFlow<DownloadState>,
-  ) {
+  private suspend fun monitorTaskState(handle: RealDownloadTask) {
+    val taskId = handle.taskId
+    val stateFlow = handle.state
     monitorMutex.withLock {
       taskMonitors.remove(taskId)?.cancel()
       taskMonitors[taskId] = scope.launch {
@@ -474,9 +950,15 @@ class Ketch(
             log.i { "Task state: taskId=$taskId, ${last.logLabel()} -> ${state.logLabel()}" }
           }
           when (state) {
-            is DownloadState.Completed -> queue.onTaskCompleted(taskId, state)
+            is DownloadState.Completed -> {
+              queue.onTaskCompleted(taskId, state)
+              extensionOf(handle.record.value.sourceType)?.taskCompleted(handle)
+            }
             is DownloadState.Failed -> queue.onTaskFailed(taskId, state)
             is DownloadState.Canceled -> queue.onTaskCanceled(taskId, state)
+            is DownloadState.Paused -> if (state.reason == PauseReason.AwaitingFileSelection) {
+              queue.onTaskParked(taskId, state)
+            }
             else -> {}
           }
         }
@@ -497,6 +979,7 @@ class Ketch(
     is PauseReason.Preempted -> "preempted by taskId=$byTaskId"
     PauseReason.WaitingForCondition -> "waiting for conditions"
     PauseReason.Shutdown -> "shutdown"
+    PauseReason.AwaitingFileSelection -> "awaiting file selection"
   }
 
   /**
@@ -505,6 +988,7 @@ class Ketch(
    * download when it starts or resumes. See [KetchApi.updateConfig].
    */
   override suspend fun updateConfig(config: DownloadConfig) {
+    requireProxySupport(config.proxy)
     val directory = config.defaultDirectory
     if (directory != null && directory != currentConfig.defaultDirectory) {
       requireDownloadDirectory(directory)
@@ -529,21 +1013,105 @@ class Ketch(
     log.i { "Config updated: $config" }
   }
 
+  /** Refuses a [proxy] other than the system's when the HTTP engine cannot apply it. */
+  private fun requireProxySupport(proxy: Proxy?) {
+    if (proxy == null || proxy == Proxy.System || KetchFeatures.PROXY in features) return
+    throw UnsupportedOperationException("The HTTP engine cannot use a proxy")
+  }
+
+  /**
+   * Refuses a [DownloadRequest.checksum] for a source that writes its own files, such as a
+   * torrent's several files, which Ketch cannot hash as one. A URL no source takes fails later,
+   * as it does without a checksum.
+   */
+  private fun requireChecksumSupport(request: DownloadRequest) {
+    if (request.checksum == null) return
+    val source = try {
+      request.resolvedSource?.let { sourceResolver.resolveByType(it.sourceType, request.url) }
+        ?: sourceResolver.resolve(request.url)
+    } catch (_: KetchError) {
+      return
+    }
+    require(!source.managesOwnFileIo) {
+      "A checksum applies to downloads saved as one file, not to ${source.type} downloads"
+    }
+  }
+
   override suspend fun networkInterfaces(): NetworkInterfaces =
     (httpEngine as? ConfigurableNetworkHttpEngine)?.networkInterfaces() ?: NetworkInterfaces()
 
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     val configurable = httpEngine as? ConfigurableNetworkHttpEngine
       ?: throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
-    return configurable.updateNetworkInterfaces(config)
+    return configurable.selectNetworkInterfaces(config)
   }
 
+  /**
+   * Follows [interest]: segments as the tasks report them, stats every [interval] from [tasks],
+   * which are live, and [Interest.Connections] sampled once a second while collected (HTTP and
+   * media requests, FTP transfers and the peers of sources that report them). The sources'
+   * extensions answer the interests of their modules.
+   */
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+    require(interval.isPositive()) { "interval must be positive" }
+    return when (interest) {
+      is Interest.Segments -> segmentsOf(interest.taskIds)
+      Interest.Stats -> statsEvery(interval)
+      is Interest.Connections -> connectionRegistry.snapshots(interest.limit)
+      else -> extensions.firstNotNullOfOrNull { (_, extension) ->
+        extension.subscribe(interest, interval)
+      } ?: flow { throw UnsupportedOperationException("Ketch does not report $interest") }
+    } as Flow<T>
+  }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun segmentsOf(taskIds: Set<String>): Flow<Map<String, List<Segment>>> =
+    tasks.flatMapLatest { all ->
+      val named = all.filter { it.taskId in taskIds }
+      if (named.isEmpty()) {
+        flowOf(emptyMap())
+      } else {
+        combine(named.map { task -> task.segments.map { task.taskId to it } }) { it.toMap() }
+      }
+    }.distinctUntilChanged()
+
+  private fun statsEvery(interval: Duration): Flow<KetchStats> = flow {
+    while (true) {
+      emit(KetchStats.of(tasks.value.map { it.state.value }))
+      delay(interval)
+    }
+  }.distinctUntilChanged()
+
+  /**
+   * Stops every task and releases the engine, then closes [dispatchers] once its coroutines have
+   * finished; [KetchDispatchers.Default] stays open for every other instance.
+   */
   override fun close() {
     log.i { "Closing Ketch" }
-    coordinator.close()
+    val executions = coordinator.close()
+    connectionRegistry.closeAll()
     scope.cancel()
     sourceResolver.close()
     httpEngine.close()
-    dispatchers.close()
+    if (!dispatchers.isDefault) {
+      closeDispatchersAfter(listOf(scope.coroutineContext.job, executions))
+    }
+  }
+
+  /**
+   * Closes [dispatchers] once [jobs] have finished: cancelled coroutines still complete on their
+   * dispatcher, and a closed pool throws when they do. Waits on [Dispatchers.Default], as a
+   * Native pool cannot close from one of its own threads.
+   */
+  @OptIn(DelicateCoroutinesApi::class)
+  private fun closeDispatchersAfter(jobs: List<Job>) {
+    GlobalScope.launch(Dispatchers.Default) {
+      jobs.joinAll()
+      dispatchers.close()
+    }
   }
 }
+
+/** How long a task's retry ledger keeps a command: 15 minutes. */
+private const val LEDGER_WINDOW_MS = 15 * 60 * 1000L

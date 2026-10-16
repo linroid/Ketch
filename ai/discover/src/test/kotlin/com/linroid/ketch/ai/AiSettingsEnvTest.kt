@@ -118,6 +118,50 @@ class AiSettingsEnvTest {
   }
 
   @Test
+  fun `each saved provider reads its own variable`() {
+    val base = AiSettings()
+      .withEntry(LlmSettings(id = "deepseek", provider = LlmProvider.DeepSeek))
+      .withEntry(LlmSettings(id = "work", provider = LlmProvider.OpenAi, apiKey = "stored"))
+      .withEntry(LlmSettings(id = "personal", provider = LlmProvider.OpenAi))
+      .withEntry(LlmSettings(id = "local", provider = LlmProvider.Ollama))
+    val settings = resolveAiSettingsFromEnv(
+      base = base,
+      getenv = env("DEEPSEEK_API_KEY" to "ds", "OPENAI_API_KEY" to "oa"),
+    )
+    assertEquals(
+      listOf("ds", "stored", "oa", ""),
+      settings.providers.map { it.apiKey },
+    )
+    assertEquals("deepseek", settings.llm.id)
+  }
+
+  @Test
+  fun `several keys add a provider each with the first active`() {
+    val settings = resolveAiSettingsFromEnv(
+      getenv = env("MISTRAL_API_KEY" to "m", "ANTHROPIC_API_KEY" to "a", "OPENAI_API_KEY" to "o"),
+    )
+    assertEquals(
+      listOf(LlmProvider.OpenAi, LlmProvider.Anthropic, LlmProvider.Mistral),
+      settings.providers.map { it.provider },
+    )
+    assertEquals(LlmProvider.OpenAi, settings.llm.provider)
+    assertEquals("a", settings.entry("anthropic")?.apiKey)
+  }
+
+  @Test
+  fun `without auto configuration the default provider still gets its key`() {
+    val settings = resolveAiSettingsFromEnv(
+      getenv = env("OPENAI_API_KEY" to "sk-test"),
+      autoConfigure = false,
+    )
+    assertEquals(LlmProvider.OpenAi, settings.llm.provider)
+    assertEquals("sk-test", settings.llm.apiKey)
+    // It keeps the blank id the settings page knows it by.
+    assertEquals("", settings.llm.id)
+    assertTrue(settings.isUsable)
+  }
+
+  @Test
   fun `brave search credentials are picked up from the environment`() {
     val settings = resolveAiSettingsFromEnv(
       getenv = env("BRAVE_SEARCH_API_KEY" to "brave-key"),

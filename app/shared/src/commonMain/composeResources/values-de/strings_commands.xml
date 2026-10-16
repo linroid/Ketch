@@ -7,6 +7,7 @@
   <string name="command_palette">Befehlspalette</string>
   <string name="command_search">Downloads durchsuchen</string>
   <string name="command_discover">Entdecken</string>
+  <string name="command_connections">Verbindungen</string>
   <string name="command_devices">Geräte</string>
   <string name="command_device_all">Alle Geräte</string>
   <string name="command_device_switcher">Gerät wechseln…</string>
@@ -36,7 +37,7 @@
   <string name="command_list_toggle">Pausieren oder fortsetzen</string>
   <string name="command_list_open">Öffnen</string>
   <string name="command_list_reveal">Im Ordner anzeigen</string>
-  <string name="command_list_remove">Aus der Liste entfernen</string>
+  <string name="command_list_remove">Entfernen</string>
   <string name="command_list_remove_and_trash">Entfernen und Dateien in den Papierkorb legen…</string>
   <string name="command_list_copy_link">Link kopieren</string>
   <string name="command_list_copy_path">Dateipfad kopieren</string>

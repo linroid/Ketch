@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.KetchDispatchers
@@ -13,7 +14,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
@@ -24,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -35,6 +36,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.serializer
 
 /**
  * Verifies that [DownloadCoordinator.pause] keeps the segments the execution saves while
@@ -115,17 +117,21 @@ class DownloadCoordinatorPauseTest {
   }
 
   /** Publishes some progress, then waits for [checkpoint] while it stops. */
-  private class StoppingSource(private val checkpoint: CompletableDeferred<Unit>) : DownloadSource {
+  private class StoppingSource(
+    private val checkpoint: CompletableDeferred<Unit>,
+  ) : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
-    override fun canHandle(url: String) = true
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-      suggestedFileName = "fixture", maxSegments = 1,
-    )
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) {
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+        suggestedFileName = "fixture", maxSegments = 1,
+      )
+    }
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       context.segments.value = listOf(Segment(0, 0, 99, 20))
       try {
         awaitCancellation()
@@ -133,7 +139,6 @@ class DownloadCoordinatorPauseTest {
         withContext(NonCancellable) { checkpoint.await() }
       }
     }
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
   }
 
   private fun handle(onSave: (TaskRecord) -> Unit = {}): TaskHandle {
@@ -147,12 +152,13 @@ class DownloadCoordinatorPauseTest {
       override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
       override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
         createdAt = now, updatedAt = now)) { onSave(it) }
     }
   }
 
-  private fun TestScope.coordinator(source: DownloadSource): DownloadCoordinator {
+  private fun TestScope.coordinator(source: DownloadSource<*>): DownloadCoordinator {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return DownloadCoordinator(SourceResolver(listOf(source)),
       { DownloadConfig(saveIntervalMs = 60_000) }, DefaultFileNameResolver(),
@@ -163,22 +169,23 @@ class DownloadCoordinatorPauseTest {
     published: List<Segment>,
     final: List<Segment>,
   ): TaskRecord {
-    val source = object : DownloadSource {
+    val source = object : DownloadSource<Unit> {
+      override val stateSerializer = Unit.serializer()
       override val type = "fixture"
       override val managesOwnFileIo = true
-      override fun canHandle(url: String) = true
-      override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
-        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
-        suggestedFileName = "fixture", maxSegments = 1,
-      )
-      override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-        SourceResumeState(type, "")
-      override suspend fun download(context: DownloadContext) {
+      override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+      override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+        val url = (input as ResolveInput.Url).url
+        return ResolvedSource(
+          url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+          suggestedFileName = "fixture", maxSegments = 1,
+        )
+      }
+      override suspend fun download(context: DownloadContext, state: Unit?) {
         context.segments.value = published
         // Like SegmentedDownloadHelper, which publishes throttled progress when a batch stops.
         try { awaitCancellation() } finally { context.segments.value = final }
       }
-      override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) = Unit
     }
     val now = Clock.System.now()
     val request = DownloadRequest("fixture:input",
@@ -190,6 +197,7 @@ class DownloadCoordinatorPauseTest {
       override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
       override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
       override val record = AtomicSaver(TaskRecord(taskId, request, state = TaskState.QUEUED,
         createdAt = now, updatedAt = now)) {}
     }

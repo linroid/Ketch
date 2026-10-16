@@ -115,9 +115,22 @@ class ContinuedDownloadsTest {
 
   @Test
   fun backgroundProgress_onlyWaiting_isIndeterminate() = runTest {
-    val shown = shownFor(DownloadState.Queued)
+    val api = RecordingKetchApi()
+    api.add(DownloadState.Queued).queuePosition.value = 1
+
+    val shown = backgroundProgress(api.tasks.value)
 
     assertEquals("Waiting to download 1 file", shown?.title)
+    assertEquals("", shown?.subtitle)
+    assertEquals(-1, shown?.permille)
+  }
+
+  @Test
+  fun backgroundProgress_onlyStarting_countsItAsDownloading() = runTest {
+    // Queued without a position: it holds a slot while it starts.
+    val shown = shownFor(DownloadState.Queued)
+
+    assertEquals("Downloading 1 file", shown?.title)
     assertEquals("", shown?.subtitle)
     assertEquals(-1, shown?.permille)
   }

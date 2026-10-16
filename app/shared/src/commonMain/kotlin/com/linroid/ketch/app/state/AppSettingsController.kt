@@ -13,6 +13,7 @@ import com.linroid.ketch.config.DesktopSettings
 import com.linroid.ketch.config.IntegrationSettings
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.PowerSettings
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.TorrentSettings
@@ -136,6 +137,15 @@ class AppSettingsController(
     update { it.copy(ui = transform(it.ui)) }
   }
 
+  /** The order of torrent files [surface] shows, as last chosen there. */
+  internal fun fileSort(surface: FileSortSurface): FileSort =
+    FileSort.decode(ui.sort[surface.key], surface)
+
+  /** Remembers [sort] as the order of torrent files [surface] shows. */
+  internal fun saveFileSort(surface: FileSortSurface, sort: FileSort) {
+    saveUi { it.copy(sort = it.sort + (surface.key to sort.encode())) }
+  }
+
   /** Persists a change to the desktop app's window and startup behavior. */
   fun saveDesktop(transform: (DesktopSettings) -> DesktopSettings) {
     update { it.copy(desktop = transform(it.desktop)) }
@@ -144,6 +154,11 @@ class AppSettingsController(
   /** Persists a change to which activity the apps report, and how. */
   fun saveNotifications(transform: (NotificationSettings) -> NotificationSettings) {
     update { it.copy(notifications = transform(it.notifications)) }
+  }
+
+  /** Persists a change to how the apps treat the power of the device they run on. */
+  fun savePower(transform: (PowerSettings) -> PowerSettings) {
+    update { it.copy(power = transform(it.power)) }
   }
 
   /** Persists a change to how the desktop app hooks into the operating system. */
@@ -170,16 +185,22 @@ class AppSettingsController(
 
 /** Maps the persisted accent onto the theme's palette. */
 fun AccentColor.toKetchAccent(): KetchAccent = when (this) {
-  AccentColor.Signal -> KetchAccent.Signal
-  AccentColor.Harbor -> KetchAccent.Harbor
-  AccentColor.Fathom -> KetchAccent.Fathom
-  AccentColor.Beacon -> KetchAccent.Beacon
+  AccentColor.Indigo -> KetchAccent.Indigo
+  AccentColor.Purple -> KetchAccent.Purple
+  AccentColor.Pink -> KetchAccent.Pink
+  AccentColor.Orange -> KetchAccent.Orange
+  AccentColor.Green -> KetchAccent.Green
+  AccentColor.Teal -> KetchAccent.Teal
+  AccentColor.Blue -> KetchAccent.Blue
 }
 
 /** Maps a theme palette back onto its persisted form. */
 fun KetchAccent.toAccentColor(): AccentColor = when (this) {
-  KetchAccent.Signal -> AccentColor.Signal
-  KetchAccent.Harbor -> AccentColor.Harbor
-  KetchAccent.Fathom -> AccentColor.Fathom
-  KetchAccent.Beacon -> AccentColor.Beacon
+  KetchAccent.Indigo -> AccentColor.Indigo
+  KetchAccent.Purple -> AccentColor.Purple
+  KetchAccent.Pink -> AccentColor.Pink
+  KetchAccent.Orange -> AccentColor.Orange
+  KetchAccent.Green -> AccentColor.Green
+  KetchAccent.Teal -> AccentColor.Teal
+  KetchAccent.Blue -> AccentColor.Blue
 }

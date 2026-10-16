@@ -1,0 +1,52 @@
+name: "Français"
+description: "Signalez un bug, suggérez une amélioration ou posez une question."
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Type d’issue"
+      options:
+        - "Rapport de bug"
+        - "Demande de fonctionnalité"
+        - "Question"
+        - "Autre"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description"
+      description: "Que s’est-il passé, à quoi vous attendiez-vous ou que souhaiteriez-vous voir ?"
+      placeholder: "Décrivez le problème et le contexte utile."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Étapes de reproduction"
+      description: "Pour les rapports de bug, indiquez les étapes permettant de reproduire le problème."
+      placeholder: "1. ...\n2. ..."
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environnement"
+      description: "Indiquez la version de Ketch et la plateforme si nécessaire."
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        Récupérez les journaux depuis **Paramètres → À propos → Dépannage** :
+        - **Ordinateur :** choisissez **Ouvrir le dossier des journaux**.
+        - **Android ou iOS :** choisissez **Partager les journaux**.
+        - **Web :** ouvrez la console de développement de votre navigateur.
+        - **CLI :** copiez la sortie pertinente du terminal.
+        Consultez le [guide des journaux](https://github.com/linroid/Ketch/blob/main/docs/logging.md) pour plus de détails.
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Journaux"
+      description: "Collez des extraits pertinents ici ou joignez les fichiers dans un commentaire après l’envoi de l’issue. Supprimez les informations sensibles avant de les partager."
+      placeholder: "Collez ici des extraits pertinents des journaux."
+    validations:
+      required: false

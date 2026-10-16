@@ -1,102 +1,67 @@
 package com.linroid.ketch.api
 
-import com.linroid.ketch.api.torrent.TorrentController
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Duration
 
 /**
- * Service interface for managing downloads. Both core (in-process)
- * and remote (HTTP+SSE) backends implement this interface, allowing
- * the UI to work identically regardless of backend mode.
+ * Manages downloads. Implemented in-process by `Ketch` and over HTTP and SSE by `RemoteKetch`,
+ * so callers work the same with either.
  */
+@SubclassOptInRequired(KetchImplementationApi::class)
 interface KetchApi {
   /** Human-readable label: "Core" or "Remote · host:port". */
   val backendLabel: String
 
-  /**
-   * Optional typed torrent controls exposed by this backend. Null preserves compatibility with
-   * backends that support legacy torrent downloads but have not implemented the control protocol.
-   */
-  val torrents: TorrentController? get() = null
+  // Lifecycle
 
-  /** Reactive task list updated on any state change. */
-  val tasks: StateFlow<List<DownloadTask>>
-
-  /** Create a new download and return the task handle. */
-  suspend fun download(request: DownloadRequest): DownloadTask
-
-  /**
-   * Resolves metadata for the given URL without downloading.
-   *
-   * Probes the URL (e.g., via an HTTP HEAD request) and returns
-   * file size, resume support, suggested file name, and other
-   * source-specific metadata. The returned [ResolvedSource] can be
-   * passed in [DownloadRequest.resolvedSource] to skip the probe
-   * during [download].
-   *
-   * @param url the URL to resolve
-   * @param properties source-specific key-value pairs. For HTTP
-   *   sources this contains HTTP headers; other sources may
-   *   interpret them differently or ignore them.
-   */
-  suspend fun resolve(
-    url: String,
-    properties: Map<String, String> = emptyMap(),
-  ): ResolvedSource
-
-  /**
-   * Resolves metadata from file content the caller already holds, such as
-   * a `.torrent` file picked or dropped by the user, without fetching it.
-   *
-   * The content is not stored anywhere else, so start the download by
-   * passing the returned [ResolvedSource] in [DownloadRequest.resolvedSource]
-   * with its [ResolvedSource.url] as [DownloadRequest.url].
-   *
-   * @param content the raw file content
-   * @param fileName the original file name, if known. Sources may use its
-   *   extension to recognize the content.
-   * @throws KetchError.Unsupported if no source recognizes the content
-   * @throws UnsupportedOperationException if this backend cannot resolve content
-   */
-  suspend fun resolveContent(
-    content: ByteArray,
-    fileName: String? = null,
-  ): ResolvedSource {
-    throw UnsupportedOperationException("Resolving file content is unavailable")
-  }
-
-  /**
-   * Initialize backend runtime state.
-   *
-   * - Core backend restores persisted tasks.
-   * - Remote backend establishes connection and syncs tasks.
-   */
+  /** Restores saved tasks (in-process) or connects and loads them (remote). */
   suspend fun start()
 
+  /** Releases the instance's resources. */
+  fun close()
+
+  // Tasks
+
+  /** Every task of this instance. */
+  val tasks: StateFlow<List<DownloadTask>>
+
   /**
-   * Returns a point-in-time status snapshot including
-   * configuration, system information, and storage details, and the optional
-   * behaviors the instance supports in [KetchStatus.features].
+   * Adds a download.
+   *
+   * @throws UnsupportedOperationException if [DownloadRequest.proxy] is not [Proxy.System]
+   *   and this backend does not list [KetchFeatures.PROXY]
    */
+  suspend fun download(request: DownloadRequest): DownloadTask
+
+  // Probing
+
+  /**
+   * Probes [input] without downloading it: a URL the instance fetches, or file content the caller
+   * holds. Pass the result in [DownloadRequest.resolvedSource] to skip probing again. The
+   * `resolve(url)` and `resolve(content, fileName)` extensions build the input.
+   *
+   * It runs until it has an answer, as a magnet link waits for peers to come online; cancel the
+   * call to stop it.
+   *
+   * @throws KetchError.Unsupported if no source handles the URL or recognizes the content
+   * @throws UnsupportedOperationException if this backend cannot resolve content
+   */
+  suspend fun resolve(input: ResolveInput): ResolvedSource
+
+  // Status and settings
+
+  /** The instance's configuration, system, storage and [features][KetchStatus.features]. */
   suspend fun status(): KetchStatus
 
   /**
-   * Replaces the runtime download configuration.
-   *
-   * Applied immediately:
-   * - [DownloadConfig.speedLimit] throttles all active downloads.
-   * - [DownloadConfig.maxConcurrentDownloads] and [DownloadConfig.maxConnectionsPerHost]:
-   *   raising a limit starts queued downloads right away; lowering one never interrupts
-   *   running downloads, queued ones wait until enough of them finish.
-   *
-   * Applied to downloads that start or resume after the update (running downloads keep the
-   * values they started with until paused and resumed):
-   * [DownloadConfig.defaultDirectory], [DownloadConfig.maxConnectionsPerDownload],
-   * [DownloadConfig.retryCount], [DownloadConfig.retryDelayMs],
-   * [DownloadConfig.progressIntervalMs], [DownloadConfig.saveIntervalMs] and
-   * [DownloadConfig.bufferSize].
+   * Replaces the download configuration. Speed and queue limits apply at once; other fields
+   * apply to downloads that start or resume afterwards (see [DownloadConfig]).
    *
    * @throws IllegalArgumentException if [DownloadConfig.defaultDirectory]
    *   changed to a folder that does not exist on this instance
+   * @throws UnsupportedOperationException if [DownloadConfig.proxy] is not [Proxy.System]
+   *   and this backend does not list [KetchFeatures.PROXY]
    */
   suspend fun updateConfig(config: DownloadConfig)
 
@@ -104,26 +69,42 @@ interface KetchApi {
   suspend fun networkInterfaces(): NetworkInterfaces = NetworkInterfaces()
 
   /**
-   * Selects interfaces for subsequent HTTP requests, including retries and new segments.
-   * In-flight requests finish on their existing network. An empty selection restores default
-   * routing. Selection is runtime-only and is not persisted across instance restarts.
+   * Selects the interfaces later HTTP requests use, round-robin; requests in flight keep theirs.
+   * Empty restores default routing. Not saved across restarts.
    *
    * @throws IllegalArgumentException if an ID is unknown or unavailable
    * @throws UnsupportedOperationException if this backend cannot configure interfaces
    */
-  suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     throw UnsupportedOperationException("HTTP network interface configuration is unavailable")
   }
 
-  /** Release resources (HTTP client, SSE connection, etc.). */
-  fun close()
+  // Extensions
 
+  /**
+   * Follows [interest] while collected. A remote instance asks its server for updates every
+   * [interval] (the shortest its callers ask for); an in-process one reports changes as they
+   * happen, and stats every [interval]. Unknown interests fail with
+   * [UnsupportedOperationException] when collected.
+   *
+   * @throws IllegalArgumentException if [interval] is not positive
+   */
+  fun <T> subscribe(interest: Interest<T>, interval: Duration = Interest.DEFAULT_INTERVAL): Flow<T>
 
+  /**
+   * The controller this backend offers for [key], defined by another module, or `null`. Check the
+   * feature its module names in [KetchStatus.features] first: a remote controller fails against
+   * servers without it.
+   */
+  fun <T : Any> controller(key: ControlKey<T>): T? = null
+
+  // Not `const`, which callers would inline, reporting the version they were compiled against.
+  @Suppress("MayBeConstant")
   companion object {
     /** Library version string (e.g., "0.0.1-dev"). */
-    const val VERSION: String = KETCH_BUILD_VERSION
+    val VERSION: String = KETCH_BUILD_VERSION
 
     /** Build revision (git short hash). */
-    const val REVISION: String = KETCH_BUILD_REVISION
+    val REVISION: String = KETCH_BUILD_REVISION
   }
 }

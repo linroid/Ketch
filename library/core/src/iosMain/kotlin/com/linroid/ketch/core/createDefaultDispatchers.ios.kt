@@ -2,16 +2,14 @@
 
 package com.linroid.ketch.core
 
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.newFixedThreadPoolContext
-import kotlinx.coroutines.newSingleThreadContext
 
-internal actual fun createMainDispatcher(): CoroutineDispatcher =
-  newSingleThreadContext("ketch-main")
-
-internal actual fun createNetworkDispatcher(poolSize: Int): CoroutineDispatcher =
-  newFixedThreadPoolContext(poolSize, "ketch-network")
-
-internal actual fun createIoDispatcher(poolSize: Int): CoroutineDispatcher =
-  newFixedThreadPoolContext(poolSize, "ketch-io")
+internal actual fun createDefaultDispatchers(): KetchDispatchers {
+  val network = newFixedThreadPoolContext(DEFAULT_NETWORK_THREADS, "ketch-network")
+  return KetchDispatchers(
+    main = network,
+    network = network,
+    disk = newFixedThreadPoolContext(DEFAULT_DISK_THREADS, "ketch-disk"),
+  )
+}

@@ -19,6 +19,7 @@
   <string name="tray_recent">最近</string>
   <string name="tray_show_ketch">显示 Ketch</string>
   <string name="tray_speed">速度</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">显示</string>
   <string name="tray_enter_token">输入令牌…</string>
   <string name="tray_retry_now">立即重试</string>
@@ -58,7 +59,7 @@
   <string name="message_update_ready">Ketch %1$s 已准备好安装</string>
   <string name="message_update_installed">已更新到 Ketch %1$s</string>
   <string name="message_update_failed">无法更新到 Ketch %1$s</string>
-  <string name="message_update_failed_hint">日志文件夹中的 update.log 记录了出错原因。</string>
+  <string name="message_update_failed_hint">请查看日志文件夹中的 update.log。</string>
   <string name="message_update">更新</string>
   <string name="message_restart">重新启动</string>
   <string name="message_open_installer">打开安装程序</string>
@@ -76,6 +77,11 @@
     <item quantity="other">已复制 %1$d 个链接</item>
   </plurals>
   <string name="message_window_error">出现问题</string>
+  <string name="message_downloads_run_by">%1$s（进程 %2$d）正在运行这台电脑的下载任务</string>
+  <string name="message_downloads_run_elsewhere">另一个 Ketch 进程正在运行这台电脑的下载任务</string>
+  <string name="message_downloads_run_hint">停止它，再退出并重新打开 Ketch，即可在这里运行</string>
+  <string name="message_command_stopped">%1$s 已停止</string>
+  <string name="message_command_stopped_hint">退出并重新打开 Ketch，即可在这里运行这台电脑的下载任务</string>
   <string name="open_torrent_title">打开种子文件</string>
 
   <string name="close_keep_running_title">在后台继续下载？</string>
@@ -118,4 +124,6 @@
   </plurals>
 
   <string name="settings_window_title">设置</string>
+
+  <string name="keep_awake_reason">正在下载</string>
 </resources>

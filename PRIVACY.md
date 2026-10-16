@@ -1,6 +1,6 @@
 # Privacy policy
 
-Effective 5 October 2026. This policy covers the Ketch apps for Android, iOS and iPadOS, macOS,
+Effective 13 October 2026. This policy covers the Ketch apps for Android, iOS and iPadOS, macOS,
 Windows, Linux and the web, the `ketch` command line and server, and the Ketch browser extension.
 
 Ketch is an open-source download manager. It has no accounts, no ads, no analytics and no crash
@@ -18,8 +18,10 @@ what you ask, as described below. You can check this in the
   by your device's own security.
 - **Discover history** (Android and desktop): your searches and the links found, kept on the
   device. The steps it records have their web addresses shortened.
+- **Your clipboard**: only if you let Ketch suggest copied links (Settings → Integration), it
+  reads links from the clipboard to offer them, and nothing leaves the device until you add one.
 - **Logs**: a log file on the device, which leaves it only if you share it yourself, for example
-  from Settings › About to report a problem. Logs leave out passwords and tokens in links.
+  from Settings → About to report a problem. Logs leave out passwords and tokens in links.
 
 Your device's own backup, such as Android backup or iCloud, may include Ketch's settings and task
 list, under that service's terms. On Android, Discover history is excluded from backups and device
@@ -36,7 +38,20 @@ Ketch only connects to the places you point it at:
 - **BitTorrent peers and trackers.** For a torrent or magnet link, Ketch connects to the trackers
   it names and to other peers, and uses the distributed hash table (DHT) to find them. As with
   any BitTorrent client, the trackers and peers can see your IP address and which torrent you
-  are downloading.
+  are downloading. By default, while a torrent downloads, peers also download from you the pieces
+  you already have, and uploading stops once it finishes. On Android and iOS this happens only
+  over Wi-Fi or another network that is not metered, unless you turn off *Only on Wi-Fi*. To
+  upload nothing, choose *Off* under Settings → BitTorrent → Uploading, or set
+  `[torrent] upload = "off"`. An app whose saved settings already say *Off*, as Ketch 0.5 to 0.7
+  saved them by default, keeps it; check Settings → BitTorrent → Uploading after updating. With
+  *Keep seeding*, Ketch keeps sharing finished torrents while it runs, until you stop sharing
+  them, remove them or turn it off, and shares them again after it restarts.
+- **Your router and local network, for torrents.** By default Ketch asks your router (UPnP or
+  NAT-PMP) to forward a port so more peers can reach it, and, on the desktop, Android and the
+  server, announces the public torrents it downloads to other devices on your local network
+  (local peer discovery), so devices on that network can see which public torrents you
+  download. Turn these off under Settings → BitTorrent → Connections (`[torrent] portMapping`
+  and `localDiscovery`).
 - **Your other devices.** When you pair devices, the device that controls another sends it your
   commands and receives its list of downloads, directly over your network. On a local network
   this traffic is not encrypted unless you set up HTTPS. Ketch looks for your devices on the local
@@ -50,10 +65,20 @@ Ketch only connects to the places you point it at:
   Search or Google, your search terms go to it. Those services handle the data under their own
   privacy policies. Discover sends nothing until you set up a service, and asks you before it
   opens a website unless you tell it not to.
-- **GitHub, for updates** (desktop app and command line only). The desktop app checks GitHub for
-  a new release once a day while that setting is on, and the command line when you run
-  `ketch update`. GitHub sees your IP address. The Android and iOS apps from the app stores do not
-  check for updates themselves.
+- **GitHub, for updates** (the desktop app, the Android app downloaded from GitHub, and the
+  command line). These apps check GitHub for a new release once a day while **Check for updates
+  automatically** is on (Settings → About), and when you choose **Check now**; the command line
+  only when you run `ketch update`. Opening the release notes (**What's new**, **Release
+  history**) also reads them from GitHub. GitHub sees your IP address. Apps installed from an app
+  store do not check for updates themselves.
+- **Tracker lists, for torrents.** To find more peers for public torrents, Ketch downloads two
+  public lists of BitTorrent trackers once a day from GitHub, or from the jsDelivr mirror when
+  GitHub fails. This happens while the setting is on (the default), whether or not you download
+  torrents. Those services see your IP address. Turn it off under Settings → BitTorrent →
+  **Tracker lists** (`[torrent] trackerList`).
+
+The web app is a static page served by GitHub Pages, which sees your IP address when you open
+it. It connects only to the Ketch devices you add, and keeps its settings in your browser.
 
 The browser extension sends the downloads you hand to Ketch, with the cookies, referring page and
 user agent that the site needs, only to the Ketch app or server you choose in its settings.
@@ -61,9 +86,12 @@ user agent that the site needs, only to the Ketch app or server you choose in it
 ## Permissions
 
 - **Notifications**, to show download progress and finished downloads.
-- **Local network** (iOS) and **nearby Wi-Fi devices** (Android), to find your other devices
-  running Ketch on the same network.
+- **Local network** (iOS and Android 17 and later) and **nearby Wi-Fi devices** (Android 13 to
+  16), to find and reach your other devices running Ketch on the same network, and, on Android,
+  for local peer discovery of torrents.
 - **Storage and files**, only for the folders you choose to save downloads to.
+- **Install apps** (only the Android app downloaded from GitHub), to install an update you
+  chose to download.
 
 ## Children
 

@@ -49,24 +49,6 @@
     "message": "Download added",
     "description": "Notification text after a download was handed to Ketch, when its file name isn't known."
   },
-  "notify_fallback_browser": {
-    "message": "Downloading in the browser instead",
-    "description": "Notification title when Ketch couldn't take a download the browser started, so the browser downloads it. The text below says why."
-  },
-  "notify_fallback_magnet": {
-    "message": "Opening the magnet link in another app",
-    "description": "Notification title when Ketch couldn't take a clicked magnet link, so it opens as it would without the extension. The text below says why."
-  },
-  "notify_send_failed": {
-    "message": "Couldn't send to $NAME$",
-    "description": "Notification title when a link from the context menu couldn't be sent. $NAME$ is the instance's name. The text below says why.",
-    "placeholders": {
-      "name": {
-        "content": "$1",
-        "example": "NAS"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch can't download this",
     "description": "Notification title when the context menu was used on something without a link Ketch can download."
@@ -150,6 +132,10 @@
   "error_app_connect_failed": {
     "message": "The Ketch app couldn't connect",
     "description": "Error when the Ketch app on this computer reported a problem without describing it."
+  },
+  "error_app_pick_unsupported": {
+    "message": "Update the Ketch app to choose folders from here",
+    "description": "Download review dialog: error when the Ketch app is too old to show its folder dialog for the extension"
   },
   "error_app_invalid_reply": {
     "message": "The Ketch app sent an invalid reply",
@@ -521,16 +507,6 @@
     "message": "Download",
     "description": "Button next to that field that sends the link to Ketch. A verb."
   },
-  "popup_added": {
-    "message": "Added $NAME$",
-    "description": "Message after a link from the popup was added. $NAME$ is the download's name.",
-    "placeholders": {
-      "name": {
-        "content": "$1",
-        "example": "ubuntu-24.04.iso"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "Enter an http, https, ftp or magnet link.",
     "description": "Error in the popup when what was typed isn't a link Ketch can download. http, https, ftp and magnet are link types; keep them as they are."
@@ -805,25 +781,9 @@
     "message": "This Ketch instance does not support media playlists. Update it before sending this link.",
     "description": "Media capability error"
   },
-  "review_setting": {
-    "message": "Review downloads before sending",
-    "description": "Download review: setting"
-  },
-  "review_title": {
-    "message": "Review download",
-    "description": "Download review: title"
-  },
-  "review_name": {
-    "message": "File name (optional)",
-    "description": "Download review: name"
-  },
   "review_folder": {
     "message": "Folder on the selected device (optional)",
     "description": "Download review: folder"
-  },
-  "review_detail": {
-    "message": "Leave the folder empty to use the device’s default. The server controls which folders are allowed. Torrents keep their own file layout. Closing this page returns a paused download to the browser.",
-    "description": "Download review: detail"
   },
   "review_cancel": {
     "message": "Cancel",
@@ -840,5 +800,153 @@
   "safari_detail": {
     "message": "Safari sends reviewed links and page resources to a configured Ketch server. Start sharing in Ketch and enter its address and access token here. Automatic download capture and app launching are not available.",
     "description": "Safari server setup and supported features"
+  },
+  "dialog_title": {
+    "message": "New download",
+    "description": "Download review dialog: window title"
+  },
+  "dialog_name_label": {
+    "message": "File name",
+    "description": "Download review dialog: accessible label of the file name field"
+  },
+  "dialog_send_to": {
+    "message": "Send to",
+    "description": "Download review dialog: heading above the list of Ketch devices to send to"
+  },
+  "dialog_save_in": {
+    "message": "Save in",
+    "description": "Download review dialog: heading above the folder field"
+  },
+  "dialog_folder_default": {
+    "message": "Default folder",
+    "description": "Download review dialog: folder field placeholder when the device has not said which folder it uses"
+  },
+  "dialog_folder_browse": {
+    "message": "Browse…",
+    "description": "Download review dialog: button beside the folder field that opens the folder dialog of the Ketch app on this computer"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Choose a folder on this computer",
+    "description": "Download review dialog: tooltip of the Browse button"
+  },
+  "dialog_device_checking": {
+    "message": "Checking…",
+    "description": "Download review dialog: device line while its status is being checked"
+  },
+  "dialog_device_ready": {
+    "message": "Ready",
+    "description": "Download review dialog: device line when it answered but did not report free space"
+  },
+  "dialog_device_free": {
+    "message": "$SIZE$ free",
+    "description": "Download review dialog: device line with the free space in its download folder, e.g. \"120 GB free\"",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "120 GB"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "Closed · starts when you send",
+    "description": "Download review dialog: device line when the Ketch app on this computer is closed; sending to it starts the app"
+  },
+  "dialog_device_offline": {
+    "message": "Not reachable",
+    "description": "Download review dialog: device line when it cannot be reached"
+  },
+  "dialog_torrent_layout": {
+    "message": "Torrents keep their own folder layout.",
+    "description": "Download review dialog: note under the folder field for torrents, whose own folders are kept"
+  },
+  "dialog_space_warning": {
+    "message": "Only $SIZE$ free on $DEVICE$.",
+    "description": "Download review dialog: warning when the file is larger than the free space on the device",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "2 GB"
+      },
+      "device": {
+        "content": "$2",
+        "example": "NAS"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "Download in browser",
+    "description": "Download review dialog: button that lets the browser download this file itself instead of Ketch"
+  },
+  "dialog_sending": {
+    "message": "Sending…",
+    "description": "Download review dialog: status while the download is being sent"
+  },
+  "dialog_folder_auto": {
+    "message": "Auto",
+    "description": "Download review dialog: chip that leaves the folder to the device, which sorts files into category folders"
+  },
+  "dialog_folder_auto_match": {
+    "message": "Auto · $FOLDER$",
+    "description": "Download review dialog: the Auto chip when the device would save this file in a category folder; $FOLDER$ is that folder, e.g. \"Auto · Videos\"",
+    "placeholders": {
+      "folder": {
+        "content": "$1",
+        "example": "Videos"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "Let the device choose: its download folder, or the category folder that matches this file.",
+    "description": "Download review dialog: tooltip of the Auto chip"
+  },
+  "dialog_folder_recent": {
+    "message": "Recently used: $FOLDER$",
+    "description": "Download review dialog: tooltip of a chip for a folder used before on this device; $FOLDER$ is its full path",
+    "placeholders": {
+      "folder": {
+        "content": "$1",
+        "example": "Videos"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Review downloads before sending",
+    "description": "Download review: setting"
+  },
+  "notify_fallback_browser": {
+    "message": "Downloading in the browser instead",
+    "description": "Notification title when Ketch couldn't take a download the browser started, so the browser downloads it. The text below says why."
+  },
+  "notify_fallback_magnet": {
+    "message": "Opening the magnet link in another app",
+    "description": "Notification title when Ketch couldn't take a clicked magnet link, so it opens as it would without the extension. The text below says why."
+  },
+  "notify_send_failed": {
+    "message": "Couldn't send to $NAME$",
+    "description": "Notification title when a link from the context menu couldn't be sent. $NAME$ is the instance's name. The text below says why.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "NAS"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "Added $NAME$",
+    "description": "Message after a link from the popup was added. $NAME$ is the download's name.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "ubuntu-24.04.iso"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch doesn't accept this copy of the extension",
+    "description": "Error when the browser refuses to let this extension reach the Ketch app, because the app did not register this copy's extension ID"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch only connects to the extension from the Chrome Web Store, or a release's chrome-unpacked package loaded with Load unpacked. Install one of those, then try again.",
+    "description": "Hint for error_app_not_allowed: which copies of the extension the Ketch app accepts"
   }
 }

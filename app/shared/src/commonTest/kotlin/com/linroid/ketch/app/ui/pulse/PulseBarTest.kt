@@ -41,7 +41,8 @@ class PulseBarTest {
 
   @Test
   fun pulseCounts_everyState_equalTheStatusTabCounts() = runTest {
-    val api = RecordingKetchApi()
+    // One slot, taken, so the queued tasks wait with positions instead of starting.
+    val api = RecordingKetchApi(maxActive = 1)
     listOf(
       DownloadState.Downloading(DownloadProgress(10, 100, 5)),
       DownloadState.Queued,

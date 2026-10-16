@@ -4,7 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Additional edge case tests for [TorrentConfig] beyond the basics
@@ -13,30 +12,16 @@ import kotlin.time.Duration.Companion.seconds
 class TorrentConfigEdgeCaseTest {
 
   @Test
-  fun metadataTimeout_zeroSeconds() {
-    val config = TorrentConfig(metadataTimeoutSeconds = 0)
-    assertEquals(0.seconds, config.metadataTimeout)
-  }
-
-  @Test
-  fun metadataTimeout_largeValue() {
-    val config = TorrentConfig(metadataTimeoutSeconds = 3600)
-    assertEquals(3600.seconds, config.metadataTimeout)
-  }
-
-  @Test
   fun customConfig_allFieldsOverridden() {
     val config = TorrentConfig(
       dhtEnabled = false,
       maxActiveTorrents = 10,
-      metadataTimeoutSeconds = 300,
       connectionsPerTorrent = 50,
       enableUpload = true,
       listenPort = 6881,
     )
     assertFalse(config.dhtEnabled)
     assertEquals(10, config.maxActiveTorrents)
-    assertEquals(300, config.metadataTimeoutSeconds)
     assertEquals(50, config.connectionsPerTorrent)
     assertTrue(config.enableUpload)
     assertEquals(6881, config.listenPort)

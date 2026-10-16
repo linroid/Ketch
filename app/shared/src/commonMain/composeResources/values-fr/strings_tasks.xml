@@ -10,6 +10,7 @@
   <string name="row_status_downloading">En cours</string>
   <string name="row_status_stalled">Bloqué</string>
   <string name="row_status_paused">En pause</string>
+  <string name="row_status_starting">Démarrage</string>
   <string name="row_status_queued">En file d'attente</string>
   <string name="row_status_scheduled">Planifié</string>
   <string name="row_status_done">Terminé</string>
@@ -23,6 +24,8 @@
   <string name="row_saved_on">Enregistré sur %1$s</string>
   <string name="row_missing_file">Fichier déplacé ou supprimé</string>
   <string name="row_completed">Terminé</string>
+  <string name="row_choose_files">Choisissez les fichiers à télécharger</string>
+  <string name="row_seeding">En partage</string>
   <string name="row_took">en %1$s</string>
   <plurals name="row_files">
     <item quantity="one">%1$d fichier</item>
@@ -60,6 +63,10 @@
   <string name="sort_origin">Origine</string>
   <string name="sort_priority">Priorité</string>
   <string name="sort_device">Appareil</string>
+  <string name="sort_kind">Type</string>
+  <string name="sort_selected_first">Sélectionnés d'abord</string>
+  <string name="sort_torrent_order">Ordre du torrent</string>
+  <string name="sort_reverse">Ordre inversé</string>
   <string name="group_smart">Intelligent</string>
   <string name="group_status">État</string>
   <string name="group_day">Jour</string>
@@ -105,6 +112,7 @@
     <item quantity="one">%1$d devant</item>
     <item quantity="other">%1$d devant</item>
   </plurals>
+  <string name="row_finding_peers">Recherche de pairs</string>
   <string name="queue_starting">Démarrage</string>
 
   <string name="action_row_pause">Mettre en pause</string>
@@ -130,10 +138,12 @@
   <string name="action_row_open_source_page">Ouvrir la page source</string>
   <string name="action_row_copy_error">Copier l'erreur</string>
   <string name="action_row_copy_details">Copier les détails</string>
-  <string name="action_row_stop_and_discard">Arrêter et abandonner la progression…</string>
-  <string name="action_row_remove">Retirer de la liste</string>
-  <string name="action_row_remove_and_trash">Retirer et mettre le fichier à la corbeille…</string>
-  <string name="action_row_remove_and_delete">Retirer et supprimer les fichiers…</string>
+  <string name="action_row_stop_and_discard">Annuler le téléchargement…</string>
+  <string name="action_row_remove">Retirer…</string>
+  <string name="action_row_choose_files">Choisir les fichiers…</string>
+  <string name="action_row_download_all_files">Télécharger tous les fichiers</string>
+  <string name="action_row_stop_seeding">Arrêter le partage</string>
+  <string name="action_row_seed">Partager</string>
   <plurals name="batch_pause">
     <item quantity="one">Mettre en pause %1$d téléchargement</item>
     <item quantity="other">Mettre en pause %1$d téléchargements</item>
@@ -168,22 +178,18 @@
     <item quantity="other">Retélécharger %1$d fichiers</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Abandonner la progression de %1$d téléchargement…</item>
-    <item quantity="other">Abandonner la progression de %1$d téléchargements…</item>
+    <item quantity="one">Annuler %1$d téléchargement…</item>
+    <item quantity="other">Annuler %1$d téléchargements…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Retirer %1$d téléchargement de la liste</item>
-    <item quantity="other">Retirer %1$d téléchargements de la liste</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Retirer %1$d téléchargement et son fichier…</item>
-    <item quantity="other">Retirer %1$d téléchargements et leurs fichiers…</item>
+    <item quantity="one">Retirer %1$d téléchargement…</item>
+    <item quantity="other">Retirer %1$d téléchargements…</item>
   </plurals>
   <string name="bar_speed">Vitesse</string>
   <string name="bar_copy_links">Copier les liens</string>
   <string name="bar_remove">Retirer…</string>
   <string name="bar_copy_paths">Copier les chemins des fichiers</string>
-  <string name="bar_discard">Abandonner la progression…</string>
+  <string name="bar_discard">Annuler les téléchargements…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s %2$d sur %3$d sélectionnés</string>

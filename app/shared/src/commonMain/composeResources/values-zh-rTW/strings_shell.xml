@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">下載</string>
   <string name="shell_destination_discover">搜尋</string>
+  <string name="shell_destination_connections">連線</string>
   <string name="shell_destination_devices">裝置</string>
   <string name="shell_settings">設定</string>
   <string name="shell_devices">裝置</string>
@@ -38,7 +39,6 @@
   <string name="shell_devices_online">%2$d 台中有 %1$d 台在線上</string>
 
   <string name="sidebar_all_devices_tooltip">所有裝置的下載</string>
-  <string name="sidebar_add_device">新增裝置</string>
   <string name="sidebar_device_menu">裝置選單</string>
   <string name="sidebar_menu_pause_all">全部暫停</string>
   <string name="sidebar_menu_resume_all">全部繼續</string>
@@ -52,7 +52,7 @@
 
   <string name="switcher_overview">總覽</string>
   <string name="switcher_add_device">新增裝置…</string>
-  <string name="switcher_find_on_network">在網路上尋找</string>
+  <string name="switcher_find_on_network">在區域網路中尋找</string>
   <string name="switcher_share">共享%1$s…</string>
 
   <string name="shell_device_button">%1$s，切換裝置</string>
@@ -79,6 +79,7 @@
   <string name="banner_retrying">正在重試</string>
   <string name="banner_retry_now">立即重試</string>
   <string name="banner_switch_to">切換至 %1$s</string>
+  <string name="banner_pairing_on">配對已開啟，還剩 %1$s · 區域網路中的裝置可以要求控制%2$s上的 Ketch</string>
   <string name="banner_unauthorized">%1$s 需要新的存取權杖</string>
   <string name="banner_enter_token">輸入權杖</string>
   <string name="toast_subject_reason">%1$s：%2$s</string>

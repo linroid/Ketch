@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
@@ -12,7 +13,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadExecution
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.platformFileSystem
@@ -21,6 +22,7 @@ import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -30,6 +32,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -166,7 +169,7 @@ class DownloadTimeTest {
     state = state,
     totalBytes = 4,
     sourceType = FIXTURE,
-    sourceResumeState = SourceResumeState(FIXTURE, ""),
+    sourceState = SourceState(FIXTURE, "{}"),
     downloadTime = downloadTime,
     createdAt = now,
     updatedAt = now,
@@ -179,10 +182,14 @@ class DownloadTimeTest {
     override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
     override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
     override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+    override val controlLock = Mutex()
     override val record = AtomicSaver(record) {}
   }
 
-  private fun TestScope.execution(handle: TaskHandle, source: DownloadSource): DownloadExecution {
+  private fun TestScope.execution(
+    handle: TaskHandle,
+    source: DownloadSource<*>,
+  ): DownloadExecution {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return DownloadExecution(
       handle = handle,
@@ -203,19 +210,19 @@ class DownloadTimeTest {
     private val finishes: Boolean = true,
     private val totalBytes: Long = 4,
     selfManaged: Boolean = true,
-  ) : DownloadSource {
+  ) : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = FIXTURE
     override val managesOwnFileIo = selfManaged
-    override fun canHandle(url: String) = true
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = totalBytes, supportsResume = true,
-      suggestedFileName = "fixture", maxSegments = 1,
-    )
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) = transfer()
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      transfer()
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = totalBytes, supportsResume = true,
+        suggestedFileName = "fixture", maxSegments = 1,
+      )
+    }
+    override suspend fun download(context: DownloadContext, state: Unit?) = transfer()
 
     private suspend fun transfer() {
       timeSource += runTime

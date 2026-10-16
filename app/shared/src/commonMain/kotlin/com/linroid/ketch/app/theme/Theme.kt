@@ -54,7 +54,7 @@ fun ThemeMode.isDark(): Boolean = when (this) {
 @Composable
 fun KetchTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
-  accent: KetchAccent = KetchAccent.Signal,
+  accent: KetchAccent = KetchAccent.Indigo,
   density: DensityMode = DensityMode.Auto,
   reduceMotion: Boolean = rememberReduceMotion(),
   windowChrome: WindowChrome = LocalWindowChrome.current,

@@ -26,3 +26,17 @@ internal enum class SuccessFeedbackSupport {
 
 /** What this platform's host plays when a download finishes or Discover finds downloads. */
 internal expect val successFeedbackSupport: SuccessFeedbackSupport
+
+/**
+ * Whether this platform's host keeps the system awake while downloads run (`[power] keepAwake`):
+ * the desktop and Android apps. iOS suspends apps in the background, and the web app has no
+ * downloads of its own.
+ */
+internal expect val keepAwakeSupported: Boolean
+
+/**
+ * Whether this platform's torrent engine finds peers on the local network (BEP 14): the desktop
+ * and Android apps. iOS needs a multicast entitlement the app does not have, and the web app has
+ * no engine of its own.
+ */
+internal expect val localPeerDiscoverySupported: Boolean

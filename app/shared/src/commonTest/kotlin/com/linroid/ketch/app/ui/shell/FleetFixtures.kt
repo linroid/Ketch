@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.backgroundChild
+import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -36,7 +37,7 @@ internal object FleetFixtures {
   /** 1.8 TB free of 3.6 TB, in the binary units the app shows. */
   val NasDisk = DiskSpace(1_979_120_929_996, 4_000_787_030_016, "/volume1/downloads")
 
-  /** This device, "This Mac" on "MacBook Pro". */
+  /** This device, "MacBook Pro", which "This Mac" describes. */
   fun mac(
     counts: PulseCounts = PulseCounts(),
     speed: Long = 0,
@@ -44,8 +45,8 @@ internal object FleetFixtures {
     speedMode: SpeedMode = SpeedMode.Full,
   ): DevicePresence = presence(
     entry = EmbeddedInstance(FakeKetchApi(), "MacBook Pro"),
-    name = "This Mac",
-    detail = "MacBook Pro",
+    name = "MacBook Pro",
+    detail = verbatim("This Mac"),
     health = DeviceHealth.Local(),
     counts = counts,
     speed = speed,
@@ -69,7 +70,7 @@ internal object FleetFixtures {
       connectionState = MutableStateFlow(ConnectionState.Connected),
     ),
     name = "NAS-Basement",
-    detail = NAS_ID,
+    detail = verbatim(NAS_ID),
     health = health,
     connected = connected,
     counts = counts,
@@ -83,7 +84,7 @@ internal object FleetFixtures {
   fun presence(
     entry: InstanceEntry,
     name: String,
-    detail: String = name,
+    detail: UiText = verbatim(name),
     health: DeviceHealth = DeviceHealth.Live,
     connected: Boolean = true,
     status: KetchStatus? = null,

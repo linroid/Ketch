@@ -7,6 +7,7 @@
   <string name="command_palette">命令面板</string>
   <string name="command_search">搜索下载</string>
   <string name="command_discover">搜索</string>
+  <string name="command_connections">连接</string>
   <string name="command_devices">设备</string>
   <string name="command_device_all">所有设备</string>
   <string name="command_device_switcher">切换设备…</string>
@@ -36,7 +37,7 @@
   <string name="command_list_toggle">暂停或继续</string>
   <string name="command_list_open">打开</string>
   <string name="command_list_reveal">在文件夹中显示</string>
-  <string name="command_list_remove">从列表中移除</string>
+  <string name="command_list_remove">移除</string>
   <string name="command_list_remove_and_trash">移除并将文件移到回收站…</string>
   <string name="command_list_copy_link">复制链接</string>
   <string name="command_list_copy_path">复制文件路径</string>

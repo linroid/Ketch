@@ -101,6 +101,9 @@ import ketch.app.shared.generated.resources.intake_advanced_show
 import ketch.app.shared.generated.resources.intake_also_sent
 import ketch.app.shared.generated.resources.intake_auto_device
 import ketch.app.shared.generated.resources.intake_auto_setting
+import ketch.app.shared.generated.resources.intake_category_folder
+import ketch.app.shared.generated.resources.intake_checksum
+import ketch.app.shared.generated.resources.intake_checksum_caption
 import ketch.app.shared.generated.resources.intake_choose_folder
 import ketch.app.shared.generated.resources.intake_connections
 import ketch.app.shared.generated.resources.intake_default_folder
@@ -512,7 +515,10 @@ private fun SaveToPill(
   val folder = session.folder
   val default = session.defaultFolder
   val free = session.targetStatus?.system?.usableSpace?.takeIf { folder == null && it > 0 }
-  val name = folderLabel(folder ?: default ?: stringResource(Res.string.intake_folder_downloads))
+  val category = session.categoryFolder
+  val name = folderLabel(
+    folder ?: category ?: default ?: stringResource(Res.string.intake_folder_downloads),
+  )
   val saveTo = stringResource(Res.string.intake_save_to)
   val local = session.target is EmbeddedInstance && actions.picker.canPickFolder
   Box(modifier) {
@@ -534,7 +540,8 @@ private fun SaveToPill(
       item(
         label = default?.let { verbatim(folderLabel(it)) }
           ?: Res.string.intake_default_folder.text(),
-        caption = default?.let(::verbatim),
+        caption = category?.let { Res.string.intake_category_folder.text(it) }
+          ?: default?.let(::verbatim),
         icon = KetchIcon.Folder,
         checked = folder == null,
         onClick = { session.folder = null },
@@ -653,8 +660,8 @@ internal fun TargetChip(session: IntakeSession, instances: List<InstanceEntry>) 
 }
 
 /**
- * Advanced: the file name of a single link, and request headers sent with every link: Referer,
- * User-Agent, Cookie, Authorization and any other.
+ * Advanced: the file name of a single link, its checksum on devices that verify one, and request
+ * headers sent with every link: Referer, User-Agent, Cookie, Authorization and any other.
  */
 @Composable
 internal fun AdvancedSection(actions: IntakeActions) {
@@ -702,6 +709,7 @@ internal fun AdvancedSection(actions: IntakeActions) {
         )
       }
     }
+    if (session.offersChecksum) ChecksumField(session)
     KetchTextField(
       value = headers.referer,
       onValueChange = {
@@ -790,6 +798,31 @@ internal fun AdvancedSection(actions: IntakeActions) {
       text = stringResource(Res.string.intake_headers_saved),
       style = KetchTheme.typography.caption,
       color = colors.textTertiary,
+    )
+  }
+}
+
+/**
+ * The checksum the single link's file is verified against once it finishes; text that is not
+ * one shows why under the field, and keeps the sheet from submitting.
+ */
+@Composable
+private fun ChecksumField(session: IntakeSession) {
+  val error = session.checksumError?.resolve()
+  KetchTextField(
+    value = session.checksumText,
+    onValueChange = { session.checksumText = it },
+    label = stringResource(Res.string.intake_checksum),
+    placeholder = CHECKSUM_PLACEHOLDER,
+    mono = true,
+    error = error,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  if (error == null) {
+    Text(
+      text = stringResource(Res.string.intake_checksum_caption),
+      style = KetchTheme.typography.caption,
+      color = KetchTheme.colors.textTertiary,
     )
   }
 }
@@ -888,3 +921,6 @@ private fun resetLabel(option: IntakeOption): StringResource = when (option) {
 
 private const val SECRET_LINES = 3
 private const val HEADER_NAME_WEIGHT = 0.4f
+
+// The form a checksum is usually written in; the field takes any `Checksum.parse` reads.
+private const val CHECKSUM_PLACEHOLDER = "sha256:…"

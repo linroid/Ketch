@@ -53,6 +53,8 @@ data class AccessNote(
  * @property access how the user answered the agent's requests to open websites, each website
  *   and answer once.
  * @property filtered how many of the agent's results the content filter hid.
+ * @property model the provider and model it searched with, once it started; `null` while it
+ *   waits, and for turns saved before they were recorded.
  */
 data class DiscoverTurn(
   val id: String,
@@ -66,6 +68,7 @@ data class DiscoverTurn(
   val errorText: String? = null,
   val access: List<AccessNote> = emptyList(),
   val filtered: Int = 0,
+  val model: TurnModel? = null,
 )
 
 /**

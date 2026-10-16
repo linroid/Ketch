@@ -36,6 +36,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.library.api)
+      api(projects.library.torrentApi)
       implementation(libs.kotlinx.serialization.json)
       implementation(libs.ktor.resources)
     }

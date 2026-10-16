@@ -27,7 +27,7 @@
   <!-- A device found this one on the network and wants its access code, while Ketch is not in
        front. %1$s is that device's name, such as "Pixel 9"; %2$s names this device inside a
        sentence, such as "this Mac". -->
-  <string name="notify_pairing_title">%1$s wants to control %2$s</string>
+  <string name="notify_pairing_title">%1$s wants to control Ketch on %2$s</string>
   <!-- %1$s is four digits the other device shows too. -->
   <string name="notify_pairing_body">Allow it only if it shows %1$s.</string>
   <!-- The channel of messages that wait for the user, such as Discover asking before it opens a
@@ -122,7 +122,7 @@
   <string name="feedback_switch_failed">Couldn't switch to %1$s</string>
   <string name="feedback_reconnect_failed">Couldn't reconnect to %1$s</string>
   <string name="feedback_remove_device_failed">Couldn't remove %1$s</string>
-  <string name="feedback_discovery_failed">Failed to discover LAN servers</string>
+  <string name="feedback_discovery_failed">Couldn't discover devices on the local network</string>
   <!-- Shown once when the settings file, config.toml, could not be read as Ketch started. It
        was moved aside, so Ketch runs with the default settings. -->
   <string name="feedback_settings_unreadable">Couldn't read your settings, so Ketch started with the defaults</string>
@@ -203,8 +203,8 @@
   <!-- %1$s is a file name, %2$s a device. -->
   <string name="feedback_redownload_failed_one">Couldn't download %1$s again on %2$s</string>
   <plurals name="feedback_redownload_failed">
-    <item quantity="one">Couldn't download %1$d download again</item>
-    <item quantity="other">Couldn't download %1$d downloads again</item>
+    <item quantity="one">Couldn't restart %1$d download</item>
+    <item quantity="other">Couldn't restart %1$d downloads</item>
   </plurals>
   <string name="feedback_started_now_one">Started %1$s now</string>
   <plurals name="feedback_started_now">
@@ -265,10 +265,10 @@
     <item quantity="one">Couldn't discard progress of %1$d download on %2$s</item>
     <item quantity="other">Couldn't discard progress of %1$d downloads on %2$s</item>
   </plurals>
-  <string name="feedback_undo_start_now_failed_one">Couldn't undo start now of %1$s on %2$s</string>
+  <string name="feedback_undo_start_now_failed_one">Couldn't undo “Start now” for %1$s on %2$s</string>
   <plurals name="feedback_undo_start_now_failed">
-    <item quantity="one">Couldn't undo start now of %1$d download on %2$s</item>
-    <item quantity="other">Couldn't undo start now of %1$d downloads on %2$s</item>
+    <item quantity="one">Couldn't undo “Start now” for %1$d download on %2$s</item>
+    <item quantity="other">Couldn't undo “Start now” for %1$d downloads on %2$s</item>
   </plurals>
   <string name="feedback_remove_failed_one">Couldn't remove %1$s on %2$s</string>
   <plurals name="feedback_remove_failed">
@@ -293,6 +293,8 @@
 
   <!-- What the devices report, in the Activity history. %1$s is a file name. -->
   <string name="feedback_added">Added %1$s</string>
+  <!-- A torrent waits until the user chooses its files. %1$s is its name. -->
+  <string name="feedback_choose_files">Choose which files of “%1$s” to download</string>
   <plurals name="feedback_recovered">
     <item quantity="one">Resuming %1$d download from your last session</item>
     <item quantity="other">Resuming %1$d downloads from your last session</item>

@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.shell
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.i18n.isEmpty
 import com.linroid.ketch.app.i18n.load
+import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.PulseCounts
@@ -31,7 +32,7 @@ class DeviceSwitcherTest {
       connectionState = MutableStateFlow(ConnectionState.Disconnected("Offline")),
     ),
     name = name,
-    detail = NAS_ID,
+    detail = verbatim(NAS_ID),
   )
 
   @Test

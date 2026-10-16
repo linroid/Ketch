@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,6 +46,8 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.isMobilePlatform
+import com.linroid.ketch.app.platform.keepAwakeSupported
+import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
@@ -80,6 +84,8 @@ import ketch.app.shared.generated.resources.settings_general_density
 import ketch.app.shared.generated.resources.settings_general_density_hint
 import ketch.app.shared.generated.resources.settings_general_device_name
 import ketch.app.shared.generated.resources.settings_general_device_name_hint
+import ketch.app.shared.generated.resources.settings_general_keep_awake
+import ketch.app.shared.generated.resources.settings_general_keep_awake_hint
 import ketch.app.shared.generated.resources.settings_general_language
 import ketch.app.shared.generated.resources.settings_general_language_current
 import ketch.app.shared.generated.resources.settings_general_language_in_settings
@@ -87,7 +93,9 @@ import ketch.app.shared.generated.resources.settings_general_language_system
 import ketch.app.shared.generated.resources.settings_general_login_add_failed
 import ketch.app.shared.generated.resources.settings_general_login_remove_failed
 import ketch.app.shared.generated.resources.settings_general_login_update_failed
+import ketch.app.shared.generated.resources.settings_general_menu_bar_speed
 import ketch.app.shared.generated.resources.settings_general_open_at_login
+import ketch.app.shared.generated.resources.settings_general_power
 import ketch.app.shared.generated.resources.settings_general_reduce_motion
 import ketch.app.shared.generated.resources.settings_general_reduce_motion_auto
 import ketch.app.shared.generated.resources.settings_general_reduce_motion_on
@@ -106,8 +114,8 @@ import org.jetbrains.compose.resources.stringResource
 private val log = KetchLogger("GeneralSettings")
 
 /**
- * The name of this device, how the app looks and moves, and on desktop what happens when its
- * window closes and whether it opens at login.
+ * The name of this device, how the app looks and moves, on desktop what happens when its window
+ * closes and whether it opens at login, and whether the system stays awake while downloading.
  *
  * @param systemDeviceName name the device goes by when none is set, or `null` when there is no
  *   device of this app's own to name (the web app).
@@ -188,6 +196,7 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
+  if (keepAwakeSupported) PowerGroup(appSettings)
   // Phones have no keyboard to speak of.
   if (!isMobilePlatform) {
     val chord = KetchCommands.Shortcuts.shortcutLabel(KeyboardPlatform.current)
@@ -209,7 +218,10 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
   }
 }
 
-/** Closing the window, opening at login and the app icon badge, on desktop. */
+/**
+ * Closing the window, opening at login, the app icon badge and, on macOS, the speed in the menu
+ * bar, on desktop.
+ */
 @Composable
 private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
   val hooks = LocalDesktopHooks.current
@@ -321,6 +333,26 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
         hooks.setDockBadgeMode(mode)
       },
     )
+    if (menuBar) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_general_menu_bar_speed),
+        checked = desktop.menuBarSpeed,
+        onCheckedChange = { on -> appSettings.saveDesktop { it.copy(menuBarSpeed = on) } },
+      )
+    }
+  }
+}
+
+/** Whether the system stays awake while downloads run, on desktop and Android. */
+@Composable
+private fun PowerGroup(appSettings: AppSettingsController) {
+  SettingsGroup(title = stringResource(Res.string.settings_general_power)) {
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_general_keep_awake),
+      description = Res.string.settings_general_keep_awake_hint.text(localDeviceNoun()).resolve(),
+      checked = appSettings.config.power.keepAwake,
+      onCheckedChange = { on -> appSettings.savePower { it.copy(keepAwake = on) } },
+    )
   }
 }
 
@@ -331,13 +363,18 @@ private val DensityMode.label: StringResource
     DensityMode.Comfortable -> Res.string.settings_density_comfortable
   }
 
-/** The four accents as swatches, each named under it, the selected one ringed and checked. */
+/**
+ * The accents as swatches, each named under it, the selected one ringed and checked. They wrap
+ * onto more lines where the row is too narrow for all of them, as on phones.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccentPicker(selected: KetchAccent, onSelect: (KetchAccent) -> Unit) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
-  Row(
+  FlowRow(
     horizontalArrangement = Arrangement.spacedBy(spacing.s1),
+    verticalArrangement = Arrangement.spacedBy(spacing.s1),
     modifier = Modifier.selectableGroup(),
   ) {
     KetchAccent.entries.forEach { accent ->

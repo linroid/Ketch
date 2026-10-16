@@ -1,5 +1,5 @@
 # Files that still hold hard-coded user-facing text, with how many literals.
-feedback/ActivityMonitor.kt:8
+feedback/ActivityMonitor.kt:6
 input/KeyChord.kt:12
 instance/InstanceEntry.kt:1
 instance/InstanceFactory.kt:1

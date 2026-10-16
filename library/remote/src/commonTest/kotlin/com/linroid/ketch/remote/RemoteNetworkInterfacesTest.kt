@@ -39,9 +39,9 @@ class RemoteNetworkInterfacesTest {
     val remote = RemoteKetch("remote.example", 8642, "secret", false, transport)
     try {
       assertEquals(available, remote.networkInterfaces().available)
-      val result = remote.updateNetworkInterfaces(NetworkInterfaceConfig(listOf("remote-wifi")))
+      val result = remote.selectNetworkInterfaces(NetworkInterfaceConfig(listOf("remote-wifi")))
       assertEquals(listOf("remote-wifi"), result.config.interfaceIds)
-      remote.updateNetworkInterfaces(NetworkInterfaceConfig())
+      remote.selectNetworkInterfaces(NetworkInterfaceConfig())
       assertEquals(emptyList(), selection.interfaceIds)
       assertEquals(listOf(HttpMethod.Get, HttpMethod.Put, HttpMethod.Put), methods)
     } finally {
@@ -58,7 +58,7 @@ class RemoteNetworkInterfacesTest {
       try {
         assertFalse(remote.networkInterfaces().supported)
         assertFailsWith<UnsupportedOperationException> {
-          remote.updateNetworkInterfaces(NetworkInterfaceConfig())
+          remote.selectNetworkInterfaces(NetworkInterfaceConfig())
         }
       } finally {
         remote.close()
@@ -73,7 +73,7 @@ class RemoteNetworkInterfacesTest {
     })
     try {
       assertFailsWith<IllegalArgumentException> {
-        remote.updateNetworkInterfaces(NetworkInterfaceConfig(listOf("missing")))
+        remote.selectNetworkInterfaces(NetworkInterfaceConfig(listOf("missing")))
       }
     } finally {
       remote.close()

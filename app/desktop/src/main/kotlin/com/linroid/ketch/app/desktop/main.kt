@@ -11,16 +11,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
-import androidx.compose.ui.window.Notification
-import androidx.compose.ui.window.TrayState
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
@@ -33,6 +31,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
@@ -40,10 +39,14 @@ import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessageNotifications
+import com.linroid.ketch.app.feedback.PairingNotices
+import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.NotificationCopy
+import com.linroid.ketch.app.feedback.NotificationLink
 import com.linroid.ketch.app.feedback.SystemNotifier
 import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.UnreadableFiles
+import com.linroid.ketch.app.feedback.open
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.resolve
@@ -57,8 +60,12 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.AwtFilePicker
+import com.linroid.ketch.app.platform.FileActionException
+import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
@@ -68,7 +75,9 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoverHistoryStore
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.FileDiscoverHistoryStore
+import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.IncomingDownloads
+import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.ObservedPeak
@@ -87,21 +96,37 @@ import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
+import com.linroid.ketch.config.RemoteConfig
+import com.linroid.ketch.config.TorrentEncryptionMode
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hls.HlsDownloadSource
+import com.linroid.ketch.hooks.HookRunner
+import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentEncryption
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
 import ketch.app.desktop.generated.resources.Res
+import ketch.app.desktop.generated.resources.icon
+import ketch.app.desktop.generated.resources.keep_awake_reason
+import ketch.app.desktop.generated.resources.message_command_stopped
+import ketch.app.desktop.generated.resources.message_command_stopped_hint
+import ketch.app.desktop.generated.resources.message_downloads_run_by
+import ketch.app.desktop.generated.resources.message_downloads_run_elsewhere
+import ketch.app.desktop.generated.resources.message_downloads_run_hint
 import ketch.app.desktop.generated.resources.message_window_error
 import ketch.app.desktop.generated.resources.notify_added
 import ketch.app.desktop.generated.resources.notify_names_more
@@ -122,13 +147,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
+import org.jetbrains.compose.resources.painterResource
 import java.awt.Desktop
 import java.awt.Dimension
 import java.awt.EventQueue
@@ -143,7 +171,26 @@ import kotlin.time.TimeSource
 
 private val log = KetchLogger("DesktopApp")
 
+/**
+ * Caps kotlinx.coroutines' shared pool before anything uses it, unless `-D` already set these, as
+ * the launcher's `jvmArgs` do: runs started otherwise, such as from an IDE, get the same caps.
+ * `Dispatchers.IO` at 16 threads rather than 64, and idle workers end after 10 s rather than 60.
+ * Ketch's own blocking work runs on pools of its own; what is left there, such as ktor-network's
+ * socket loops, never blocks for long.
+ */
+private fun capCoroutineThreads() {
+  for ((key, value) in COROUTINE_THREAD_LIMITS) {
+    if (System.getProperty(key) == null) System.setProperty(key, value)
+  }
+}
+
+private val COROUTINE_THREAD_LIMITS = mapOf(
+  "kotlinx.coroutines.io.parallelism" to "16",
+  "kotlinx.coroutines.scheduler.keep.alive.sec" to "10",
+)
+
 fun main(args: Array<String>) {
+  capCoroutineThreads()
   // A portable copy keeps its data in its own folder, and so does its browser extension host.
   val portable = PortableApp.detect()
   val configDir = portable?.writableDataDir() ?: File(defaultConfigDir())
@@ -178,14 +225,22 @@ fun main(args: Array<String>) {
     file = File(configDir, "browser-extension.properties"),
     browsers = registration::browsers,
   )
-  val extensionServer = BrowserExtensionServer(
+  val localApiServer = LocalApiServer(
     onConnect = { integration.extensionConnected(connectingBrowser()) },
   )
   val singleInstance = SingleInstance.acquire(
     configDir,
     launched.toArguments() + listOfNotNull(BACKGROUND_FLAG.takeIf { background }),
     onRequest = { request ->
-      if (request == NativeMessagingHost.CONNECT_REQUEST) extensionServer.connect() else null
+      when (request) {
+        NativeMessagingHost.CONNECT_REQUEST -> localApiServer.connect()
+        CLI_CONNECT_REQUEST -> localApiServer.connect(fromExtension = false)
+        else -> if (request.startsWith(NativeMessagingHost.PICK_FOLDER_REQUEST + "\n")) {
+          pickFolderReply(request) { initialFolder -> pickFolderInFront(initialFolder) }
+        } else {
+          null
+        }
+      }
     },
   ) { forwarded ->
     open(fileArguments(forwarded), LinkSource.Arguments)
@@ -239,6 +294,9 @@ fun main(args: Array<String>) {
   registerNativeHost(registration, integration, logger)
   // Before the UI thread starts: this can run a command and, as a last resort, wait on a lookup.
   val hostName = localHostName()
+  // Also before: this waits a moment for a `ketch` command that has just taken the lock.
+  val downloads = DownloadsLock.claim(configDir)
+  val standIn = (downloads as? DownloadsClaim.Taken)?.let { serveStandIn(it, localApiServer) }
 
   val launch = LaunchContext(
     configDir = configDir,
@@ -247,7 +305,9 @@ fun main(args: Array<String>) {
     windowRequests = windowRequests.receiveAsFlow(),
     background = background,
     singleInstance = singleInstance,
-    extensionServer = extensionServer,
+    downloads = downloads,
+    standIn = standIn,
+    localApiServer = localApiServer,
     integration = integration,
     logger = logger,
     fileLogger = fileLogger,
@@ -272,6 +332,10 @@ fun main(args: Array<String>) {
  *
  * @property windowRequests emits when the window should come forward.
  * @property background whether the app starts hidden ([BACKGROUND_FLAG]).
+ * @property downloads who runs this computer's downloads. The app holds the lock until the
+ *   process exits, and never closes it, as its engine may still save downloads once closed.
+ * @property standIn the device of the `ketch` command that runs them instead, when it can be
+ *   reached.
  * @property integration how Ketch is wired into the browsers and the system, for Settings.
  * @property discoverHistory the Discover sessions, kept in `discover-history.json`.
  * @property openFiles adds `.torrent` files, as if opened from the file manager.
@@ -283,7 +347,9 @@ private class LaunchContext(
   val windowRequests: Flow<Unit>,
   val background: Boolean,
   val singleInstance: SingleInstance,
-  val extensionServer: BrowserExtensionServer,
+  val downloads: DownloadsClaim,
+  val standIn: RemoteConfig?,
+  val localApiServer: LocalApiServer,
   val integration: DesktopIntegrationStatus,
   val logger: Logger,
   val fileLogger: FileLogger,
@@ -336,6 +402,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       discoverHistory = launch.discoverHistory,
     ).also { localSpeed.follow(it.pulse) }
   }
+  LaunchedEffect(controller) {
+    (launch.downloads as? DownloadsClaim.Taken)?.let { announceDownloadsElsewhere(controller, it) }
+  }
   val resources = remember { AppResources(controller, localSpeed, launch) }
   DisposableEffect(resources) {
     onDispose { resources.close() }
@@ -365,7 +434,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       saveCloseAction = { action ->
         saveConfig(configStore) { it.copy(desktop = it.desktop.copy(closeAction = action)) }
       },
-      onFirstHide = { scope.launch { announceBackground(trayState) } },
+      onFirstHide = { scope.launch { announceBackground(notifier) } },
       quit = { response ->
         scope.launch {
           quit(controller, resources, launch.discoverHistory, response) { exitApplication() }
@@ -403,7 +472,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
   }
   val updater = remember { createUpdater(launch, controller, behavior, scope) }
-  LaunchedEffect(updater) { updater.start(desktopSettings.checkForUpdates) }
+  LaunchedEffect(updater) {
+    val appSettings = controller.appSettings
+    val lastVersion = appSettings.ui.lastVersion
+    updater.start(desktopSettings.checkForUpdates, lastVersion)
+    // The next launch tells from it whether the app was updated in between.
+    if (lastVersion != KetchApi.VERSION) {
+      appSettings.saveUi { it.copy(lastVersion = KetchApi.VERSION) }
+    }
+  }
   // The Settings window closes and minimizes itself, from its own menu bar or keys.
   val actions = remember {
     DesktopActions(
@@ -443,11 +520,13 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     onDispose { remove() }
   }
 
-  // The window composes its content once it is first shown, so what must work while it is
-  // hidden lives out here.
+  // The window exists only while it shows, so what must work while it is hidden lives out here.
+  // Disposing it returns the GPU memory and UI it would otherwise keep in the background; what
+  // its content saves, such as the page, the filter and scroll positions, is kept here meanwhile.
+  val windowStates = rememberSaveableStateHolder()
   var mainWindow by remember { mutableStateOf<ComposeWindow?>(null) }
   var windowFocused by remember { mutableStateOf(false) }
-  // A hidden window stops composing, so the focus it last reported only counts while it shows.
+  // The focus the window last reported only counts while it shows.
   fun mainInFront() = behavior.windowVisible && windowFocused && !windowState.isMinimized
   // Toasts show in the main window, which stays in view beside the Settings window.
   fun inFront() = behavior.windowVisible && !windowState.isMinimized &&
@@ -457,8 +536,17 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   val activityEvents = remember {
     reportDesktopActivity(controller, notifier, successFeedback, ::inFront)
   }
-  // Pairing requests ask in the main window; from the tray while it is not in front.
-  remember { notifyPairingRequests(controller, notifier, ::mainInFront) }
+  // Pairing requests are answered in Settings › Sharing; the tray tells about them while the
+  // app is not in front.
+  LaunchedEffect(controller, notifier) {
+    PairingNotices.follow(
+      requests = controller.instanceManager.pairingRequests,
+      inFront = snapshotFlow { inFront() },
+      post = { ask -> notifier.postPairing(pairingNotificationCopy(ask)) },
+      withdraw = {},
+    )
+  }
+  remember { keepAwake(controller) }
   LaunchedEffect(controller, notifier) {
     // Such as Discover waiting for an OK, which would wait unseen while the window is away.
     MessageNotifications.follow(
@@ -473,7 +561,10 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       controller.appSettings.config.notifications
     }
   }
-  KetchTray(controller, status, actions, speedMode, trayState)
+  LaunchedEffect(notifier, behavior, files) {
+    notifier.clicks.collect { openNotification(it, controller, behavior, files) }
+  }
+  KetchTray(controller, status, actions, speedMode, trayState, notifier::trayMessageClicked)
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   // Text resolves as it composes, so the menus compose again in a new language.
   val language = controller.appSettings.language
@@ -487,15 +578,16 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     }
   }
   CloseDialogs(behavior, controller.appSettings)
+  // Closed to the menu bar, Ketch leaves the Dock until a window opens again.
+  MacDockPresence(shown = behavior.windowVisible || settingsWindow.isOpen)
 
-  val icon = painterResource("icon.svg")
+  val icon = painterResource(Res.drawable.icon)
   val exceptionHandlers = remember { windowExceptionHandlers(controller) }
   CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
-    if (behavior.windowCreated) {
+    if (behavior.windowVisible) {
       Window(
         onCloseRequest = behavior::closeWindow,
         state = windowState,
-        visible = behavior.windowVisible,
         title = windowTitle(status.pulse).resolve(),
         icon = icon,
         onPreviewKeyEvent = { event ->
@@ -511,10 +603,14 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       ) {
         LaunchedEffect(Unit) {
           window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
-          mainWindow = window
+          bringToFront(window)
         }
-        LaunchedEffect(behavior.windowVisible) {
-          if (behavior.windowVisible) bringToFront(window)
+        DisposableEffect(window) {
+          mainWindow = window
+          onDispose {
+            mainWindow = null
+            windowFocused = false
+          }
         }
         LaunchedEffect(behavior) {
           behavior.frontRequests.collect { bringToFront(window) }
@@ -534,9 +630,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
           LocalAppUpdates provides updater,
         ) {
           val app = @Composable {
-            App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+            windowStates.SaveableStateProvider(MAIN_WINDOW_STATE) {
+              App(controller, activityEvents = activityEvents, fileLogger = launch.fileLogger)
+            }
           }
-          if (fullWindowContent) TitleBarArea(windowState, app) else app()
+          if (fullWindowContent) {
+            TitleBarArea(windowState, onClick = controller.state::titleBarClicked, content = app)
+          } else {
+            app()
+          }
         }
       }
     }
@@ -561,29 +663,55 @@ private fun createInstanceManager(
 ): InstanceManager {
   val configDir = launch.configDir
   val config = configStore.load()
+  val instanceName = config.name?.ifEmpty { null } ?: launch.hostName
+  if (launch.downloads is DownloadsClaim.Taken) {
+    // Another process runs this computer's downloads: no engine, so ketch.db stays closed, and
+    // that process's device in the engine's place, when the app can reach it.
+    return InstanceManager(
+      factory = InstanceFactory(deviceName = instanceName),
+      initialRemotes = config.remotes,
+      configStore = configStore,
+      standIn = launch.standIn,
+    )
+  }
   val driverFactory = DriverFactory(File(configDir, "ketch.db").path) { unreadable ->
     unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
   }
   val taskStore = createSqliteTaskStore(driverFactory)
-  val instanceName = config.name?.ifEmpty { null } ?: launch.hostName
   val torrentSource = TorrentDownloadSource(
     TorrentConfig(
       stateDirectory = File(configDir, "torrent-state").path,
       additionalTrackers = config.torrent.trackers,
+      trackerListUrls = config.torrent.subscribedTrackerLists,
+      uploadPolicy = config.torrent.upload.toUploadPolicy(),
+      uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
+      encryption = config.torrent.encryption.toEncryption(),
+      utpEnabled = config.torrent.utp,
+      portMapping = config.torrent.portMapping,
+      localDiscovery = config.torrent.localDiscovery,
     ),
   )
   return InstanceManager(
     factory = InstanceFactory(
       deviceName = instanceName,
       embeddedFactory = {
+        val httpEngine = KtorHttpEngine.withNetworkInterfaces()
         Ketch(
-          httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+          httpEngine = httpEngine,
           taskStore = taskStore,
           config = config.download,
           name = instanceName,
           logger = launch.logger,
-          additionalSources = listOf(FtpDownloadSource(), torrentSource),
-        ).also(launch.extensionServer::attach)
+          additionalSources = listOf(
+            FtpDownloadSource(), torrentSource,
+            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+          ),
+        ).also { ketch ->
+          launch.localApiServer.attach(ketch)
+          // The app runs this computer's downloads, so it runs the hooks of config.toml; for the
+          // life of the process, as the engine.
+          HookRunner.start(ketch, config.hooks)
+        }
       },
       localServerFactory = { ketchApi, pairingRequests ->
         // Reloaded here so a restart from Settings picks up the
@@ -603,10 +731,12 @@ private fun createInstanceManager(
           },
           allowedHosts = serverConfig.allowedHosts,
           allowedDirectories = serverConfig.allowedDirectories,
+          protectedDirectories = sharedServerProtectedDirectories(configDir),
           mdnsEnabled = serverConfig.mdnsEnabled,
           pairingApprover = { request, address ->
             pairingRequests.ask(request.name, request.code, request.os, address)
           },
+          pairingOpen = { pairingRequests.isOpen },
         )
         server.start(wait = false)
         object : LocalServerHandle {
@@ -615,7 +745,22 @@ private fun createInstanceManager(
           }
         }
       },
-      applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
+      applyTorrentSettings = {
+        torrentSource.setAdditionalTrackers(it.trackers)
+        torrentSource.setTrackerLists(it.subscribedTrackerLists)
+        torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
+        torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
+        torrentSource.setEncryption(it.encryption.toEncryption())
+        torrentSource.setUtpEnabled(it.utp)
+        torrentSource.setPortMapping(it.portMapping)
+        torrentSource.setLocalDiscovery(it.localDiscovery)
+      },
+      trackerList = torrentSource.trackerLists.map { lists ->
+        lists.map {
+          TrackerListStatus(it.url.orEmpty(), it.trackers, it.updatedAt, it.failed, it.updating)
+        }
+      },
+      refreshTrackerList = torrentSource::refreshTrackerLists,
     ),
     initialRemotes = config.remotes,
     configStore = configStore,
@@ -623,9 +768,60 @@ private fun createInstanceManager(
 }
 
 /**
+ * Serves the downloads [claim]'s process runs to the browser extension and the `ketch` commands
+ * through [server], with a client of its own, or turns them away when the app can't reach it.
+ *
+ * @return the process's device, or `null` when the app can't reach it.
+ */
+private fun serveStandIn(claim: DownloadsClaim.Taken, server: LocalApiServer): RemoteConfig? {
+  val device = claim.engine?.device()
+  if (device == null) {
+    claim.engine?.let { engine ->
+      val url = engine.url?.let(::redactUrl)
+      log.w { "${engine.describe()} gave no address on this machine: $url" }
+    }
+    server.refuse("Another Ketch process that the app can't reach runs this computer's downloads")
+    return null
+  }
+  val client = RemoteKetch(device.host, device.port, device.apiToken, device.secure)
+  // Only launches the connection, which retries while the process is unreachable.
+  runBlocking { client.start() }
+  server.attach(client, owned = true)
+  return device
+}
+
+/**
+ * Tells the user in banners that [claim]'s process runs this computer's downloads instead of the
+ * app, and when it stops, as the app runs them only once it is opened again.
+ */
+private fun announceDownloadsElsewhere(controller: AppController, claim: DownloadsClaim.Taken) {
+  val engine = claim.engine
+  val notice = controller.messages.post(
+    level = MessageLevel.Info,
+    title = engine?.let { Res.string.message_downloads_run_by.text(it.command, it.pid) }
+      ?: Res.string.message_downloads_run_elsewhere.text(),
+    detail = Res.string.message_downloads_run_hint.text(),
+    placement = MessagePlacement.Banner,
+  )
+  if (engine == null) return
+  val process = ProcessHandle.of(engine.pid).orElse(null) ?: return
+  controller.scope.launch {
+    process.onExit().await()
+    log.i { "${engine.describe()} stopped" }
+    controller.messages.dismiss(notice.id)
+    controller.messages.post(
+      level = MessageLevel.Warning,
+      title = Res.string.message_command_stopped.text(engine.command),
+      detail = Res.string.message_command_stopped_hint.text(),
+      placement = MessagePlacement.Banner,
+    )
+  }
+}
+
+/**
  * The app's [DesktopUpdater], which keeps its files in the `updates` folder, logs its
  * installers to `logs/update.log`, quits through [behavior] to install and tells the user what
- * it finds in toasts.
+ * it finds in toasts, whose What's new shows the release notes in the main window.
  */
 private fun createUpdater(
   launch: LaunchContext,
@@ -645,7 +841,11 @@ private fun createUpdater(
     workDir = workDir,
     download = ReleaseDownloader({ KtorHttpEngine() }, launch.logger)::download,
     quit = behavior::quitWithoutAsking,
-    onEvent = { event -> postUpdateNotice(event, controller.messages, updater) },
+    onEvent = { event ->
+      postUpdateNotice(event, controller.messages, updater) { request ->
+        controller.state.releaseNotesRequest = request
+      }
+    },
   )
   return updater
 }
@@ -663,7 +863,7 @@ private class AppResources(
     closed = true
     controller.close()
     localSpeed.close()
-    launch.extensionServer.close()
+    launch.localApiServer.close()
     controller.instanceManager.close()
     launch.singleInstance.close()
   }
@@ -702,10 +902,61 @@ private fun activeDownloads(manager: InstanceManager): Int =
   }
 
 // Windows users expect the close button to quit, so the first hide says where Ketch went.
-private suspend fun announceBackground(trayState: TrayState) {
+private suspend fun announceBackground(notifier: TrayNotifier) {
   if (DesktopOs.current != DesktopOs.WINDOWS || !isTraySupported) return
-  val notice = Notification(APP_NAME, Res.string.notify_still_running.text().load())
-  trayState.sendNotification(notice)
+  notifier.post(NotificationCopy(APP_NAME, Res.string.notify_still_running.text().load()))
+}
+
+/**
+ * Does what clicking a notification asks: opens a finished download's file when it is on this
+ * computer, otherwise shows the window on the task, the finished downloads or the message the
+ * notification is about.
+ */
+private suspend fun openNotification(
+  click: NotificationClick,
+  controller: AppController,
+  behavior: CloseBehavior,
+  files: FileActions?,
+) {
+  when (click) {
+    is NotificationClick.Activity -> {
+      val path = NotificationLink.filePathOf(click.event)
+      if (path != null && files != null && openFile(files, path)) return
+      behavior.showWindow()
+      controller.state.open(NotificationLink.of(click.event))
+    }
+    is NotificationClick.Message -> {
+      behavior.showWindow()
+      MessageNotifications.open(controller.messages, click.id, click.postedAt)
+    }
+    // Settings opens in a window of its own.
+    NotificationClick.Pairing ->
+      controller.state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+    NotificationClick.App -> behavior.showWindow()
+  }
+}
+
+// Whether the file at [path] opened; a file that is gone or would not open shows its task.
+private suspend fun openFile(files: FileActions, path: String): Boolean = try {
+  files.exists(path) && run {
+    files.open(path)
+    true
+  }
+} catch (e: FileActionException) {
+  log.d { "Showing the task, as its file did not open: ${e.describeCauses()}" }
+  false
+}
+
+/**
+ * Shows the folder dialog for the browser extension, with Ketch in front first: macOS only shows
+ * the active app's dialogs in front, and Ketch may be in the menu bar alone.
+ */
+private fun pickFolderInFront(initialFolder: String?): String? {
+  if (Desktop.isDesktopSupported()) {
+    val desktop = Desktop.getDesktop()
+    if (desktop.isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) desktop.requestForeground(true)
+  }
+  return runBlocking { AwtFilePicker.pickFolder(initialFolder) }
 }
 
 /** Opens Settings from the macOS Settings and About items; returns what removes the handlers. */
@@ -825,18 +1076,16 @@ private fun reportDesktopActivity(
 }
 
 /**
- * Posts a notification from the tray for each pairing request that arrives while the main window
- * is not [inFront], where the app asks about it, so the owner comes to answer.
+ * Keeps this computer from sleeping while idle as long as its downloads run or wait in the queue,
+ * as `[power] keepAwake` allows; the controller's scope ending lets it sleep again.
  */
-private fun notifyPairingRequests(
-  controller: AppController,
-  notifier: TrayNotifier,
-  inFront: () -> Boolean,
-) {
-  controller.scope.launch {
-    controller.instanceManager.pairingRequests.watch(
-      onArrived = { ask -> if (!inFront()) notifier.post(pairingNotificationCopy(ask)) },
-      onLeft = {},
+private fun keepAwake(controller: AppController) {
+  val embedded = controller.instanceManager.embedded ?: return
+  controller.scope.launch(Dispatchers.IO) {
+    KeepAwake.follow(
+      inhibitor = systemSleepInhibitor(Res.string.keep_awake_reason.text().load()),
+      statuses = ForegroundPolicy.observe(embedded.tasks, controller.instanceManager.serverState),
+      enabled = snapshotFlow { controller.appSettings.config.power.keepAwake },
     )
   }
 }
@@ -990,8 +1239,22 @@ private const val LOGS_DIR = "logs"
 private const val UPDATES_DIR = "updates"
 private const val UPDATE_LOG = "update.log"
 private const val DISCOVER_HISTORY_FILE = "discover-history.json"
+private const val MAIN_WINDOW_STATE = "main-window"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
 private val PEAK_SAVE_DELAY = 10.seconds
 private val QUIT_COMMIT_TIMEOUT = 5.seconds
 private val WINDOW_ERROR_QUIET = 5.seconds
+
+/** The engine's upload policy for this `[torrent] upload` setting. */
+private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}
+
+private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this) {
+  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
+  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
+  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
+}

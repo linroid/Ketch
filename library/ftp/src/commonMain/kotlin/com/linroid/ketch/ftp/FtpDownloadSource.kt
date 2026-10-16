@@ -1,21 +1,25 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.core.engine.ConnectionHandle
+import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.KSerializer
 
 /**
  * FTP/FTPS download source using the [FtpClient] protocol layer.
@@ -35,7 +39,7 @@ import kotlinx.serialization.json.Json
  * single connection. Retries after a dropped connection continue from the
  * bytes already written.
  */
-class FtpDownloadSource : DownloadSource {
+class FtpDownloadSource : DownloadSource<FtpSourceState> {
 
   /** Creates the [FtpClient] for a URL and read buffer size. Override for testing. */
   internal var clientFactory: (url: FtpUrl, bufferSize: Int) -> FtpClient = { url, bufferSize ->
@@ -45,31 +49,22 @@ class FtpDownloadSource : DownloadSource {
 
   override val type: String = TYPE
 
-  override fun canHandle(url: String): Boolean {
+  override val stateSerializer: KSerializer<FtpSourceState> = FtpSourceState.serializer()
+
+  override fun canHandle(input: ResolveInput): Boolean {
+    val url = (input as? ResolveInput.Url)?.url ?: return false
     val lower = url.lowercase()
     return lower.startsWith("ftp://") || lower.startsWith("ftps://")
   }
 
-  override fun buildResumeState(
-    resolved: ResolvedSource,
-    totalBytes: Long,
-  ): SourceResumeState {
-    return buildResumeState(
-      totalBytes = totalBytes,
-      mdtm = resolved.metadata[META_MDTM],
-    )
-  }
+  /** The file's size and modification time as the download started, once; a resume keeps them. */
+  override suspend fun store(context: DownloadContext): FtpSourceState? =
+    context.preResolved?.let {
+      FtpSourceState(totalBytes = it.totalBytes, mdtm = it.metadata[META_MDTM])
+    }
 
-  override suspend fun resolve(
-    url: String,
-    properties: Map<String, String>,
-  ): ResolvedSource = resolve(url, properties, DownloadConfig.Default)
-
-  override suspend fun resolve(
-    url: String,
-    properties: Map<String, String>,
-    config: DownloadConfig,
-  ): ResolvedSource {
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+    val url = (input as ResolveInput.Url).url
     val ftpUrl = try {
       FtpUrl.parse(url)
     } catch (e: IllegalArgumentException) {
@@ -111,7 +106,11 @@ class FtpDownloadSource : DownloadSource {
     }
   }
 
-  override suspend fun download(context: DownloadContext) {
+  override suspend fun download(context: DownloadContext, state: FtpSourceState?) {
+    if (state == null) downloadFresh(context) else continueFrom(context, state)
+  }
+
+  private suspend fun downloadFresh(context: DownloadContext) {
     val resolved = context.preResolved
       ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
@@ -168,17 +167,8 @@ class FtpDownloadSource : DownloadSource {
     downloadSegments(context, segments, totalBytes, supportsRest, requested)
   }
 
-  override suspend fun resume(
-    context: DownloadContext,
-    resumeState: SourceResumeState,
-  ) {
-    val state = try {
-      Json.decodeFromString<FtpResumeState>(resumeState.data)
-    } catch (e: Exception) {
-      if (e is CancellationException) throw e
-      throw KetchError.CorruptResumeState(e.message, e)
-    }
-
+  /** Continues from [context]'s segments once the file's modification time still matches. */
+  private suspend fun continueFrom(context: DownloadContext, state: FtpSourceState) {
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)
@@ -331,60 +321,67 @@ class FtpDownloadSource : DownloadSource {
     val client = clientFactory(ftpUrl, context.config.bufferSize)
     var downloadedBytes = segment.downloadedBytes
     val remaining = segment.totalBytes - downloadedBytes
+    var handle = ConnectionHandle.None
 
     try {
-      client.connect()
-      if (ftpUrl.isTls) client.upgradeToTls()
-      client.login(ftpUrl.username, ftpUrl.password)
-      client.setBinaryMode()
+      context.watchdog.watch { monitor ->
+        client.connect()
+        handle = context.connections.open(connectionSpec(ftpUrl))
+        if (ftpUrl.isTls) client.upgradeToTls()
+        client.login(ftpUrl.username, ftpUrl.password)
+        client.setBinaryMode()
 
-      val fileOffset = segment.start + downloadedBytes
+        val fileOffset = segment.start + downloadedBytes
 
-      log.d {
-        "Starting segment ${segment.index}: " +
-          "offset=$fileOffset, " +
-          "remaining=$remaining bytes"
-      }
-
-      client.retrieve(
-        ftpUrl.path,
-        offset = fileOffset,
-      ) { data ->
-        currentCoroutineContext().ensureActive()
-
-        val bytesNeeded = segment.totalBytes - downloadedBytes
-        if (bytesNeeded <= 0) {
-          throw SegmentCompleteException()
+        log.d {
+          "Starting segment ${segment.index}: " +
+            "offset=$fileOffset, " +
+            "remaining=$remaining bytes"
         }
 
-        // Truncate if this chunk would exceed our segment boundary
-        val chunk = if (data.size.toLong() > bytesNeeded) {
-          data.copyOf(bytesNeeded.toInt())
-        } else {
-          data
-        }
+        client.retrieve(
+          ftpUrl.path,
+          offset = fileOffset,
+        ) { data ->
+          currentCoroutineContext().ensureActive()
+          monitor.received(data.size)
 
-        context.throttle(chunk.size)
+          val bytesNeeded = segment.totalBytes - downloadedBytes
+          if (bytesNeeded <= 0) {
+            throw SegmentCompleteException()
+          }
 
-        val writeOffset = segment.start + downloadedBytes
-        try {
-          context.fileAccessor.writeAt(writeOffset, chunk)
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          if (e is KetchError) throw e
-          throw KetchError.Disk(e)
-        }
-        downloadedBytes += chunk.size
-        onProgress(downloadedBytes)
+          // Truncate if this chunk would exceed our segment boundary
+          val chunk = if (data.size.toLong() > bytesNeeded) {
+            data.copyOf(bytesNeeded.toInt())
+          } else {
+            data
+          }
 
-        // Stop reading once segment is complete
-        if (downloadedBytes >= segment.totalBytes) {
-          throw SegmentCompleteException()
+          monitor.throttled { context.throttle(chunk.size) }
+
+          val writeOffset = segment.start + downloadedBytes
+          try {
+            context.fileAccessor.writeAt(writeOffset, chunk)
+          } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (e is KetchError) throw e
+            throw KetchError.Disk(e)
+          }
+          downloadedBytes += chunk.size
+          handle.received(chunk.size)
+          onProgress(downloadedBytes)
+
+          // Stop reading once segment is complete
+          if (downloadedBytes >= segment.totalBytes) {
+            throw SegmentCompleteException()
+          }
         }
       }
     } catch (_: SegmentCompleteException) {
       // Expected: segment boundary reached, stop reading
     } finally {
+      handle.close()
       client.disconnect()
     }
 
@@ -410,6 +407,20 @@ class FtpDownloadSource : DownloadSource {
   }
 
   /**
+   * The connection a segment transfer reports: its control host and port. FTP ignores the proxy
+   * setting, so it goes directly. FTPS protects every data connection (`PROT P`) and fails
+   * rather than transfer in the clear, so its transfers are secure.
+   */
+  private fun connectionSpec(ftpUrl: FtpUrl) = ConnectionSpec(
+    source = TYPE,
+    host = ftpUrl.host.removePrefix("[").removeSuffix("]").lowercase(),
+    port = ftpUrl.port,
+    protocol = if (ftpUrl.isTls) "FTPS" else "FTP",
+    secure = ftpUrl.isTls,
+    route = ConnectionRoute.DIRECT,
+  )
+
+  /**
    * Thrown internally to break out of the [FtpClient.retrieve]
    * callback loop when a segment has received all its bytes.
    */
@@ -420,19 +431,5 @@ class FtpDownloadSource : DownloadSource {
     internal const val META_MDTM = "mdtm"
     internal const val META_SIZE = "size"
     internal const val META_REST = "rest"
-
-    fun buildResumeState(
-      totalBytes: Long,
-      mdtm: String?,
-    ): SourceResumeState {
-      val state = FtpResumeState(
-        totalBytes = totalBytes,
-        mdtm = mdtm,
-      )
-      return SourceResumeState(
-        sourceType = TYPE,
-        data = Json.encodeToString(state),
-      )
-    }
   }
 }

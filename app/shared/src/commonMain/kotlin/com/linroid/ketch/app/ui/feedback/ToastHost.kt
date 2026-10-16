@@ -27,15 +27,20 @@ import ketch.app.shared.generated.resources.toast_subject_reason
 
 /**
  * Shows the active toast messages of [messages], at most [MAX_TOASTS] stacked 8 dp apart with
- * the newest at the bottom. Each rises in and fades away. Place it at the bottom center of the
- * content card, 8 dp above the Pulse bar, or above the add button and bottom bar on phones.
+ * the newest at the bottom, lined up by [horizontalAlignment]. Each rises in and fades away.
+ * Place it at the bottom end of the content card, 8 dp above the Pulse bar, or centered above
+ * the add button and bottom bar on phones.
  *
  * A timed toast that newer ones push off the stack is dismissed, so it never comes back later
  * with an Undo that has expired; one that stays until dismissed, such as an error, waits for
  * room. Banner messages belong to [BannerHost].
  */
 @Composable
-fun ToastHost(messages: MessageCenter, modifier: Modifier = Modifier) {
+fun ToastHost(
+  messages: MessageCenter,
+  modifier: Modifier = Modifier,
+  horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+) {
   val active by messages.active.collectAsState()
   LaunchedEffect(active) {
     overflowingToasts(active).forEach { messages.dismiss(it.id) }
@@ -50,7 +55,7 @@ fun ToastHost(messages: MessageCenter, modifier: Modifier = Modifier) {
     exit = fadeOut(tween(motion.short, easing = motion.easeAccelerate)) +
       shrinkVertically(tween(motion.medium, delayMillis = motion.short)),
     modifier = modifier,
-    horizontalAlignment = Alignment.CenterHorizontally,
+    horizontalAlignment = horizontalAlignment,
   ) { message ->
     KetchToast(
       message = message,

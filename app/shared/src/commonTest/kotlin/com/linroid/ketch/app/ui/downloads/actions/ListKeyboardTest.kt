@@ -64,7 +64,7 @@ class ListKeyboardTest {
       KeyCase(KeyPress(Key.Enter, ctrl = true), completed, RowAction.ShowInFolder, pc),
       KeyCase(KeyPress(Key.Backspace), completed, RowAction.Remove),
       KeyCase(KeyPress(Key.Delete), downloading, RowAction.Remove, pc),
-      KeyCase(KeyPress(Key.Backspace, shift = true), paused, RowAction.RemoveAndDelete),
+      KeyCase(KeyPress(Key.Backspace, shift = true), paused, RowAction.Remove),
       KeyCase(KeyPress(Key.C, meta = true), downloading, RowAction.CopyLink),
       KeyCase(copyPath, completed, RowAction.CopyPath),
       KeyCase(copyPath, downloading, null),
@@ -141,6 +141,22 @@ class ListKeyboardTest {
     keyboard.apply(ListKey.Rows(KetchCommands.RemoveAndTrash), rows)
 
     assertEquals(RowDialog.Remove(rows, withFiles = true), f.runner.dialog)
+  }
+
+  @Test
+  fun apply_deleteOnSelection_removesAtOnceWithoutAsking() = actionsTest { f ->
+    val rows = List(2) { rowOf(f.add(downloading)) }
+    backgroundScope.launch { f.state.tasks.collect {} }
+    runCurrent()
+    val selection = ListSelection(f.state)
+    selection.update(SelectionState().selectAllVisible(rows.map { it.key }))
+    val keyboard = ListKeyboard(selection, f.runner, RowMenuState(), backgroundScope)
+
+    keyboard.apply(ListKey.Rows(KetchCommands.Remove), rows)
+    runCurrent()
+
+    assertEquals(null, f.runner.dialog)
+    assertTrue(f.state.tasks.value.isEmpty())
   }
 
   @Test

@@ -4,11 +4,14 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main, "codex/torrent-*", "torrent-v2-*" ]
+    branches: [ main ]
 
+# A new push to a pull request cancels its older run, but every commit on main gets its own group:
+# sharing one would cancel the run of each merge that lands while another is still testing.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: >-
+    ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -104,6 +107,10 @@ jobs:
       - name: Compile publication metadata
         run: ./gradlew compilePublishedMetadata
 
+      # After an intended API change, run `./gradlew :library:api:updateKotlinAbi`.
+      - name: Check public API dump
+        run: ./gradlew :library:api:checkKotlinAbi
+
   android-tests:
     name: Android Unit Tests
     runs-on: ubuntu-latest
@@ -120,7 +127,10 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Run Android unit tests
-        run: ./gradlew testDebugUnitTest :library:torrent:testAndroidHostTest :library:core:testAndroidHostTest
+        run: >-
+          ./gradlew :app:android:testDirectDebugUnitTest :app:android:testPlayDebugUnitTest
+          :library:torrent:testAndroidHostTest :library:core:testAndroidHostTest
+          :library:hls:testAndroidHostTest :library:dash:testAndroidHostTest
 
       - name: Upload test results
         if: always()
@@ -147,26 +157,29 @@ jobs:
         with:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Read Xcode build version
-        id: xcode
+      - name: Read toolchain versions
+        id: toolchain
         run: |
-          echo "build=$(xcodebuild -version | awk '/Build version/ {print $3}')" >> "$GITHUB_OUTPUT"
+          echo "xcode=$(xcodebuild -version | awk '/Build version/ {print $3}')" >> "$GITHUB_OUTPUT"
+          kotlin=$(sed -n 's/^kotlin = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+          echo "kotlin=$kotlin" >> "$GITHUB_OUTPUT"
 
-      # setup-gradle caches ~/.gradle, but the native toolchain and compiler caches live here.
-      # Refresh the cache per commit, restoring only from a compatible toolchain.
+      # setup-gradle caches ~/.gradle, but the native toolchain and the compiler caches of
+      # third-party libraries live here. They only change with the dependencies, so the cache is
+      # saved once per dependency set (about 450 MB) rather than per commit. A dependency update
+      # restores the previous set for the same Kotlin and Xcode and only builds the changed
+      # libraries' caches; a Kotlin update starts afresh, leaving the old distribution behind.
       - name: Cache Kotlin/Native
         uses: actions/cache@v4
         with:
           path: ~/.konan
           key: >-
             ${{ format('konan-{0}-{1}-{2}-{3}-{4}', runner.os, runner.arch,
-                steps.xcode.outputs.build,
-                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties'),
-                github.sha) }}
+                steps.toolchain.outputs.xcode, steps.toolchain.outputs.kotlin,
+                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties')) }}
           restore-keys: >-
             ${{ format('konan-{0}-{1}-{2}-{3}-', runner.os, runner.arch,
-                steps.xcode.outputs.build,
-                hashFiles('gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties')) }}
+                steps.toolchain.outputs.xcode, steps.toolchain.outputs.kotlin) }}
 
       - name: Run iOS simulator tests
         run: ./gradlew iosSimulatorArm64Test -PenableIosSimulatorTests=true
@@ -240,6 +253,19 @@ jobs:
           name: test-results-extension-attempt-${{ github.run_attempt }}
           path: app/browser-extension/build/test-results/TEST-*.xml
 
+  # Builds the image around a stub ketch, so it needs no native build.
+  docker-tests:
+    name: Docker image entrypoint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Lint the image scripts
+        run: shellcheck docker/*.sh
+
+      - name: Test the entrypoint
+        run: docker/test-entrypoint.sh
+
   torrent-desktop-tests:
     name: Torrent filesystem (${{ matrix.os }})
     strategy:
@@ -303,6 +329,25 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Install emulator image with retries
+        timeout-minutes: 10
+        run: |
+          # The runner installs command-line tools without adding them to PATH.
+          sdk_manager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # SDK downloads can fail with a truncated archive before any tests run.
+          # Disable pipefail only here: yes may receive SIGPIPE after licenses are accepted.
+          (set +o pipefail; yes | "$sdk_manager" --licenses > /dev/null)
+          for attempt in 1 2 3; do
+            if "$sdk_manager" --install 'system-images;android-36;google_apis;x86_64' --channel=0; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Emulator image installation failed (attempt $attempt of 3); retrying."
+              sleep "$((attempt * 10))"
+            fi
+          done
+          echo '::error::Emulator image installation failed after 3 attempts.'
+          exit 1
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -326,7 +371,7 @@ jobs:
   required-checks:
     name: Required Checks
     runs-on: ubuntu-24.04
-    needs: [ jvm-tests, publication-metadata, android-tests, ios-tests, js-tests, extension-tests, torrent-desktop-tests, desktop-windows-tests, torrent-device-tests, publish-results ]
+    needs: [ jvm-tests, publication-metadata, android-tests, ios-tests, js-tests, extension-tests, docker-tests, torrent-desktop-tests, desktop-windows-tests, torrent-device-tests, publish-results ]
     if: always()
     steps:
       - name: Require every test job to succeed on this revision

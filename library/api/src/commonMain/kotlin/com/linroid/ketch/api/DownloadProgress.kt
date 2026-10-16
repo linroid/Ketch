@@ -3,11 +3,9 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Snapshot of download progress aggregated across all segments.
+ * A download's progress over all segments.
  *
- * @property downloadedBytes total number of bytes received so far
- * @property totalBytes expected file size in bytes, or 0 if unknown
- * @property bytesPerSecond current download speed in bytes per second
+ * @property totalBytes the expected size, or 0 if unknown
  */
 @Serializable
 data class DownloadProgress(
@@ -15,11 +13,11 @@ data class DownloadProgress(
   val totalBytes: Long,
   val bytesPerSecond: Long = 0,
 ) {
-  /** Fraction complete in the range `0f..1f`, or `0f` if [totalBytes] is unknown. */
+  /** Fraction done, `0f..1f`; `0f` when the size is unknown. */
   val percent: Float
     get() = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
 
-  /** `true` when [downloadedBytes] has reached or exceeded [totalBytes]. */
+  /** Whether every byte of a known size is downloaded. */
   val isComplete: Boolean
     get() = totalBytes > 0 && downloadedBytes >= totalBytes
 }

@@ -16,6 +16,8 @@
   <string name="row_status_downloading">Downloading</string>
   <string name="row_status_stalled">Stalled</string>
   <string name="row_status_paused">Paused</string>
+  <!-- A queued task that holds a download slot and is getting ready, such as a magnet link looking up its torrent. -->
+  <string name="row_status_starting">Starting</string>
   <string name="row_status_queued">Queued</string>
   <string name="row_status_scheduled">Scheduled</string>
   <string name="row_status_done">Done</string>
@@ -31,6 +33,10 @@
   <string name="row_saved_on">Saved on %1$s</string>
   <string name="row_missing_file">File moved or deleted</string>
   <string name="row_completed">Completed</string>
+  <!-- A torrent's detail while it waits for the user to choose which of its files to download. -->
+  <string name="row_choose_files">Choose files to download</string>
+  <!-- A finished torrent's detail while it shares its files with other peers. -->
+  <string name="row_seeding">Seeding</string>
   <!-- How long a finished download took. %1$s is a duration, such as "4m 2s". -->
   <string name="row_took">took %1$s</string>
   <plurals name="row_files">
@@ -79,6 +85,14 @@
   <string name="sort_origin">Origin</string>
   <string name="sort_priority">Priority</string>
   <string name="sort_device">Device</string>
+  <!-- The orders of a torrent's file list, in its Sort menu, beside sort_name, sort_size and
+       sort_progress. Kind groups videos, audio, subtitles and so on. -->
+  <string name="sort_kind">Kind</string>
+  <string name="sort_selected_first">Selected first</string>
+  <!-- The order the torrent itself lists its files in. -->
+  <string name="sort_torrent_order">Torrent order</string>
+  <!-- A check in a Sort menu that turns the order around. -->
+  <string name="sort_reverse">Reverse order</string>
   <!-- How the Downloads list groups rows, in the Group menu. -->
   <string name="group_smart">Smart</string>
   <string name="group_status">Status</string>
@@ -134,6 +148,8 @@
     <item quantity="other">%1$d ahead</item>
   </plurals>
   <!-- A queued task that has a download slot and is about to download. -->
+  <!-- The second line of a magnet link that is starting: it asks peers for the torrent's details. -->
+  <string name="row_finding_peers">Finding peers</string>
   <string name="queue_starting">Starting</string>
 
   <!-- Actions on a task, in menus, buttons and the command palette. -->
@@ -160,10 +176,13 @@
   <string name="action_row_open_source_page">Open source page</string>
   <string name="action_row_copy_error">Copy error</string>
   <string name="action_row_copy_details">Copy details</string>
-  <string name="action_row_stop_and_discard">Stop and discard progress…</string>
-  <string name="action_row_remove">Remove from list</string>
-  <string name="action_row_remove_and_trash">Remove and trash file…</string>
-  <string name="action_row_remove_and_delete">Remove and delete files…</string>
+  <string name="action_row_stop_and_discard">Cancel download…</string>
+  <string name="action_row_remove">Remove…</string>
+  <!-- Opens the torrent's file list to choose which files to download. -->
+  <string name="action_row_choose_files">Choose files…</string>
+  <string name="action_row_download_all_files">Download all files</string>
+  <string name="action_row_stop_seeding">Stop seeding</string>
+  <string name="action_row_seed">Seed</string>
   <!-- Menu labels of actions on several selected downloads. %1$d is how many. -->
   <plurals name="batch_pause">
     <item quantity="one">Pause %1$d download</item>
@@ -200,23 +219,19 @@
     <item quantity="other">Download %1$d files again</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Discard progress of %1$d download…</item>
-    <item quantity="other">Discard progress of %1$d downloads…</item>
+    <item quantity="one">Cancel %1$d download…</item>
+    <item quantity="other">Cancel %1$d downloads…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">Remove %1$d download from list</item>
-    <item quantity="other">Remove %1$d downloads from list</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">Remove %1$d download and its file…</item>
-    <item quantity="other">Remove %1$d downloads and their files…</item>
+    <item quantity="one">Remove %1$d download…</item>
+    <item quantity="other">Remove %1$d downloads…</item>
   </plurals>
   <!-- Buttons of the bar shown while downloads are selected. -->
   <string name="bar_speed">Speed</string>
   <string name="bar_copy_links">Copy links</string>
   <string name="bar_remove">Remove…</string>
   <string name="bar_copy_paths">Copy file paths</string>
-  <string name="bar_discard">Discard progress…</string>
+  <string name="bar_discard">Cancel downloads…</string>
   <!-- A bar action in a menu with how many selected downloads it applies to: "Pause (3)". -->
   <string name="bar_label_count">%1$s (%2$d)</string>
   <!-- The same on a phone's bar button: "Pause 3". -->

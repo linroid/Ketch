@@ -3,7 +3,10 @@ package com.linroid.ketch.sqlite
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.core.task.TaskCommandRecord
+import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.test.runTest
@@ -108,6 +111,177 @@ class SqliteTaskStoreTest {
     }
   }
 
+  @Test
+  fun save_control_roundTrips() = runTest {
+    val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+    try {
+      KetchDatabase.Schema.create(driver)
+      val store = SqliteTaskStore(driver)
+      val control = TaskControl(
+        selectionGeneration = 3,
+        sharing = true,
+        commands = listOf(
+          TaskCommandRecord(
+            key = "retry-key",
+            digest = "0".repeat(64),
+            epoch = "epoch",
+            sequence = 7,
+            selectionGeneration = 3,
+            recordedAtMs = 1_700_000_000_000,
+          )
+        ),
+      )
+      val record = record("a").copy(control = control)
+
+      store.save(record)
+      assertEquals(control, store.load("a")?.control)
+
+      store.save(record.copy(control = null))
+      assertNull(store.load("a")?.control)
+    } finally {
+      driver.close()
+    }
+  }
+
+  @Test
+  fun load_unreadableControl_keepsTheRecord() = runTest {
+    val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+    try {
+      KetchDatabase.Schema.create(driver)
+      val store = SqliteTaskStore(driver)
+      store.save(record("a").copy(control = TaskControl(selectionGeneration = 1)))
+      driver.execute(null, "UPDATE task_records SET control_json = '{\"selectionGeneration\":'", 0)
+      store.save(record("b"))
+      driver.execute(
+        null,
+        "UPDATE task_records SET control_json = '{\"selectionGeneration\":-1}' " +
+          "WHERE task_id = 'b'",
+        0
+      )
+
+      val records = store.loadAll().associateBy { it.taskId }
+
+      assertEquals(setOf("a", "b"), records.keys)
+      assertNull(records.getValue("a").control)
+      assertNull(records.getValue("b").control)
+      assertEquals(TaskState.COMPLETED, records.getValue("a").state)
+    } finally {
+      driver.close()
+    }
+  }
+
+  @Test
+  fun migrate_fromVersion5_addsTheControlColumn() = runTest {
+    val dir = Files.createTempDirectory("ketch-sqlite").toFile()
+    try {
+      val path = File(dir, "ketch.db").absolutePath
+      // The schema of version 5, before control_json existed.
+      JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+        driver.execute(null, VERSION_5_TABLE, 0)
+        driver.execute(
+          null,
+          "INSERT INTO task_records(task_id, request_json, state, total_bytes, completed_at) " +
+            "VALUES ('old', '{\"url\":\"https://example.com/a\"}', 'COMPLETED', 100, 5)",
+          0
+        )
+        driver.execute(null, "PRAGMA user_version = 5", 0)
+      }
+
+      val driver = DriverFactory(path).createDriver()
+      val records = try {
+        val store = SqliteTaskStore(driver)
+        store.save(record("new").copy(control = TaskControl(selectionGeneration = 2)))
+        store.loadAll().associateBy { it.taskId }
+      } finally {
+        driver.close()
+      }
+
+      val old = records.getValue("old")
+      assertNull(old.control)
+      assertEquals(Instant.fromEpochMilliseconds(5), old.completedAt)
+      assertEquals(2, records.getValue("new").control?.selectionGeneration)
+    } finally {
+      dir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun migrate_fromVersion6_keepsRowsWritingToTheirOutputPath() = runTest {
+    val dir = Files.createTempDirectory("ketch-sqlite").toFile()
+    try {
+      val path = File(dir, "ketch.db").absolutePath
+      // The schema of version 6, before partial_path existed.
+      JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+        driver.execute(null, VERSION_5_TABLE.replace("completed_at INTEGER", VERSION_6_COLUMNS), 0)
+        driver.execute(
+          null,
+          "INSERT INTO task_records(task_id, request_json, output_path, state, total_bytes) " +
+            "VALUES ('old', '{\"url\":\"https://example.com/a\"}', '/d/a', 'PAUSED', 100)",
+          0
+        )
+        driver.execute(null, "PRAGMA user_version = 6", 0)
+      }
+
+      val driver = DriverFactory(path).createDriver()
+      val records = try {
+        val store = SqliteTaskStore(driver)
+        store.save(record("new").copy(outputPath = "/d/b", partialPath = "/d/b.ketch"))
+        store.loadAll().associateBy { it.taskId }
+      } finally {
+        driver.close()
+      }
+
+      val old = records.getValue("old")
+      assertEquals("/d/a", old.outputPath)
+      assertNull(old.partialPath)
+      assertEquals("/d/b.ketch", records.getValue("new").partialPath)
+    } finally {
+      dir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun migrate_fromVersion7_keepsTheResolutionsTasksSave() = runTest {
+    val dir = Files.createTempDirectory("ketch-sqlite").toFile()
+    try {
+      val path = File(dir, "ketch.db").absolutePath
+      // The schema of version 7, before resolved_source_json existed.
+      JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+        val columns = "$VERSION_6_COLUMNS,\n  partial_path TEXT"
+        driver.execute(null, VERSION_5_TABLE.replace("completed_at INTEGER", columns), 0)
+        driver.insertRow("old", "{\"url\":\"magnet:?xt=old\"}", "PAUSED")
+        driver.execute(null, "PRAGMA user_version = 7", 0)
+      }
+      val resolved = ResolvedSource(
+        url = "magnet:?xt=new", sourceType = "torrent", totalBytes = 3, supportsResume = true,
+        suggestedFileName = "pack", maxSegments = 1,
+        metadata = mapOf(ResolvedSource.METAINFO_KEY to "bWV0YWluZm8="),
+      )
+
+      val driver = DriverFactory(path).createDriver()
+      val records = try {
+        val store = SqliteTaskStore(driver)
+        store.save(record("new").copy(resolvedSource = resolved))
+        store.loadAll().associateBy { it.taskId }
+      } finally {
+        driver.close()
+      }
+
+      assertNull(records.getValue("old").resolvedSource)
+      assertEquals(resolved, records.getValue("new").resolvedSource)
+    } finally {
+      dir.deleteRecursively()
+    }
+  }
+
+  private fun record(taskId: String) = TaskRecord(
+    taskId = taskId,
+    request = DownloadRequest(url = "https://example.com/$taskId"),
+    state = TaskState.COMPLETED,
+    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000),
+    updatedAt = Instant.fromEpochMilliseconds(1_700_000_000_000),
+  )
+
   private fun JdbcSqliteDriver.insertRow(taskId: String, requestJson: String, state: String) {
     execute(null, "INSERT INTO task_records(task_id, request_json, state) VALUES (?, ?, ?)", 3) {
       bindString(0, taskId)
@@ -124,6 +298,27 @@ class SqliteTaskStoreTest {
   ).value ?: 0
 
   private companion object {
+    /** The columns version 6 ends with, replacing version 5's last one. */
+    const val VERSION_6_COLUMNS = "completed_at INTEGER,\n  control_json TEXT"
+
+    val VERSION_5_TABLE = """
+      CREATE TABLE IF NOT EXISTS task_records (
+        task_id TEXT NOT NULL PRIMARY KEY,
+        request_json TEXT NOT NULL,
+        output_path TEXT,
+        state TEXT NOT NULL DEFAULT 'PENDING',
+        total_bytes INTEGER NOT NULL DEFAULT -1,
+        source_type TEXT,
+        source_resume_state_json TEXT,
+        segments_json TEXT,
+        created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+        error_json TEXT,
+        download_time_ms INTEGER,
+        completed_at INTEGER
+      )
+    """.trimIndent()
+
     val VERSION_4_TABLE = """
       CREATE TABLE IF NOT EXISTS task_records (
         task_id TEXT NOT NULL PRIMARY KEY,

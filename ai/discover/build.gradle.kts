@@ -34,4 +34,6 @@ dependencies {
   testImplementation(libs.kotlin.test)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.ktor.client.mock)
+  // Builds Koog clients on a MockEngine to check the URLs they call.
+  testImplementation(libs.koog.http.client.ktor)
 }

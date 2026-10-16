@@ -23,6 +23,41 @@ class SettingsSearchTest {
   }
 
   @Test
+  fun searchSettings_seed_findsTheBitTorrentUpload() = runTest {
+    val hits = searchSettings("seed", every, allFeatures, loadSettingsSearchIndex())
+
+    val first = hits.first().entry
+    assertEquals(SettingsCategory.BitTorrent, first.category)
+    assertEquals("Share with peers", first.title)
+    assertEquals("Share pieces with peers and seed finished torrents", first.description)
+    assertEquals("BitTorrent", first.page)
+  }
+
+  @Test
+  fun searchSettings_metered_findsOnlyOnWifiWhereUploadsFollowTheNetwork() = runTest {
+    val index = loadSettingsSearchIndex()
+
+    for (query in listOf("metered", "mobile data")) {
+      val hits = searchSettings(query, every, setOf(SettingsFeature.UploadWifiOnly), index)
+      assertEquals(listOf("Only on Wi-Fi"), hits.map { it.entry.title }, query)
+      assertEquals("BitTorrent", hits.single().entry.page)
+      assertEquals(emptyList(), searchSettings(query, every, emptySet(), index), query)
+    }
+  }
+
+  @Test
+  fun searchSettings_wifi_findsOnlyOnWifiBesideTheNetworks() = runTest {
+    val index = loadSettingsSearchIndex()
+
+    val with = searchSettings("wifi", every, setOf(SettingsFeature.UploadWifiOnly), index)
+    val without = searchSettings("wifi", every, emptySet(), index)
+
+    assertTrue(with.any { it.entry.title == "Only on Wi-Fi" })
+    assertTrue(without.none { it.entry.title == "Only on Wi-Fi" })
+    assertEquals(without.map { it.entry }, with.map { it.entry }.filter { it.needs == null })
+  }
+
+  @Test
   fun searchSettings_titleStartingWithTheQuery_ranksAboveOtherMatches() = runTest {
     val titles = searchSettings("speed", every, allFeatures, loadSettingsSearchIndex())
       .map { it.entry.title }
@@ -40,10 +75,10 @@ class SettingsSearchTest {
 
   @Test
   fun searchSettings_accentNames_findTheAccentColor() = runTest {
-    val hits = searchSettings("harbor", every, allFeatures, loadSettingsSearchIndex())
+    val hits = searchSettings("teal", every, allFeatures, loadSettingsSearchIndex())
 
     assertEquals("Accent color", hits.first().entry.title)
-    assertEquals("Signal, Harbor, Fathom or Beacon", hits.first().entry.description)
+    assertEquals("Indigo, Purple, Pink, Orange, Green, Teal or Blue", hits.first().entry.description)
   }
 
   @Test

@@ -5,7 +5,7 @@ Status: **Proposal** — not implemented. Prepared 2026-10-03 against `2f274a45`
 
 Related plans: the [transfer plan](../plans/task-transfer.md) (#355, #361; Send to / Move to
 carrying downloaded data) uses this proposal's identity (§7.1) and shares its prerequisite fixes
-(§15), read path and `Sha256` (§9.6, §14.2) and `HttpResumeState` fields (§9.8). §5.1 says which
+(§15), read path and `Sha256` (§9.6, §14.2) and `HttpSourceState` fields (§9.8). §5.1 says which
 plan owns each shared piece; the transfer plan's §7.1 lists the shared prerequisites and its §14
 orders both plans.
 
@@ -205,7 +205,7 @@ prerequisites and its §14 orders both plans:
 | Reading a task's output | Shared F14: core `Sha256`, core `fileIdentity`, one positional-read path, before PR3 | `FileAccessor.readAt` for a running execution here (§9.4, §9.6); transfer's `FileReader` for export (its §7.4) |
 | Sign-in classification | `isSensitiveHeader` (its §5.5, F11), plus §11's signed-URL keys and fragment masking | Forwarding allowlist and `SIGN_INS` here (§11) |
 | Snapshot → sync → persist, durable `flush()` | PR1 item 2, transfer's F3 | Imports sync through the same `FileAccessor.flush()` (its §7.7) |
-| Segment export, `HttpResumeState` | This design (§6.10, §9.8); #359 shipped empty segments as no progress and kept partial files (transfer's F2, F1) | Manifests carry the segments, `pinMode` and `aliases`, never provenance or pending audits (its §5.1-5.2) |
+| Segment export, `HttpSourceState` | This design (§6.10, §9.8); #359 shipped empty segments as no progress and kept partial files (transfer's F2, F1) | Manifests carry the segments, `pinMode` and `aliases`, never provenance or pending audits (its §5.1-5.2) |
 | `KetchServer` route sets | Transfer's M1 adds `routes: Set<RouteGroup>` (its §4.5); PR8 adds `HELPERS` | `BrowserExtensionServer` keeps the default and serves neither |
 | Constant-time compare, blank token as none, server `coerceInputValues` | PR1 item 8, transfer's F10b | — |
 | `PauseReason.Transferring` | Transfer (its K12, §7.3) | A frozen task's lanes stop as on any pause (§8.6) |
@@ -978,7 +978,7 @@ drive cache. After an OS crash at most `saveIntervalMs` of committed bytes are r
   prefix". Per-connection data moves to `LaneInfo`, which supersedes the
   `Segment.bytesPerSecond`/`retryCount`/`networkInterfaceId` plan of ux-redesign
   W5-API-ERRORS-SEGMENTS.
-- `HttpResumeState` gains `pinMode`, `aliases`, `pinVersion = 1`, `relayed: List<RelaySpan(helper,
+- `HttpSourceState` gains `pinMode`, `aliases`, `pinVersion = 1`, `relayed: List<RelaySpan(helper,
   start, end)>` (at most 256, merged across gaps beyond that, which over-invalidates safely) and
   `pendingAudits: List<PendingAudit(start, sha256)>`, all defaulted, and decodes with
   `ignoreUnknownKeys` (today strict `Json.decodeFromString`). Old JSON decodes; a downgrade to a
@@ -1548,7 +1548,7 @@ are this design's alone:
 | 4 | Writes after close recreate the file | `PathFileAccessor.getOrCreateHandle` reopens and creates parents | Closed flag; `writeAt` after `close()` throws |
 | 5 | One execution's `Error` can cancel every execution | `DownloadCoordinator.scope = CoroutineScope(dispatchers.network)` | Add `SupervisorJob()` |
 | 6 | Speed spike after resume | `buildContext` starts `lastBytes` at 0 | Seed it from the first report |
-| 7 | Strict resume-state decode | `Json.decodeFromString<HttpResumeState>` | `ignoreUnknownKeys` + old-JSON tests |
+| 7 | Strict resume-state decode | `Json.decodeFromString<HttpSourceState>` | `ignoreUnknownKeys` + old-JSON tests |
 | 8 | Bearer compared with `==`; a blank token half-applied | `KetchServer.configureServer` (`apiToken != null`, `credential.token == expectedToken`) vs `startMdnsRegistration` and #352's `pairing` field (`isNullOrBlank`): a blank token installs `Authentication` and skips `HostValidator`/`CrossOriginGuard` while mDNS says `token=none` and pairing is off; the server's `Json` lacks `coerceInputValues` | Constant-time compare; blank → `null`; `coerceInputValues` in the server's `Json` (§9.8) |
 
 Already fixed at HEAD and dropped: pause before the first byte (`RealDownloadTask.pause` accepts
@@ -1711,7 +1711,7 @@ written and synced interval sets and `crash()`, a fake `TimeSource`, a `FakeRela
 drops, delays, duplicates, reorders and partitions); `commonTest` by default, jvmTest only for
 sockets, `testApplication`, SQLite and platform crypto; algorithms tested through production code
 (the split formula through `RangeLedger`); no data-class or plain serialization tests, but
-old-JSON decode tests for `HttpResumeState`, `KetchStatus`, `DownloadRequest` and `TaskSnapshot`
+old-JSON decode tests for `HttpSourceState`, `KetchStatus`, `DownloadRequest` and `TaskSnapshot`
 (extending #353's `KetchStatusTest` and `TaskSnapshotCompatibilityTest`), and an unknown
 `HelperPolicy` type decoding as `Off`;
 every integration case bounded by a timeout and cleaning up servers, clients and temp files.

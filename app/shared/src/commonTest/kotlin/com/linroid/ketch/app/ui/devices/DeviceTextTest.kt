@@ -66,7 +66,7 @@ class DeviceTextTest {
   ) = presence(
     entry = entry,
     name = "NAS-Basement",
-    detail = "nas.local:8642",
+    detail = verbatim("nas.local:8642"),
     health = health,
     connected = connected,
     status = status,
@@ -200,7 +200,7 @@ class DeviceTextTest {
 
     assertEquals(ProblemKind.NotConnected, problem?.kind)
     assertEquals(
-      "Ketch keeps only a few devices connected at once. It connects to this one while it shows.",
+      "Ketch connects to a few devices at a time. This one connects while it's shown.",
       problem?.detail.load()
     )
   }

@@ -107,7 +107,7 @@ private fun restrictToOwner(file: File) {
 
 private fun isPosix(): Boolean = "posix" in FileSystems.getDefault().supportedFileAttributeViews()
 
-private fun newToken(): String =
+internal fun newToken(): String =
   ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 
 private val OWNER_ONLY = PosixFilePermissions.fromString("rw-------")

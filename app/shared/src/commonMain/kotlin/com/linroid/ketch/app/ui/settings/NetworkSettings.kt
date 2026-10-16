@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.linroid.ketch.api.NetworkInterfaceInfo
+import com.linroid.ketch.api.NetworkKind
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -32,7 +33,7 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The networks [device] spreads its HTTP requests over, as chips: the system's default
  * connection, or any set of its interfaces. The choice applies at once and lasts until the
- * device restarts.
+ * device restarts. Below them, the proxy those requests go through ([ProxySettings]).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -94,7 +95,8 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
               KetchChip(
                 label = chipLabel(info, gone = info.id !in available),
                 selected = ticked,
-                leadingIcon = if (info.id in available) KetchIcon.Network else KetchIcon.Warning,
+                leadingIcon = if (info.id in available) info.kind.icon() else KetchIcon.Warning,
+                checkWhenSelected = false,
                 onClick = {
                   val ids = if (ticked) selected - info.id else selected + info.id
                   controller.selectNetworks(ids)
@@ -106,6 +108,7 @@ fun NetworkSettings(state: AppState, device: InstanceEntry) {
       }
     }
   }
+  ProxySettings(state, device)
 }
 
 /**
@@ -117,4 +120,13 @@ private fun chipLabel(info: NetworkInterfaceInfo, gone: Boolean): String {
   if (gone) return stringResource(Res.string.settings_network_gone, info.name)
   val address = ipv4Addresses(listOf(info)).firstOrNull()
   return if (address == null) info.name else info.name + SEPARATOR + address
+}
+
+private fun NetworkKind.icon(): KetchIcon = when (this) {
+  NetworkKind.WIFI -> KetchIcon.Network
+  NetworkKind.CELLULAR -> KetchIcon.Cellular
+  NetworkKind.ETHERNET -> KetchIcon.Ethernet
+  NetworkKind.VPN -> KetchIcon.Vpn
+  NetworkKind.BLUETOOTH -> KetchIcon.Bluetooth
+  NetworkKind.OTHER -> KetchIcon.Globe
 }

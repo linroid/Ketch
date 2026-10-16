@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.inspector
 
 import androidx.compose.runtime.Immutable
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
@@ -25,10 +26,13 @@ import com.linroid.ketch.app.ui.inspector.tabs.sameByteUnit
 import com.linroid.ketch.app.util.RowStatus
 import com.linroid.ketch.app.util.TaskOrigin
 import com.linroid.ketch.app.util.clockTime
+import com.linroid.ketch.app.util.startingReason
 import com.linroid.ketch.app.util.urlHost
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.date_at_time
 import ketch.app.shared.generated.resources.inspector_captured
+import ketch.app.shared.generated.resources.inspector_checksum_pending
+import ketch.app.shared.generated.resources.inspector_checksum_verified
 import ketch.app.shared.generated.resources.inspector_file_missing
 import ketch.app.shared.generated.resources.inspector_metric_done_at
 import ketch.app.shared.generated.resources.inspector_metric_left
@@ -60,6 +64,7 @@ import ketch.app.shared.generated.resources.inspector_with_cookies_referrer
 import ketch.app.shared.generated.resources.inspector_with_cookies_referrer_alone
 import ketch.app.shared.generated.resources.inspector_with_referrer
 import ketch.app.shared.generated.resources.inspector_with_referrer_alone
+import ketch.app.shared.generated.resources.queue_starting
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.StringResource
@@ -101,9 +106,9 @@ internal data class InspectorReason(
  * The reason line of [row], or `null` when nothing needs explaining. A stall comes first; then
  * the limit that caps a running download: the Slow lane when [slowLane] is on and [globalCap]
  * is the lower one, the download's own limit, or the device's [globalCap]. Waiting tasks say why
- * they wait, tasks the engine paused say why and when they go on, and paused ones whether
- * resuming keeps their progress; a completed download whose
- * file is gone ([fileMissing]) says so. The action bar already offers Resume, Start now and
+ * they wait, starting ones that they start or find peers, tasks the engine paused say why and
+ * when they go on, and paused ones whether resuming keeps their progress; a completed download
+ * whose file is gone ([fileMissing]) says so. The action bar already offers Resume, Start now and
  * Download again, so these reasons carry no chip of their own.
  */
 internal fun inspectorReason(
@@ -119,6 +124,9 @@ internal fun inspectorReason(
         InspectorReason(content.detail, ReasonAction.Reconnect, warning = true)
       else -> limitReason(row.request.speedLimit, slowLane, globalCap)
     }
+    // The subline already names the site that a starting row's detail may be.
+    is DownloadState.Queued if row.isStarting ->
+      InspectorReason(startingReason(row.request) ?: Res.string.queue_starting.text())
     is DownloadState.Queued, is DownloadState.Scheduled -> InspectorReason(content.detail)
     // The row explains a pause the engine made, and when the task goes on by itself.
     is DownloadState.Paused -> if (row.state.reason != PauseReason.User) {
@@ -244,6 +252,25 @@ internal fun finishedDetail(row: TaskRow, now: Instant, zone: TimeZone): UiText?
   val today = now.toLocalDateTime(zone).date
   if (finishedAt.toLocalDateTime(zone).date == today) return row.content.finished
   return Res.string.date_at_time.text(row.content.finished, clockTime(finishedAt, zone))
+}
+
+/**
+ * The checksum of a task in [state] downloading [request], for the Checksum detail, and the text
+ * it reads as: "SHA-256 · verified" once the finished file was checked against it, "SHA-256 ·
+ * checked when done" while the request's checksum waits for the file. `null` when there is none,
+ * as for a file that finished unverified or a canceled task.
+ */
+internal fun checksumDetail(
+  state: DownloadState,
+  request: DownloadRequest,
+): Pair<Checksum, UiText>? = when (state) {
+  is DownloadState.Completed -> state.checksum?.let { checksum ->
+    checksum to Res.string.inspector_checksum_verified.text(checksum.algorithm.label)
+  }
+  is DownloadState.Canceled -> null
+  else -> request.checksum?.let { checksum ->
+    checksum to Res.string.inspector_checksum_pending.text(checksum.algorithm.label)
+  }
 }
 
 /**

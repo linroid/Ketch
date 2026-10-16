@@ -4,7 +4,7 @@
   <string name="quick_add_no_link">Aucun lien à télécharger</string>
 
   <string name="notifications_offer_title">Être averti des téléchargements et de Découvrir</string>
-  <string name="notifications_offer_message">Ketch vous prévient lorsqu\'un téléchargement se termine ou échoue, ou lorsque Découvrir vous demande l\'autorisation d\'accéder à un site. Vous recevez ces notifications même quand vous utilisez d\'autres apps.</string>
+  <string name="notifications_offer_message">Soyez prévenu quand un téléchargement se termine ou échoue, ou quand Découvrir a besoin de votre autorisation, même dans d\'autres apps.</string>
   <string name="notifications_offer_allow">Autoriser</string>
   <string name="notifications_offer_not_now">Plus tard</string>
 </resources>

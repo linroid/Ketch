@@ -2,9 +2,12 @@ package com.linroid.ketch.ftp
 
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import io.ktor.network.selector.SelectorManager
+import io.ktor.network.sockets.Connection
 import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.connection
 import io.ktor.network.sockets.openReadChannel
 import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteReadChannel
@@ -12,45 +15,69 @@ import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * FTP client implementation using ktor-network raw sockets.
  *
  * Manages a control connection for sending FTP commands and opens
- * separate passive data connections for file transfer.
+ * separate passive data connections for file transfer. Once
+ * [upgradeToTls] has negotiated `PROT P`, every data connection is
+ * wrapped in TLS too, with the control connection's server name.
  *
  * Not thread-safe: use one instance per coroutine.
  *
  * @param host FTP server hostname
  * @param port FTP server port
  * @param bufferSize read buffer size for data transfers
+ * @param secureSocket wraps a connection in TLS, or returns null
+ *   where TLS is unavailable
+ * @param selector selects for this client's sockets; every client shares
+ *   [sharedSelector] by default, so connections need no thread of their own
  */
 internal class RealFtpClient(
   private val host: String,
   private val port: Int,
   private val bufferSize: Int = 8192,
+  private val secureSocket: suspend (
+    connection: Connection,
+    serverName: String,
+    context: CoroutineContext,
+  ) -> Socket? = ::tlsUpgrade,
+  private val selector: SelectorManager = sharedSelector,
 ) : FtpClient {
   private val log = KetchLogger("FtpClient")
 
-  private var selectorManager: SelectorManager? = null
+  // TLS record loops run outside the caller's job, as ktor advises: a loop
+  // failing after a broken handshake must not cancel the download, and the
+  // loops end when their socket closes.
+  private val tlsContext = Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+    log.d { "TLS session ended: ${e.describeCauses()}" }
+  }
+
   private var controlSocket: Socket? = null
   private var reader: ByteReadChannel? = null
   private var writer: ByteWriteChannel? = null
   private var restSupported: Boolean? = null
+
+  /** True once the server accepted `PROT P`: data connections use TLS. */
+  private var protectData = false
 
   override val isConnected: Boolean
     get() = controlSocket != null
 
   override suspend fun connect() {
     try {
-      val sm = SelectorManager(Dispatchers.IO)
-      selectorManager = sm
-      val socket = aSocket(sm).tcp().connect(host, port)
+      val socket = connectWithin(host, port)
       controlSocket = socket
       reader = socket.openReadChannel()
       writer = socket.openWriteChannel(autoFlush = true)
@@ -71,9 +98,11 @@ internal class RealFtpClient(
 
   override suspend fun upgradeToTls() {
     val socket = controlSocket
-      ?: throw KetchError.Network(
-        Exception("Not connected")
-      )
+    val input = reader
+    val output = writer
+    if (socket == null || input == null || output == null) {
+      throw KetchError.Network(Exception("Not connected"))
+    }
 
     log.d { "Upgrading to TLS for $host:$port" }
 
@@ -84,11 +113,8 @@ internal class RealFtpClient(
       throw FtpError.fromReply(authReply)
     }
 
-    val upgraded = tlsUpgrade(socket, host, port)
-    if (upgraded == null) {
-      log.e { "TLS not available on this platform" }
-      throw KetchError.Unsupported()
-    }
+    // The handshake continues on the channels connect() opened.
+    val upgraded = secure(Connection(socket, input, output), "control")
 
     controlSocket = upgraded
     reader = upgraded.openReadChannel()
@@ -100,10 +126,13 @@ internal class RealFtpClient(
       log.w { "PBSZ failed: $pbszReply" }
     }
 
+    // Without PROT P the file would travel in clear text under an ftps:// URL.
     val protReply = sendCommand("PROT P")
     if (!protReply.isPositiveCompletion) {
-      log.w { "PROT P failed: $protReply" }
+      log.e { "PROT P rejected, refusing clear-text data: $protReply" }
+      throw FtpError.fromReply(protReply)
     }
+    protectData = true
 
     log.d { "TLS upgrade complete for $host:$port" }
   }
@@ -196,6 +225,7 @@ internal class RealFtpClient(
   ) {
     log.d { "RETR $path (offset=$offset)" }
     val dataSocket = openPassiveDataConnection()
+    var transferSocket = dataSocket
     try {
       if (offset > 0) {
         val restReply = sendCommand("REST $offset")
@@ -213,7 +243,11 @@ internal class RealFtpClient(
         throw FtpError.fromReply(retrReply)
       }
 
-      val dataReader = dataSocket.openReadChannel()
+      // Servers start the data connection's TLS handshake after the
+      // preliminary reply, so it must come after RETR, as in RFC 4217.
+      if (protectData) transferSocket = secure(dataSocket.connection(), "data")
+
+      val dataReader = transferSocket.openReadChannel()
       val buffer = ByteArray(bufferSize)
       while (true) {
         currentCoroutineContext().ensureActive()
@@ -229,7 +263,7 @@ internal class RealFtpClient(
     } finally {
       withContext(Dispatchers.IO) {
         try {
-          dataSocket.close()
+          transferSocket.close()
         } catch (_: Exception) {
           // Ignore close errors
         }
@@ -248,21 +282,49 @@ internal class RealFtpClient(
   override suspend fun disconnect() {
     log.v { "Disconnecting from $host:$port" }
     try {
-      if (isConnected) {
-        sendCommand("QUIT")
-      }
+      // A server that stopped answering must not hold the segment that gave up on it.
+      if (isConnected) withWallClockTimeout(QUIT_TIMEOUT) { sendCommand("QUIT") }
     } catch (_: Exception) {
       // Ignore errors during disconnect
     } finally {
       withContext(Dispatchers.IO) {
         try { controlSocket?.close() } catch (_: Exception) {}
-        try { selectorManager?.close() } catch (_: Exception) {}
       }
       controlSocket = null
       reader = null
       writer = null
-      selectorManager = null
+      protectData = false
     }
+  }
+
+  /**
+   * Wraps [connection] in TLS for the control host.
+   *
+   * ktor-network-tls cannot resume TLS sessions, so servers that
+   * require the data connection to reuse the control connection's
+   * session refuse it, and this fails.
+   *
+   * @param channel "control" or "data", for logs and errors
+   * @throws KetchError.Network when the handshake fails
+   * @throws KetchError.Unsupported where TLS is unavailable
+   */
+  private suspend fun secure(connection: Connection, channel: String): Socket {
+    val upgraded = try {
+      secureSocket(connection, host, tlsContext)
+    } catch (e: Exception) {
+      // A TLS channel closed under the handshake also throws
+      // CancellationException; only a cancelled caller rethrows it.
+      if (e is CancellationException) currentCoroutineContext().ensureActive()
+      log.w { "TLS handshake failed on the $channel connection: ${e.describeCauses()}" }
+      throw KetchError.Network(
+        Exception("TLS handshake failed on the FTPS $channel connection", e)
+      )
+    }
+    if (upgraded == null) {
+      log.e { "TLS not available on this platform" }
+      throw KetchError.Unsupported()
+    }
+    return upgraded
   }
 
   /**
@@ -303,11 +365,9 @@ internal class RealFtpClient(
     dataHost: String,
     dataPort: Int,
   ): Socket {
-    val sm = selectorManager ?: throw KetchError.Network(
-      Exception("Not connected")
-    )
+    if (!isConnected) throw KetchError.Network(Exception("Not connected"))
     return try {
-      aSocket(sm).tcp().connect(dataHost, dataPort)
+      connectWithin(dataHost, dataPort)
     } catch (e: Exception) {
       if (e is CancellationException) throw e
       throw KetchError.Network(e)
@@ -373,7 +433,7 @@ internal class RealFtpClient(
     }
 
     val firstLine = lines.first()
-    val code = firstLine.substring(0, 3).toIntOrNull()
+    val code = firstLine.take(3).toIntOrNull()
       ?: throw KetchError.Network(
         Exception("Invalid FTP reply: $firstLine")
       )
@@ -412,7 +472,35 @@ internal class RealFtpClient(
     return sb.toString()
   }
 
+  /**
+   * Connects to [host] and [port], failing with [KetchError.Network] after [CONNECT_TIMEOUT].
+   * Transfers have no read timeout: the download's transfer watchdog drops stalled ones.
+   */
+  private suspend fun connectWithin(host: String, port: Int): Socket =
+    withWallClockTimeout(CONNECT_TIMEOUT) { aSocket(selector).tcp().connect(host, port) }
+      ?: throw KetchError.Network(Exception("Connection timed out after $CONNECT_TIMEOUT"))
+
+  /**
+   * Runs [block] for at most [timeout] of real time, `null` once it runs out: on
+   * [Dispatchers.IO], whose clock a test's virtual time does not advance while a socket waits.
+   */
+  private suspend fun <T> withWallClockTimeout(timeout: Duration, block: suspend () -> T): T? =
+    withContext(Dispatchers.IO) { withTimeoutOrNull(timeout) { block() } }
+
   companion object {
+    /**
+     * The selector every client shares by default, created on first use and never closed: it
+     * waits for every client's sockets on one thread, where a selector per client took one each.
+     * Idle, the JVM's suspends; the native (iOS) one keeps an IO thread waiting in `pselect`.
+     */
+    internal val sharedSelector: SelectorManager by lazy { SelectorManager(Dispatchers.IO) }
+
+    /** How long a control or data connection may take to open. */
+    internal val CONNECT_TIMEOUT: Duration = 30.seconds
+
+    /** How long [disconnect] waits for the reply to `QUIT`. */
+    internal val QUIT_TIMEOUT: Duration = 5.seconds
+
     /**
      * Parses EPSV response to extract port number.
      * Format: "Entering Extended Passive Mode (|||port|)"

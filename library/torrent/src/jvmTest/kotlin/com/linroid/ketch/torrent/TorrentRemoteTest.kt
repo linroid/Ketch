@@ -3,24 +3,35 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.TorrentSessionState
+import com.linroid.ketch.torrent.engine.TorrentTaskSpec
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import java.net.ServerSocket
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class TorrentRemoteTest {
   @Test
@@ -41,14 +52,14 @@ class TorrentRemoteTest {
         seedDir.resolve("skip").writeBytes(bytes.copyOfRange(0, 131_072))
         seedDir.resolve("keep").writeBytes(bytes.copyOfRange(131_072, bytes.size))
         val seed = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val ketch = Ketch(KtorHttpEngine(), additionalSources = listOf(
           TorrentDownloadSource(TorrentConfig(dhtEnabled = false))))
-        val port = ServerSocket(0).use { it.localPort }
         // Without a token the server keeps clients to its folders, so the test's one is added.
-        val server = KetchServer(ketch, host = "127.0.0.1", port = port,
+        // It binds a port of its own: one chosen earlier could be taken before it binds.
+        val server = KetchServer(ketch, host = "127.0.0.1", port = 0,
           allowedDirectories = listOf(root.path), mdnsEnabled = false)
-        val remote = RemoteKetch("127.0.0.1", port)
+        var remote: RemoteKetch? = null
         try {
           seed.start()
           val seeding = seed.addTask(TorrentTaskSpec("seed", metadata,
@@ -57,15 +68,19 @@ class TorrentRemoteTest {
           seeding.state.first { it == TorrentSessionState.SEEDING }
           ketch.start()
           server.start(wait = false)
-          remote.start()
+          val client = RemoteKetch("127.0.0.1", server.port()).also { remote = it }
+          client.start()
           val magnet = MagnetUri(metadata.infoHash,
             explicitPeers = listOf("127.0.0.1:${seed.listenPort}")).toUri()
-          val resolved = remote.resolve(magnet)
+          val resolved = client.resolve(magnet)
           assertEquals(listOf("0", "1"), resolved.files.map { it.id })
           val output = root.resolve("output")
-          val task = remote.download(DownloadRequest(magnet,
+          val task = client.download(DownloadRequest(magnet,
             destination = Destination(output.absolutePath), selectedFileIds = setOf("1"),
             resolvedSource = resolved, speedLimit = SpeedLimit.of(16_384)))
+          // A remote task's segments only come while followed.
+          val segments = Interest.Segments(setOf(task.taskId))
+          val following = launch { client.subscribe(segments, 200.milliseconds).collect() }
           while (task.segments.value.sumOf { it.downloadedBytes } == 0L) delay(25)
           task.pause()
           task.state.first { it is DownloadState.Paused }
@@ -77,12 +92,15 @@ class TorrentRemoteTest {
             val failed = ketch.tasks.value.first().state.value as? DownloadState.Failed
             throw AssertionError("Local torrent failed: ${failed?.error}", failed?.error)
           }
-          assertEquals(131_072L, task.segments.value.sumOf { it.downloadedBytes })
+          client.subscribe(segments, 200.milliseconds).first { bySegments ->
+            bySegments[task.taskId].orEmpty().sumOf { it.downloadedBytes } == 131_072L
+          }
+          following.cancel()
           assertFalse(output.resolve("skip").exists())
           assertContentEquals(bytes.copyOfRange(131_072, bytes.size),
             output.resolve("keep").readBytes())
         } finally {
-          remote.close()
+          remote?.close()
           server.stop()
           ketch.close()
           seed.stop()

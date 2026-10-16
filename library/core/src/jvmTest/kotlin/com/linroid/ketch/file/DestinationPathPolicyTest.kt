@@ -32,6 +32,63 @@ class DestinationPathPolicyTest {
   }
 
   @Test
+  fun contains_excludedFolderBelowARoot_false() {
+    val excluded = File(temp, "app-data")
+    val policy = DestinationPathPolicy(listOf(temp.path), excluded = listOf(excluded.path))
+
+    assertFalse(policy.contains("${excluded.path}/LaunchAgents/evil.plist"))
+    assertTrue(policy.contains("${outside.path}/file.zip"))
+  }
+
+  @Test
+  fun contains_excludedFolderInAnotherCase_false() {
+    val excluded = File(temp, "Library").apply { mkdirs() }
+    val policy = DestinationPathPolicy(listOf(temp.path), excluded = listOf(excluded.path))
+
+    assertFalse(policy.contains("${temp.path}/library/LaunchAgents/evil.plist"))
+  }
+
+  @Test
+  fun contains_excludedFolderInsideANarrowerRoot_true() {
+    val excluded = File(temp, "app-data")
+    val downloads = File(excluded, "downloads")
+    val policy = DestinationPathPolicy(
+      listOf(temp.path, downloads.path),
+      excluded = listOf(excluded.path),
+    )
+
+    assertTrue(policy.contains("${downloads.path}/file.zip"))
+    assertFalse(policy.contains("${excluded.path}/other/file.zip"))
+  }
+
+  @Test
+  fun contains_hiddenEntryBelowARootRefusingThem_false() {
+    val policy = DestinationPathPolicy(listOf(temp.path), refuseHidden = true)
+
+    assertFalse(policy.contains("${temp.path}/.ssh/authorized_keys"))
+    assertFalse(policy.contains("${outside.path}/.zshrc"))
+    assertTrue(policy.contains("${outside.path}/file.zip"))
+  }
+
+  @Test
+  fun contains_hiddenEntryAboveTheRoot_true() {
+    val hidden = File(temp, ".downloads").apply { mkdirs() }
+    val policy = DestinationPathPolicy(listOf(hidden.path), refuseHidden = true)
+
+    assertTrue(policy.contains("${hidden.path}/file.zip"))
+  }
+
+  @Test
+  fun contains_linkIntoAnExcludedFolder_false() {
+    val excluded = File(temp, "app-data").apply { mkdirs() }
+    val link = File(outside, "innocent")
+    Files.createSymbolicLink(link.toPath(), excluded.toPath())
+    val policy = DestinationPathPolicy(listOf(temp.path), excluded = listOf(excluded.path))
+
+    assertFalse(policy.contains("${link.path}/evil.plist"))
+  }
+
+  @Test
   fun contains_siblingSharingTheRootsPrefix_false() {
     assertFalse(policy.contains("${root.path}2/file.zip"))
   }
@@ -48,6 +105,39 @@ class DestinationPathPolicyTest {
     val throughLink = DestinationPathPolicy(listOf(link.path))
 
     assertTrue(throughLink.contains("${root.path}/file.zip"))
+  }
+
+  @Test
+  fun confinesTo_theFreeNameConfineGaveItEarlier_true() {
+    File(root, "file.zip").writeText("existing")
+    val given = Destination("${root.path}/file.zip")
+    val earlier = policy.confine(given, root.path)
+    File(root, "file (1).zip").writeText("downloading")
+
+    assertEquals(Destination(File(root, "file (1).zip").path), earlier)
+    assertTrue(policy.confinesTo(given, root.path, earlier))
+    assertTrue(policy.confinesTo(Destination("file.zip"), root.path, Destination("file.zip")))
+  }
+
+  @Test
+  fun confinesTo_anotherFileOrFolder_false() {
+    val given = Destination("${root.path}/file.zip")
+
+    assertFalse(policy.confinesTo(given, root.path, Destination("${root.path}/other (1).zip")))
+    assertFalse(policy.confinesTo(given, root.path, Destination("${root.path}/sub/file (1).zip")))
+    assertFalse(policy.confinesTo(given, root.path, Destination("${root.path}/file (x).zip")))
+    assertFalse(policy.confinesTo(Destination("${root.path}/a/"), root.path, Destination("b/")))
+  }
+
+  @Test
+  fun confinesTo_outsideTheRoots_rejected() {
+    assertFailsWith<PathRejectedException> {
+      policy.confinesTo(
+        Destination("${outside.path}/file.zip"),
+        root.path,
+        Destination("${outside.path}/file.zip"),
+      )
+    }
   }
 
   @Test

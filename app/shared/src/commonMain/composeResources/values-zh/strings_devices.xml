@@ -42,9 +42,9 @@
   <string name="device_not_connected">未连接</string>
 
   <string name="device_problem_unauthorized">需要新的访问令牌</string>
-  <string name="device_problem_token_rejected">该设备不接受已保存的访问令牌。</string>
-  <string name="device_problem_over_limit">Ketch 同时只与少数几台设备保持连接。切换到这台设备时会自动连接。</string>
-  <string name="device_problem_not_kept">切换到这台设备或开启“保持连接”后，Ketch 会自动连接。</string>
+  <string name="device_problem_token_rejected">已保存的访问令牌被拒绝。</string>
+  <string name="device_problem_over_limit">Ketch 同时只连接少数几台设备。显示这台设备时会连接。</string>
+  <string name="device_problem_not_kept">显示时连接，或开启“保持连接”后连接。</string>
   <string name="device_problem_connecting">正在连接…</string>
   <string name="device_problem_offline_for">已离线%1$s · 正在重试</string>
   <string name="device_problem_offline">离线 · 正在重试</string>
@@ -79,7 +79,7 @@
   <string name="device_free_space_unknown">可用空间未知</string>
   <string name="device_chip_networks">用于下载的网络</string>
   <string name="device_chip_sharing_settings">共享设置</string>
-  <string name="device_chip_share_tooltip">允许其他设备控制它</string>
+  <string name="device_chip_share_tooltip">允许其他设备控制此设备上的 Ketch</string>
   <string name="device_chip_not_shared">未共享 · 共享…</string>
   <plurals name="device_retry_failed">
     <item quantity="other">重试 %1$d 个失败的下载</item>
@@ -100,7 +100,7 @@
   <string name="device_rename_local_hint">其他设备会在重启后看到此名称。</string>
   <string name="device_rename_name">名称</string>
   <string name="device_remove_title">移除 %1$s？</string>
-  <string name="device_remove_body">移除后，这里将不再显示该设备的下载。下载会继续在 %1$s 上进行，之后可随时重新添加该设备。</string>
+  <string name="device_remove_body">它的下载会继续在 %1$s 上进行。之后可以重新添加。</string>
 
   <string name="device_speed_of">%1$s 的速度</string>
 
@@ -142,8 +142,8 @@
   <string name="connect_code_no_longer_accepted">%1$s 不再接受 Ketch 保存的访问码。请粘贴那台设备“设置 › 共享”中新的配对链接，或输入它的访问码。</string>
   <string name="connect_scan_hint">用相机应用扫描另一台设备“设置 › 共享”中的配对码，或粘贴它的配对链接。</string>
   <string name="connect_paste_hint">粘贴另一台设备“设置 › 共享”中的配对链接，或输入它的地址。</string>
-  <string name="connect_find_on_network">在网络中查找</string>
-  <string name="connect_on_your_network">同一网络中</string>
+  <string name="connect_find_on_network">在局域网中查找</string>
+  <string name="connect_on_your_network">局域网中</string>
   <string name="connect_searching">正在搜索…</string>
   <string name="connect_search_again">重新搜索</string>
   <string name="connect_looking">正在此网络中查找 Ketch 设备…</string>
@@ -157,10 +157,12 @@
   <string name="connect_approval_enter_code">改为输入访问码</string>
   <string name="connect_approval_denied">%1$s 拒绝了配对请求。请重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_expired">%1$s 未及时响应配对请求。请重新请求，或输入该设备的访问码。</string>
-  <string name="connect_approval_busy">%1$s 仍在处理此设备的另一个请求。请稍后再次请求，或输入其访问码。</string>
+  <string name="connect_approval_busy">%1$s 正在处理此设备的另一个请求。请稍后再试，或输入其访问码。</string>
+  <string name="connect_approval_paused">%1$s 暂时不接受此设备的配对请求。请稍后再试，或输入该设备的访问码。</string>
+  <string name="connect_approval_closed">%1$s 不接受配对请求。请在该设备的“设置 › 共享”中开启配对后重新请求，或输入该设备的访问码。</string>
   <string name="connect_approval_ask_again">重新请求</string>
   <string name="connect_added_badge">已添加</string>
-  <string name="connect_share_instead">想从其他设备控制%1$s？</string>
+  <string name="connect_share_instead">想从其他设备控制%1$s上的 Ketch？</string>
   <string name="connect_show_pairing_code">显示配对码</string>
 
   <string name="connect_landing_title">连接到 Ketch 设备</string>
@@ -178,9 +180,9 @@
   <string name="connect_pairing_known">已添加过 %1$s。连接后将切换到该设备。</string>
   <string name="connect_pairing_known_code">已添加过 %1$s。连接后将切换到该设备，并更新为此链接中的访问码。</string>
   <string name="connect_pairing_has_code">此链接包含访问码。</string>
-  <string name="pairing_request_title">允许 %1$s 控制%2$s？</string>
+  <string name="pairing_request_title">允许 %1$s 控制%2$s上的 Ketch？</string>
   <string name="pairing_request_check">请确认 %1$s 上显示的配对码与下方一致，再允许连接：</string>
-  <string name="pairing_request_note">允许后，该设备可以添加、暂停和移除这里的下载。若要撤销访问权限，请在“设置 › 共享”中选择“新访问码”。</string>
+  <string name="pairing_request_note">它可以添加、暂停和移除这里的下载。若要撤销访问权限，请在“设置 › 共享”中选择“新访问码”。</string>
   <string name="pairing_request_allow">允许</string>
   <string name="pairing_request_deny">不允许</string>
 

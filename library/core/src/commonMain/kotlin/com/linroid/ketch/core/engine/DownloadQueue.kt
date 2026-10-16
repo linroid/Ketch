@@ -180,6 +180,29 @@ internal class DownloadQueue(
     }
   }
 
+  /**
+   * Frees the slot of a task that stopped to wait for a file selection
+   * ([PauseReason.AwaitingFileSelection]) and starts the next one. Like [onTaskCompleted], it
+   * does nothing when [expectedState] is no longer the task's state.
+   */
+  suspend fun onTaskParked(taskId: String, expectedState: DownloadState? = null) {
+    mutex.withLock {
+      try {
+        if (expectedState != null &&
+          activeEntries[taskId]?.handle?.mutableState?.value !== expectedState
+        ) return
+        removeActive(taskId)
+        log.d {
+          "Task waits for a file selection: taskId=$taskId, " +
+            "active=${activeEntries.size}/$maxConcurrent"
+        }
+        promoteNext()
+      } finally {
+        publishPositions()
+      }
+    }
+  }
+
   suspend fun onTaskFailed(taskId: String, expectedState: DownloadState? = null) {
     mutex.withLock {
       try {
@@ -404,25 +427,14 @@ internal class DownloadQueue(
   }
 
   companion object {
-    private val AUTHORITY = Regex("""^([A-Za-z][A-Za-z0-9+.\-]*)://([^/?#]*)""")
-
     /**
      * Returns the key used for the per-host limit: the URL host in lower
      * case, without user info, port or IPv6 brackets. Returns `null` for
      * URIs without a network host — magnet links, `torrent:` identifiers,
      * `file:` URLs and local paths — which the per-host limit ignores.
      */
-    internal fun extractHost(url: String): String? {
-      val match = AUTHORITY.find(url.trim()) ?: return null
-      if (match.groupValues[1].equals("file", ignoreCase = true)) return null
-      val hostPort = match.groupValues[2].substringAfterLast('@')
-      val host = if (hostPort.startsWith('[')) {
-        hostPort.substring(1).substringBefore(']')
-      } else {
-        hostPort.substringBefore(':')
-      }
-      return host.lowercase().ifEmpty { null }
-    }
+    internal fun extractHost(url: String): String? =
+      UrlAuthority.parse(url)?.takeUnless { it.scheme == "file" }?.host
 
     private fun effectiveLimit(value: Int): Int =
       if (value > 0) value else Int.MAX_VALUE

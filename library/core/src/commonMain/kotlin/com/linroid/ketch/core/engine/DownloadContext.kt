@@ -1,11 +1,16 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlin.concurrent.Volatile
 
 /**
  * Bundles everything a [DownloadSource] needs to execute a download.
@@ -37,16 +42,36 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   canceling the download batch scope. Read by sources to
  *   distinguish resegment-cancel from external cancel.
  * @property config snapshot of the global [DownloadConfig] taken when
- *   this download started or resumed. Sources read their defaults from
- *   it instead of their own constructor settings:
+ *   this download started or resumed, with [DownloadRequest.proxy] in
+ *   place of [DownloadConfig.proxy] when the request names one. Sources
+ *   read their defaults from it instead of their own constructor settings:
  *   [DownloadConfig.maxConnectionsPerDownload] via [effectiveConnections],
- *   [DownloadConfig.progressIntervalMs] for progress throttling and
- *   [DownloadConfig.bufferSize] for socket reads. Retries
+ *   [DownloadConfig.progressIntervalMs] for progress throttling,
+ *   [DownloadConfig.bufferSize] for socket reads and [DownloadConfig.proxy]
+ *   for HTTP requests ([HttpEngine.withProxy]). Retries
  *   ([DownloadConfig.retryCount], [DownloadConfig.retryDelayMs]) are
  *   applied by the engine, which calls [DownloadSource.download] again
  *   after a retryable [com.linroid.ketch.api.KetchError]; sources should
  *   keep the progress recorded in [segments] on such a retry. Sources
  *   that have no use for a setting may ignore it.
+ * @property selection the task's file selection while it runs. Its first value is the selection
+ *   the run starts with; [com.linroid.ketch.api.DownloadTask.selectFiles] sends a new revision
+ *   while it runs. Sources that implement [DownloadSource.planSelection] apply each revision live
+ *   and confirm it with [acknowledgeSelection].
+ * @property connections opens the task's live network connections, which
+ *   [com.linroid.ketch.api.Interest.Connections] reports. Sources open a handle when a
+ *   transfer starts, count its bytes and close it when the transfer ends, also on failure and
+ *   cancellation.
+ * @property watchdog fails transfers that stall, from [DownloadConfig.idleTimeoutMs] and
+ *   [DownloadConfig.minSpeed] of [config]. Sources run each network transfer in
+ *   [TransferWatchdog.watch], reporting received bytes and running [throttle] in the monitor's
+ *   [TransferMonitor.throttled], so a stalled connection fails with a retryable
+ *   [com.linroid.ketch.api.KetchError.Network] instead of hanging.
+ * @property publishedChecksum the digest the server publishes for the whole file, which Ketch
+ *   verifies the finished file against when the request names no
+ *   [checksum][DownloadRequest.checksum]. Starts as [preResolved]'s
+ *   [checksum][ResolvedSource.checksum]; sources that ask the server again, as an HTTP resume
+ *   does, replace it with what the server says now, `null` included.
  */
 class DownloadContext(
   val taskId: String,
@@ -61,12 +86,38 @@ class DownloadContext(
   val maxConnections: MutableStateFlow<Int> =
     MutableStateFlow(request.connections.coerceAtLeast(0)),
   var pendingResegment: Int = 0,
-  /** Final destination resolved by Ketch, including default directory and deduplication. */
+  /**
+   * Final destination resolved by Ketch, including default directory and deduplication. Sources
+   * writing through [fileAccessor] write its partial file (`name.ext.ketch`) instead, which Ketch
+   * moves here once the download completes.
+   */
   val outputPath: String? = null,
   /** Optional payload speed for sources whose verified progress advances in whole pieces. */
   val reportedSpeed: MutableStateFlow<Long?> = MutableStateFlow(null),
   val config: DownloadConfig = DownloadConfig.Default,
+  val selection: StateFlow<SelectionUpdate> =
+    MutableStateFlow(SelectionUpdate(request.selectedFileIds, 0)),
+  val connections: ConnectionReporter = ConnectionReporter.None,
+  val watchdog: TransferWatchdog = TransferWatchdog.of(config),
 ) {
+  @Volatile
+  var publishedChecksum: Checksum? = preResolved?.checksum
+
+  private val acknowledged = MutableStateFlow(0)
+
+  /** The latest [selection] revision the source confirmed with [acknowledgeSelection]. */
+  val acknowledgedSelection: StateFlow<Int> = acknowledged.asStateFlow()
+
+  /**
+   * Confirms that this run delivers the files of [selection] revision [revision] before
+   * [DownloadSource.download] returns. Never acknowledge a revision the run can no longer act on,
+   * such as one that arrives after the transfer finished: Ketch then runs the download again,
+   * from its latest state, with the saved selection.
+   */
+  fun acknowledgeSelection(revision: Int) {
+    acknowledged.update { maxOf(it, revision) }
+  }
+
   /**
    * Number of connections a segmented source should use now: [maxConnections] when positive,
    * otherwise (Auto) [DownloadConfig.maxConnectionsPerDownload] from [config]. Sources must

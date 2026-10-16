@@ -5,16 +5,20 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.RowCapabilities
+import com.linroid.ketch.app.state.taskActions
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.UtcOffset
@@ -124,8 +128,12 @@ class RowContentTest {
   @Test
   fun rowContent_queued_explainsWait() = runTest {
     val running = listOf(DownloadRequest("https://a.com/1"), DownloadRequest("https://b.com/2"))
+    val fullQueue = context.copy(
+      config = DownloadConfig(maxConcurrentDownloads = 2),
+      running = running,
+    )
 
-    val waiting = rowContent(request, DownloadState.Queued, now, context.copy(running = running))
+    val waiting = rowContent(request, DownloadState.Queued, now, fullQueue)
     val unknown = rowContent(request, DownloadState.Queued, now, context.copy(config = null))
 
     assertEquals("Waiting for a free slot (2 of 2 in use)", waiting.detail.load())
@@ -146,7 +154,11 @@ class RowContentTest {
   @Test
   fun rowContent_queuedWithPositionThree_saysTwoAhead() = runTest {
     val running = listOf(DownloadRequest("https://a.com/1"), DownloadRequest("https://b.com/2"))
-    val capable = context.copy(running = running, features = KetchFeatures.ALL)
+    val capable = context.copy(
+      config = DownloadConfig(maxConcurrentDownloads = 2),
+      running = running,
+      features = KetchFeatures.ALL,
+    )
 
     val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = 3)
 
@@ -159,7 +171,21 @@ class RowContentTest {
 
     val content = rowContent(request, DownloadState.Queued, now, capable, queuePosition = null)
 
-    assertEquals("Starting", content.detail.load())
+    assertEquals(RowStatus.Starting, content.status)
+    assertEquals("Starting", content.statusText.load())
+    assertEquals(urlHost(request.url), content.detail.load())
+    assertEquals(RowAction.Pause, content.primary)
+  }
+
+  @Test
+  fun rowContent_magnetStarting_saysFindingPeers() = runTest {
+    val capable = context.copy(features = KetchFeatures.ALL)
+    val magnet = DownloadRequest("magnet:?xt=urn:btih:45b3e332a3b991b3ff000513c4a135054775d73d")
+
+    val content = rowContent(magnet, DownloadState.Queued, now, capable, queuePosition = null)
+
+    assertEquals("Starting", content.statusText.load())
+    assertEquals("Finding peers", content.detail.load())
   }
 
   @Test
@@ -182,6 +208,70 @@ class RowContentTest {
       content.detail.load()
     )
     assertEquals(RowAction.StartNow, content.primary)
+  }
+
+  @Test
+  fun rowContent_awaitingFiles_saysChooseFiles() = runTest {
+    val state = DownloadState.Paused(DownloadProgress(0, 3000), PauseReason.AwaitingFileSelection)
+
+    val content = rowContent(request, state, now, context)
+
+    assertEquals(RowStatus.Paused, content.status)
+    assertEquals("Choose files to download", content.detail.load())
+    assertEquals(RowAction.ChooseFiles, content.primary)
+    val actions = taskActions(request, state, local)
+    assertEquals(
+      listOf(RowAction.ChooseFiles, RowAction.DownloadAllFiles),
+      actions.menu.take(2)
+    )
+    assertFalse(RowAction.Resume in actions.menu)
+  }
+
+  @Test
+  fun taskActions_awaitingSingleChoice_offersOnlyTheChoice() {
+    val state = DownloadState.Paused(DownloadProgress(0, 3000), PauseReason.AwaitingFileSelection)
+    val variants = request.copy(
+      resolvedSource = ResolvedSource(
+        url = request.url,
+        sourceType = "hls",
+        totalBytes = 3000,
+        supportsResume = false,
+        suggestedFileName = null,
+        maxSegments = 1,
+        files = listOf(SourceFile("hi", "1080p", 2000), SourceFile("lo", "480p", 1000)),
+        selectionMode = FileSelectionMode.SINGLE,
+      ),
+    )
+
+    val actions = taskActions(variants, state, local)
+
+    assertEquals(RowAction.ChooseFiles, actions.primary)
+    assertFalse(RowAction.DownloadAllFiles in actions.menu)
+    assertFalse(RowAction.Resume in actions.menu)
+  }
+
+  @Test
+  fun rowContent_completedSeeding_saysSeeding() = runTest {
+    val state = DownloadState.Completed(
+      outputPath = "/tmp/Show",
+      totalBytes = 10_485_760,
+      downloadTime = 4.seconds,
+      sharing = true,
+    )
+
+    val content = rowContent(request, state, now, context)
+    val remoteContent = rowContent(request, state, now, context.copy(device = remote))
+
+    assertEquals(RowStatus.Completed, content.status)
+    assertEquals(
+      "Seeding · took 4s · avg 2.5 MB/s · releases.example.com",
+      content.detail.load()
+    )
+    assertEquals("Seeding · Saved on NAS-Basement", remoteContent.detail.load())
+    assertTrue(RowAction.StopSeeding in taskActions(request, state, local).menu)
+    assertFalse(
+      RowAction.StopSeeding in taskActions(request, state.copy(sharing = false), local).menu
+    )
   }
 
   @Test

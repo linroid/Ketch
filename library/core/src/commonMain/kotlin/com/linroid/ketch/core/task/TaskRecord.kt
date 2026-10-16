@@ -3,8 +3,9 @@ package com.linroid.ketch.core.task
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -18,8 +19,21 @@ import kotlin.time.Instant
  *
  * @property downloadTime time spent downloading over every run of the task; `null` for records
  *   created before it was tracked, which keep it unknown rather than undercount it
- * @property completedAt when the task completed; set once, `null` before completion and for
- *   records completed before it was tracked
+ * @property completedAt when the task last completed; `null` before completion, for records
+ *   completed before it was tracked, and while a selection that added files reopens the task
+ * @property partialPath the file an unfinished download writes to until it completes and moves
+ *   it to [outputPath], such as `name.ext.ketch`, or an Android document URI; `null` once it
+ *   completes, and for a download that writes to [outputPath] itself: one whose name leaves no
+ *   room for the suffix, one resumed with a new destination, or one started before partial files
+ *   existed
+ * @property resolvedSource what the source resolved, kept when it describes all the content
+ *   ([ResolvedSource.METAINFO_KEY]), as a torrent's metainfo does: the task starts and resumes
+ *   from it without resolving again, and sources read the content's description from it
+ *   ([com.linroid.ketch.core.engine.DownloadContext.preResolved],
+ *   [com.linroid.ketch.core.engine.SelectionRequest.resolved]). Ketch writes it, never a client,
+ *   unlike the request's [DownloadRequest.resolvedSource], which then keeps only what views need
+ * @property control state of typed controls (selection generations, the sharing intent and the
+ *   retry ledger of controller commands) that Ketch owns; `null` until the first control change
  */
 @Serializable
 data class TaskRecord(
@@ -31,12 +45,87 @@ data class TaskRecord(
   val error: KetchError? = null,
   val segments: List<Segment>? = null,
   val sourceType: String? = null,
-  val sourceResumeState: SourceResumeState? = null,
+  val sourceState: SourceState? = null,
+  val resolvedSource: ResolvedSource? = null,
   val downloadTime: Duration? = null,
   val createdAt: Instant,
   val updatedAt: Instant,
   val completedAt: Instant? = null,
+  val control: TaskControl? = null,
+  val partialPath: String? = null,
 )
+
+/** Whether a task keeps this resolution in [TaskRecord.resolvedSource]. */
+internal fun ResolvedSource.isKeptWithTask(): Boolean =
+  !metadata[ResolvedSource.METAINFO_KEY].isNullOrEmpty()
+
+/**
+ * Control state of tasks whose sources offer typed controls
+ * ([com.linroid.ketch.core.engine.SourceExtension]). Ketch owns it, never the sources, and saves it
+ * with the change it describes in one [TaskStore.save].
+ *
+ * @property selectionGeneration counts the selection changes of the task; 0 until the first
+ * @property sharing share this completed task with others whenever its source can, including
+ *   after a restart
+ * @property commands the retry ledger of controller commands, at most [MAX_COMMANDS] entries
+ */
+@Serializable
+data class TaskControl(
+  val selectionGeneration: Long = 0,
+  val sharing: Boolean = false,
+  val commands: List<TaskCommandRecord> = emptyList(),
+) {
+  init {
+    require(selectionGeneration >= 0) { "Selection generation must not be negative" }
+    require(commands.size <= MAX_COMMANDS) { "Too many ledger entries" }
+  }
+
+  companion object {
+    /** The most controller commands a task's retry ledger keeps. */
+    const val MAX_COMMANDS: Int = 32
+  }
+}
+
+/**
+ * One controller command in a task's retry ledger, so an exact retry returns its outcome.
+ *
+ * @property key the caller's idempotency key; never logged
+ * @property digest the SHA-256 of the canonical command, as 64 lowercase hex digits
+ * @property epoch the revision epoch the outcome was published at
+ * @property sequence the revision sequence the outcome was published at
+ * @property selectionGeneration the selection generation after the command
+ * @property sharing the sharing intent after a sharing command; `null` for other commands
+ * @property recordedAtMs when the command ran, in epoch milliseconds
+ */
+@Serializable
+data class TaskCommandRecord(
+  val key: String,
+  val digest: String,
+  val epoch: String,
+  val sequence: Long,
+  val selectionGeneration: Long,
+  val sharing: Boolean? = null,
+  val recordedAtMs: Long,
+) {
+  init {
+    require(key.length in 1..128) { "Invalid idempotency key" }
+    require(digest.length == 64 && digest.all { it in '0'..'9' || it in 'a'..'f' }) {
+      "Invalid command digest"
+    }
+    require(sequence >= 0 && selectionGeneration >= 0) { "Invalid revision" }
+  }
+}
+
+/**
+ * Whether this record is a task that waits for a file selection: it asked to
+ * ([DownloadRequest.awaitFileSelection]), chose no files or variant, and stopped once its source
+ * listed several, whatever its [com.linroid.ketch.api.FileSelectionMode],
+ * before it reserved an output path or saved any progress. A user pause while the file list is
+ * still being looked up leaves no source type, so it stays a plain pause.
+ */
+internal fun TaskRecord.awaitsFileSelection(): Boolean = state == TaskState.PAUSED &&
+  request.awaitFileSelection && request.selectedFileIds.isEmpty() && sourceType != null &&
+  outputPath == null && segments == null
 
 /** Progress saved in this record, as a paused task reports it. */
 internal fun TaskRecord.savedProgress(): DownloadProgress =

@@ -2,16 +2,39 @@
 <resources>
   <string name="discover_title">ディスカバー</string>
   <string name="discover_settings">ディスカバーの設定</string>
-  <string name="discover_hero_title">欲しいファイルを伝えるだけ。Ketchが探します。</string>
-  <string name="discover_intro_body">ディスカバーは%1$sを使ってWebを検索し、見つかったページを読んで信頼できると判断したファイルを表示します。追加するまでダウンロードは始まりません。</string>
-  <string name="discover_example_blender">Appleシリコン版Blender</string>
-  <string name="discover_example_ubuntu">Ubuntu 24.04 サーバー版ISO</string>
+  <string name="discover_hero_title">何をダウンロードしますか？</string>
+  <string name="discover_intro_body">ディスカバーがWebを検索し、見つかったダウンロードを表示します。追加するまでダウンロードは始まりません。</string>
+  <string name="discover_example_bootable_usb">起動用USBメモリを作るツール</string>
+  <string name="discover_example_photo_editor">無料のオープンソース写真編集ソフト</string>
+  <string name="discover_example_video_editor">初心者向けの無料動画編集ソフト</string>
+  <string name="discover_example_screen_recorder">チュートリアル作成用の画面録画ソフト</string>
+  <string name="discover_example_podcast">ポッドキャスト収録用のソフト</string>
+  <string name="discover_example_password_manager">オープンソースのパスワードマネージャー</string>
+  <string name="discover_example_office">オフラインで使える無料のオフィスソフト</string>
+  <string name="discover_example_planetarium">星空観察用のプラネタリウムソフト</string>
+  <string name="discover_example_games">オフラインで遊べるオープンソースのゲーム</string>
+  <string name="discover_example_old_laptop">古いノートPC向けの軽量Linux</string>
+  <string name="discover_example_raspberry_pi">Raspberry Pi用のOS</string>
+  <string name="discover_example_local_ai">ノートPCで動くローカルAIモデル</string>
   <string name="discover_example_footage">パブリックドメインの4K自然映像</string>
+  <string name="discover_example_music">動画に使えるロイヤリティフリー音楽</string>
+  <string name="discover_example_audiobooks">名作小説の無料オーディオブック</string>
+  <string name="discover_example_films">パブリックドメインの名作映画</string>
+  <string name="discover_example_fonts">商用利用できる無料フォント</string>
+  <string name="discover_example_sound_effects">クリエイティブ・コモンズの効果音</string>
+  <string name="discover_example_textures">3Dモデル用の無料テクスチャ</string>
+  <string name="discover_example_paintings">名画の4K壁紙</string>
+  <string name="discover_example_mars">NASAの火星写真（フル解像度）</string>
+  <string name="discover_example_lectures">無料のコンピューターサイエンス講義</string>
+  <string name="discover_example_wikipedia">オフラインで読めるWikipedia</string>
+  <string name="discover_example_hdr_test">テレビ確認用の4K HDRテスト動画</string>
+  <string name="discover_example_speed_test">ダウンロード速度テスト用の大きなファイル</string>
+  <string name="discover_example_datasets">SQL練習用の公開データセット</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、ページを調べて信頼できるファイルを探します。検索内容は選択したプロバイダに送信されます。</string>
+  <string name="discover_setup_body">ディスカバーはAIモデルでWebを検索し、見つかったダウンロードを表示します。検索内容は選択したプロバイダに送信されます。</string>
   <string name="discover_setup_unsupported">ディスカバーは、コンピュータまたはAndroidスマートフォンのKetchアプリで利用できます。</string>
-  <string name="discover_setup_pending">「%1$s」の検索は、ディスカバーの設定が完了するとすぐに実行されます。</string>
+  <string name="discover_setup_pending">「%1$s」はディスカバーの設定後に実行されます。</string>
   <string name="discover_setup_choose_model">モデルを選択</string>
   <string name="discover_setup_local_provider">%1$s · ローカルで実行、キー不要</string>
   <string name="discover_setup_finish">%1$sの設定を完了</string>
@@ -24,6 +47,8 @@
   <string name="discover_send">送信</string>
   <string name="discover_stop">停止</string>
   <string name="discover_sites_limit">Webサイトを限定</string>
+  <string name="discover_model_menu_title">モデル</string>
+  <string name="discover_model_manage">プロバイダを管理</string>
   <plurals name="discover_sites_count">
     <item quantity="other">%1$d件のWebサイト</item>
   </plurals>
@@ -75,9 +100,9 @@
   <string name="discover_error_title">ディスカバーはこの検索を完了できませんでした</string>
   <string name="discover_failed">検索に失敗しました</string>
   <string name="discover_none_title">ダウンロードできるファイルが見つかりません</string>
-  <string name="discover_none_body">ディスカバーは信頼できるソースのファイルのみを表示します。バージョンやプラットフォーム、配布しているWebサイトを指定してみてください。</string>
+  <string name="discover_none_body">バージョン、プラットフォーム、Webサイトを追加してみてください。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">安全でないと思われる%1$d件の結果をコンテンツフィルタが非表示にしました。フィルタはディスカバーの設定でオフにできます。</item>
+    <item quantity="other">コンテンツフィルタで%1$d件の結果を非表示にしました。ディスカバーの設定でオフにできます。</item>
   </plurals>
   <string name="discover_search_everywhere">Web全体を検索</string>
   <string name="discover_stopped">停止しました</string>
@@ -124,7 +149,7 @@
   <string name="discover_history_clear">履歴を消去</string>
   <string name="discover_turn_off">ディスカバーをオフにする</string>
   <string name="discover_turned_off">ディスカバーをオフにしました</string>
-  <string name="discover_turned_off_detail">「設定」の「ディスカバー」でもう一度オンにできます。</string>
+  <string name="discover_turned_off_detail">「設定 › ディスカバー」でもう一度オンにできます。</string>
   <string name="discover_history_filter">履歴を検索</string>
   <string name="discover_history_empty">実行した検索がここに表示されます。</string>
   <string name="discover_history_no_match">「%1$s」に一致する検索はありません</string>

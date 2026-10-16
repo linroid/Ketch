@@ -35,6 +35,8 @@
   <string name="tray_recent">Recent</string>
   <string name="tray_show_ketch">Show Ketch</string>
   <string name="tray_speed">Speed</string>
+  <!-- Under the tray menu's status sentence while downloading. %1$s is the speed: "↓ 4.2 MB/s". -->
+  <string name="tray_speed_now">↓ %1$s</string>
   <!-- First item of a device's submenu: shows the window on that device. -->
   <string name="tray_show">Show</string>
   <!-- Asks for a new access token for a device that rejected its token. -->
@@ -81,7 +83,7 @@
   </plurals>
   <!--
     The main window's title and the tray icon's tooltip. %1$s is what the downloads are doing,
-    such as "3 downloading · 45%" or "All quiet".
+    such as "3 downloading · 45%" or "Idle".
   -->
   <string name="app_title_status">Ketch — %1$s</string>
 
@@ -99,7 +101,7 @@
   <string name="message_update_installed">Updated to Ketch %1$s</string>
   <!-- Toast after a restart that should have installed version %1$s did not. -->
   <string name="message_update_failed">Couldn't update to Ketch %1$s</string>
-  <string name="message_update_failed_hint">update.log in the log folder says what went wrong.</string>
+  <string name="message_update_failed_hint">See update.log in the log folder.</string>
   <string name="message_update">Update</string>
   <!-- Button: quits Ketch, installs the update and opens Ketch again. -->
   <string name="message_restart">Restart</string>
@@ -129,6 +131,17 @@
   </plurals>
   <!-- A failure the window could not handle; its error message follows. -->
   <string name="message_window_error">Something went wrong</string>
+  <!--
+    Banners while a `ketch` command, not the app, runs this computer's downloads. %1$s is the
+    command, such as "ketch server", %2$d its process ID.
+  -->
+  <string name="message_downloads_run_by">%1$s (process %2$d) is running this computer's downloads</string>
+  <string name="message_downloads_run_elsewhere">Another Ketch process is running this computer's downloads</string>
+  <!-- The second part of either banner above. -->
+  <string name="message_downloads_run_hint">Stop it, then quit and reopen Ketch to run them here</string>
+  <!-- The command that ran the downloads exited. %1$s is the command, such as "ketch server". -->
+  <string name="message_command_stopped">%1$s stopped</string>
+  <string name="message_command_stopped_hint">Quit and reopen Ketch to run this computer's downloads here</string>
   <!-- Title of the dialog that picks .torrent files to add. -->
   <string name="open_torrent_title">Open torrent file</string>
 
@@ -201,4 +214,7 @@
 
   <!-- Title of the Settings window. -->
   <string name="settings_window_title">Settings</string>
+
+  <!-- Why Ketch keeps the system from sleeping, as the system lists it among what prevents sleep. -->
+  <string name="keep_awake_reason">Downloads are running</string>
 </resources>

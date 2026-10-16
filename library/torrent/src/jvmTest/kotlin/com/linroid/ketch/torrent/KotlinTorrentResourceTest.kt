@@ -1,5 +1,12 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.TorrentSessionState
+import com.linroid.ketch.torrent.engine.TorrentTaskSpec
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.sun.management.UnixOperatingSystemMXBean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -27,7 +34,7 @@ class KotlinTorrentResourceTest {
         val metadata = TorrentMetadata.fromBencode(data)
         val seedFile = root.resolve("seed").apply { writeBytes(bytes) }
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val counts = mutableListOf<Long>()
         try {
           seeder.start()
@@ -42,7 +49,7 @@ class KotlinTorrentResourceTest {
             try {
               val output = root.resolve("result-$index")
               source.download(sourceContext(magnet, source.resolveMetainfo(data),
-                output.absolutePath, "resource-$index"))
+                output.absolutePath, "resource-$index"), null)
               assertTrue(output.readBytes().contentEquals(bytes))
             } finally { source.close() }
             delay(50) // Allow canceled selector/accept jobs to finish closing their descriptors.

@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.core.engine.canHandle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

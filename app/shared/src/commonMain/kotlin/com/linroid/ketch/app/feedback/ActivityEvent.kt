@@ -18,6 +18,15 @@ sealed interface ActivityEvent {
     val request: DownloadRequest,
   ) : ActivityEvent
 
+  /**
+   * A torrent's file list arrived and it waits, paused, for the user to choose which files to
+   * download.
+   */
+  data class FilesNeeded(
+    val taskKey: TaskKey,
+    val request: DownloadRequest,
+  ) : ActivityEvent
+
   /** A task finished; [state] holds its output path, size and download time. */
   data class Completed(
     val taskKey: TaskKey,
@@ -60,10 +69,16 @@ sealed interface ActivityEvent {
   data class DeviceOnline(val deviceId: String) : ActivityEvent
 }
 
-/** A button on a system notification. Notifiers leave out the ones their platform lacks. */
+/**
+ * A button on a system notification. Notifiers leave out the ones their platform lacks.
+ *
+ * Clicking the notification itself shows its task in Ketch, except for a finished download on
+ * this device, whose file it opens ([NotificationLink.filePathOf]); [Show] then still leads to
+ * the task.
+ */
 enum class NotificationAction {
-  /** Open the downloaded file. */
-  Open,
+  /** Show the task in Ketch. */
+  Show,
 
   /** Show the downloaded file in the file manager. */
   Reveal,

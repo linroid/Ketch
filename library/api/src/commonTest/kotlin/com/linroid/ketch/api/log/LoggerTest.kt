@@ -2,11 +2,15 @@ package com.linroid.ketch.api.log
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class LoggerTest {
-  private class RecordingLogger : Logger {
+  private class RecordingLogger(private val minLevel: LogLevel = LogLevel.VERBOSE) : Logger {
     val records = mutableListOf<String>()
+
+    override fun isLoggable(level: LogLevel): Boolean = level >= minLevel
 
     override fun v(message: String) {
       records += "V $message"
@@ -56,5 +60,41 @@ class LoggerTest {
   fun combine_oneActiveLogger_returnsItUnwrapped() {
     val file = RecordingLogger()
     assertSame(file, Logger.combine(Logger.None, file))
+  }
+
+  @Test
+  fun combine_isLoggable_whenAnyLoggerIs() {
+    val logger = Logger.combine(RecordingLogger(LogLevel.WARN), RecordingLogger(LogLevel.INFO))
+    assertFalse(logger.isLoggable(LogLevel.DEBUG))
+    assertTrue(logger.isLoggable(LogLevel.INFO))
+  }
+
+  @Test
+  fun none_isNeverLoggable() {
+    assertFalse(Logger.None.isLoggable(LogLevel.ERROR))
+  }
+
+  @Test
+  fun console_isLoggable_fromItsMinimumLevel() {
+    val logger = Logger.console(LogLevel.INFO)
+    assertFalse(logger.isLoggable(LogLevel.DEBUG))
+    assertTrue(logger.isLoggable(LogLevel.INFO))
+  }
+
+  @Test
+  fun ketchLogger_belowTheLevel_neverBuildsTheMessage() {
+    val recording = RecordingLogger(LogLevel.INFO)
+    KetchLogger.setLogger(recording)
+    try {
+      val log = KetchLogger("Test")
+      var built = 0
+      log.v { built++; "verbose" }
+      log.d { built++; "debug" }
+      log.i { built++; "info" }
+      assertEquals(1, built)
+      assertEquals(listOf("I [Test] info"), recording.records)
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
   }
 }

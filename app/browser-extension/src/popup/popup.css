@@ -59,6 +59,11 @@ body {
   padding: 10px 12px 0;
 }
 
+.add > button {
+  flex: none;
+  white-space: nowrap;
+}
+
 .add-message {
   margin: 6px 12px 0;
 }
@@ -82,6 +87,14 @@ body {
   display: flex;
   flex: 1;
   flex-direction: column;
+}
+
+#page-resources {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  text-align: start;
 }
 
 .recent h2 {

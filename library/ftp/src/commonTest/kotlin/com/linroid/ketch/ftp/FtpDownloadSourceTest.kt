@@ -1,12 +1,18 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.TransferStalledException
+import com.linroid.ketch.core.engine.canHandle
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
@@ -14,6 +20,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -90,11 +97,53 @@ class FtpDownloadSourceTest {
       config = DownloadConfig(maxConnectionsPerDownload = 3, bufferSize = 4096),
     )
 
-    source(server).download(context)
+    source(server).download(context, null)
 
     assertEquals(listOf(0L, 334L, 667L), server.retrieveOffsets.sorted())
     assertContentEquals(server.content, file.bytes)
     assertTrue(server.bufferSizes.all { it == 4096 })
+  }
+
+  @Test
+  fun download_eachSegment_reportsOneFtpConnection() = runTest {
+    val server = FakeFtpServer(content(1000))
+    val connections = RecordingConnections()
+    val context = context(MemoryFileAccessor(), connections = 3, reporter = connections)
+
+    source(server).download(context, null)
+
+    assertEquals(3, connections.opened.size)
+    for (connection in connections.opened) {
+      assertEquals("ftp", connection.spec.source)
+      assertEquals("FTP", connection.spec.protocol)
+      assertEquals("ftp.example.com", connection.spec.host)
+      assertEquals(21, connection.spec.port)
+      assertEquals(false, connection.spec.secure)
+      assertEquals(ConnectionRoute.DIRECT, connection.spec.route)
+      assertTrue(connection.closed)
+    }
+    val received = connections.opened.map { it.received }.sortedDescending()
+    assertEquals(listOf(334L, 333L, 333L), received)
+  }
+
+  @Test
+  fun download_overFtps_reportsSecureConnections() = runTest {
+    val server = FakeFtpServer(content(1000))
+    val connections = RecordingConnections()
+    val context = context(
+      MemoryFileAccessor(),
+      connections = 2,
+      reporter = connections,
+      url = FTPS_URL,
+    )
+
+    source(server).download(context, null)
+
+    assertEquals(2, connections.opened.size)
+    for (connection in connections.opened) {
+      assertEquals("FTPS", connection.spec.protocol)
+      assertEquals(true, connection.spec.secure)
+    }
   }
 
   @Test
@@ -126,7 +175,7 @@ class FtpDownloadSourceTest {
     val server = FakeFtpServer(content(1000), supportsRest = false)
     val file = MemoryFileAccessor()
 
-    source(server).download(context(file, connections = 4))
+    source(server).download(context(file, connections = 4), null)
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -140,12 +189,30 @@ class FtpDownloadSourceTest {
     val context = context(file, connections = 1)
     val source = source(server)
 
-    assertFailsWith<KetchError.Network> { source.download(context) }
+    assertFailsWith<KetchError.Network> { source.download(context, null) }
     assertEquals(300L, context.segments.value.sumOf { it.downloadedBytes })
     // The engine retries a retryable failure by calling download again with the same context.
-    source.download(context)
+    source.download(context, null)
 
     assertEquals(listOf(0L, 300L), server.retrieveOffsets)
+    assertContentEquals(server.content, file.bytes)
+  }
+
+  @Test
+  fun download_stalledTransfer_failsAsNetworkErrorAndRetryKeepsProgress() = runTest {
+    val server = FakeFtpServer(content(1000))
+    server.stallNextTransferAfter = 400
+    val file = MemoryFileAccessor()
+    val context = context(file, connections = 1, config = DownloadConfig(idleTimeoutMs = 10_000))
+    val source = source(server)
+
+    val error = assertFailsWith<KetchError.Network> { source.download(context, null) }
+    assertIs<TransferStalledException>(error.cause)
+    assertTrue(currentTime >= 10_000)
+    assertEquals(400L, context.segments.value.sumOf { it.downloadedBytes })
+    source.download(context, null)
+
+    assertEquals(listOf(0L, 400L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
   }
 
@@ -160,7 +227,7 @@ class FtpDownloadSourceTest {
       Segment(index = 1, start = 500, end = 999, downloadedBytes = 100),
     )
 
-    source(server).resume(context, FtpDownloadSource.buildResumeState(1000, null))
+    source(server).download(context, FtpSourceState(1000, null))
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -179,7 +246,7 @@ class FtpDownloadSourceTest {
       }
     }
 
-    source(server).download(context(accessor, maxConnections = connections))
+    source(server).download(context(accessor, maxConnections = connections), null)
 
     assertEquals(listOf(0L, 250L, 500L, 750L), server.retrieveOffsets.sorted())
     assertContentEquals(server.content, file.bytes)
@@ -193,7 +260,7 @@ class FtpDownloadSourceTest {
     file.preallocate(1000)
     val context = context(file, connections = 1)
 
-    source(server).resume(context, FtpDownloadSource.buildResumeState(1000, null))
+    source(server).download(context, FtpSourceState(1000, null))
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -212,7 +279,7 @@ class FtpDownloadSourceTest {
       }
     })
 
-    source(server).download(context)
+    source(server).download(context, null)
 
     assertEquals(listOf(0L), server.retrieveOffsets)
     assertContentEquals(server.content, file.bytes)
@@ -230,10 +297,12 @@ class FtpDownloadSourceTest {
     config: DownloadConfig = DownloadConfig.Default,
     maxConnections: MutableStateFlow<Int> = MutableStateFlow(connections),
     throttle: suspend (Int) -> Unit = {},
+    reporter: ConnectionReporter = ConnectionReporter.None,
+    url: String = URL,
   ) = DownloadContext(
     taskId = "ftp",
-    url = URL,
-    request = DownloadRequest(URL, connections = connections),
+    url = url,
+    request = DownloadRequest(url, connections = connections),
     fileAccessor = file,
     segments = MutableStateFlow(emptyList()),
     onProgress = { _, _ -> },
@@ -241,9 +310,11 @@ class FtpDownloadSourceTest {
     headers = emptyMap(),
     maxConnections = maxConnections,
     config = config,
+    connections = reporter,
   )
 
   private companion object {
     const val URL = "ftp://user:secret@ftp.example.com/pub/file.bin"
+    const val FTPS_URL = "ftps://user:secret@ftp.example.com/pub/file.bin"
   }
 }

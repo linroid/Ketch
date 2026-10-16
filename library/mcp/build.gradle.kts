@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
   api(projects.library.api)
+  implementation(projects.library.torrentApi)
 
   implementation(libs.koog.mcp.server)
   implementation(libs.kotlinx.coroutines.core)

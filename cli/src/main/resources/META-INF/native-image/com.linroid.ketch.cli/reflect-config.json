@@ -10,6 +10,25 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "com.linroid.ketch.endpoints.model.HealthResponse",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.HealthResponse$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.HealthStatus",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.HealthStatus$Companion",
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.linroid.ketch.endpoints.model.TaskSnapshot",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
@@ -240,6 +259,176 @@
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.FileSelectionRequest",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.model.FileSelectionRequest$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCapabilities",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCapabilities$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentSnapshot",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentSnapshot$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCounters",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCounters$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentRevision",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentRevision$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCommandContext",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCommandContext$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCommandResult",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCommandResult$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentFilePage",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentFilePage$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentFileEntry",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentFileEntry$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentActivity",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentActivity$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ActiveConnections",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ActiveConnections$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ActiveConnection",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ActiveConnection$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.PeerDetails",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.PeerDetails$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ConnectionDirection",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ConnectionDirection$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ConnectionRoute",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.api.ConnectionRoute$Companion",
+    "allDeclaredMethods": true
   },
   {
     "name": "kotlin.internal.jdk8.JDK8PlatformImplementations",

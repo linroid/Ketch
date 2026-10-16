@@ -1,22 +1,47 @@
 package com.linroid.ketch.config
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
-/** Accent palettes the apps can be themed with. */
-@Serializable
-enum class AccentColor {
-  @SerialName("signal")
-  Signal,
+/**
+ * Accent palettes the apps can be themed with, each named after its color.
+ *
+ * Saved as [id]. The names older versions saved ([previousId]) still load, and an id this version
+ * does not know loads as [Indigo] rather than failing the whole config file.
+ *
+ * @property id value stored in `config.toml`.
+ * @property previousId the name older versions saved this palette under, if it had another.
+ */
+@Serializable(with = AccentColorSerializer::class)
+enum class AccentColor(val id: String, internal val previousId: String? = null) {
+  Indigo(id = "indigo", previousId = "signal"),
+  Purple(id = "purple"),
+  Pink(id = "pink"),
+  Orange(id = "orange", previousId = "beacon"),
+  Green(id = "green", previousId = "fathom"),
+  Teal(id = "teal", previousId = "harbor"),
+  Blue(id = "blue"),
+}
 
-  @SerialName("harbor")
-  Harbor,
+internal object AccentColorSerializer : KSerializer<AccentColor> {
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("com.linroid.ketch.config.AccentColor", PrimitiveKind.STRING)
 
-  @SerialName("fathom")
-  Fathom,
+  override fun serialize(encoder: Encoder, value: AccentColor) {
+    encoder.encodeString(value.id)
+  }
 
-  @SerialName("beacon")
-  Beacon,
+  override fun deserialize(decoder: Decoder): AccentColor {
+    val id = decoder.decodeString()
+    return AccentColor.entries.firstOrNull { it.id == id || it.previousId == id }
+      ?: AccentColor.Indigo
+  }
 }
 
 /** Whether the apps use a light or dark palette. */
@@ -46,7 +71,7 @@ enum class ThemeMode {
  */
 @Serializable
 data class AppearanceConfig(
-  val accent: AccentColor = AccentColor.Signal,
+  val accent: AccentColor = AccentColor.Indigo,
   val theme: ThemeMode = ThemeMode.System,
   val language: String? = null,
 )

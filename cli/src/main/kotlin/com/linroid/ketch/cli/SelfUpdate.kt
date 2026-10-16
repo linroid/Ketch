@@ -81,6 +81,12 @@ internal fun runUpdate(args: List<String>, logger: Logger): Int {
   )
   val installation = CliInstallation.current()
   if (!parsed.checkOnly) {
+    if (!System.getenv(DOCKER_ENV).isNullOrBlank()) {
+      return fail(
+        "This ketch is part of the Ketch Docker image, which updates as a whole: pull the new\n" +
+          "image and recreate the container, e.g. `docker compose pull && docker compose up -d`.",
+      )
+    }
     if (installation == null) {
       return fail(
         "`ketch update` replaces the native ketch binary, and this one runs on a JVM.\n" +
@@ -190,3 +196,6 @@ internal fun printUpdateUsage() {
 }
 
 private const val INSTALL_SCRIPT = "https://raw.githubusercontent.com/linroid/Ketch/main/install.sh"
+
+/** Set by the Docker image, whose binary `ketch update` must leave to the image. */
+internal const val DOCKER_ENV = "KETCH_DOCKER"

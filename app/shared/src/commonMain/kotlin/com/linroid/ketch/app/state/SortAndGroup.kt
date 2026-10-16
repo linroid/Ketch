@@ -208,9 +208,9 @@ fun arrangeRows(
 /**
  * Keeps the Downloads list from shuffling under the pointer: rows are re-sorted at most every
  * [interval], and not at all while [arrange] is told the list is frozen (the pointer is over
- * it, a row has focus or a menu is open). Between re-sorts, rows keep their group and place,
- * rows that left disappear and new rows are placed where a full sort would put them among the
- * others.
+ * it, a row has focus or a menu is open). Between re-sorts, rows keep their place, rows that
+ * left disappear, and new rows and rows whose group changed (a download that finished) are placed
+ * where a full sort would put them among the others.
  *
  * Not thread-safe: call it from one coroutine.
  *
@@ -276,10 +276,15 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
     now: Instant,
     timeZone: TimeZone,
   ): List<Pair<Slot, List<TaskKey>>>? {
-    val present = rows.mapTo(HashSet()) { it.key }
+    val rowsByKey = rows.associateBy { it.key }
     val groups = LinkedHashMap<Slot, MutableList<TaskKey>>()
     for ((slot, keys) in layout) {
-      val kept = keys.filterTo(ArrayList()) { it in present }
+      // A row whose group changed, such as a download that finished, moves at once: holding it
+      // would show it under a group it no longer belongs to.
+      val kept = keys.filterTo(ArrayList()) { key ->
+        val row = rowsByKey[key]
+        row != null && slotOf(row, arrangement.group, now, timeZone) == slot
+      }
       if (kept.isNotEmpty()) groups[slot] = kept
     }
     if (groups.isEmpty()) return null
@@ -287,7 +292,6 @@ class StableArrangement(private val interval: Duration = RESORT_INTERVAL) {
     val fresh = rows.filter { it.key !in placed }
     if (fresh.isNotEmpty()) {
       val order = rowOrder(arrangement)
-      val rowsByKey = rows.associateBy { it.key }
       for (row in fresh.sortedWith(order)) {
         val keys = groups.getOrPut(slotOf(row, arrangement.group, now, timeZone)) { ArrayList() }
         val index = keys.indexOfFirst { order.compare(rowsByKey.getValue(it), row) > 0 }
@@ -355,7 +359,8 @@ private fun slotOf(row: TaskRow, group: GroupBy, now: Instant, timeZone: TimeZon
   when (group) {
     GroupBy.Smart -> when (row.state) {
       is DownloadState.Downloading -> DOWNLOADING
-      is DownloadState.Queued, is DownloadState.Scheduled -> WAITING
+      is DownloadState.Queued -> if (row.isStarting) DOWNLOADING else WAITING
+      is DownloadState.Scheduled -> WAITING
       is DownloadState.Paused -> if (row.state.waitsInQueue) WAITING else PAUSED
       is DownloadState.Failed, is DownloadState.Canceled -> ATTENTION
       // A finish time the task does not report is never guessed: those rows keep the day added.
@@ -364,7 +369,7 @@ private fun slotOf(row: TaskRow, group: GroupBy, now: Instant, timeZone: TimeZon
         ?: daySlot("smart", row.createdAt, now, timeZone)
     }
     GroupBy.Status -> {
-      val filter = StatusFilter.entries.first { it != StatusFilter.All && it.matches(row.state) }
+      val filter = StatusFilter.entries.first { it != StatusFilter.All && it.matches(row) }
       val kind = when (filter) {
         StatusFilter.Downloading -> SlotKind.Downloading
         StatusFilter.Waiting -> SlotKind.Waiting
@@ -494,7 +499,7 @@ private fun rowOrder(arrangement: ListArrangement): Comparator<TaskRow> {
     SortKey.TimeLeft -> valueOrder(descending) { it.timeLeft }
     SortKey.Added -> valueOrder(descending) { it.createdAt }
     SortKey.Finished -> valueOrder(descending) { it.finishedAt }
-    SortKey.Status -> valueOrder(descending) { smartRank(it.state) }
+    SortKey.Status -> valueOrder(descending) { smartRank(it) }
     SortKey.Connections -> valueOrder(descending) { it.connections }
     SortKey.Source -> textOrder(descending) { it.sourceHost }
     SortKey.Origin -> textOrder(descending) { it.origin?.id }
@@ -504,10 +509,11 @@ private fun rowOrder(arrangement: ListArrangement): Comparator<TaskRow> {
   return order.then(TIEBREAK)
 }
 
-/** Rank of a state in Smart order. */
-private fun smartRank(state: DownloadState): Int = when (state) {
+/** Rank of [row]'s state in Smart order; a starting task ranks with the downloading ones. */
+private fun smartRank(row: TaskRow): Int = when (val state = row.state) {
   is DownloadState.Downloading -> 0
-  is DownloadState.Queued, is DownloadState.Scheduled -> 1
+  is DownloadState.Queued -> if (row.isStarting) 0 else 1
+  is DownloadState.Scheduled -> 1
   is DownloadState.Paused -> if (state.waitsInQueue) 1 else 2
   is DownloadState.Failed, is DownloadState.Canceled -> 3
   is DownloadState.Completed -> 4
@@ -557,11 +563,11 @@ private val DOWNLOADING_ORDER: Comparator<TaskRow> =
   compareByDescending<TaskRow> { it.request.priority }.then(valueOrder(true) { it.progress })
 
 private val SMART_ORDER: Comparator<TaskRow> = Comparator { a, b ->
-  val rank = smartRank(a.state).compareTo(smartRank(b.state))
+  val rank = smartRank(a)
   when {
-    rank != 0 -> rank
-    a.state is DownloadState.Downloading -> DOWNLOADING_ORDER.compare(a, b)
-    smartRank(a.state) == 1 -> WAITING_ORDER.compare(a, b)
+    rank != smartRank(b) -> rank.compareTo(smartRank(b))
+    rank == 0 -> DOWNLOADING_ORDER.compare(a, b)
+    rank == 1 -> WAITING_ORDER.compare(a, b)
     a.state is DownloadState.Completed -> RECENTLY_DONE_FIRST.compare(a, b)
     else -> NEWEST_FIRST.compare(a, b)
   }

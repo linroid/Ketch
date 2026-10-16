@@ -1,5 +1,10 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.engine.TorrentEngine
+import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
+import com.linroid.ketch.torrent.engine.TorrentSession
+import com.linroid.ketch.torrent.engine.TorrentSessionState
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -19,12 +24,19 @@ internal class FakeTorrentEngine : TorrentEngine {
 
   var fetchMetadataResult: TorrentMetadata? = null
   var fetchMetadataError: Exception? = null
+
+  /** Results of the next lookups, in order, before [fetchMetadataResult] applies. */
+  val fetchMetadataResults = ArrayDeque<TorrentMetadata?>()
+  var fetchMetadataCalls = 0
+    private set
   var addTorrentResult: FakeTorrentSession? = null
   var addTorrentError: Exception? = null
   var removedTorrents = mutableListOf<Pair<String, Boolean>>()
   var downloadRateLimit = 0L
     private set
   var uploadRateLimit = 0L
+    private set
+  var uploadPolicy: TorrentUploadPolicy? = null
     private set
 
   override suspend fun start() {
@@ -40,7 +52,9 @@ internal class FakeTorrentEngine : TorrentEngine {
   override suspend fun fetchMetadata(
     magnetUri: String,
   ): TorrentMetadata? {
+    fetchMetadataCalls++
     fetchMetadataError?.let { throw it }
+    if (fetchMetadataResults.isNotEmpty()) return fetchMetadataResults.removeFirst()
     return fetchMetadataResult
   }
 
@@ -71,6 +85,10 @@ internal class FakeTorrentEngine : TorrentEngine {
   override fun setUploadRateLimit(bytesPerSecond: Long) {
     uploadRateLimit = bytesPerSecond
   }
+
+  override suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
+    uploadPolicy = policy
+  }
 }
 
 /**
@@ -78,7 +96,7 @@ internal class FakeTorrentEngine : TorrentEngine {
  */
 internal class FakeTorrentSession(
   override val infoHash: String,
-  override val totalBytes: Long = 0,
+  override var totalBytes: Long = 0,
 ) : TorrentSession {
 
   private val _downloadedBytes = MutableStateFlow(0L)
@@ -94,9 +112,18 @@ internal class FakeTorrentSession(
     private set
   var resumed = false
     private set
-  var filePriorities = emptyMap<Int, Int>()
-    private set
+  override var selectedFileIds: Set<String> = emptySet()
+
+  /** Every [changeSelection] call, in order. */
+  val selectionChanges = mutableListOf<Set<String>>()
+
+  /** What [changeSelection] returns: whether the change was taken live. */
+  var changeSelectionResult = true
+  var changeSelectionError: Exception? = null
+  var counters = TorrentPayloadCounters(received = 0, uploaded = 0, uploadSpeed = null)
   var sessionDownloadRateLimit = 0L
+    private set
+  var sessionUploadRateLimit = 0L
     private set
   var savedResumeData: ByteArray? = null
 
@@ -110,12 +137,21 @@ internal class FakeTorrentSession(
     _state.value = TorrentSessionState.DOWNLOADING
   }
 
-  override fun setFilePriorities(priorities: Map<Int, Int>) {
-    filePriorities = priorities
+  override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    selectionChanges += fileIds
+    changeSelectionError?.let { throw it }
+    selectedFileIds = fileIds
+    return changeSelectionResult
   }
+
+  override suspend fun payloadCounters(): TorrentPayloadCounters = counters
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) {
     sessionDownloadRateLimit = bytesPerSecond
+  }
+
+  override fun setUploadRateLimit(bytesPerSecond: Long) {
+    sessionUploadRateLimit = bytesPerSecond
   }
 
   override suspend fun saveResumeData(): ByteArray? {
@@ -130,6 +166,10 @@ internal class FakeTorrentSession(
 
   fun finish() {
     _state.value = TorrentSessionState.FINISHED
+  }
+
+  fun seed() {
+    _state.value = TorrentSessionState.SEEDING
   }
 
   fun stopUnexpectedly() {

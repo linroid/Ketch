@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -15,7 +16,6 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.file.resolveChildPath
 import com.linroid.ketch.core.task.InMemoryTaskStore
@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -460,7 +461,8 @@ class KetchQueueIntegrationTest {
     destination = Destination("/test/$name"),
   )
 
-  private class GatedSource : DownloadSource {
+  private class GatedSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override val managesOwnFileIo = true
     var maximumActive = 0
@@ -472,14 +474,23 @@ class KetchQueueIntegrationTest {
     private val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
 
     fun complete(name: String) { gates.getValue(name).complete(Unit) }
-    override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-      ResolvedSource(
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("fixture:")
+    }
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
         url = url, sourceType = type, totalBytes = 4, supportsResume = true,
         suggestedFileName = "fixture.bin", maxSegments = 1,
       )
+    }
 
-    override suspend fun download(context: DownloadContext) {
+    // Stored as each run starts, so a resumed run gets it back.
+    override suspend fun store(context: DownloadContext) = Unit
+
+    override suspend fun download(context: DownloadContext, state: Unit?) {
+      if (state != null) resumed += context.url.substringAfterLast('/')
       if (failNext) {
         failNext = false
         throw KetchError.Unsupported()
@@ -497,13 +508,5 @@ class KetchQueueIntegrationTest {
         active--
       }
     }
-
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) {
-      resumed += context.url.substringAfterLast('/')
-      download(context)
-    }
-
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long): SourceResumeState =
-      SourceResumeState(type, "{}")
   }
 }

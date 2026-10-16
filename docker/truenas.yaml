@@ -1,0 +1,26 @@
+# Ketch on TrueNAS 24.10 or later: Apps > Discover Apps > ⋮ > Install via YAML, then paste this.
+#
+# First create a dataset for Ketch's settings, such as tank/apps/ketch, and pick the dataset
+# downloads go to; replace the two /mnt paths below with yours. Ketch runs as the apps user
+# (568), which the Apps dataset preset gives access, so give that user write access to the
+# downloads dataset too, or set PUID and PGID to its owner. See docs/docker.md.
+services:
+  ketch:
+    image: ghcr.io/linroid/ketch:latest
+    restart: unless-stopped
+    environment:
+      PUID: "568"
+      PGID: "568"
+      TZ: Etc/UTC
+      # Instance name the Ketch apps show for this NAS.
+      KETCH_NAME: TrueNAS
+      # The access code apps and the web UI ask for. Left empty, the first start creates one,
+      # prints it in the app's logs and keeps it in the config dataset (api-token).
+      KETCH_API_TOKEN: ""
+    volumes:
+      - /mnt/tank/apps/ketch:/config
+      - /mnt/tank/downloads:/downloads
+    ports:
+      - "8642:8642" # web UI and REST API
+      - "16881:16881" # BitTorrent peers
+      - "16881:16881/udp" # BitTorrent DHT

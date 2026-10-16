@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
+import { inflateRawSync } from 'node:zlib';
 import { build, releaseVersion } from '../build.mjs';
 
 describe('releaseVersion', () => {
@@ -32,7 +34,31 @@ describe('build', () => {
   const outputs = build({ outDir });
 
   test('builds for Chromium, Firefox and Safari', () => {
-    assert.deepEqual(outputs.map((it) => it.browser), ['chrome', 'firefox', 'safari']);
+    assert.deepEqual(outputs.map((it) => it.browser),
+      ['chrome-store', 'chrome-unpacked', 'firefox', 'safari']);
+  });
+
+  test('the Chromium package for unpacked installs has the Chrome Web Store id', () => {
+    const { zip } = outputs.find((it) => it.browser === 'chrome-unpacked');
+    const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
+    // Chromium's id: the first 16 bytes of the key's SHA-256, each hex digit as a to p.
+    const id = [...createHash('sha256').update(Buffer.from(packaged.key, 'base64')).digest('hex')
+      .slice(0, 32)].map((digit) => String.fromCharCode(97 + parseInt(digit, 16))).join('');
+    assert.equal(id, 'flnjeochbgpaipiofdjmoijaeooemhka');
+    const { key: _key, ...rest } = packaged;
+    const store = JSON.parse(zipEntry(outputs.find((it) => it.browser === 'chrome-store').zip,
+      'manifest.json'));
+    assert.deepEqual(rest, store);
+  });
+
+  test('Chromium zip omits the development key of src', () => {
+    const source = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
+    assert.ok(source.key);
+    const { dir, zip } = outputs.find((it) => it.browser === 'chrome-store');
+    const packaged = JSON.parse(zipEntry(zip, 'manifest.json'));
+    assert.deepEqual(packaged, JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')));
+    const { key: _key, ...expected } = source;
+    assert.deepEqual(packaged, expected);
   });
 
   test('every build and zip has the messages of every language', () => {
@@ -54,6 +80,40 @@ describe('build', () => {
     }
   });
 });
+
+test('Chromium release package carries the release version and no key', () => {
+  const outDir = mkdtempSync(join(tmpdir(), 'ketch-store-build-'));
+  try {
+    const outputs = build({ outDir, release: '1.2.3-rc1', buildNumber: '57' });
+    const { zip } = outputs.find((it) => it.browser === 'chrome-store');
+    assert.equal(zip, join(outDir, 'ketch-extension-1.2.3-rc1-chrome-store.zip'));
+    const manifest = JSON.parse(zipEntry(zip, 'manifest.json'));
+    assert.equal(manifest.version, '1.2.3.57');
+    assert.equal(manifest.version_name, '1.2.3-rc1');
+    assert.ok(!Object.hasOwn(manifest, 'key'));
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+/** Reads an entry from the build's deflated ZIP, including its root-relative file name. */
+function zipEntry(path, name) {
+  const zip = readFileSync(path);
+  let offset = 0;
+  while (zip.readUInt32LE(offset) === 0x04034b50) {
+    const size = zip.readUInt32LE(offset + 18);
+    const nameLength = zip.readUInt16LE(offset + 26);
+    const extraLength = zip.readUInt16LE(offset + 28);
+    const entryName = zip.toString('utf8', offset + 30, offset + 30 + nameLength);
+    const start = offset + 30 + nameLength + extraLength;
+    if (entryName === name) {
+      assert.equal(zip.readUInt16LE(offset + 8), 8, 'entry uses deflate');
+      return inflateRawSync(zip.subarray(start, start + size)).toString('utf8');
+    }
+    offset = start + size;
+  }
+  assert.fail(`Missing ZIP entry: ${name}`);
+}
 
 test('Safari excludes capture and native-host permissions while retaining manual sending', () => {
   const outDir = mkdtempSync(join(tmpdir(), 'ketch-safari-build-'));

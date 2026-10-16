@@ -37,8 +37,8 @@ import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchSpinner
-import com.linroid.ketch.app.components.LaneStrip
 import com.linroid.ketch.app.components.LaneStripDefaults
+import com.linroid.ketch.app.components.ProgressStrip
 import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.i18n.SEPARATOR
@@ -153,10 +153,9 @@ private fun RowBody(
           overflow = TextOverflow.Ellipsis,
         )
         if (lanes) {
-          LaneStrip(
+          ProgressStrip(
             state = row.state,
-            segments = row.segments,
-            stalled = rememberStalledLanes(row),
+            stalled = row.content.status == RowStatus.Stalled,
             onCompletionShown = completion::onSheenShown,
             modifier = Modifier.fillMaxWidth().padding(top = spacing.s1),
           )
@@ -266,7 +265,7 @@ internal fun secondLineParts(row: TaskRow, touch: Boolean): List<LinePart> {
       val detail = content.detail
       // A queue reason is a sentence and may wrap; the other details are short facts.
       when {
-        state.waitsInQueue -> add(LinePart(detail, unbroken = false))
+        state.waitsInQueue && !row.isStarting -> add(LinePart(detail, unbroken = false))
         detail is UiText.Joined && detail.separator == SEPARATOR ->
           detail.parts.forEach { add(LinePart(it)) }
         else -> add(LinePart(detail))

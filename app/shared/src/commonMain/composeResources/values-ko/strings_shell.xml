@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">다운로드</string>
   <string name="shell_destination_discover">찾기</string>
+  <string name="shell_destination_connections">연결</string>
   <string name="shell_destination_devices">기기</string>
   <string name="shell_settings">설정</string>
   <string name="shell_devices">기기</string>
@@ -38,7 +39,6 @@
   <string name="shell_devices_online">%2$d대 중 %1$d대 온라인</string>
 
   <string name="sidebar_all_devices_tooltip">모든 기기의 다운로드</string>
-  <string name="sidebar_add_device">기기 추가</string>
   <string name="sidebar_device_menu">기기 메뉴</string>
   <string name="sidebar_menu_pause_all">이 기기에서 모두 일시정지</string>
   <string name="sidebar_menu_resume_all">이 기기에서 모두 재개</string>
@@ -52,7 +52,7 @@
 
   <string name="switcher_overview">개요</string>
   <string name="switcher_add_device">기기 추가…</string>
-  <string name="switcher_find_on_network">네트워크에서 찾기</string>
+  <string name="switcher_find_on_network">로컬 네트워크에서 찾기</string>
   <string name="switcher_share">%1$s 공유…</string>
 
   <string name="shell_device_button">%1$s, 기기 전환</string>
@@ -79,6 +79,7 @@
   <string name="banner_retrying">재시도 중</string>
   <string name="banner_retry_now">지금 재시도</string>
   <string name="banner_switch_to">%1$s(으)로 전환</string>
+  <string name="banner_pairing_on">페어링이 앞으로 %1$s 동안 켜짐 · 로컬 네트워크의 기기가 %2$s의 Ketch 제어를 요청할 수 있습니다</string>
   <string name="banner_unauthorized">%1$s에 새 액세스 토큰 필요</string>
   <string name="banner_enter_token">토큰 입력</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

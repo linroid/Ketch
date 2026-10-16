@@ -4,14 +4,24 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.file.PathRejectedException
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.server.api.ConnectionStreams
 import com.linroid.ketch.server.api.PayloadTooLargeException
 import com.linroid.ketch.server.api.ServerJson
+import com.linroid.ketch.server.api.connectionRoutes
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
+import com.linroid.ketch.server.api.healthRoutes
 import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
+import com.linroid.ketch.server.api.streamRoutes
+import com.linroid.ketch.server.api.toErrorResponse
+import com.linroid.ketch.server.api.torrentErrorStatus
+import com.linroid.ketch.server.api.torrentRoutes
 import com.linroid.ketch.server.mdns.MdnsRegistrar
 import com.linroid.ketch.server.mdns.defaultMdnsRegistrar
+import com.linroid.ketch.server.stream.EventHub
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -93,8 +103,49 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `PUT    /api/tasks/{id}/speed-limit` — set task speed limit
  * - `PUT    /api/tasks/{id}/priority`    — set task priority
  * - `PUT    /api/tasks/{id}/connections` — set task connections
+ * - `PUT    /api/tasks/{id}/files`       — choose the files of a task with several: `400`
+ *   `invalid_selection`, `409` `selection_unavailable` (no file list yet, or canceled), `501`
+ *   `unsupported` (not a task with files)
  *
- * ### Events (SSE)
+ * ### Torrents
+ *
+ * Served from `KetchApi.controller(TorrentController)`, and only when the instance has one: servers
+ * listing `torrent.control` do, and others answer `404` without an error code. Failures answer
+ * with the `TorrentCommandError` wire name: `400` `invalid_input`; `409` `invalid_state`,
+ * `metadata_unavailable`, `revision_conflict` (with the current `revision`),
+ * `idempotency_key_reused` and `stale_cursor`; `403` `policy_denied`; `429`
+ * `resource_exhausted`; `404` `not_found`; `500` `storage_failure`; `501` `unsupported`.
+ * - `GET /api/torrents/capabilities`   — the controller's capabilities
+ * - `GET /api/torrents/{id}`           — a torrent task's snapshot
+ * - `GET /api/torrents/{id}/files`     — a page of its files
+ *   (`?limit=1..1000&cursor=&sort=torrent|name|size|extension|selected&desc=true`)
+ * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
+ * - `PUT /api/torrents/{id}/seeding`   — start or stop seeding it, guarded by a revision
+ * - `GET /api/torrents/{id}/events`    — SSE: `snapshot` events, then `removed` or `error`;
+ *   deprecated, the event stream carries them
+ *
+ * ### Live connections
+ *
+ * Served from `Interest.Connections`; servers listing `net.activeConnections` report
+ * them. Both take `?limit=1..1024` (default 256; `400` `invalid_limit` otherwise), and an engine
+ * that does not report connections answers `501` `unsupported`. They carry hosts and peer
+ * addresses, which `/api/events` never does.
+ * - `GET /api/connections`        — a snapshot of the live connections
+ * - `GET /api/connections/events` — SSE: a `snapshot` event right away, then one when the
+ *   connections change and every 15 seconds while they do not; an `error` event ends it. At
+ *   most 16 streams run at once; more are `429` `too_many_streams`. Deprecated, the event
+ *   stream carries them
+ *
+ * ### Event stream (SSE)
+ *
+ * One stream per client carries the task lifecycle and whatever the `Interest`s of its
+ * subscription ask for, at the intervals they ask; `/api/status` lists `events.stream`. At most
+ * 32 run at once; more are `429` `too_many_streams`. Idle streams send a comment every 15 s.
+ * - `GET /api/stream`                   — SSE: `hello`, `subscribed`, `tasks`, then changes
+ * - `PUT /api/stream/{id}/subscription` — replace its interests: `404` `unknown_stream`, `400`
+ *   `invalid_subscription`
+ *
+ * ### Events (SSE), deprecated: the event stream replaces them
  * - `GET /api/events`       — SSE stream of all task events
  * - `GET /api/events/{id}`  — SSE stream for a specific task
  *
@@ -103,11 +154,19 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `GET    /api/pairing/{id}` — whether the owner answered, with the token once allowed
  * - `DELETE /api/pairing/{id}` — withdraw the request
  *
+ * ### Health
+ * - `GET /api/health` — `200` once [ketch] serves its saved tasks, `503` before ([markReady])
+ *
+ * Until [markReady], every other API endpoint but pairing answers `503 Service Unavailable` with
+ * a `starting` `ErrorResponse` and `Retry-After: 1`, so no download is added while the saved
+ * tasks load.
+ *
  * ## Access token
  *
- * With an [apiToken], every API request must carry it as `Authorization: Bearer <token>`. An
- * address that sends ten wrong tokens within a minute gets `429 Too Many Requests` for any
- * token until that minute ends. Without one, anyone who can reach [host] and [port] can use the
+ * With an [apiToken], every API request but the pairing and health endpoints must carry it as
+ * `Authorization: Bearer <token>`. An address that sends ten wrong tokens within a minute gets
+ * `429 Too Many Requests` for any token until that minute ends. Without one, anyone who can
+ * reach [host] and [port] can use the
  * API, so the server binds to loopback by default and logs a warning when it listens on another
  * address without a token.
  *
@@ -121,6 +180,11 @@ import kotlin.coroutines.cancellation.CancellationException
  * files `deleteFiles` removes. Anything else gets `403 Forbidden` with a `path_rejected`
  * `ErrorResponse`. Symbolic links count as the place they point to.
  *
+ * With an [apiToken] and no [allowedDirectories], callers may choose any folder, as owners pick
+ * folders on their other devices, but not one where a new file can take over the account:
+ * [protectedDirectories] and hidden entries such as `~/.ssh` are refused the same way, unless
+ * they lie in the download directory. A new download still never replaces an existing file.
+ *
  * ## Request bodies
  *
  * JSON bodies must be `application/json` (`415` otherwise) and are read up to 1 MiB, or 32 MiB
@@ -132,7 +196,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * With an [apiToken] and a [pairingApprover], a device can ask for the token instead of having
  * someone type it: the pairing endpoints take no token, [pairingApprover] decides, and the
  * device polls until it has the answer or the request expires after two minutes. One request
- * per address, and four in all, wait at a time. Web pages are refused, since with a token
+ * per address, and four in all, wait at a time. An address whose request was denied or left
+ * unanswered must wait before asking again, longer each time, and many such requests from any
+ * addresses pause pairing for a while (`429` `pairing_paused`). While [pairingOpen] is false
+ * requests are refused with `403` `pairing_closed`. Web pages are refused, since with a token
  * [corsAllowedHosts] may let them call the API. The server advertises `pairing=1` over mDNS
  * when it takes requests.
  *
@@ -192,11 +259,20 @@ import kotlin.coroutines.cancellation.CancellationException
  * @param allowedDirectories folders, besides the download directory, that callers may save
  *   downloads to and delete files from. Without an [apiToken] callers are always kept to the
  *   download directory and these folders; with one, only when this list is not empty.
+ * @param protectedDirectories folders callers with the [apiToken] may not save to or delete
+ *   from when [allowedDirectories] is empty; [systemProtectedDirectories] by default, to which
+ *   apps add their own data and configuration folders
  * @param mdnsEnabled whether to advertise the server over mDNS
  * @param mdnsRegistrar mDNS service registrar for LAN discovery; Android callers must supply
  *   an Android implementation, since the default registrar is compiled for the JVM
  * @param pairingApprover decides pairing requests, or `null` to take none; ignored without an
  *   [apiToken]
+ * @param pairingOpen whether pairing requests are taken now; others are refused with `403`
+ *   `pairing_closed` before [pairingApprover] hears of them. The apps take them only for a few
+ *   minutes after the owner turns pairing on.
+ * @param ready whether [ketch] already serves its saved tasks, as `GET /api/health` reports.
+ *   Pass `false` to start listening before [KetchApi.start] returns, and call [markReady] then;
+ *   until then the other API endpoints answer `503`.
  */
 class KetchServer(
   private val ketch: KetchApi,
@@ -207,23 +283,31 @@ class KetchServer(
   private val corsAllowedHosts: List<String> = emptyList(),
   private val allowedHosts: List<String> = emptyList(),
   allowedDirectories: List<String> = emptyList(),
+  protectedDirectories: List<String> = systemProtectedDirectories(),
   private val mdnsEnabled: Boolean = true,
   private val mdnsRegistrar: MdnsRegistrar = defaultMdnsRegistrar(),
   pairingApprover: PairingApprover? = null,
+  pairingOpen: () -> Boolean = { true },
+  ready: Boolean = true,
 ) {
   private val log = KetchLogger("KetchServer")
+  @Volatile
+  private var ready = ready
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
   private val pairing = if (apiToken.isNullOrBlank() || pairingApprover == null) {
     null
   } else {
-    PairingSessions(pairingApprover, apiToken, scope)
+    PairingSessions(pairingApprover, apiToken, scope, isOpen = pairingOpen)
   }
   private val destinations = DestinationGuard(
     ketch,
     allowedDirectories,
-    enabled = apiToken == null || allowedDirectories.isNotEmpty(),
+    confined = apiToken == null || allowedDirectories.isNotEmpty(),
+    protectedDirectories = protectedDirectories,
   )
   private val throttle = AuthThrottle()
+  private val connectionStreams = ConnectionStreams()
+  private val events = EventHub(ketch, scope)
   private val stopped = CountDownLatch(1)
   private var engine: EmbeddedServer<CIOApplicationEngine, *> = embeddedServer(
     CIO,
@@ -251,6 +335,15 @@ class KetchServer(
     engine.start(wait = false)
     startMdnsRegistration()
     if (wait) awaitStop()
+  }
+
+  /**
+   * Tells health checks that [ketch] serves its saved tasks, so `GET /api/health` answers `200`
+   * from now on; only needed when the server was created with `ready = false`.
+   */
+  fun markReady() {
+    if (!ready) log.i { "Ready: saved tasks are restored" }
+    ready = true
   }
 
   /** Blocks the calling thread until [stop] is called. */
@@ -349,6 +442,9 @@ class KetchServer(
       }
     }
 
+    // Before authentication too: the API is closed to everyone while the tasks are restored.
+    install(startupGate { ready })
+
     if (apiToken != null) {
       // Before authentication, so an address guessing tokens is turned away unchecked.
       install(authThrottling(throttle))
@@ -376,6 +472,9 @@ class KetchServer(
             cause.message ?: "Request body must be application/json",
           ),
         )
+      }
+      exception<TorrentCommandException> { call, cause ->
+        call.respond(torrentErrorStatus(cause.error), cause.toErrorResponse())
       }
       exception<IllegalArgumentException> { call, cause ->
         call.respond(
@@ -426,12 +525,13 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, destinations)
+          apiRoutes(ketch, destinations, connectionStreams, events)
         }
       } else {
-        apiRoutes(ketch, destinations)
+        apiRoutes(ketch, destinations, connectionStreams, events)
       }
       pairing?.let { pairingRoutes(it) }
+      healthRoutes { ready }
       webResources()
     }
   }
@@ -457,9 +557,17 @@ private fun CORSConfig.allowCorsEntry(entry: String) {
   }
 }
 
-private fun Route.apiRoutes(ketch: KetchApi, destinations: DestinationGuard) {
+private fun Route.apiRoutes(
+  ketch: KetchApi,
+  destinations: DestinationGuard,
+  connectionStreams: ConnectionStreams,
+  events: EventHub,
+) {
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
+  ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it) }
+  connectionRoutes(ketch, connectionStreams)
+  streamRoutes(events)
   eventRoutes(ketch)
 }
 

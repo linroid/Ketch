@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "Загрузка добавлена"
   },
-  "notify_fallback_browser": {
-    "message": "Загрузка продолжится в браузере"
-  },
-  "notify_fallback_magnet": {
-    "message": "Magnet-ссылка откроется в другом приложении"
-  },
-  "notify_send_failed": {
-    "message": "Не удалось отправить на $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch не может это скачать"
   },
@@ -115,6 +101,9 @@
   },
   "error_app_connect_failed": {
     "message": "Приложению Ketch не удалось подключиться"
+  },
+  "error_app_pick_unsupported": {
+    "message": "Обновите приложение Ketch, чтобы выбирать папки отсюда"
   },
   "error_app_invalid_reply": {
     "message": "Приложение Ketch прислало неверный ответ"
@@ -402,14 +391,6 @@
   "popup_add_button": {
     "message": "Скачать"
   },
-  "popup_added": {
-    "message": "Добавлено: $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "Введите ссылку http, https, ftp или magnet."
   },
@@ -616,20 +597,8 @@
   "error_media_unsupported": {
     "message": "Этот экземпляр Ketch не поддерживает медиаплейлисты. Обновите его перед отправкой ссылки."
   },
-  "review_setting": {
-    "message": "Проверять загрузки перед отправкой"
-  },
-  "review_title": {
-    "message": "Проверка загрузки"
-  },
-  "review_name": {
-    "message": "Имя файла (необязательно)"
-  },
   "review_folder": {
     "message": "Папка на выбранном устройстве (необязательно)"
-  },
-  "review_detail": {
-    "message": "Оставьте папку пустой, чтобы использовать папку устройства по умолчанию. Сервер определяет разрешённые папки. Торренты сохраняют свою структуру файлов. Закрытие этой страницы возвращает приостановленную загрузку браузеру."
   },
   "review_cancel": {
     "message": "Отмена"
@@ -642,5 +611,119 @@
   },
   "safari_detail": {
     "message": "Safari отправляет проверенные ссылки и ресурсы страниц настроенному серверу Ketch. Включите общий доступ в Ketch и укажите здесь адрес и токен. Автоматический перехват загрузок и запуск приложения недоступны."
+  },
+  "dialog_title": {
+    "message": "Новая загрузка"
+  },
+  "dialog_name_label": {
+    "message": "Имя файла"
+  },
+  "dialog_send_to": {
+    "message": "Отправить на"
+  },
+  "dialog_save_in": {
+    "message": "Сохранить в"
+  },
+  "dialog_folder_default": {
+    "message": "Папка по умолчанию"
+  },
+  "dialog_folder_browse": {
+    "message": "Обзор…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Выбрать папку на этом компьютере"
+  },
+  "dialog_device_checking": {
+    "message": "Проверка…"
+  },
+  "dialog_device_ready": {
+    "message": "Готово"
+  },
+  "dialog_device_free": {
+    "message": "Свободно $SIZE$",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "Закрыто · запустится при отправке"
+  },
+  "dialog_device_offline": {
+    "message": "Недоступно"
+  },
+  "dialog_torrent_layout": {
+    "message": "Торренты сохраняют собственную структуру папок."
+  },
+  "dialog_space_warning": {
+    "message": "На $DEVICE$ свободно только $SIZE$.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "Скачать в браузере"
+  },
+  "dialog_sending": {
+    "message": "Отправка…"
+  },
+  "dialog_folder_auto": {
+    "message": "Авто"
+  },
+  "dialog_folder_auto_match": {
+    "message": "Авто · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "Устройство выберет само: папку загрузок или подходящую папку категории."
+  },
+  "dialog_folder_recent": {
+    "message": "Недавно использовалась: $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Проверять загрузки перед отправкой"
+  },
+  "notify_fallback_browser": {
+    "message": "Загрузка продолжится в браузере"
+  },
+  "notify_fallback_magnet": {
+    "message": "Magnet-ссылка откроется в другом приложении"
+  },
+  "notify_send_failed": {
+    "message": "Не удалось отправить на $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "Добавлено: $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch не принимает эту копию расширения"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch подключается только к расширению из Chrome Web Store или к пакету chrome-unpacked из релиза, загруженному через «Загрузить распакованное расширение». Установите одно из них и повторите попытку."
   }
 }

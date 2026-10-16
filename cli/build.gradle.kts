@@ -31,8 +31,17 @@ graalvmNative {
       )
       buildArgs.addAll(
         "--no-fallback",
+        // Runs the shutdown hooks on SIGINT and SIGTERM, as the JVM does: `ketch server` then
+        // pauses its downloads and stops announcing itself. Without them, PID 1 of a container,
+        // as in the Docker image, would even ignore `docker stop`'s SIGTERM.
+        "--install-exit-handlers",
         "-H:+ReportExceptionStackTraces",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
+        // kotlinx.coroutines' scheduler reads these as it initializes, which is here, at build
+        // time, so setting them in main is too late for the binary: Dispatchers.IO at 16 threads
+        // rather than 64, idle workers ended after 10 s rather than 60 (capCoroutineThreads).
+        "-Dkotlinx.coroutines.io.parallelism=16",
+        "-Dkotlinx.coroutines.scheduler.keep.alive.sec=10",
         "--initialize-at-build-time=ch.qos.logback",
         "--initialize-at-build-time=org.slf4j",
         // Logback parses logback.xml at build time and keeps SAX helper objects from it.
@@ -41,6 +50,9 @@ graalvmNative {
         // build-time WhenMappings class initializes it, along with its companion.
         "--initialize-at-build-time=okhttp3.Protocol,okhttp3.Protocol\$Companion",
         "--initialize-at-run-time=kotlin.uuid.SecureRandomHolder",
+        // Ktor 3.6 starts the nonce generator's executor in this class's initializer, and an
+        // executor cannot be kept in the image heap.
+        "--initialize-at-run-time=io.ktor.util.NonceKt",
         "-H:IncludeResources=web/.*",
         "-H:IncludeResources=logback.xml",
       )
@@ -67,7 +79,7 @@ val webSourceDir = if (prebuiltWebDir.isPresent) {
     .dir("dist/wasmJs/productionExecutable").get()
 }
 
-val bundleWebApp by tasks.registering(Sync::class) {
+val bundleWebApp = tasks.register<Sync>("bundleWebApp") {
   if (!prebuiltWebDir.isPresent) {
     dependsOn(":app:web:wasmJsBrowserDistribution")
   }
@@ -119,7 +131,7 @@ distributions.main {
   }
 }
 
-val prepareNativeLicenses by tasks.registering(Sync::class) {
+val prepareNativeLicenses = tasks.register<Sync>("prepareNativeLicenses") {
   from(releaseLicenses)
   into(layout.buildDirectory.dir("native/nativeCompile/licenses"))
 }
@@ -132,22 +144,30 @@ tasks.named("nativeCompile") {
 
 // Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the CLI does not
 // use (reflective tool sets and schemas, loading server modules by name). The stdlib looks it up
-// by name, so native-image would compile much of it in.
-configurations.runtimeClasspath {
-  exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
-}
+// by name, so native-image would compile much of it in, without the metadata it reads: Ktor's
+// StatusPages then failed every error response with "Built-in class kotlin.Any is not found"
+// while printing its handler. The native image resolves a classpath of its own.
+configurations.matching { it.name == "runtimeClasspath" || it.name == "nativeImageClasspath" }
+  .configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+  }
 
 dependencies {
   implementation(projects.config)
   implementation(projects.library.server)
+  implementation(projects.library.remote)
   implementation(projects.library.mcp)
   implementation(projects.ai.discover)
   implementation(projects.library.core)
   implementation(projects.library.sqlite)
   implementation(projects.library.ktor)
   implementation(projects.library.ftp)
+  implementation(projects.library.hls)
+  implementation(projects.library.dash)
   implementation(projects.library.torrent)
+  implementation(projects.library.torrentApi)
   implementation(projects.updater)
+  implementation(projects.hooks)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.ktor.client.cio)

@@ -1,5 +1,6 @@
 package com.linroid.ketch.server.api
 
+import com.linroid.ketch.endpoints.stream.StreamSerializers
 import io.ktor.http.ContentType
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.plugins.UnsupportedMediaTypeException
@@ -14,6 +15,7 @@ import java.io.ByteArrayOutputStream
 internal val ServerJson = Json {
   encodeDefaults = true
   ignoreUnknownKeys = true
+  serializersModule = StreamSerializers
 }
 
 /** Upper bound of a JSON request body, ample for every request but a new task's. */

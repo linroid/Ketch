@@ -6,6 +6,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.IBinder
 import androidx.compose.runtime.snapshotFlow
@@ -27,15 +28,21 @@ import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.UnreadableFile
+import com.linroid.ketch.app.feedback.PairingNotices
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
+import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.instance.isUnmeteredNow
+import com.linroid.ketch.app.instance.unmeteredNetworkChanges
+import com.linroid.ketch.app.instance.uploadsPaused
 import com.linroid.ketch.app.state.AiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.EmbeddedAiDiscoveryProviderFactory
 import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.ForegroundStatus
+import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SpeedModeController
@@ -43,15 +50,22 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.pauseActiveTasks
 import com.linroid.ketch.app.state.toKetchAccent
 import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.TorrentEncryptionMode
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.server.KetchServer
+import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentEncryption
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,13 +77,18 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -104,9 +123,14 @@ class KetchService : Service() {
   private val toasts = Channel<ActivityEvent>(EVENT_BUFFER, BufferOverflow.DROP_OLDEST)
   private val speed = MutableStateFlow(0L)
   private val discovering = MutableStateFlow(0)
+
+  // `[power] keepAwake`, as the app's settings last said, and whether the service runs in the
+  // foreground: the wake lock follows both.
+  private val keepAwake = MutableStateFlow(true)
+  private val foreground = MutableStateFlow(false)
   private lateinit var notifier: AndroidNotifier
   private val successFeedback by lazy { SuccessFeedback(AndroidFeedbackPlayer(this)) }
-  private var isForeground = false
+  private var isForeground by foreground::value
   private var isBound = false
   private var isStarted = false
   private val inFront = MutableStateFlow(false)
@@ -121,6 +145,15 @@ class KetchService : Service() {
    * `App(activityEvents = …)`, which shows it as toasts. Each event goes to one collector.
    */
   val activityEvents: Flow<ActivityEvent> = toasts.receiveAsFlow()
+
+  private val lanPeerSearch = MutableStateFlow(false)
+
+  /**
+   * Whether local peer discovery has wanted the LAN since the service started: it is on and a
+   * public torrent ran or a magnet looked for its metadata. Android 17 blocks the multicast
+   * group until the local network permission is granted, so the activity offers it then.
+   */
+  val lanPeerSearchStarted: StateFlow<Boolean> = lanPeerSearch.asStateFlow()
 
   override fun onCreate() {
     super.onCreate()
@@ -145,6 +178,7 @@ class KetchService : Service() {
     val configStore = app.configStore
     val config = configStore.load()
     notifier.accent = config.appearance.accent.toKetchAccent()
+    keepAwake.value = config.power.keepAwake
     val driverFactory = DriverFactory(this) { unreadable ->
       app.unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
     }
@@ -154,16 +188,35 @@ class KetchService : Service() {
       TorrentConfig(
         stateDirectory = filesDir.resolve("torrent-state").absolutePath,
         additionalTrackers = config.torrent.trackers,
+        trackerListUrls = config.torrent.subscribedTrackerLists,
+        uploadPolicy = config.torrent.upload.toUploadPolicy(),
+        uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
+        encryption = config.torrent.encryption.toEncryption(),
+        utpEnabled = config.torrent.utp,
+        portMapping = config.torrent.portMapping,
+        localDiscovery = config.torrent.localDiscovery,
       ),
+      // Wi-Fi drivers drop multicast to save power unless an app holds a lock; LAN discovery
+      // holds it only while a public torrent runs.
+      multicastLock = {
+        lanPeerSearch.value = true
+        val lock = applicationContext.getSystemService(WifiManager::class.java)
+          .createMulticastLock("ketch-lsd")
+        lock.setReferenceCounted(false)
+        lock.acquire()
+        AutoCloseable { lock.release() }
+      },
+      uploadsPaused = uploadsPaused(config.torrent, isUnmeteredNow(this)),
     )
     instanceManager = InstanceManager(
       factory = InstanceFactory(
         deviceName = instanceName,
         embeddedFactory = {
+          val httpEngine = KtorHttpEngine.withNetworkInterfaces(
+            getSystemService(ConnectivityManager::class.java)
+          )
           Ketch(
-            httpEngine = KtorHttpEngine.withNetworkInterfaces(
-              getSystemService(ConnectivityManager::class.java)
-            ),
+            httpEngine = httpEngine,
             taskStore = taskStore,
             config = config.download,
             name = instanceName,
@@ -171,7 +224,10 @@ class KetchService : Service() {
               Logger.console(LogLevel.DEBUG),
               app.fileLogger
             ),
-            additionalSources = listOf(FtpDownloadSource(), torrentSource),
+            additionalSources = listOf(
+              FtpDownloadSource(), torrentSource,
+              HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+            ),
           )
         },
         localServerFactory = { ketchApi, pairingRequests ->
@@ -193,11 +249,14 @@ class KetchService : Service() {
             },
             allowedHosts = serverConfig.allowedHosts,
             allowedDirectories = serverConfig.allowedDirectories,
+            // The app's own files: its settings, database and token.
+            protectedDirectories = systemProtectedDirectories() + dataDir.path,
             mdnsEnabled = serverConfig.mdnsEnabled,
             mdnsRegistrar = AndroidMdnsRegistrar(),
             pairingApprover = { request, address ->
               pairingRequests.ask(request.name, request.code, request.os, address)
             },
+            pairingOpen = { pairingRequests.isOpen },
           )
           server.start(wait = false)
           log.i { "Local server started on port ${serverConfig.port}" }
@@ -209,7 +268,24 @@ class KetchService : Service() {
             }
           }
         },
-        applyTorrentSettings = { torrentSource.setAdditionalTrackers(it.trackers) },
+        applyTorrentSettings = {
+          torrentSource.setAdditionalTrackers(it.trackers)
+          torrentSource.setTrackerLists(it.subscribedTrackerLists)
+          torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
+          torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
+          torrentSource.setEncryption(it.encryption.toEncryption())
+          torrentSource.setUtpEnabled(it.utp)
+          torrentSource.setPortMapping(it.portMapping)
+          torrentSource.setLocalDiscovery(it.localDiscovery)
+        },
+        trackerList = torrentSource.trackerLists.map { lists ->
+          lists.map {
+            TrackerListStatus(it.url.orEmpty(), it.trackers, it.updatedAt, it.failed, it.updating)
+          }
+        },
+        refreshTrackerList = torrentSource::refreshTrackerLists,
+        uploadNetwork = unmeteredNetworkChanges(this),
+        pauseUploads = torrentSource::setUploadsPaused,
       ),
       initialRemotes = config.remotes,
       configStore = configStore,
@@ -239,10 +315,10 @@ class KetchService : Service() {
       }
       AndroidNotifier.ACTION_PAUSE_ALL -> pauseAll()
       AndroidNotifier.ACTION_SLOW_LANE -> toggleSlowLane()
-      AndroidNotifier.ACTION_PAIRING_ALLOW, AndroidNotifier.ACTION_PAIRING_DENY -> {
-        val allow = intent.action == AndroidNotifier.ACTION_PAIRING_ALLOW
+      // Allowing happens in Settings › Sharing only; the notification can only turn it away.
+      AndroidNotifier.ACTION_PAIRING_DENY -> {
         val id = AndroidNotifier.pairingIdOf(intent)
-        if (id != null) instanceManager.pairingRequests.answer(id, allow)
+        if (id != null) instanceManager.pairingRequests.answer(id, allow = false)
       }
     }
     return START_STICKY
@@ -269,8 +345,9 @@ class KetchService : Service() {
    * with `notify`, such as Discover waiting for the user's OK to open a website, while the app is
    * not in front; each notification goes once its message leaves the screen, and tapping it
    * opens [MainActivity], which runs the message's first action. It gives success feedback when a
-   * search finds downloads, and keeps the service in the foreground while Discover searches, so
-   * the search keeps going, and can ask, once the user leaves the app.
+   * search finds downloads, keeps the service in the foreground while Discover searches, so
+   * the search keeps going, and can ask, once the user leaves the app, and follows the keep awake
+   * setting.
    */
   fun follow(controller: AppController) {
     followed = controller
@@ -286,6 +363,11 @@ class KetchService : Service() {
       successFeedback.follow(controller.state.aiDiscover) {
         controller.appSettings.config.notifications
       }
+    }
+    controller.scope.launch {
+      // The setting keeps its last value once the app closes, as the service keeps running.
+      snapshotFlow { controller.appSettings.config.power.keepAwake }
+        .collect { if (followed === controller) keepAwake.value = it }
     }
     controller.scope.launch {
       // A controller that closes after the next one started leaves the count to that one.
@@ -331,12 +413,24 @@ class KetchService : Service() {
   /**
    * Keeps the service in the foreground while the embedded device downloads or shares itself,
    * whichever device the app shows, or while Discover searches, and refreshes the ongoing
-   * notification once a second while it downloads.
+   * notification once a second while it downloads. While it downloads in the foreground, a wake
+   * lock keeps the CPU running with the screen off, as the keep awake setting allows.
    */
   private fun startForegroundMonitor(embedded: KetchApi) {
     val statuses = ForegroundPolicy
       .observe(embedded.tasks, instanceManager.serverState, discovering)
       .flowOn(Dispatchers.Default)
+      .shareIn(scope, SharingStarted.Eagerly, replay = 1)
+    scope.launch {
+      KeepAwake.follow(
+        inhibitor = WakeLockInhibitor(this@KetchService),
+        // Android vitals count a wake lock held without a foreground service as excessive.
+        statuses = combine(statuses, foreground) { status, inForeground ->
+          if (inForeground) status else ForegroundStatus()
+        },
+        enabled = keepAwake,
+      )
+    }
     scope.launch {
       // A new speed mode only relabels the Slow lane button.
       combine(statuses, speedMode.mode) { status, _ -> status }.collectLatest { status ->
@@ -385,16 +479,18 @@ class KetchService : Service() {
   }
 
   /**
-   * Asks about each pairing request that arrives while the app is not in front, where it asks
-   * itself, from the notification shade, and withdraws the question once it is answered.
+   * Tells about each pairing request that waits while the app is not in front, when it arrives
+   * or once the app leaves the front, and withdraws the notification once it is answered. The
+   * owner answers in Settings › Sharing, which tapping it opens; inside the app a toast leads
+   * there.
    */
   private fun startPairingNotices() {
     scope.launch {
-      instanceManager.pairingRequests.watch(
-        onArrived = { ask ->
-          if (!inFront.value) notifier.showPairing(ask, pairingNotificationCopy(ask))
-        },
-        onLeft = notifier::cancelPairing,
+      PairingNotices.follow(
+        requests = instanceManager.pairingRequests,
+        inFront = inFront,
+        post = { ask -> notifier.showPairing(ask, pairingNotificationCopy(ask)) },
+        withdraw = notifier::cancelPairing,
       )
     }
   }
@@ -542,4 +638,17 @@ class KetchService : Service() {
     val PEAK_SAVE_DELAY = 10.seconds
     val RECOVERY_HOLD = 30.seconds
   }
+}
+
+/** The engine's upload policy for this `[torrent] upload` setting. */
+private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}
+
+private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this) {
+  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
+  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
+  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
 }

@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "Descarga añadida"
   },
-  "notify_fallback_browser": {
-    "message": "Descargando en el navegador"
-  },
-  "notify_fallback_magnet": {
-    "message": "Abriendo el enlace magnet en otra app"
-  },
-  "notify_send_failed": {
-    "message": "No se pudo enviar a $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch no puede descargar esto"
   },
@@ -115,6 +101,9 @@
   },
   "error_app_connect_failed": {
     "message": "La app de Ketch no pudo conectarse"
+  },
+  "error_app_pick_unsupported": {
+    "message": "Actualiza la app Ketch para elegir carpetas desde aquí"
   },
   "error_app_invalid_reply": {
     "message": "La app de Ketch envió una respuesta no válida"
@@ -402,14 +391,6 @@
   "popup_add_button": {
     "message": "Descargar"
   },
-  "popup_added": {
-    "message": "Se añadió $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "Introduce un enlace http, https, ftp o magnet."
   },
@@ -616,20 +597,8 @@
   "error_media_unsupported": {
     "message": "Esta instancia de Ketch no admite listas multimedia. Actualízala antes de enviar este enlace."
   },
-  "review_setting": {
-    "message": "Revisar descargas antes de enviarlas"
-  },
-  "review_title": {
-    "message": "Revisar descarga"
-  },
-  "review_name": {
-    "message": "Nombre del archivo (opcional)"
-  },
   "review_folder": {
     "message": "Carpeta en el dispositivo elegido (opcional)"
-  },
-  "review_detail": {
-    "message": "Deja la carpeta vacía para usar la predeterminada del dispositivo. El servidor controla las carpetas permitidas. Los torrents conservan su estructura. Cerrar esta página devuelve al navegador una descarga pausada."
   },
   "review_cancel": {
     "message": "Cancelar"
@@ -642,5 +611,119 @@
   },
   "safari_detail": {
     "message": "Safari envía enlaces revisados y recursos de páginas a un servidor Ketch configurado. Activa el uso compartido en Ketch e introduce aquí su dirección y token. No se permite capturar descargas automáticamente ni iniciar la app."
+  },
+  "dialog_title": {
+    "message": "Nueva descarga"
+  },
+  "dialog_name_label": {
+    "message": "Nombre del archivo"
+  },
+  "dialog_send_to": {
+    "message": "Enviar a"
+  },
+  "dialog_save_in": {
+    "message": "Guardar en"
+  },
+  "dialog_folder_default": {
+    "message": "Carpeta predeterminada"
+  },
+  "dialog_folder_browse": {
+    "message": "Examinar…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Elegir una carpeta de este equipo"
+  },
+  "dialog_device_checking": {
+    "message": "Comprobando…"
+  },
+  "dialog_device_ready": {
+    "message": "Listo"
+  },
+  "dialog_device_free": {
+    "message": "$SIZE$ libres",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "Cerrado · se abre al enviar"
+  },
+  "dialog_device_offline": {
+    "message": "No disponible"
+  },
+  "dialog_torrent_layout": {
+    "message": "Los torrents conservan su propia estructura de carpetas."
+  },
+  "dialog_space_warning": {
+    "message": "Solo quedan $SIZE$ libres en $DEVICE$.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "Descargar en el navegador"
+  },
+  "dialog_sending": {
+    "message": "Enviando…"
+  },
+  "dialog_folder_auto": {
+    "message": "Automática"
+  },
+  "dialog_folder_auto_match": {
+    "message": "Automática · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "Deja que el dispositivo elija: su carpeta de descargas o la carpeta de categoría que coincida."
+  },
+  "dialog_folder_recent": {
+    "message": "Usada recientemente: $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Revisar descargas antes de enviarlas"
+  },
+  "notify_fallback_browser": {
+    "message": "Descargando en el navegador"
+  },
+  "notify_fallback_magnet": {
+    "message": "Abriendo el enlace magnet en otra app"
+  },
+  "notify_send_failed": {
+    "message": "No se pudo enviar a $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "Se añadió $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch no acepta esta copia de la extensión"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch solo se conecta con la extensión de Chrome Web Store o con el paquete chrome-unpacked de una versión, cargado con «Cargar descomprimida». Instala una de ellas e inténtalo de nuevo."
   }
 }

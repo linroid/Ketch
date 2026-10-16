@@ -4,10 +4,15 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -20,6 +25,7 @@ import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -43,6 +49,41 @@ class ServerRoutesTest {
     )
     assertEquals(KetchApi.VERSION, status.version)
     assertNotNull(status.revision)
+  }
+
+  @Test
+  fun resolve_logsTheRedactedUrl() = testApplication {
+    val ketch = createTestKetch()
+    val lines = java.util.Collections.synchronizedList(mutableListOf<String>())
+    val capture = object : Logger {
+      override fun v(message: String) { lines += message }
+      override fun d(message: String) { lines += message }
+      override fun i(message: String) { lines += message }
+      override fun w(message: String, throwable: Throwable?) { lines += message }
+      override fun e(message: String, throwable: Throwable?) { lines += message }
+    }
+    application {
+      val server = createTestServer(ketch)
+      with(server) { configureServer() }
+    }
+    // Ketch installs its own logger when it is created.
+    KetchLogger.setLogger(capture)
+    try {
+      client.post("/api/resolve") {
+        contentType(ContentType.Application.Json)
+        setBody(
+          json.encodeToString(
+            ResolveUrlRequest("https://user:hunter2@example.com/file.zip?token=s3cret")
+          )
+        )
+      }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+    val line = lines.first { "POST /api/resolve" in it }
+    assertFalse("hunter2" in line, line)
+    assertFalse("s3cret" in line, line)
+    assertTrue("example.com/file.zip" in line, line)
   }
 
   @Test
@@ -193,4 +234,89 @@ class ServerRoutesTest {
       assertTrue(missing in error.message)
       assertEquals(DownloadConfig.Default, ketch.status().config)
     }
+
+  @Test
+  fun `PUT config without categories keeps the categories set`() = testApplication {
+    val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
+    val ketch = createTestKetch(config = DownloadConfig(categories = listOf(video)))
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    // As a client older than category folders sends it.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"maxConcurrentDownloads": 2}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    val config = ketch.status().config
+    assertEquals(2, config.maxConcurrentDownloads)
+    assertEquals(listOf(video), config.categories)
+  }
+
+  @Test
+  fun `PUT config without timeout and retry fields keeps them`() = testApplication {
+    val set = DownloadConfig(
+      unlimitedRetries = true,
+      maxRetryDelayMs = 5_000,
+      idleTimeoutMs = 20_000,
+      minSpeed = 1_024,
+    )
+    val ketch = createTestKetch(config = set)
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    // As a client older than idle timeouts sends it.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"retryCount": 5}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(set.copy(retryCount = 5), ketch.status().config)
+  }
+
+  @Test
+  fun `PUT config cannot set hooks`() = testApplication {
+    val ketch = createTestKetch()
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    // Hooks run programs on the server's machine: only its own config.toml names them.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(
+        """{"maxConcurrentDownloads": 2,
+          |"hooks": [{"events": ["completed"], "command": ["sh", "-c", "id"]}]}""".trimMargin()
+      )
+    }
+
+    assertTrue(response.status == HttpStatusCode.OK || response.status == HttpStatusCode.BadRequest)
+    assertFalse("hooks" in response.bodyAsText())
+    assertFalse("hooks" in json.encodeToString(DownloadConfig.serializer(), ketch.status().config))
+    assertFalse("hooks" in client.get("/api/status").bodyAsText())
+  }
+
+  @Test
+  fun `PUT config with categories replaces them`() = testApplication {
+    val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
+    val ketch = createTestKetch(config = DownloadConfig(categories = listOf(video)))
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(DownloadConfig(categories = emptyList()))
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(emptyList(), ketch.status().config.categories)
+  }
 }

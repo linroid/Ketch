@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">Descargas</string>
   <string name="shell_destination_discover">Descubrir</string>
+  <string name="shell_destination_connections">Conexiones</string>
   <string name="shell_destination_devices">Dispositivos</string>
   <string name="shell_settings">Ajustes</string>
   <string name="shell_devices">Dispositivos</string>
@@ -42,7 +43,6 @@
   <string name="shell_devices_online">%1$d de %2$d en línea</string>
 
   <string name="sidebar_all_devices_tooltip">Las descargas de todos los dispositivos</string>
-  <string name="sidebar_add_device">Añadir dispositivo</string>
   <string name="sidebar_device_menu">Menú del dispositivo</string>
   <string name="sidebar_menu_pause_all">Pausar todo aquí</string>
   <string name="sidebar_menu_resume_all">Reanudar todo aquí</string>
@@ -56,7 +56,7 @@
 
   <string name="switcher_overview">Resumen</string>
   <string name="switcher_add_device">Añadir dispositivo…</string>
-  <string name="switcher_find_on_network">Buscar en la red</string>
+  <string name="switcher_find_on_network">Buscar en la red local</string>
   <string name="switcher_share">Compartir %1$s…</string>
 
   <string name="shell_device_button">%1$s, cambiar de dispositivo</string>
@@ -85,6 +85,7 @@
   <string name="banner_retrying">reintentando</string>
   <string name="banner_retry_now">Reintentar ahora</string>
   <string name="banner_switch_to">Cambiar a %1$s</string>
+  <string name="banner_pairing_on">Vinculación activada %1$s más · los dispositivos de tu red local pueden pedir controlar Ketch en %2$s</string>
   <string name="banner_unauthorized">%1$s necesita un token de acceso nuevo</string>
   <string name="banner_enter_token">Introducir token</string>
   <string name="toast_subject_reason">%1$s: %2$s</string>

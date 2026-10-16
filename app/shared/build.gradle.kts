@@ -12,6 +12,11 @@ plugins {
 }
 
 kotlin {
+  // PlatformLanguage is an expect object, which Kotlin still calls Beta.
+  compilerOptions {
+    freeCompilerArgs.add("-Xexpect-actual-classes")
+  }
+
   android {
     namespace = "com.linroid.ketch.app.shared"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -36,17 +41,16 @@ kotlin {
     }
   }
 
-  // Compose Multiplatform 1.11+ references iOS 18 APIs (e.g. UIViewLayoutRegion in
-  // compose-ui-uikit) and dnssd 1.1.0 is built for iOS 15+. Kotlin/Native defaults to
-  // iOS 14.0, which causes link failures and missing back-deployment dylib lookups at
-  // runtime. Override the minimum iOS version to 18.0.
+  // iOS 15.0 is the lowest deployment target Xcode 26+ accepts, and the one the Xcode project
+  // sets. Kotlin/Native defaults to iOS 14.0, below what dnssd is built for. Compose and Skiko
+  // weak-link the newer UIKit classes they use and check for them at runtime.
   targets.withType<KotlinNativeTarget>().configureEach {
     compilations.configureEach {
       compileTaskProvider.configure {
         compilerOptions.freeCompilerArgs.add(
           "-Xoverride-konan-properties=" +
-            "osVersionMin.ios_arm64=18.0;" +
-            "osVersionMin.ios_simulator_arm64=18.0",
+            "osVersionMin.ios_arm64=15.0;" +
+            "osVersionMin.ios_simulator_arm64=15.0",
         )
       }
     }
@@ -63,21 +67,29 @@ kotlin {
 
   sourceSets {
     // The targets that run the engine inside the app: Android, desktop and iOS.
-    val nonWebMain by creating {
+    val nonWebMain = create("nonWebMain") {
       dependsOn(commonMain.get())
     }
-    val jvmAndAndroidMain by creating {
+    val jvmAndAndroidMain = create("jvmAndAndroidMain") {
       dependsOn(nonWebMain)
     }
     androidMain.get().dependsOn(jvmAndAndroidMain)
     jvmMain.get().dependsOn(jvmAndAndroidMain)
     iosMain.get().dependsOn(nonWebMain)
+    // The targets Compose draws with Skia: desktop, iOS and the web.
+    val skikoMain = create("skikoMain") {
+      dependsOn(commonMain.get())
+    }
+    jvmMain.get().dependsOn(skikoMain)
+    iosMain.get().dependsOn(skikoMain)
+    wasmJsMain.get().dependsOn(skikoMain)
 
     commonMain.dependencies {
       api(projects.config)
       // FileLogger takes okio paths.
       api(libs.okio)
       implementation(projects.library.remote)
+      implementation(projects.library.torrentApi)
 
       implementation(libs.kotlinx.coroutines.core)
       implementation(libs.kotlinx.datetime)
@@ -112,6 +124,8 @@ kotlin {
       implementation(projects.library.core)
       implementation(projects.library.ktor)
       implementation(projects.library.ftp)
+      implementation(projects.library.hls)
+      implementation(projects.library.dash)
       implementation(projects.library.torrent)
       implementation(libs.compose.uiToolingPreview)
       implementation(libs.ktor.client.okhttp)
@@ -120,6 +134,8 @@ kotlin {
       implementation(projects.library.core)
       implementation(projects.library.ktor)
       implementation(projects.library.ftp)
+      implementation(projects.library.hls)
+      implementation(projects.library.dash)
       implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.ktor.client.darwin)
@@ -128,6 +144,8 @@ kotlin {
       implementation(projects.library.core)
       implementation(projects.library.ktor)
       implementation(projects.library.ftp)
+      implementation(projects.library.hls)
+      implementation(projects.library.dash)
       implementation(projects.library.torrent)
       implementation(projects.library.sqlite)
       implementation(libs.kotlinx.coroutinesSwing)

@@ -136,7 +136,7 @@
   <string name="launchpad_checklist_detected">%1$sを検出</string>
   <string name="launchpad_checklist_connected">接続済み</string>
   <string name="launchpad_checklist_get_it">入手</string>
-  <string name="launchpad_checklist_phone">スマートフォンから%1$sを操作</string>
+  <string name="launchpad_checklist_phone">スマートフォンから%1$sのKetchを操作</string>
   <string name="launchpad_checklist_show_qr">QRコードを表示</string>
 
   <string name="downloads_clip_download">%1$sをダウンロード</string>
@@ -225,6 +225,8 @@
   <string name="downloads_failed_priority">%2$sで%1$sの優先度を設定できませんでした</string>
   <string name="downloads_failed_connections">%2$sで%1$sの接続数を設定できませんでした</string>
   <string name="downloads_failed_reschedule">%2$sで%1$sの予約を変更できませんでした</string>
+  <string name="downloads_failed_files">%2$sで%1$sのファイルを変更できませんでした</string>
+  <string name="downloads_failed_seeding">%2$sで%1$sのシードを変更できませんでした</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">%1$d件のダウンロードを一時停止しました</item>

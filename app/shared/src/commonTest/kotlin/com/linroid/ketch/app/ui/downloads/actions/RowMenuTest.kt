@@ -69,7 +69,7 @@ class RowMenuTest {
     assertEquals(
       listOf(
         "Pause", "Speed limit", "Connections", "Priority", "Start later", "Copy link", "Details",
-        "—", "Stop and discard progress…", "Remove from list",
+        "—", "Cancel download…", "Remove…",
       ),
       entries.map { labelOf(it) },
     )
@@ -88,7 +88,7 @@ class RowMenuTest {
 
       val labels = entries.map { labelOf(it) }
       assertTrue("Show in Finder" in labels)
-      assertEquals("Remove and trash file…", labels.last())
+      assertEquals("Remove…", labels.last())
     }
 
   @Test
@@ -99,7 +99,7 @@ class RowMenuTest {
 
     assertEquals("Pause 2 downloads", labels.first())
     assertTrue("Copy 3 links" in labels)
-    assertTrue("Remove 3 downloads from list" in labels)
+    assertTrue("Remove 3 downloads…" in labels)
   }
 
   @Test
@@ -271,14 +271,7 @@ class RowMenuTest {
     )
     assertEquals("Speed limit", batchLabel(RowAction.SpeedLimit, 3, null).load())
     assertEquals("Download 2 files again", batchLabel(RowAction.DownloadAgain, 2, null).load())
-    assertEquals(
-      "Remove 1 download and its file…",
-      batchLabel(RowAction.RemoveAndTrash, 1, null).load(),
-    )
-    assertEquals(
-      "Remove 3 downloads and their files…",
-      batchLabel(RowAction.RemoveAndDelete, 3, null).load(),
-    )
+    assertEquals("Remove 1 download…", batchLabel(RowAction.Remove, 1, null).load())
   }
 
   private suspend fun labelOf(entry: MenuEntry): String = when (entry) {

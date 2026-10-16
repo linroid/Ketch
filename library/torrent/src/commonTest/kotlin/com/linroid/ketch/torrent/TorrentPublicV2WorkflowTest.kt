@@ -10,12 +10,25 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskStore
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.sha256Digest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.engine.TorrentBufferBudget
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.TorrentListener
+import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerExtensions
+import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.peer.pieceBitfield
+import com.linroid.ketch.torrent.storage.torrentFileSystem
+import com.linroid.ketch.torrent.v2.peer.PeerHashMessage
+import com.linroid.ketch.torrent.v2.peer.PeerHashWire
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +52,13 @@ import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
 import okio.use
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class TorrentPublicV2WorkflowTest {
   @Test fun pureV2SelectionSurvivesKetchRecreationAndRechecksFiles() = runTest {
@@ -73,7 +93,8 @@ class TorrentPublicV2WorkflowTest {
     fixture(false, payloadLength = 131_075) { peer ->
       peer.remaining.complete(Unit)
       val root = temporaryDirectory()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val ketch = Ketch(peer.http, additionalSources = listOf(source))
       try {
         ketch.start()
@@ -97,7 +118,8 @@ class TorrentPublicV2WorkflowTest {
       peer.remaining.complete(Unit)
       peer.corruptPayload = true
       val root = temporaryDirectory()
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val ketch = Ketch(peer.http, additionalSources = listOf(source))
       try {
         ketch.start()
@@ -117,8 +139,8 @@ class TorrentPublicV2WorkflowTest {
   @Test fun magnetDoesNotResolveWhenPieceLayerProofIsCorrupt() = runTest {
     fixture(false) { peer ->
       peer.corruptProof = true
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
-        metadataTimeoutSeconds = 1), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http).apply { magnetLookupTime = 1.seconds }
       try {
         val uri = MagnetUri(peer.document.identity,
           trackers = listOf("http://fixture/announce")).toUri()
@@ -133,7 +155,8 @@ class TorrentPublicV2WorkflowTest {
   @Test fun closingSourceJoinsOutstandingV2MetadataResolution() = runTest {
     fixture(false) { peer -> coroutineScope {
       peer.corruptProof = true
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
       val uri = MagnetUri(peer.document.identity,
         trackers = listOf("http://fixture/announce")).toUri()
       val resolving = async { source.resolve(uri, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
@@ -163,7 +186,8 @@ class TorrentPublicV2WorkflowTest {
             })))
         }
       }
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false,
         connectionsPerTorrent = 1), http)
       val ketch = Ketch(http, additionalSources = listOf(source))
       try {
@@ -183,12 +207,144 @@ class TorrentPublicV2WorkflowTest {
     } }
   }
 
+  @Test fun v2SelectionChange_survivesKetchRestart() = runTest {
+    fixture(false) { peer ->
+      val root = temporaryDirectory()
+      val recordPath = root / "tasks.json"
+      fun source() = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
+      val firstSource = source()
+      val first = Ketch(peer.http, taskStore = Records(recordPath),
+        additionalSources = listOf(firstSource))
+      var second: Ketch? = null
+      try {
+        first.start()
+        val task = first.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0")))
+        task.segments.first { values -> values.sumOf { it.downloadedBytes } >= 16_384 }
+        // Taken by the running owner, then saved with the task.
+        task.selectFiles(setOf("0", "1"))
+        task.pause()
+        first.close()
+        firstSource.assertNoLeaks()
+        peer.remaining.complete(Unit)
+        val secondSource = source()
+        val replacement = Ketch(peer.http, taskStore = Records(recordPath),
+          additionalSources = listOf(secondSource))
+        second = replacement
+        replacement.start()
+        val restored = replacement.tasks.value.single()
+        assertEquals(setOf("0", "1"), restored.request.selectedFileIds)
+        restored.resume()
+        restored.await().getOrThrow()
+        assertEquals(peer.payload.size + 1L,
+          (restored.state.value as DownloadState.Completed).totalBytes)
+        assertContentEquals(peer.payload, torrentFileSystem.read(root / "out" / "a") {
+          readByteArray()
+        })
+        assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+          readByteArray()
+        })
+        secondSource.assertNoLeaks()
+      } finally {
+        first.close()
+        second?.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    }
+  }
+
+  @Test fun hybridSelectionChange_completesAndRemovesOwnedFiles() = runTest {
+    fixture(true) { peer ->
+      val root = temporaryDirectory()
+      val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
+      val ketch = Ketch(peer.http, additionalSources = listOf(source))
+      try {
+        ketch.start()
+        val task = ketch.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0")))
+        task.segments.first { values -> values.sumOf { it.downloadedBytes } >= 16_384 }
+        // Hybrid IDs skip the padding file between a and b.
+        task.selectFiles(setOf("0", "2"))
+        peer.remaining.complete(Unit)
+        task.await().getOrThrow()
+        assertContentEquals(peer.payload, torrentFileSystem.read(root / "out" / "a") {
+          readByteArray()
+        })
+        assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+          readByteArray()
+        })
+        torrentFileSystem.write(root / "out" / "foreign") { writeUtf8("keep") }
+        task.remove(deleteFiles = true)
+        assertFalse(torrentFileSystem.exists(root / "out" / "a"))
+        assertFalse(torrentFileSystem.exists(root / "out" / "b"))
+        assertEquals("keep", torrentFileSystem.read(root / "out" / "foreign") { readUtf8() })
+        assertFalse(torrentFileSystem.exists(v2CreationLog(root / "out", task.taskId)))
+        source.assertNoLeaks()
+      } finally {
+        ketch.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    }
+  }
+
+  @Test fun v2LegacyCreationLog_isRebound() = runTest {
+    fixture(false) { peer ->
+      val root = temporaryDirectory()
+      val recordPath = root / "tasks.json"
+      fun source() = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+        dhtEnabled = false), peer.http)
+      val firstSource = source()
+      val first = Ketch(peer.http, taskStore = Records(recordPath),
+        additionalSources = listOf(firstSource))
+      var second: Ketch? = null
+      try {
+        first.start()
+        val task = first.download(DownloadRequest("http://fixture/file.torrent",
+          destination = Destination((root / "out").toString()), selectedFileIds = setOf("0")))
+        task.segments.first { values -> values.sumOf { it.downloadedBytes } >= 16_384 }
+        task.pause()
+        first.close()
+        firstSource.assertNoLeaks()
+        // An unchanged task's creation log is bound to its selection, as older builds bind it.
+        val log = v2CreationLog(root / "out", task.taskId)
+        val legacy = torrentFileSystem.read(log) { readByteArray() }
+        val secondSource = source()
+        val replacement = Ketch(peer.http, taskStore = Records(recordPath),
+          additionalSources = listOf(secondSource))
+        second = replacement
+        replacement.start()
+        val restored = replacement.tasks.value.single()
+        // Changed while paused: the next run opens the log through the selection it last ran.
+        restored.selectFiles(setOf("0", "1"))
+        peer.remaining.complete(Unit)
+        restored.resume()
+        restored.await().getOrThrow()
+        assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+          readByteArray()
+        })
+        assertFalse(legacy.contentEquals(torrentFileSystem.read(log) { readByteArray() }))
+        restored.remove(deleteFiles = true)
+        assertFalse(torrentFileSystem.exists(root / "out" / "a"))
+        assertFalse(torrentFileSystem.exists(root / "out" / "b"))
+        assertFalse(torrentFileSystem.exists(log))
+        secondSource.assertNoLeaks()
+      } finally {
+        first.close()
+        second?.close()
+        torrentFileSystem.deleteRecursively(root)
+      }
+    }
+  }
+
   private suspend fun magnet(
     hybrid: Boolean,
     selectLast: Boolean = false,
   ) = fixture(hybrid) { peer ->
     peer.remaining.complete(Unit)
-    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+    val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false), peer.http)
     val ketch = Ketch(peer.http, additionalSources = listOf(source))
     val root = temporaryDirectory()
     try {
@@ -219,7 +375,8 @@ class TorrentPublicV2WorkflowTest {
     val root = temporaryDirectory()
     val recordPath = root / "tasks.json"
     val records = Records(recordPath)
-    fun source() = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), peer.http)
+    fun source() = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false), peer.http)
     val firstSource = source()
     val first = Ketch(peer.http, taskStore = records, additionalSources = listOf(firstSource))
     var second: Ketch? = null
@@ -233,11 +390,15 @@ class TorrentPublicV2WorkflowTest {
       task.pause()
       assertTrue(task.state.value is DownloadState.Paused, "Pause returned ${task.state.value}")
       val stored = requireNotNull(records.load(task.taskId))
-      assertTrue(stored.sourceResumeState?.data?.contains(peer.document.info.hash.hex) == true)
+      assertTrue(stored.sourceState?.data?.contains(peer.document.info.hash.hex) == true)
       first.close()
       if (staleCheckpoint) {
-        records.save(stored.copy(sourceResumeState = firstSource.buildResumeState(
-          source().resolveMetainfo(peer.metainfo), peer.payload.size.toLong())))
+        // A state without a checkpoint; the metainfo comes from the resolution the task kept.
+        val resolved = source().resolveMetainfo(peer.metainfo)
+        records.save(stored.copy(sourceState = TorrentSourceState(
+          peer.document.info.hash.hex, peer.payload.size.toLong(), "",
+          resolved.files.mapTo(LinkedHashSet()) { it.id }, "", version = 3,
+          privacy = TorrentDiscoveryPrivacy.PUBLIC).saved()))
       }
       // Persisted verified bits cannot authorize payload modified while the process was away.
       torrentFileSystem.openReadWrite(root / "out" / "a").use {
@@ -375,8 +536,11 @@ class TorrentPublicV2WorkflowTest {
           val connection = listener.accept()
           launch {
             try {
+              // Like hybrid clients, this peer takes the upgrade a hybrid offers on its v1 tag:
+              // it only serves v2 pieces, never v1 ones with their padding.
               PeerIdentityHandshake(document.identity, extensions = true).respond(connection,
-                torrentRandomBytes(20).toByteString(), TorrentBufferBudget(65_536))
+                torrentRandomBytes(20).toByteString(), TorrentBufferBudget(65_536),
+                allowUpgrade = true)
               val wire = PeerWire(connection, pieceCount = blocks.size + 1)
               wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
                 "m" to mapOf("ut_metadata" to PeerExtensions.METADATA.toLong()),

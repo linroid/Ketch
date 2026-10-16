@@ -136,7 +136,7 @@
   <string name="launchpad_checklist_detected">%1$s 감지됨</string>
   <string name="launchpad_checklist_connected">연결됨</string>
   <string name="launchpad_checklist_get_it">설치하기</string>
-  <string name="launchpad_checklist_phone">휴대폰에서 %1$s 제어</string>
+  <string name="launchpad_checklist_phone">휴대폰에서 %1$s의 Ketch 제어</string>
   <string name="launchpad_checklist_show_qr">QR 코드 보기</string>
 
   <string name="downloads_clip_download">%1$s 다운로드</string>
@@ -225,6 +225,8 @@
   <string name="downloads_failed_priority">%2$s에서 %1$s의 우선순위를 설정할 수 없음</string>
   <string name="downloads_failed_connections">%2$s에서 %1$s의 연결 수를 설정할 수 없음</string>
   <string name="downloads_failed_reschedule">%2$s에서 %1$s의 일정을 변경할 수 없음</string>
+  <string name="downloads_failed_files">%2$s에서 %1$s의 파일을 변경할 수 없음</string>
+  <string name="downloads_failed_seeding">%2$s에서 %1$s의 시딩을 변경할 수 없음</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">다운로드 %1$d개 일시정지됨</item>

@@ -1,15 +1,18 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.HttpExchange
+import com.linroid.ketch.core.engine.HttpExchangeObserver
 import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.ServerInfo
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareRequest
 import io.ktor.client.request.url
@@ -19,6 +22,7 @@ import io.ktor.client.statement.request
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpProtocolVersion
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
@@ -27,18 +31,16 @@ import io.ktor.http.isSecure
 import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
 import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * [HttpEngine] implementation backed by a Ktor [HttpClient].
  *
- * Uses platform-specific Ktor engines: OkHttp (Android), Darwin (iOS),
- * and CIO (JVM).
- *
  * Request headers pass through [RequestHeaders.sendable]: one that cannot be sent fails the
  * request with an [IllegalArgumentException], and the engine's own, such as `Range`, are ignored.
  *
- * The engine follows redirects itself, at most 20 per request, in place of [client]'s redirect
+ * The engine follows redirects itself, at most 20 per request, in place of its clients' redirect
  * handling, which it turns off. It refuses redirects from HTTPS to HTTP and to schemes other
  * than HTTP(S). A redirect to another scheme, host or port keeps only the headers that cannot
  * carry credentials, `User-Agent`, `Accept`, `Accept-Encoding` and `Accept-Language`, plus
@@ -48,26 +50,47 @@ import kotlin.coroutines.cancellation.CancellationException
  * segments after a probe, go to the same server without following them again; they follow them
  * again when that server fails.
  *
- * @param client the Ktor HTTP client to use, or a default client
- *   with infinite timeouts (suitable for large downloads)
- * @param logRequests whether request URLs, response headers, and transport errors may be logged
- * @param userAgent the `User-Agent` of requests whose headers name none, [DEFAULT_USER_AGENT]
- *   by default; `null` leaves it to [client]
+ * Without a client of its own, the engine applies proxies ([withProxy]): each request, and each
+ * hop of a redirect, goes directly, through an HTTP proxy (`CONNECT` for HTTPS) or through a
+ * SOCKS5 proxy as its [Proxy] says for that URL, on a client kept for that route. Proxy
+ * credentials only ever go to the proxy. On the JVM, requests use CIO when they go directly and
+ * OkHttp, limited to HTTP/1.1 so that segments keep their own connections, through a proxy;
+ * Android uses OkHttp and iOS Darwin (`NSURLSession`). A client given to it is used as it is,
+ * and only follows the system's proxy settings in its own way.
  */
-class KtorHttpEngine(
-  private val client: HttpClient = defaultClient(),
-  private val logRequests: Boolean = true,
-  private val userAgent: String? = DEFAULT_USER_AGENT,
+class KtorHttpEngine private constructor(
+  private val transports: HttpTransports,
+  private val proxy: Proxy,
+  private val redirects: RedirectCache,
+  private val logRequests: Boolean,
+  private val userAgent: String?,
+  // Views from withProxy share the transports of the engine that made them, which closes them.
+  private val ownsTransports: Boolean,
 ) : HttpEngine {
+  /**
+   * @param client the Ktor HTTP client to use, or `null` for the engine's own clients, with
+   *   infinite timeouts (suitable for large downloads)
+   * @param logRequests whether request URLs, response headers, and transport errors may be logged
+   * @param userAgent the `User-Agent` of requests whose headers name none, [DEFAULT_USER_AGENT]
+   *   by default; `null` leaves it to [client]
+   */
+  constructor(
+    client: HttpClient? = null,
+    logRequests: Boolean = true,
+    userAgent: String? = DEFAULT_USER_AGENT,
+  ) : this(client?.let(::FixedTransports) ?: defaultTransports(), logRequests, userAgent)
+
+  internal constructor(
+    transports: HttpTransports,
+    logRequests: Boolean,
+    userAgent: String?,
+  ) : this(transports, Proxy.System, RedirectCache(), logRequests, userAgent, true)
+
   private val log = KetchLogger("KtorHttpEngine")
 
   init {
     userAgent?.let { RequestHeaders.requireValid(mapOf(HttpHeaders.UserAgent to it)) }
   }
-
-  // Redirects are followed below, where each hop's target and headers are checked.
-  private val requests = client.config { followRedirects = false }
-  private val redirects = RedirectCache()
 
   override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
     val requestHeaders = requestHeaders(headers)
@@ -82,6 +105,7 @@ class KtorHttpEngine(
           contentLength = response.contentLength(),
           acceptRanges = response.headers[HttpHeaders.AcceptRanges]
             ?.contains("bytes", ignoreCase = true) == true,
+          whole = true,
         )
       }
     }
@@ -102,16 +126,26 @@ class KtorHttpEngine(
               ?: throw KetchError.Unsupported(
                 IllegalStateException("Server returned a different range"),
               )
-            serverInfo(response, contentLength = contentRange.total, acceptRanges = true)
+            serverInfo(
+              response,
+              contentLength = contentRange.total,
+              acceptRanges = true,
+              whole = false,
+            )
           }
           // An empty resource has no first byte to send.
           status == HttpStatusCode.RequestedRangeNotSatisfiable &&
             response.headers[HttpHeaders.ContentRange]?.trim()
               .equals("bytes */0", ignoreCase = true) ->
-            serverInfo(response, contentLength = 0, acceptRanges = false)
+            serverInfo(response, contentLength = 0, acceptRanges = false, whole = false)
           // The server ignored the range and started sending the whole resource.
           status.isSuccess() ->
-            serverInfo(response, contentLength = response.contentLength(), acceptRanges = false)
+            serverInfo(
+              response,
+              contentLength = response.contentLength(),
+              acceptRanges = false,
+              whole = true,
+            )
           else -> throw httpError("GET", response)
         }
       }
@@ -197,9 +231,28 @@ class KtorHttpEngine(
     }
   }
 
+  /** `false` when this engine was given its own client, which only follows the system's. */
+  override val supportsProxies: Boolean get() = transports.supports(Proxy.Direct)
+
+  /**
+   * An engine sharing this one's clients and remembered redirects, whose requests reach their
+   * servers as [proxy] says; the redirects followed through each proxy are remembered apart.
+   *
+   * @throws KetchError.Unsupported when this engine was given its own client and [proxy] is not
+   *   the system's
+   */
+  override fun withProxy(proxy: Proxy): HttpEngine {
+    if (proxy == this.proxy) return this
+    if (!transports.supports(proxy)) {
+      throw KetchError.Unsupported(
+        cause = UnsupportedOperationException("A custom HttpClient cannot change its proxy"),
+      )
+    }
+    return KtorHttpEngine(transports, proxy, redirects, logRequests, userAgent, false)
+  }
+
   override fun close() {
-    requests.close()
-    client.close()
+    if (ownsTransports) transports.close()
   }
 
   /** [headers] as they are sent: checked, without the engine's own, with the user agent. */
@@ -237,7 +290,7 @@ class KtorHttpEngine(
     reuseTarget: Boolean,
     handle: suspend (HttpResponse) -> T,
   ): T {
-    val key = RedirectCache.Key(url, headers)
+    val key = RedirectCache.Key(url, headers, proxy)
     val cached = if (reuseTarget) redirects.get(key) else null
     if (cached != null) {
       val result = try {
@@ -303,12 +356,40 @@ class KtorHttpEngine(
     headers: Map<String, String>,
     range: LongRange?,
     onResponse: suspend (HttpResponse) -> R,
-  ): R = requests.prepareRequest {
-    this.method = method
-    url(target)
-    headers.forEach { (name, value) -> header(name, value) }
-    if (range != null) header(HttpHeaders.Range, "bytes=${range.first}-${range.last}")
-  }.execute { onResponse(it) }
+  ): R {
+    val routed = transports.clientFor(target, proxy)
+    if (logRequests && routed.route.isProxy) log.d {
+      "Sending ${method.value} for ${redactUrl(target.toString())} through ${routed.route}"
+    }
+    val observer = currentCoroutineContext()[HttpExchangeObserver]
+    return routed.client.prepareRequest {
+      this.method = method
+      url(target)
+      headers.forEach { (name, value) -> header(name, value) }
+      if (range != null) header(HttpHeaders.Range, "bytes=${range.first}-${range.last}")
+    }.execute { response ->
+      // Every hop reports; the last one, the final target, is what the caller keeps.
+      observer?.onExchange(exchangeOf(response, routed.route))
+      onResponse(response)
+    }
+  }
+
+  /** Where [response]'s request went, for an [HttpExchangeObserver]. */
+  private fun exchangeOf(response: HttpResponse, route: ProxyRoute): HttpExchange {
+    val url = response.call.request.url
+    return HttpExchange(
+      host = url.host.removePrefix("[").removeSuffix("]").lowercase(),
+      port = url.port,
+      secure = url.protocol.isSecure(),
+      protocol = protocolLabel(response.version),
+      route = when (route) {
+        ProxyRoute.Direct -> ConnectionRoute.DIRECT
+        ProxyRoute.Platform -> ConnectionRoute.UNKNOWN
+        is ProxyRoute.Http -> ConnectionRoute.HTTP_PROXY
+        is ProxyRoute.Socks5 -> ConnectionRoute.SOCKS5_PROXY
+      },
+    )
+  }
 
   private fun logResponse(label: String, response: HttpResponse) {
     if (logRequests) log.d {
@@ -352,7 +433,7 @@ class KtorHttpEngine(
 
   companion object {
     /** `User-Agent` of requests that name none: `Ketch/` and the library version. */
-    const val DEFAULT_USER_AGENT: String = "Ketch/${KetchApi.VERSION}"
+    val DEFAULT_USER_AGENT: String = "Ketch/${KetchApi.VERSION}"
 
     private const val DEFAULT_BUFFER_SIZE = 8192
     private const val MAX_REDIRECTS = 20
@@ -365,6 +446,20 @@ class KtorHttpEngine(
       "user-agent", "accept", "accept-encoding", "accept-language",
     )
     private val SENSITIVE_HEADERS = setOf("set-cookie", "cookie", "authorization")
+    /** `HTTP/1.1` as it is, `HTTP/2.0` as `HTTP/2` and `HTTP/3.0` as `HTTP/3`. */
+    internal fun protocolLabel(version: HttpProtocolVersion): String =
+      if (version.name == "HTTP" && version.major >= 2 && version.minor == 0) {
+        "HTTP/${version.major}"
+      } else {
+        version.toString()
+      }
+
+    /** RFC 9530: the digest of the whole representation, whatever range a response carries. */
+    private const val REPR_DIGEST = "Repr-Digest"
+
+    /** RFC 3230's instance digest, which `Repr-Digest` replaces. */
+    private const val DIGEST = "Digest"
+
     private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""", RegexOption.IGNORE_CASE)
 
     /** [headers] for a debug log line, with the values of [SENSITIVE_HEADERS] masked. */
@@ -389,10 +484,15 @@ class KtorHttpEngine(
       return contentRange.first == range.first && contentRange.last == range.last
     }
 
+    /**
+     * The metadata of [response]. [whole] says it describes the whole file, as a `HEAD` or a
+     * `200` does: only such a response's legacy `Digest` is used.
+     */
     private fun serverInfo(
       response: HttpResponse,
       contentLength: Long?,
       acceptRanges: Boolean,
+      whole: Boolean,
     ): ServerInfo = ServerInfo(
       contentLength = contentLength,
       acceptRanges = acceptRanges,
@@ -401,6 +501,12 @@ class KtorHttpEngine(
       contentDisposition = response.headers[HttpHeaders.ContentDisposition],
       rateLimitRemaining = findRateLimitRemaining(response.headers),
       rateLimitReset = findRateLimitReset(response.headers),
+      contentType = response.headers[HttpHeaders.ContentType],
+      checksum = ServerInfo.publishedChecksum(
+        reprDigest = response.headers[REPR_DIGEST],
+        digest = response.headers[DIGEST].takeIf { whole },
+        contentEncoding = response.headers[HttpHeaders.ContentEncoding],
+      ),
     )
 
     private fun redirectOf(response: HttpResponse): Hop.Redirect? {
@@ -468,12 +574,8 @@ class KtorHttpEngine(
       return "${url.protocol.name}://${url.host}$port/"
     }
 
-    private fun defaultClient(): HttpClient = HttpClient(defaultHttpClientEngine()) {
-      install(HttpTimeout) {
-        socketTimeoutMillis = Long.MAX_VALUE
-        requestTimeoutMillis = Long.MAX_VALUE
-      }
-    }
+    private val ProxyRoute.isProxy: Boolean
+      get() = this is ProxyRoute.Http || this is ProxyRoute.Socks5
 
     /**
      * Parses the `Retry-After` header value as a number of seconds.

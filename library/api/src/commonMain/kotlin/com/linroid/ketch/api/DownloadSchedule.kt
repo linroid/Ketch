@@ -5,30 +5,20 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/**
- * Defines when a download should start.
- */
+/** When a download starts. */
 @Serializable
 sealed class DownloadSchedule {
-  /** Download starts immediately (default behavior). */
+  /** At once. */
   @Serializable
   @SerialName("immediate")
   data object Immediate : DownloadSchedule()
 
-  /**
-   * Download starts at a specific time.
-   *
-   * @property startAt the [Instant] at which the download should begin
-   */
+  /** At [startAt]. */
   @Serializable
   @SerialName("at_time")
   data class AtTime(val startAt: Instant) : DownloadSchedule()
 
-  /**
-   * Download starts after a delay from the time it is submitted.
-   *
-   * @property delay the [Duration] to wait before starting
-   */
+  /** [delay] after it is added. */
   @Serializable
   @SerialName("after_delay")
   data class AfterDelay(val delay: Duration) : DownloadSchedule()

@@ -217,6 +217,28 @@ enum class KetchIcon(internal val data: IconData) {
     ),
     fill = listOf("M10 17.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"),
   )),
+  // Network kinds, beside Network, which doubles as Wi-Fi.
+  // Solid bars, as a phone's signal meter draws them; strokes read as thin lines at chip size.
+  Cellular(IconData.fills(
+    "M3 13a1 1 0 0 1 2 0V16a1 1 0 0 1 -2 0z",
+    "M7 10.5a1 1 0 0 1 2 0V16a1 1 0 0 1 -2 0z",
+    "M11 8a1 1 0 0 1 2 0V16a1 1 0 0 1 -2 0z",
+    "M15 5.5a1 1 0 0 1 2 0V16a1 1 0 0 1 -2 0z"
+  )),
+  Ethernet(IconData.strokes(
+    "M4 5h12a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-3v2.5H7V13H4a1 1 0 0 1 -1-1V6a1 1 0 0 1 1-1z",
+    "M7.5 8v1.5M10 8v1.5M12.5 8v1.5"
+  )),
+  Vpn(IconData.strokes(
+    "M5.5 9h9a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-9a1 1 0 0 1 -1-1v-6a1 1 0 0 1 1-1z",
+    "M7 9V6.5a3 3 0 0 1 6 0V9"
+  )),
+  Bluetooth(IconData.strokes("M6 6.5l8 7-4 3.5V3l4 3.5-8 7")),
+  Globe(IconData.strokes(
+    CIRCLE,
+    "M3 10h14",
+    "M10 3c1.9 2 2.8 4.3 2.8 7s-0.9 5-2.8 7c-1.9-2-2.8-4.3-2.8-7s0.9-5 2.8-7z"
+  )),
   Info(IconData.paths(
     stroke = listOf(CIRCLE, "M10 9.5v4.5"),
     fill = listOf("M10 7.6a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"),

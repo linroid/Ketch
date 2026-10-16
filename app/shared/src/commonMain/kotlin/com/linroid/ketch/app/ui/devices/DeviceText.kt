@@ -94,7 +94,7 @@ internal fun shortDurationText(duration: Duration): UiText = when {
  */
 internal fun deviceMeta(device: DevicePresence, now: Instant): UiText {
   val status = device.status
-    ?: return device.detail.takeUnless { device.name == verbatim(it) }.orEmpty().let(::verbatim)
+    ?: return device.detail.takeUnless { it == device.name } ?: verbatim("")
   val uptime = device.uptimeAt(now)?.takeIf { device.health.isOnline }
   return listOfNotNull(
     verbatim("Ketch ${status.version}"),

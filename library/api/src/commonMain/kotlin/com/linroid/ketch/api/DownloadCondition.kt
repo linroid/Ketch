@@ -6,23 +6,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
-/**
- * A condition that must be met before a scheduled download can start.
- *
- * Conditions are evaluated continuously. When all conditions for a task
- * are met simultaneously, the download proceeds.
- */
+/** Something that must hold before a download starts; it starts once all of them do. */
 @Serializable
 sealed class DownloadCondition {
-  /** Emits `true` when the condition is satisfied, `false` when not. */
+  /** Whether the condition holds, as it changes. */
   abstract fun isMet(): Flow<Boolean>
 
   /**
-   * A condition backed by a runtime [Flow]. Useful for testing and
-   * for consumers who need a simple, ad-hoc condition.
-   *
-   * The [flow] is `@Transient` and defaults to `flowOf(true)` after
-   * deserialization.
+   * A condition backed by [flow], which is not serialized (decoded as always met).
    *
    * ```kotlin
    * val wifiConnected = MutableStateFlow(false)

@@ -6,9 +6,12 @@ import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverDevice
@@ -16,11 +19,15 @@ import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
+import com.linroid.ketch.api.resolve
+import com.linroid.ketch.config.CONFIG_DIR_ENV
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentEncryptionMode
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.config.defaultConfigPath
 import com.linroid.ketch.config.defaultDbPath
@@ -30,11 +37,17 @@ import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentEncryption
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
+import com.linroid.ketch.hooks.HookRunner
+import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.server.KetchServer
+import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -44,10 +57,30 @@ import java.io.PrintStream
 import java.util.Locale
 import kotlin.system.exitProcess
 
+/**
+ * Caps kotlinx.coroutines' shared pool before anything uses it, unless `-D` already set these:
+ * `Dispatchers.IO` at 16 threads rather than 64, and idle workers end after 10 s rather than 60.
+ * Ketch's own blocking work runs on pools of its own; what is left there, such as ktor-network's
+ * socket loops and the server's, never blocks for long. On the JVM only: the native binary
+ * initializes kotlinx.coroutines while it is built, so `build.gradle.kts` passes the same values
+ * to `native-image`.
+ */
+private fun capCoroutineThreads() {
+  for ((key, value) in COROUTINE_THREAD_LIMITS) {
+    if (System.getProperty(key) == null) System.setProperty(key, value)
+  }
+}
+
+private val COROUTINE_THREAD_LIMITS = mapOf(
+  "kotlinx.coroutines.io.parallelism" to "16",
+  "kotlinx.coroutines.scheduler.keep.alive.sec" to "10",
+)
+
 /** Ketch library log level, derived from CLI flags. */
 private var ketchLogLevel = LogLevel.INFO
 
 fun main(args: Array<String>) {
+  capCoroutineThreads()
   // Windows cannot replace a running program, so `ketch update` renamed the old binary aside.
   if (File.separatorChar == '\\') CliInstallation.current()?.removeReplaced()
 
@@ -55,7 +88,7 @@ fun main(args: Array<String>) {
   val remaining = applyGlobalFlags(args.toMutableList())
 
   // The MCP server owns stdout, and ai-discover keeps it for its results, so each prints the
-  // banner to stderr itself
+  // banner to stderr itself; health and the commands that work on a running instance print none
   when (remaining.firstOrNull()) {
     "mcp" -> {
       runMcp(remaining.drop(1))
@@ -66,13 +99,19 @@ fun main(args: Array<String>) {
       if (status != AiDiscoverExit.OK) exitProcess(status)
       return
     }
+    in INSTANCE_COMMANDS -> exitProcess(runInstance(remaining.first(), remaining.drop(1)))
+    // Health checks run it every few seconds: one line, no banner.
+    "health" -> exitProcess(runHealth(remaining.drop(1)))
   }
 
   printBanner()
 
   when (remaining.firstOrNull()) {
     null -> printUsage()
-    "server" -> runServer(remaining.drop(1).toTypedArray())
+    "server" -> {
+      val status = runServer(remaining.drop(1).toTypedArray())
+      if (status != 0) exitProcess(status)
+    }
     "update" -> {
       // The engine that downloads the release only logs warnings unless -v or --debug asks for
       // more, so the progress line stays readable.
@@ -85,8 +124,14 @@ fun main(args: Array<String>) {
         System.err.println("Error: ${parsed.message}")
         println()
         printUsage()
+        exitProcess(InstanceExit.USAGE)
       }
-      is DownloadArgs.Download -> runDownload(parsed)
+      is DownloadArgs.Download -> if (parsed.listFiles) {
+        val status = runListFiles(parsed)
+        if (status != 0) exitProcess(status)
+      } else {
+        runDownload(parsed)
+      }
     }
   }
 }
@@ -109,23 +154,33 @@ private fun runDownload(args: DownloadArgs.Download) {
     println("Priority: ${args.priority}")
   }
   println("Max concurrent: ${args.maxConcurrent}")
+  if (args.fileIds.isNotEmpty()) println("Files: ${args.fileIds.joinToString(",")}")
   // Names only: values such as cookies are credentials.
   if (args.headers.isNotEmpty()) println("Headers: ${args.headers.keys.joinToString()}")
+  val fileConfig = readDefaultConfig()
+  val proxy = args.proxy ?: fileConfig.download.proxy
+  when (proxy) {
+    Proxy.System -> Unit
+    Proxy.Direct -> println("Proxy: none")
+    // Without its credentials.
+    is Proxy.Manual -> println("Proxy: ${proxy.address.url}")
+  }
   println()
 
   val config = DownloadConfig(
-    maxConnectionsPerDownload = 4,
-    retryCount = 3,
-    retryDelayMs = 1000,
-    progressIntervalMs = 200,
     maxConcurrentDownloads = args.maxConcurrent,
+    proxy = fileConfig.download.proxy,
   )
 
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+    httpEngine = httpEngine,
     config = config,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(readDefaultConfig().torrent)),
+    additionalSources = listOf(
+      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
   )
 
   runBlocking {
@@ -156,8 +211,10 @@ private fun runDownload(args: DownloadArgs.Download) {
           }
           is DownloadState.Paused ->
             println("\n[Paused] Download paused.")
-          is DownloadState.Completed ->
+          is DownloadState.Completed -> {
             println("\n[Completed] Saved to ${state.outputPath}")
+            state.checksum?.let { println("[Verified] ${it.algorithm.label} matches") }
+          }
           is DownloadState.Failed ->
             println("\n[Failed] ${state.error.message}")
           is DownloadState.Canceled ->
@@ -176,6 +233,46 @@ private fun runDownload(args: DownloadArgs.Download) {
       }
     )
 
+    ketch.close()
+  }
+}
+
+/**
+ * Lists the files or variants of [args]' URL, such as a torrent's files, without downloading
+ * it: one `ID  SIZE  PATH` row each, in the order `--sort` and `--reverse` ask for. Returns 0, or
+ * 1 when the URL cannot be resolved or has no files to choose.
+ */
+private fun runListFiles(args: DownloadArgs.Download): Int {
+  val fileConfig = readDefaultConfig()
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
+  // Only warnings unless -v or --debug asks for more, so the rows are not lost among log lines.
+  val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
+  val ketch = Ketch(
+    httpEngine = httpEngine,
+    config = DownloadConfig(proxy = args.proxy ?: fileConfig.download.proxy),
+    logger = Logger.console(level),
+    additionalSources = listOf(
+      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
+  )
+  return try {
+    val source = runBlocking { ketch.resolve(args.url, args.headers) }
+    val rows = fileListRows(source, args.fileOrder, args.reverse)
+    if (rows.isEmpty()) {
+      System.err.println("This download has no files to choose.")
+      1
+    } else {
+      rows.forEach(::println)
+      if (source.selectionMode == FileSelectionMode.SINGLE) {
+        System.err.println("These are variants: choose one with --files <id>.")
+      }
+      0
+    }
+  } catch (e: Exception) {
+    System.err.println("Couldn't list the files: ${e.message}")
+    1
+  } finally {
     ketch.close()
   }
 }
@@ -210,7 +307,12 @@ private fun applyGlobalFlags(args: MutableList<String>): List<String> {
   return remaining
 }
 
-private fun runServer(args: Array<String>) {
+/**
+ * Runs `ketch server` with [args], the arguments after `server`, until the server stops, and
+ * returns its exit status: 0, 1 when it cannot start, or 2 for unusable arguments or
+ * environment variables.
+ */
+private fun runServer(args: Array<String>): Int {
   // Track which CLI flags are explicitly set
   var cliHost: String? = null
   var cliPort: Int? = null
@@ -221,6 +323,8 @@ private fun runServer(args: Array<String>) {
   var cliAllowedDirectories: List<String>? = null
   var cliDownloadDir: String? = null
   var cliSpeedLimit: SpeedLimit? = null
+  var cliTorrentPort: Int? = null
+  var cliTorrentUpload: TorrentUploadMode? = null
   var configPath: String? = null
 
   var i = 0
@@ -228,7 +332,7 @@ private fun runServer(args: Array<String>) {
     when (args[i]) {
       "--help", "-h" -> {
         printServerUsage()
-        return
+        return 0
       }
       "--generate-config" -> {
         val path = defaultConfigPath()
@@ -237,17 +341,17 @@ private fun runServer(args: Array<String>) {
           System.err.println(
             "Delete it first if you want to regenerate."
           )
-          return
+          return 1
         }
         generateConfig(path)
         println("Generated default config at: $path")
-        return
+        return 0
       }
       "--config" -> {
         if (i + 1 >= args.size) {
           System.err.println("Error: --config requires a value")
           printServerUsage()
-          return
+          return 2
         }
         configPath = args[++i]
       }
@@ -255,7 +359,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --host requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliHost = args[++i]
       }
@@ -263,12 +367,12 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --port requires a value")
           printServerUsage()
-          return
+          return 2
         }
         val value = args[++i].toIntOrNull()
         if (value == null || value !in 1..65535) {
           System.err.println("Error: invalid port '${args[i]}'")
-          return
+          return 2
         }
         cliPort = value
       }
@@ -276,7 +380,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --token requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliToken = args[++i]
       }
@@ -285,7 +389,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --cors requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliCorsOrigins = args[++i].split(",").map { it.trim() }
       }
@@ -293,7 +397,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --allowed-hosts requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliAllowedHosts = args[++i].split(",").map { it.trim() }
       }
@@ -301,7 +405,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --allowed-dirs requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliAllowedDirectories = args[++i].split(",").map { it.trim() }.filter { it.isNotEmpty() }
       }
@@ -309,7 +413,7 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --dir requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliDownloadDir = args[++i]
       }
@@ -317,25 +421,49 @@ private fun runServer(args: Array<String>) {
         if (i + 1 >= args.size) {
           System.err.println("Error: --speed-limit requires a value")
           printServerUsage()
-          return
+          return 2
         }
         cliSpeedLimit = SpeedLimit.parse(args[++i]) ?: run {
           System.err.println("Error: invalid speed limit '${args[i]}'")
           printServerUsage()
-          return
+          return 2
+        }
+      }
+      "--torrent-port" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --torrent-port requires a value")
+          printServerUsage()
+          return 2
+        }
+        val value = args[++i].toIntOrNull()
+        if (value == null || value !in 0..65535) {
+          System.err.println("Error: invalid torrent port '${args[i]}'")
+          return 2
+        }
+        cliTorrentPort = value
+      }
+      "--torrent-upload" -> {
+        if (i + 1 >= args.size) {
+          System.err.println("Error: --torrent-upload requires a value")
+          printServerUsage()
+          return 2
+        }
+        cliTorrentUpload = parseTorrentUploadMode(args[++i]) ?: run {
+          System.err.println("Error: invalid upload mode '${args[i]}' ($TORRENT_UPLOAD_MODES)")
+          return 2
         }
       }
       else -> {
         System.err.println("Error: unknown option '${args[i]}'")
         printServerUsage()
-        return
+        return 2
       }
     }
     i++
   }
   if (noToken && cliToken != null) {
     System.err.println("Error: --token and --no-token cannot be used together")
-    return
+    return 2
   }
 
   // Load config: explicit --config path, or default path if exists,
@@ -345,7 +473,7 @@ private fun runServer(args: Array<String>) {
       FileConfigStore(configPath).load()
     } catch (e: Exception) {
       System.err.println("Error loading config: ${e.message}")
-      return
+      return 1
     }
   } else {
     val defaultPath = defaultConfigPath()
@@ -357,33 +485,44 @@ private fun runServer(args: Array<String>) {
         System.err.println(
           "Error loading config from $defaultPath: ${e.message}"
         )
-        return
+        return 1
       }
     } else {
       KetchConfig()
     }
   }
 
-  // CLI flags override config file values
+  // Environment variables override config file values, and CLI flags both
+  val environment = System.getenv()
+  val envConfig = try {
+    applyServerEnvironment(fileConfig, environment)
+  } catch (e: IllegalArgumentException) {
+    System.err.println("Error: ${e.message}")
+    return 2
+  }
   val defaultDownloadDir = System.getProperty("user.home") +
     File.separator + "Downloads"
-  val mergedConfig = fileConfig.copy(
-    server = fileConfig.server.copy(
-      host = cliHost ?: fileConfig.server.host,
-      port = cliPort ?: fileConfig.server.port,
+  val mergedConfig = envConfig.copy(
+    server = envConfig.server.copy(
+      host = cliHost ?: envConfig.server.host,
+      port = cliPort ?: envConfig.server.port,
       corsAllowedHosts = cliCorsOrigins
-        ?: fileConfig.server.corsAllowedHosts,
+        ?: envConfig.server.corsAllowedHosts,
       allowedHosts = cliAllowedHosts
-        ?: fileConfig.server.allowedHosts,
+        ?: envConfig.server.allowedHosts,
       allowedDirectories = cliAllowedDirectories
-        ?: fileConfig.server.allowedDirectories,
+        ?: envConfig.server.allowedDirectories,
     ),
-    download = fileConfig.download.copy(
+    download = envConfig.download.copy(
       defaultDirectory = cliDownloadDir
-        ?: fileConfig.download.defaultDirectory
+        ?: envConfig.download.defaultDirectory
         ?: defaultDownloadDir,
       speedLimit = cliSpeedLimit
-        ?: fileConfig.download.speedLimit,
+        ?: envConfig.download.speedLimit,
+    ),
+    torrent = envConfig.torrent.copy(
+      listenPort = cliTorrentPort ?: envConfig.torrent.listenPort,
+      upload = cliTorrentUpload ?: envConfig.torrent.upload,
     ),
   )
 
@@ -400,7 +539,7 @@ private fun runServer(args: Array<String>) {
     )
   } catch (e: IOException) {
     System.err.println("Error: could not keep the access token: ${e.message}")
-    return
+    return 1
   }
   val serverConfig = mergedConfig.server.copy(
     apiToken = token.value,
@@ -414,15 +553,21 @@ private fun runServer(args: Array<String>) {
   File(downloadConfig.defaultDirectory).mkdirs()
 
   val dbPath = defaultDbPath()
+  val instance = claimDownloads(SERVER_COMMAND)
   val taskStore = openTaskStore(dbPath)
 
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+    httpEngine = httpEngine,
     taskStore = taskStore,
     config = downloadConfig,
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(fileConfig.torrent)),
+    additionalSources = listOf(
+      FtpDownloadSource(),
+      torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
   )
   val server = KetchServer(
     ketch,
@@ -433,13 +578,21 @@ private fun runServer(args: Array<String>) {
     corsAllowedHosts = serverConfig.corsAllowedHosts,
     allowedHosts = serverConfig.allowedHosts,
     allowedDirectories = serverConfig.allowedDirectories,
+    // The config directory holds the settings, database and token.
+    protectedDirectories = systemProtectedDirectories() + defaultConfigDir(),
     mdnsEnabled = serverConfig.mdnsEnabled,
+    // Health checks wait for the saved tasks, which serveDaemon restores once it listens.
+    ready = false,
   )
+  // This process runs the downloads of the config directory, so it runs their hooks.
+  val hooks = HookRunner.start(ketch, mergedConfig.hooks)
 
   Runtime.getRuntime().addShutdownHook(Thread {
     println("Shutting down Ketch server...")
     server.stop()
     ketch.close()
+    hooks?.close()
+    instance.close()
   })
 
   println("Ketch Server v${KetchApi.VERSION}")
@@ -450,6 +603,13 @@ private fun runServer(args: Array<String>) {
   if (configPath != null) {
     println("  Config:        $configPath")
   }
+  serverEnvironmentNames(environment).takeIf { it.isNotEmpty() }?.let { names ->
+    println("  Environment:   " + names.joinToString(", "))
+  }
+  val torrentPort = mergedConfig.torrent.listenPort
+  println("  Torrent port:  " + if (torrentPort == 0) "any free one" else "$torrentPort (TCP, UDP)")
+  println("  Uploading:     " + describeTorrentUpload(mergedConfig.torrent.upload))
+  if (hooks != null) println("  Hooks:         ${hooks.size} from the config file")
   when (token) {
     is ServerToken.Given -> println("  Auth:          token from ${token.source}")
     is ServerToken.Saved -> println("  Auth:          token from ${token.file}")
@@ -492,17 +652,148 @@ private fun runServer(args: Array<String>) {
     )
   }
 
-  serveDaemon(server, ketch)
+  serveDaemon(server, ketch) {
+    // Other `ketch` commands on this machine attach to it through this.
+    val port = runBlocking { server.port() }
+    instance.publish(
+      CliInstance.Info(
+        command = SERVER_COMMAND,
+        pid = ProcessHandle.current().pid(),
+        url = loopbackUrl(serverConfig.host, port),
+        token = serverConfig.apiToken,
+      )
+    )
+  }
+  return 0
 }
+
+/** How [CliInstance.Info] names `ketch server`. */
+internal const val SERVER_COMMAND = "ketch server"
+
+/** How [CliInstance.Info] names `ketch mcp --standalone`. */
+private const val STANDALONE_MCP_COMMAND = "ketch mcp --standalone"
+
+/**
+ * Makes this process, which runs [command], the one that runs the downloads of the config
+ * directory, before it opens their database. When the desktop app or another `ketch` process
+ * already runs them, it says so and exits with status 1 instead: two engines on one database
+ * would resume the same downloads into the same files.
+ */
+private fun claimDownloads(command: String): CliInstance {
+  val configDir = File(defaultConfigDir())
+  val instance = try {
+    CliInstance.acquire(configDir)
+  } catch (e: IOException) {
+    val lockFile = File(configDir, CliInstance.LOCK_FILE)
+    System.err.println("Error: couldn't lock $lockFile: ${e.message}")
+    exitProcess(1)
+  }
+  val other = otherEngine(
+    locked = instance != null,
+    holder = { CliInstance.read(configDir)?.takeIf { isProcessAlive(it.pid) } },
+    appRunning = { DesktopApp.isRunning(configDir) },
+  )
+  if (other == null) return checkNotNull(instance)
+  // It removes the info file, which can only be one a process that stopped left behind.
+  instance?.close()
+  when (other) {
+    OtherEngine.App -> System.err.println(
+      """
+      |Error: the Ketch app is running, and it runs the downloads in ${defaultDbPath()}.
+      |Quit it before running `$command`. To reach the app's downloads, use `ketch add`,
+      |`ketch list` and `ketch mcp`, or turn on Settings > Sharing in the app for other devices.
+      """.trimMargin()
+    )
+    is OtherEngine.Command -> {
+      val who = other.info?.let { "`${it.command}` (process ${it.pid})" }
+        ?: "another `ketch` process"
+      System.err.println(
+        """
+        |Error: $who already runs the downloads in ${defaultDbPath()}.
+        |Stop it before running `$command`, or use `ketch add`, `ketch list` and `ketch mcp`,
+        |which work through it.
+        """.trimMargin()
+      )
+    }
+  }
+  exitProcess(1)
+}
+
+private fun isProcessAlive(pid: Long): Boolean =
+  ProcessHandle.of(pid).map { it.isAlive }.orElse(false)
+
+/**
+ * The address this machine reaches a server listening on [host] and [port] at: the loopback
+ * address when it listens on every interface.
+ */
+internal fun loopbackUrl(host: String, port: Int): String {
+  val name = host.trim().removePrefix("[").removeSuffix("]")
+  val address = when {
+    name.isEmpty() || name == "0.0.0.0" || name == "::" -> "127.0.0.1"
+    ':' in name -> "[$name]"
+    else -> name
+  }
+  return "http://$address:$port"
+}
+
+/**
+ * Runs the attaching command [name], one of [INSTANCE_COMMANDS], with [args], the arguments
+ * after its name, and returns its exit status, one of [InstanceExit]. Only the results, or the
+ * usage asked for, go to [results]; errors and logs go to stderr.
+ */
+internal fun runInstance(name: String, args: List<String>, results: PrintStream = System.out): Int {
+  // Logback's console appender and the console logger write to System.out; see runMcp.
+  val stdout = System.out
+  System.setOut(System.err)
+  try {
+    val command = when (val parsed = parseInstanceArgs(name, args)) {
+      InstanceArgs.Help -> {
+        printInstanceUsage(name, results)
+        return InstanceExit.OK
+      }
+      is InstanceArgs.Invalid -> {
+        System.err.println("Error: ${parsed.message}")
+        System.err.println("Run `ketch $name --help` for usage.")
+        return InstanceExit.USAGE
+      }
+      is InstanceArgs.Run -> parsed.command
+    }
+    // Only warnings unless -v or --debug asks for more, so the results stay readable.
+    val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
+    KetchLogger.setLogger(Logger.console(level))
+    val locator = instanceLocator(command.target)
+    return runBlocking { runInstanceCommand(command, locator::locate, results, System.err) }
+  } finally {
+    System.setOut(stdout)
+  }
+}
+
+/** Finds the instance [target] names, or the one running on this machine. */
+private fun instanceLocator(target: Target) = InstanceLocator(
+  configDir = File(defaultConfigDir()),
+  server = target.server ?: System.getenv(SERVER_ENV),
+  token = target.token ?: System.getenv(TOKEN_ENV),
+)
 
 /**
  * Serves [ketch] through [server] until the server stops. It listens before restoring the
  * tasks saved by earlier runs, so a daemon that cannot start, e.g. because another one uses
- * the port, never resumes downloads into the same files.
+ * the port, never resumes downloads into the same files; health checks report it ready once
+ * they are restored. A failure to restore them stops the server.
+ *
+ * @param onReady called once the server listens and the tasks are restored, so a client it lets
+ *   find the server sees every task
  */
-internal fun serveDaemon(server: KetchServer, ketch: KetchApi) {
+internal fun serveDaemon(server: KetchServer, ketch: KetchApi, onReady: () -> Unit = {}) {
   server.start(wait = false)
-  runBlocking { ketch.start() }
+  try {
+    runBlocking { ketch.start() }
+  } catch (e: Throwable) {
+    server.stop()
+    throw e
+  }
+  server.markReady()
+  onReady()
   server.awaitStop()
 }
 
@@ -554,11 +845,27 @@ private fun discover(args: List<String>, results: PrintStream): Int {
     is AiDiscoverArgs.Discover -> parsed
   }
 
-  val settings = resolveAiSettingsFromEnv(readDefaultConfig().ai)
+  val base = when (val choice = chooseLlm(readDefaultConfig().ai, options.provider)) {
+    is CliLlmChoice.Chosen -> choice.settings
+    is CliLlmChoice.Unknown -> {
+      System.err.println("Error: ${choice.message}")
+      return AiDiscoverExit.USAGE
+    }
+  }
+  val resolved = resolveAiSettingsFromEnv(base)
+  // After the environment, which may add the provider the model is for.
+  val settings = options.model?.let { resolved.withActive(resolved.llm.id, it) } ?: resolved
   if (!settings.isUsable) {
-    System.err.println("AI discovery is not configured.")
-    System.err.println("Set a provider and API token on the app's Settings page,")
-    System.err.println("or export a provider API key for this shell.")
+    val llm = settings.llm
+    val envKey = llm.provider.envKeys.firstOrNull()
+    if (options.provider != null && !llm.isComplete && envKey != null) {
+      System.err.println("${llm.displayName} has no API key.")
+      System.err.println("Set it on the app's Settings page, or export $envKey for this shell.")
+    } else {
+      System.err.println("AI discovery is not configured.")
+      System.err.println("Set a provider and API token on the app's Settings page,")
+      System.err.println("or export a provider API key for this shell.")
+    }
     return AiDiscoverExit.FAILED
   }
 
@@ -585,7 +892,7 @@ private fun discover(args: List<String>, results: PrintStream): Int {
   val aiModule = AiModule.create(AiConfig(settings = settings))
 
   System.err.println(
-    "Using ${settings.llm.provider.label}" +
+    "Using ${settings.llm.displayName}" +
       " · ${settings.llm.effectiveModel}"
   )
   System.err.println("Discovering resources for: \"${options.query}\"")
@@ -696,6 +1003,11 @@ private fun printAiDiscoverUsage(out: PrintStream) {
   out.println("  --no-filter          Show results the content filter hides:")
   out.println("                       shortened links, download aggregators,")
   out.println("                       look-alike sites, installers over HTTP")
+  out.println("  --provider <name>    Search with this saved provider, by its id")
+  out.println("                       or name, or with a provider such as")
+  out.println("                       deepseek whose API key is in the")
+  out.println("                       environment")
+  out.println("  --model <id>         Call this model")
   out.println("  -h, --help           Show this help message")
   out.println()
   out.println("Discover asks before it opens a website unless [ai.access] in")
@@ -711,43 +1023,55 @@ private fun printAiDiscoverUsage(out: PrintStream) {
   out.println("  ketch ai-discover \"latest Ubuntu 24.04 ISO\"")
   out.println("  ketch ai-discover \"ffmpeg release\" --sites ffmpeg.org")
   out.println("  ketch ai-discover --yes \"blender 4.2 macOS\" > results.txt")
+  out.println("  ketch ai-discover --provider deepseek \"krita 5 windows\"")
   out.println()
-  out.println("Configure a provider and token on the app's Settings")
-  out.println("page, or export OPENAI_API_KEY / ANTHROPIC_API_KEY /")
-  out.println("GEMINI_API_KEY for the same effect.")
+  out.println("Configure providers and keys on the app's Settings page,")
+  out.println("or export a provider's API key, such as OPENAI_API_KEY,")
+  out.println("ANTHROPIC_API_KEY, GEMINI_API_KEY or DEEPSEEK_API_KEY.")
 }
 
 private fun runMcp(args: List<String>) {
   var configPath: String? = null
   var cliDownloadDir: String? = null
+  var server: String? = null
+  var token: String? = null
+  var standalone = false
 
   var i = 0
   while (i < args.size) {
-    when (args[i]) {
+    when (val arg = args[i]) {
       "--help", "-h" -> {
         printMcpUsage()
         return
       }
-      "--config" -> {
+      "--standalone" -> standalone = true
+      "--config", "--dir", "--server", "--token" -> {
         if (i + 1 >= args.size) {
-          printMcpError("--config requires a value")
-          return
+          printMcpError("$arg requires a value")
+          exitProcess(InstanceExit.USAGE)
         }
-        configPath = args[++i]
-      }
-      "--dir" -> {
-        if (i + 1 >= args.size) {
-          printMcpError("--dir requires a value")
-          return
+        val value = args[++i]
+        when (arg) {
+          "--config" -> configPath = value
+          "--dir" -> cliDownloadDir = value
+          "--server" -> server = value
+          "--token" -> token = value
         }
-        cliDownloadDir = args[++i]
       }
       else -> {
-        printMcpError("unknown option '${args[i]}'")
-        return
+        printMcpError("unknown option '$arg'")
+        exitProcess(InstanceExit.USAGE)
       }
     }
     i++
+  }
+  if (standalone && (server != null || token != null)) {
+    printMcpError("--server and --token attach to an instance, which --standalone does not")
+    exitProcess(InstanceExit.USAGE)
+  }
+  if (!standalone && (configPath != null || cliDownloadDir != null)) {
+    printMcpError("--config and --dir set up the engine of --standalone")
+    exitProcess(InstanceExit.USAGE)
   }
 
   // stdout carries the JSON-RPC stream, so keep it for the transport and send everything
@@ -758,6 +1082,41 @@ private fun runMcp(args: List<String>) {
   System.setOut(System.err)
   printBanner()
 
+  if (standalone) {
+    runStandaloneMcp(configPath, cliDownloadDir, protocolOut)
+  } else {
+    runAttachedMcp(Target(server, token), protocolOut)
+  }
+  // The client closed stdin, which ends the MCP session. Exit rather than rely on every
+  // library thread being a daemon; the shutdown hooks close what is still open.
+  exitProcess(0)
+}
+
+/**
+ * Serves MCP on [protocolOut] for the instance the attaching commands find: the desktop app, a
+ * server, or the `ketch` process running this machine's downloads. It looks for one when a tool
+ * first needs it and again once it is lost, so the client may start before the app does.
+ */
+private fun runAttachedMcp(target: Target, protocolOut: PrintStream) {
+  KetchLogger.setLogger(Logger.console(ketchLogLevel))
+  val locator = instanceLocator(target)
+  val connection = InstanceConnection.remote(locator::locate) { endpoint ->
+    System.err.println("Working on the downloads of ${endpoint.label}")
+  }
+  Runtime.getRuntime().addShutdownHook(Thread { connection.close() })
+  runBlocking { KetchMcpServer(connection::get).startStdio(output = protocolOut) }
+}
+
+/**
+ * Serves MCP on [protocolOut] for an engine of its own on this machine's task database, as long
+ * as nothing else runs those downloads. Its API listens on loopback, with a token made for this
+ * run, so the attaching commands work through it meanwhile.
+ */
+private fun runStandaloneMcp(
+  configPath: String?,
+  cliDownloadDir: String?,
+  protocolOut: PrintStream,
+) {
   val fileConfig = if (configPath != null) {
     try {
       FileConfigStore(configPath).load()
@@ -780,29 +1139,110 @@ private fun runMcp(args: List<String>) {
 
   File(downloadConfig.defaultDirectory!!).mkdirs()
 
+  val instance = claimDownloads(STANDALONE_MCP_COMMAND)
   val taskStore = openTaskStore(defaultDbPath())
 
+  val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   val ketch = Ketch(
-    httpEngine = KtorHttpEngine.withNetworkInterfaces(),
+    httpEngine = httpEngine,
     taskStore = taskStore,
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),
-    additionalSources = listOf(FtpDownloadSource(), torrentSource(fileConfig.torrent)),
+    additionalSources = listOf(
+      // It serves an agent while the client runs, so it does not share finished torrents again
+      // when it starts; MCP offers no seeding tool to stop them.
+      FtpDownloadSource(), torrentSource(fileConfig.torrent, restoreSeeding = false),
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+    ),
   )
+  val apiToken = newToken()
+  val apiServer = KetchServer(
+    ketch,
+    host = "127.0.0.1",
+    port = 0,
+    apiToken = apiToken,
+    mdnsEnabled = false,
+  )
+  val hooks = HookRunner.start(ketch, fileConfig.hooks)
 
   Runtime.getRuntime().addShutdownHook(Thread {
+    apiServer.stop()
     ketch.close()
+    hooks?.close()
+    instance.close()
   })
 
-  val mcpServer = KetchMcpServer(ketch)
-
+  apiServer.start(wait = false)
   runBlocking {
     ketch.start()
-    mcpServer.startStdio(output = protocolOut)
+    // Once the tasks are restored, so the attaching commands see every one.
+    instance.publish(
+      CliInstance.Info(
+        command = STANDALONE_MCP_COMMAND,
+        pid = ProcessHandle.current().pid(),
+        url = loopbackUrl("127.0.0.1", apiServer.port()),
+        token = apiToken,
+      )
+    )
+    KetchMcpServer(ketch).startStdio(output = protocolOut)
   }
-  // The client closed stdin, which ends the MCP session. Exit rather than rely on every
-  // library thread being a daemon; the shutdown hook above closes Ketch.
-  exitProcess(0)
+}
+
+/**
+ * Runs `ketch health` with [args], the arguments after `health`: asks the `ketch server` this
+ * machine runs, found through its `instance.json` once it is ready and through the same config
+ * file and environment variables until then, whether it is ready, and returns one of
+ * [HealthExit].
+ */
+private fun runHealth(args: List<String>): Int {
+  val check = when (val parsed = parseHealthArgs(args)) {
+    HealthArgs.Help -> {
+      printHealthUsage()
+      return HealthExit.READY
+    }
+    is HealthArgs.Invalid -> {
+      System.err.println("Error: ${parsed.message}")
+      System.err.println("Run `ketch health --help` for usage.")
+      return HealthExit.USAGE
+    }
+    is HealthArgs.Check -> parsed
+  }
+  val fileConfig = check.configPath?.let { path ->
+    try {
+      FileConfigStore(path).load()
+    } catch (e: Exception) {
+      System.err.println("Ignoring $path, which can't be read: ${e.message}")
+      KetchConfig()
+    }
+  } ?: readDefaultConfig()
+  val server = try {
+    applyServerEnvironment(fileConfig, System.getenv()).server
+  } catch (e: IllegalArgumentException) {
+    System.err.println("Error: ${e.message}")
+    return HealthExit.USAGE
+  }
+  val running = CliInstance.read(File(defaultConfigDir()))
+  return checkHealth(healthCheckUrl(check, server, running))
+}
+
+private fun printHealthUsage() {
+  println("Usage: ketch health [options]")
+  println()
+  println("Check whether the `ketch server` on this machine is ready, as")
+  println("container health checks do. It asks where the running server")
+  println("says it listens, else where its config file and KETCH_*")
+  println("environment variables say.")
+  println()
+  println("Options:")
+  println("  --host <address>  Address to ask (default: the server's;")
+  println("                    127.0.0.1 for one on every interface)")
+  println("  --port <number>   Port to ask (default: the server's)")
+  println("  --config <path>   Config file the server was started with")
+  println("  --help, -h        Show this help message")
+  println()
+  println("Exit status: 0 once the server serves its saved downloads; 1")
+  println("while it restores them or when it cannot be reached; 2 for")
+  println("invalid arguments or environment variables.")
 }
 
 private fun printMcpError(message: String) {
@@ -817,10 +1257,20 @@ private fun printMcpUsage() {
   println("using stdio transport. AI agents like Claude Desktop")
   println("can manage downloads through MCP tools.")
   println()
+  println("It works on the downloads of the Ketch app, or of the")
+  println("`ketch server` running on this machine, found when a tool")
+  println("first needs them, so start either before or after it.")
+  println()
   println("Options:")
-  println("  --config <path>   Path to TOML config file")
-  println("  --dir <path>      Download directory")
-  println("                    (default: ~/Downloads)")
+  println("  --server <url>    Use the Ketch server at this address;")
+  println("                    also read from $SERVER_ENV")
+  println("  --token <token>   Its access token; also read from")
+  println("                    $TOKEN_ENV")
+  println("  --standalone      Run downloads itself, as nothing else")
+  println("                    on this machine does")
+  println("  --config <path>   Path to TOML config file (--standalone)")
+  println("  --dir <path>      Download directory (--standalone;")
+  println("                    default: ~/Downloads)")
   println("  --help, -h        Show this help message")
   println()
   println("MCP client configuration (e.g. claude_desktop_config.json):")
@@ -834,18 +1284,51 @@ private fun printMcpUsage() {
   println("  }")
 }
 
-/** Torrent source that persists DHT state and adds the configured extra trackers. */
-private fun torrentSource(settings: TorrentSettings) = TorrentDownloadSource(
-  TorrentConfig(
+/**
+ * Torrent source that persists DHT state, adds the configured extra trackers and tracker list,
+ * and uploads as `[torrent] upload` and `uploadLimit` say. Only `ketch server` passes a
+ * [listenPort], [TorrentSettings.listenPort]: the other commands may run beside it, so they let
+ * the system pick a free port. [restoreSeeding] shares finished torrents again when the engine
+ * starts, as `[torrent] upload = "seed"` asks; `ketch mcp --standalone` turns it off.
+ */
+private fun torrentSource(
+  settings: TorrentSettings,
+  listenPort: Int = 0,
+  restoreSeeding: Boolean = true,
+) = TorrentDownloadSource(
+  config = TorrentConfig(
+    listenPort = listenPort,
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
     additionalTrackers = settings.trackers,
+    trackerListUrls = settings.subscribedTrackerLists,
+    uploadPolicy = torrentUploadPolicy(settings.upload),
+    uploadRateLimit = settings.uploadLimit.bytesPerSecond,
+    encryption = torrentEncryption(settings.encryption),
+    utpEnabled = settings.utp,
+    portMapping = settings.portMapping,
+    localDiscovery = settings.localDiscovery,
   ),
+  restoreSeeding = restoreSeeding,
 )
 
+/** The engine's upload policy for the `[torrent] upload` setting [mode]. */
+internal fun torrentUploadPolicy(mode: TorrentUploadMode): TorrentUploadPolicy = when (mode) {
+  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
+  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
+  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
+}
+
+internal fun torrentEncryption(mode: TorrentEncryptionMode): TorrentEncryption = when (mode) {
+  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
+  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
+  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
+}
+
 /**
- * The default config file's settings, or the defaults when there is none or it cannot be read,
- * which stderr reports. The file stays as it is: the CLI never saves it, and the apps that share
- * it move an unreadable one aside and tell the user.
+ * The default config file's settings, the defaults when there is none, or
+ * [KetchConfig.Unreadable] (no torrent uploads) when it cannot be read, which stderr reports.
+ * The file stays as it is: the CLI never saves it, and the apps that share it move an unreadable
+ * one aside and tell the user.
  */
 private fun readDefaultConfig(): KetchConfig {
   val path = defaultConfigPath()
@@ -854,7 +1337,7 @@ private fun readDefaultConfig(): KetchConfig {
     FileConfigStore(path).load()
   } catch (e: Exception) {
     System.err.println("Ignoring $path, which can't be read: ${e.message}")
-    KetchConfig()
+    KetchConfig.Unreadable
   }
 }
 
@@ -881,10 +1364,13 @@ private fun openTaskStore(dbPath: String): SqliteTaskStore {
 
 private fun printUsage() {
   println("Usage: ketch [options] <url> [destination]")
+  println("       ketch add [options] <url> [destination]")
+  println("       ketch list | pause | resume | watch [options]")
   println("       ketch server [options]")
   println("       ketch mcp [options]")
   println("       ketch ai-discover <query> [options]")
   println("       ketch update [options]")
+  println("       ketch health [options]")
   println()
   println("Global Options:")
   println("  -v, --verbose            Enable verbose logging (DEBUG)")
@@ -897,12 +1383,45 @@ private fun printUsage() {
   println("  --priority <level>       Set download priority")
   println("                           Values: low, normal, high, urgent")
   println("  --max-concurrent <n>     Max simultaneous downloads")
-  println("                           Default: 3")
+  println("                           Default: 4")
   println("  -H, --header <header>    Send a request header, e.g.")
   println("                           -H 'Cookie: sid=1'; repeatable")
   println("  --user-agent <value>     Send this User-Agent instead of")
   println("                           Ketch/<version>")
   println("  --referer <url>          Send this Referer")
+  println("  --proxy <url>            Download HTTP(S) through this proxy:")
+  println("                           http://[user:pass@]host:port or")
+  println("                           socks5://[user:pass@]host:port")
+  println("  --proxy-bypass <hosts>   Hosts to reach directly with --proxy,")
+  println("                           comma-separated, e.g. '*.lan,10.0.0.0/8'")
+  println("  --no-proxy               Connect directly, without a proxy")
+  println("                           Default: [download.proxy] in the config")
+  println("                           file, else https_proxy, http_proxy,")
+  println("                           all_proxy and no_proxy")
+  println("  --files <ids>            Download only these files of a torrent")
+  println("                           or the like, comma-separated IDs from")
+  println("                           --list-files; one ID for a choice of")
+  println("                           variants")
+  println("  --list-files             List the files or variants of a URL,")
+  println("                           such as a torrent or magnet, with their")
+  println("                           IDs instead of downloading")
+  println("  --sort <order>           Order of --list-files: name, size or")
+  println("                           type (by extension); default: the")
+  println("                           download's own order")
+  println("  --reverse                Reverse the order of --list-files")
+  println("  --checksum <digest>      Fail unless the file has this digest:")
+  println("                           sha256:<hex>, also md5, sha1, sha512;")
+  println("                           without it, a digest the server")
+  println("                           publishes is checked")
+  println()
+  println("Running Ketch (the app, or `ketch server`):")
+  println("  add <url> [destination]  Add a download; prints its task ID")
+  println("  list                     List the downloads")
+  println("  pause <id>... | --all    Pause downloads")
+  println("  resume <id>... | --all   Resume downloads")
+  println("  watch [<id>...]          Print changes as JSON lines")
+  println("                           Run `ketch <command> --help` for")
+  println("                           their options")
   println()
   println("Server:")
   println("  server [options]         Start Ketch daemon server")
@@ -941,13 +1460,99 @@ private fun printUsage() {
   println("                           release; run `ketch update --help`")
   println("                           for options")
   println()
+  println("Health:")
+  println("  health [options]         Exit 0 once the local server is ready;")
+  println("                           run `ketch health --help` for options")
+  println()
   println("Examples:")
   println("  ketch https://example.com/file.zip")
   println("  ketch -v https://example.com/file.zip")
+  println("  ketch add https://example.com/file.zip ~/Downloads/")
+  println("  ketch watch $(ketch add https://example.com/file.zip)")
   println("  ketch --priority high https://example.com/file.zip")
   println("  ketch server --port 9000 --dir /tmp/downloads")
   println("  ketch ai-discover \"latest Ubuntu ISO\"")
   println("  ketch ai-discover \"ffmpeg\" --sites ffmpeg.org")
+}
+
+/** Prints the usage of the attaching command [name] to [out]. */
+private fun printInstanceUsage(name: String, out: PrintStream) {
+  when (name) {
+    "add" -> {
+      out.println("Usage: ketch add [options] <url> [destination]")
+      out.println()
+      out.println("Add a download to the running Ketch and print its task ID.")
+      out.println("Without a destination it goes to Ketch's download folder; a")
+      out.println("relative path is taken from the current directory.")
+    }
+    "list" -> {
+      out.println("Usage: ketch list [options]")
+      out.println()
+      out.println("List the downloads of the running Ketch.")
+    }
+    "pause", "resume" -> {
+      out.println("Usage: ketch $name [options] <task-id>...")
+      out.println("       ketch $name [options] --all")
+      out.println()
+      if (name == "pause") {
+        out.println("Pause downloads of the running Ketch: those named, or every")
+        out.println("waiting and running one. Any unique start of an ID will do.")
+      } else {
+        out.println("Resume downloads of the running Ketch: those named, or every")
+        out.println("paused one. Any unique start of an ID will do.")
+      }
+    }
+    "watch" -> {
+      out.println("Usage: ketch watch [options] [<task-id>...]")
+      out.println()
+      out.println("Print the downloads of the running Ketch as JSON lines while")
+      out.println("they change. Each line has an \"event\": snapshot (each task")
+      out.println("when watch starts), added, state, progress or removed.")
+      out.println("With task IDs it follows those only and exits once each has")
+      out.println("finished: 0 when all completed, 1 otherwise. Progress comes")
+      out.println("every second unless --interval says otherwise.")
+    }
+  }
+  out.println()
+  out.println("It works on the Ketch app, or the `ketch server` running on")
+  out.println("this machine, unless --server names another device.")
+  out.println()
+  out.println("Options:")
+  if (name == "add") {
+    out.println("  --speed-limit <value>    Limit its speed (e.g. 500k, 10m)")
+    out.println("  --priority <level>       low, normal, high or urgent")
+    out.println("  --connections <n>        Connections to use; 0 (default)")
+    out.println("                           uses Ketch's setting")
+    out.println("  -H, --header <header>    Send a request header, e.g.")
+    out.println("                           -H 'Cookie: sid=1'; repeatable")
+    out.println("  --user-agent <value>     Send this User-Agent")
+    out.println("  --referer <url>          Send this Referer")
+    out.println("  --proxy <url>            Download through this HTTP or SOCKS5")
+    out.println("                           proxy instead of Ketch's setting")
+    out.println("  --proxy-bypass <hosts>   Hosts to reach directly with --proxy")
+    out.println("  --no-proxy               Connect directly, without a proxy")
+    out.println("  --idempotency-key <key>  Running the command again with the")
+    out.println("                           same key adds the download once")
+    out.println("  --checksum <digest>      Fail unless the file has this digest,")
+    out.println("                           such as sha256:<hex>")
+  }
+  if (name == "add" || name == "list") {
+    out.println("  --json                   Print JSON instead")
+  }
+  if (name == "pause" || name == "resume") {
+    out.println("  --all                    Every download it applies to")
+  }
+  if (name == "watch") {
+    out.println("  --interval <duration>    How often progress updates, e.g.")
+    out.println("                           500ms or 5s (default 1s)")
+  }
+  out.println("  --server <url>           Use the Ketch server at this address;")
+  out.println("                           also read from $SERVER_ENV")
+  out.println("  --token <token>          Its access token; also read from")
+  out.println("                           $TOKEN_ENV")
+  out.println("  -h, --help               Show this help message")
+  out.println()
+  out.println("Exit status: 0 on success, 1 on failure, 2 for invalid arguments.")
 }
 
 private fun printServerUsage() {
@@ -980,12 +1585,42 @@ private fun printServerUsage() {
   println("                         (default: ~/Downloads)")
   println("  --speed-limit <value>  Global speed limit")
   println("                         (e.g., 10m, 500k)")
+  println("  --torrent-port <number>")
+  println("                         Port for BitTorrent peers (TCP) and")
+  println("                         DHT (UDP), to forward on a router;")
+  println("                         0 picks a free one (default)")
+  println("  --torrent-upload <mode>")
+  println("                         What torrent peers may download:")
+  println("                         off, while-downloading (default)")
+  println("                         or seed (also finished torrents)")
   println("  --help, -h             Show this help message")
   println()
   println("Config file:")
   println("  Default location: ${defaultConfigPath()}")
-  println("  CLI flags override config file values.")
+  println("  Environment variables override config file values, and")
+  println("  CLI flags override both.")
   println("  Use --generate-config to create a default file.")
+  println()
+  println("Environment variables:")
+  println("  $CONFIG_DIR_ENV         Folder for config.toml, the")
+  println("                           database and the token")
+  println("  $TOKEN_ENV          --token")
+  println("  ${ServerEnv.HOST}, ${ServerEnv.PORT}   --host, --port")
+  println("  ${ServerEnv.DOWNLOAD_DIR}       --dir")
+  println("  ${ServerEnv.ALLOWED_DIRS}       --allowed-dirs")
+  println("  ${ServerEnv.ALLOWED_HOSTS}      --allowed-hosts")
+  println("  ${ServerEnv.CORS}               --cors")
+  println("  ${ServerEnv.SPEED_LIMIT}        --speed-limit")
+  println("  ${ServerEnv.TORRENT_PORT}       --torrent-port")
+  println("  ${ServerEnv.TORRENT_UPLOAD}     --torrent-upload")
+  println("  ${ServerEnv.NAME}               name")
+  println("  ${ServerEnv.MDNS}               mdnsEnabled (true or false)")
+  println("  ${ServerEnv.MAX_CONCURRENT_DOWNLOADS}")
+  println("                           maxConcurrentDownloads")
+  println("  ${ServerEnv.MAX_CONNECTIONS_PER_DOWNLOAD}")
+  println("                           maxConnectionsPerDownload")
+  println("  ${ServerEnv.MAX_CONNECTIONS_PER_HOST}")
+  println("                           maxConnectionsPerHost")
   println()
   println("Examples:")
   println("  ketch server")

@@ -9,3 +9,7 @@ actual val isMobilePlatform: Boolean = false
 
 internal actual val HorizontalResizePointerIcon: PointerIcon =
   PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR))
+
+internal actual val keepAwakeSupported: Boolean = true
+
+internal actual val localPeerDiscoverySupported: Boolean = true

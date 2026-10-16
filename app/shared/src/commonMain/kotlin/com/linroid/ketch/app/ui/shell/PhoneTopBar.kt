@@ -220,7 +220,10 @@ internal fun PhoneTopBar(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      PulseSubtitle(state, onClick = { shell.pulseSheetOpen = true })
+      PulseSubtitle(
+        state = state,
+        onClick = { shell.pulseSheetOpen = true },
+      )
     }
     if (actions != null) {
       actions()

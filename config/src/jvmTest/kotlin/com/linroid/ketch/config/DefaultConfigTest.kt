@@ -1,5 +1,9 @@
 package com.linroid.ketch.config
 
+import com.linroid.ketch.api.DownloadCategory
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.SpeedLimit
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
@@ -13,8 +17,10 @@ class DefaultConfigTest {
       KetchConfig.serializer(),
       DEFAULT_CONFIG_CONTENT,
     )
+    assertEquals(DownloadConfig.Default, decoded.download)
     assertEquals(TorrentSettings(), decoded.torrent)
     assertEquals(8642, decoded.server.port)
+    assertEquals(emptyList(), decoded.hooks)
   }
 
   @Test
@@ -29,6 +35,26 @@ class DefaultConfigTest {
 
       val home = System.getProperty("user.home").trimEnd('/', '\\')
       assertEquals("$home/Downloads", config.download.defaultDirectory)
+      val categories = listOf(
+        DownloadCategory(
+          folder = "Video",
+          extensions = listOf("mp4", "mkv", "webm"),
+          mimeTypes = listOf("video/*"),
+        ),
+        DownloadCategory(folder = "Software/GitHub", hosts = listOf("github.com")),
+      )
+      val proxy = Proxy.Manual(
+        "socks5://me:secret@127.0.0.1:1080",
+        bypass = listOf("*.lan", "10.0.0.0/8"),
+      )
+      assertEquals(
+        DownloadConfig.Default.copy(
+          defaultDirectory = "$home/Downloads",
+          proxy = proxy,
+          categories = categories,
+        ),
+        config.download,
+      )
       // Ktor's CORS allowHost rejects a scheme in the host, failing server startup
       assertEquals(listOf("localhost:3000"), config.server.corsAllowedHosts)
       assertEquals(listOf("$home/Media"), config.server.allowedDirectories)
@@ -36,6 +62,14 @@ class DefaultConfigTest {
       val remote = RemoteConfig("192.168.1.100", apiToken = "token", name = "NAS")
       assertEquals(listOf(remote), config.remotes)
       assertEquals(1, config.torrent.trackers.size)
+      assertEquals(listOf("https://lists.example.org/trackers.txt"), config.torrent.trackerListUrls)
+      assertEquals(6881, config.torrent.listenPort)
+      assertEquals(TorrentUploadMode.WhileDownloading, config.torrent.upload)
+      assertEquals(SpeedLimit.Unlimited, config.torrent.uploadLimit)
+      val (command, webhook) = config.hooks
+      assertEquals(listOf("/usr/local/bin/ketch-done"), command.command)
+      assertEquals(setOf(HookEvent.Completed, HookEvent.Failed), webhook.eventSet)
+      assertEquals("https://hooks.example.com/ketch", webhook.webhook)
     } finally {
       dir.deleteRecursively()
     }

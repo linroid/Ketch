@@ -35,21 +35,66 @@ port = 8642
 # defaultDirectory = "~/Downloads"  # ~ is your home folder
 # speedLimit = "unlimited"  # "unlimited", "10m" (MB/s), "500k" (KB/s)
 maxConnectionsPerDownload = 4
-maxConcurrentDownloads = 2
-maxConnectionsPerHost = 8
+# Queue limits count downloads, not individual connections; 0 means unlimited.
+maxConcurrentDownloads = 4
+maxConnectionsPerHost = 16
 
 # Advanced settings (defaults are usually fine):
-# retryCount = 3
-# retryDelayMs = 1000
+# retryCount = 3  # retries in a row without progress before a download fails
+# unlimitedRetries = false  # true retries until the download is paused
+# retryDelayMs = 1000  # first retry delay, doubled for each further one...
+# maxRetryDelayMs = 60000  # ...up to this, then randomized between half and all of it
+# idleTimeoutMs = 60000  # retry a connection that receives nothing this long; 0 is off
+# minSpeed = 0  # bytes/s a connection must average over 30 s, or it is retried; 0 is off
 # progressIntervalMs = 200
 # saveIntervalMs = 5000
 # bufferSize = 8192
+
+# How HTTP(S) downloads reach servers; FTP and BitTorrent always connect
+# directly. "system" (the default) follows the https_proxy, http_proxy,
+# all_proxy and no_proxy environment variables, then the system's settings;
+# "direct" uses no proxy; "manual" uses url, an http:// or socks5:// proxy.
+# Hosts in bypass (names, which match their subdomains too, IP addresses or
+# CIDR ranges) and this machine are always reached directly. The apps edit
+# this under Settings > Network.
+# [download.proxy]
+# mode = "manual"
+# url = "socks5://127.0.0.1:1080"
+# username = "me"
+# password = "secret"
+# bypass = ["*.lan", "10.0.0.0/8"]
+
+# Category folders: a download that does not choose a folder is saved in the
+# folder of the first category it matches, inside defaultDirectory. A download
+# matches by file extension or media type (either is enough) and, when hosts
+# are listed, by site too; example.com covers its subdomains. The apps edit
+# these under Settings > Downloads.
+# [[download.categories]]
+# folder = "Video"
+# extensions = ["mp4", "mkv", "webm"]
+# mimeTypes = ["video/*"]
+# [[download.categories]]
+# folder = "Software/GitHub"
+# hosts = ["github.com"]
 
 # Extra trackers announced alongside public torrents' own trackers, e.g. when
 # a network blocks a torrent's own tracker. Private torrents ignore them. The
 # apps edit this under Settings > BitTorrent.
 # [torrent]
 # trackers = ["udp://tracker.opentrackr.org:1337/announce"]
+# Lists of public trackers (one announce URL per line), downloaded daily and
+# used after the trackers above: ngosang's and XIU2's best lists by default.
+# trackerList = true
+# trackerListUrls = ["https://lists.example.org/trackers.txt"]
+# Port `ketch server` accepts peers on (TCP) and runs DHT on (UDP), for port
+# forwarding; 0 picks a free one at every launch. The apps always pick one.
+# listenPort = 6881
+# Share verified pieces with peers: "while-downloading" (default), "off", or
+# "seed" to keep sharing finished torrents while Ketch runs. Peers you upload
+# to see this device's IP address. The apps edit this under Settings >
+# BitTorrent.
+# upload = "while-downloading"
+# uploadLimit = "unlimited"  # "unlimited", "1m" (MB/s), "500k" (KB/s)
 
 # Pre-configured remote servers. The apps show `name` (or the name the server
 # announces) and stay connected to a device while another is shown unless
@@ -61,6 +106,24 @@ maxConnectionsPerHost = 8
 # secure = false
 # name = "NAS"
 # watch = true
+
+# Hooks: run a command or post a webhook when downloads are added, start,
+# complete, fail, are canceled or removed. Only `ketch server`, `ketch mcp
+# --standalone` and the desktop app run them, read from this file at launch;
+# no API can change them. A command is a program and its arguments, never a
+# shell line: it reads the event as JSON on stdin and in KETCH_* variables
+# (KETCH_EVENT, KETCH_TASK_ID, KETCH_OUTPUT_PATH, ...). A webhook gets the
+# JSON as a POST, signed in X-Ketch-Signature when `secret` is set. See
+# docs/hooks.md.
+# [[hooks]]
+# events = ["completed"]
+# command = ["/usr/local/bin/ketch-done"]
+# timeoutSeconds = 60
+# [[hooks]]
+# events = ["completed", "failed"]
+# webhook = "https://hooks.example.com/ketch"
+# secret = "change-me"
+# origins = ["browser"]
 """
 
 /** Writes a default config file to [path]. */

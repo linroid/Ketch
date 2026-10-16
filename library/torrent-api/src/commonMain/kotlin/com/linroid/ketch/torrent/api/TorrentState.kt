@@ -1,0 +1,85 @@
+package com.linroid.ketch.torrent.api
+
+import kotlinx.serialization.Serializable
+
+/** Transfer lifecycle is independent of the download task's selected-data completion. */
+@Serializable
+enum class TorrentActivity {
+  RESOLVING,
+  CHECKING,
+  QUEUED,
+  DOWNLOADING,
+  SEEDING,
+  PAUSED,
+  STOPPED,
+  FAILED,
+}
+
+/**
+ * Aggregate counters. Payload excludes padding and protocol overhead; retries/discards are
+ * separate.
+ * [selectedVerifiedBytes] can decrease after selection changes or a failed recheck. Completion is
+ * scoped to the snapshot's selection generation. Ratio is undefined when downloaded payload is
+ * zero. A counter the backend does not track is `null`, never an invented zero.
+ */
+@Serializable
+data class TorrentCounters(
+  val totalPayloadBytes: Long,
+  val wantedBytes: Long,
+  val selectedVerifiedBytes: Long,
+  val receivedPayloadBytes: Long? = null,
+  val uploadedPayloadBytes: Long? = null,
+  val discardedPayloadBytes: Long? = null,
+  val protocolBytes: Long? = null,
+  val downloadBytesPerSecond: Long? = null,
+  val uploadBytesPerSecond: Long? = null,
+  val seedSeconds: Long? = null,
+) {
+  init {
+    require(totalPayloadBytes >= 0 && wantedBytes in 0..totalPayloadBytes)
+    require(selectedVerifiedBytes in 0..wantedBytes)
+    require(
+      listOf(
+        receivedPayloadBytes, uploadedPayloadBytes, discardedPayloadBytes, protocolBytes,
+        downloadBytesPerSecond, uploadBytesPerSecond, seedSeconds
+      ).all { it == null || it >= 0 }
+    )
+  }
+}
+
+/**
+ * Bounded task summary. Peer/file lists are paginated separately at the same revision.
+ * Metadata may be absent while resolving; [counters] then remains null rather than implying zero.
+ * A completed selection does not imply full-content availability or stopped seeding.
+ *
+ * @property seeding whether the task is meant to seed: its saved seeding intent or a live seeding
+ *   session. It can be `true` while [activity] is not [TorrentActivity.SEEDING], such as while
+ *   uploads are paused, and the task seeds once they resume; `null` from backends that do not
+ *   report it.
+ */
+@Serializable
+data class TorrentSnapshot(
+  val taskId: String,
+  val revision: TorrentRevision,
+  val activity: TorrentActivity,
+  val selectionGeneration: Long,
+  val selectionComplete: Boolean,
+  val counters: TorrentCounters? = null,
+  val seeding: Boolean? = null,
+) {
+  init {
+    require(taskId.isNotBlank() && taskId.length <= 128)
+    require(selectionGeneration >= 0)
+    require(!selectionComplete || counters != null &&
+      counters.selectedVerifiedBytes == counters.wantedBytes)
+  }
+}
+
+/** Bounded page request with opaque cursors, invalidated by relevant mutations. */
+@Serializable
+data class TorrentPageRequest(val limit: Int = 100, val cursor: String? = null) {
+  init {
+    require(limit in 1..1000)
+    require(cursor == null || cursor.isNotBlank() && cursor.length <= 4096)
+  }
+}

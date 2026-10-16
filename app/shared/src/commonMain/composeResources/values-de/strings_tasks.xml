@@ -10,6 +10,7 @@
   <string name="row_status_downloading">Lädt</string>
   <string name="row_status_stalled">Stockt</string>
   <string name="row_status_paused">Pausiert</string>
+  <string name="row_status_starting">Startet</string>
   <string name="row_status_queued">In Warteschlange</string>
   <string name="row_status_scheduled">Geplant</string>
   <string name="row_status_done">Fertig</string>
@@ -23,6 +24,8 @@
   <string name="row_saved_on">Gespeichert auf %1$s</string>
   <string name="row_missing_file">Datei verschoben oder gelöscht</string>
   <string name="row_completed">Abgeschlossen</string>
+  <string name="row_choose_files">Dateien zum Herunterladen auswählen</string>
+  <string name="row_seeding">Seedet</string>
   <string name="row_took">dauerte %1$s</string>
   <plurals name="row_files">
     <item quantity="one">%1$d Datei</item>
@@ -60,6 +63,10 @@
   <string name="sort_origin">Herkunft</string>
   <string name="sort_priority">Priorität</string>
   <string name="sort_device">Gerät</string>
+  <string name="sort_kind">Art</string>
+  <string name="sort_selected_first">Ausgewählte zuerst</string>
+  <string name="sort_torrent_order">Torrent-Reihenfolge</string>
+  <string name="sort_reverse">Umgekehrte Reihenfolge</string>
   <string name="group_smart">Intelligent</string>
   <string name="group_status">Status</string>
   <string name="group_day">Tag</string>
@@ -105,6 +112,7 @@
     <item quantity="one">%1$d davor</item>
     <item quantity="other">%1$d davor</item>
   </plurals>
+  <string name="row_finding_peers">Sucht Peers</string>
   <string name="queue_starting">Startet</string>
 
   <string name="action_row_pause">Pausieren</string>
@@ -130,10 +138,12 @@
   <string name="action_row_open_source_page">Quellseite öffnen</string>
   <string name="action_row_copy_error">Fehler kopieren</string>
   <string name="action_row_copy_details">Details kopieren</string>
-  <string name="action_row_stop_and_discard">Stoppen und Fortschritt verwerfen…</string>
-  <string name="action_row_remove">Aus der Liste entfernen</string>
-  <string name="action_row_remove_and_trash">Entfernen und Datei in den Papierkorb legen…</string>
-  <string name="action_row_remove_and_delete">Entfernen und Dateien löschen…</string>
+  <string name="action_row_stop_and_discard">Download abbrechen…</string>
+  <string name="action_row_remove">Entfernen…</string>
+  <string name="action_row_choose_files">Dateien auswählen…</string>
+  <string name="action_row_download_all_files">Alle Dateien herunterladen</string>
+  <string name="action_row_stop_seeding">Seeden beenden</string>
+  <string name="action_row_seed">Seeden</string>
   <plurals name="batch_pause">
     <item quantity="one">%1$d Download pausieren</item>
     <item quantity="other">%1$d Downloads pausieren</item>
@@ -168,22 +178,18 @@
     <item quantity="other">%1$d Dateien erneut herunterladen</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="one">Fortschritt von %1$d Download verwerfen…</item>
-    <item quantity="other">Fortschritt von %1$d Downloads verwerfen…</item>
+    <item quantity="one">%1$d Download abbrechen…</item>
+    <item quantity="other">%1$d Downloads abbrechen…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="one">%1$d Download aus der Liste entfernen</item>
-    <item quantity="other">%1$d Downloads aus der Liste entfernen</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="one">%1$d Download und seine Datei entfernen…</item>
-    <item quantity="other">%1$d Downloads und ihre Dateien entfernen…</item>
+    <item quantity="one">%1$d Download entfernen…</item>
+    <item quantity="other">%1$d Downloads entfernen…</item>
   </plurals>
   <string name="bar_speed">Geschwindigkeit</string>
   <string name="bar_copy_links">Links kopieren</string>
   <string name="bar_remove">Entfernen…</string>
   <string name="bar_copy_paths">Dateipfade kopieren</string>
-  <string name="bar_discard">Fortschritt verwerfen…</string>
+  <string name="bar_discard">Downloads abbrechen…</string>
   <string name="bar_label_count">%1$s (%2$d)</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s: %2$d von %3$d ausgewählten</string>

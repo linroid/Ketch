@@ -1,22 +1,47 @@
 package com.linroid.ketch.api
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
-/** An interface available on the instance that performs downloads, not on a remote client. */
+/** A network interface of the instance that downloads. */
 @Serializable
 data class NetworkInterfaceInfo(
-  /** Opaque instance-local identifier. Use this ID when selecting interfaces. */
+  /** An opaque ID to select it by. */
   val id: String,
-  /** Human-readable interface name. */
   val name: String,
-  /** Numeric IP addresses currently assigned to this interface. */
+  /** Its current IP addresses. */
   val addresses: List<String>,
+  /** What kind of network it is; [NetworkKind.OTHER] when the instance cannot tell. */
+  val kind: NetworkKind = NetworkKind.OTHER,
 )
 
-/** Runtime HTTP interface selection. An empty list restores system-default routing. */
+/**
+ * The kind of a [NetworkInterfaceInfo], for telling networks apart at a glance. Unknown values
+ * decode as [OTHER].
+ */
+@Serializable(with = NetworkKindSerializer::class)
+enum class NetworkKind {
+  WIFI,
+  CELLULAR,
+  ETHERNET,
+
+  /** A VPN or other tunnel, which runs over another network. */
+  VPN,
+  BLUETOOTH,
+
+  /** Not known, or none of the others, such as a virtual bridge. */
+  OTHER,
+}
+
+/** The interfaces HTTP requests use; empty for default routing. */
 @Serializable
 data class NetworkInterfaceConfig(
-  /** Ordered, distinct IDs from [NetworkInterfaces.available], used for round-robin dispatch. */
+  /** Distinct IDs from [NetworkInterfaces.available], used round-robin. */
   val interfaceIds: List<String> = emptyList(),
 ) {
   init {
@@ -25,13 +50,27 @@ data class NetworkInterfaceConfig(
   }
 }
 
-/** Point-in-time interface discovery and selection for an instance. */
+/** An instance's interfaces and selection. */
 @Serializable
 data class NetworkInterfaces(
-  /** False if this backend cannot configure HTTP network interfaces. */
+  /** Whether the instance can select interfaces. */
   val supported: Boolean = false,
-  /** Interfaces currently available for selection. */
   val available: List<NetworkInterfaceInfo> = emptyList(),
-  /** Selected IDs can remain here after an interface disappears from [available]. */
+  /** May name interfaces no longer [available]. */
   val config: NetworkInterfaceConfig = NetworkInterfaceConfig(),
 )
+
+internal object NetworkKindSerializer : KSerializer<NetworkKind> {
+  override val descriptor: SerialDescriptor =
+    PrimitiveSerialDescriptor("com.linroid.ketch.api.NetworkKind", PrimitiveKind.STRING)
+
+  override fun serialize(encoder: Encoder, value: NetworkKind) {
+    encoder.encodeString(value.name.lowercase())
+  }
+
+  override fun deserialize(decoder: Decoder): NetworkKind {
+    val name = decoder.decodeString()
+    return NetworkKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+      ?: NetworkKind.OTHER
+  }
+}

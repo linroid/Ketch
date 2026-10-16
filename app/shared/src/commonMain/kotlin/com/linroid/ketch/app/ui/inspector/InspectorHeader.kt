@@ -67,6 +67,7 @@ import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.toDeviceHealth
+import com.linroid.ketch.app.state.awaitsFileSelection
 import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
@@ -360,6 +361,7 @@ private fun reasonIcon(row: TaskRow, reason: InspectorReason): KetchIcon = when 
   reason.warning -> KetchIcon.Warning
   reason.action == ReasonAction.FullSpeed -> KetchIcon.SlowLane
   reason.action != null -> KetchIcon.Speed
+  row.isStarting -> KetchIcon.Active
   row.state is DownloadState.Queued -> KetchIcon.Queued
   row.state is DownloadState.Scheduled -> KetchIcon.Scheduled
   row.state is DownloadState.Paused -> KetchIcon.Pause
@@ -442,9 +444,15 @@ private fun barActions(row: TaskRow, runner: RowActionRunner, missing: Boolean):
   val actions = when (row.state) {
     is DownloadState.Downloading -> listOf(RowAction.Pause)
     // Paused for an urgent download, it waits in the queue and resumes on its own.
-    is DownloadState.Paused ->
-      listOf(if (row.state.waitsInQueue) RowAction.StartNow else RowAction.Resume)
-    is DownloadState.Queued -> listOf(RowAction.StartNow)
+    is DownloadState.Paused -> listOf(
+      when {
+        row.state.awaitsFileSelection -> RowAction.ChooseFiles
+        row.state.waitsInQueue -> RowAction.StartNow
+        else -> RowAction.Resume
+      }
+    )
+    // Out of the queue, a starting task already runs.
+    is DownloadState.Queued -> listOf(if (row.isStarting) RowAction.Pause else RowAction.StartNow)
     is DownloadState.Scheduled -> {
       listOfNotNull(RowAction.StartNow.takeIf { row.device.capabilities.canReschedule })
     }

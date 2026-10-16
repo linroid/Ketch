@@ -1,12 +1,10 @@
 package com.linroid.ketch.core
 
-import kotlinx.coroutines.CoroutineDispatcher
+/** Most threads [KetchDispatchers.Default] runs network operations on. */
+internal const val DEFAULT_NETWORK_THREADS = 8
 
-/** Creates the single-threaded main/task dispatcher. */
-internal expect fun createMainDispatcher(): CoroutineDispatcher
+/** Most threads [KetchDispatchers.Default] runs blocking file I/O on. */
+internal const val DEFAULT_DISK_THREADS = 8
 
-/** Creates a thread pool for network operations. */
-internal expect fun createNetworkDispatcher(poolSize: Int): CoroutineDispatcher
-
-/** Creates a thread pool for blocking file I/O. */
-internal expect fun createIoDispatcher(poolSize: Int): CoroutineDispatcher
+/** Creates [KetchDispatchers.Default], once per process. */
+internal expect fun createDefaultDispatchers(): KetchDispatchers

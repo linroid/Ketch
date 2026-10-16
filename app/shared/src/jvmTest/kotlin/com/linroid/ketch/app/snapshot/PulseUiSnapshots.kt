@@ -52,6 +52,7 @@ import com.linroid.ketch.app.ui.feedback.BannerTone
 import com.linroid.ketch.app.ui.feedback.CONNECTING_GRACE
 import com.linroid.ketch.app.ui.feedback.ToastHost
 import com.linroid.ketch.app.ui.feedback.deviceBanner
+import com.linroid.ketch.app.ui.feedback.pairingBanner
 import com.linroid.ketch.app.ui.pulse.PulseBar
 import com.linroid.ketch.app.ui.pulse.PulseBarContent
 import com.linroid.ketch.app.ui.pulse.PulseSubtitle
@@ -451,9 +452,10 @@ private fun PulseCard(state: AppState, width: Dp) {
           ToastHost(
             messages = state.messages,
             modifier = Modifier
-              .align(Alignment.BottomCenter)
+              .align(Alignment.BottomEnd)
               .padding(horizontal = spacing.s4)
               .padding(bottom = spacing.s2),
+            horizontalAlignment = Alignment.End,
           )
         }
         PulseBar(state)
@@ -698,6 +700,12 @@ private object BannerSamples {
       text = verbatim("Downloads pause when Ketch is in the background"),
       actions = listOf(MessageAction(verbatim("Use a computer instead")) {}),
       onDismiss = {},
-    )
+    ),
+    pairingBanner(
+      left = 2.minutes + 41.seconds,
+      localName = verbatim("this Mac"),
+      onShow = {},
+      onTurnOff = {},
+    ),
   )
 }

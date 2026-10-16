@@ -19,6 +19,11 @@ export const FailureKind = Object.freeze({
   REJECTED: 'rejected',
   /** The Ketch desktop app hasn't registered itself with this browser. */
   APP_NOT_INSTALLED: 'app_not_installed',
+  /**
+   * The Ketch app refuses this copy of the extension: its ID is not one the app registered,
+   * as for an unpacked build without the manifest key.
+   */
+  APP_NOT_ALLOWED: 'app_not_allowed',
   /** The Ketch app is closed, and the caller asked not to start it. */
   APP_NOT_RUNNING: 'app_not_running',
 });

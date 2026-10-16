@@ -40,9 +40,9 @@ object StatusDotDefaults {
 
 /**
  * The status of a row as a small glyph in its status color, with an optional [label]: ● for
- * downloading (with a pulsing halo) and stalled, ○ queued, ◷ scheduled, ◐ paused, ✕ failed,
- * ⊘ canceled and ⚠ for a completed file that has gone missing. A completed row shows no glyph,
- * since success is the default; the space stays so columns line up.
+ * downloading and starting (with a pulsing halo) and stalled, ○ queued, ◷ scheduled, ◐ paused,
+ * ✕ failed, ⊘ canceled and ⚠ for a completed file that has gone missing. A completed row shows
+ * no glyph, since success is the default; the space stays so columns line up.
  *
  * Only a failed row colors its label; every other label is secondary text.
  *
@@ -56,7 +56,7 @@ fun StatusDot(
   size: Dp = StatusDotDefaults.Size,
 ) {
   val colors = KetchTheme.colors
-  val pulse = rememberPulse(status == RowStatus.Downloading)
+  val pulse = rememberPulse(status == RowStatus.Downloading || status == RowStatus.Starting)
   val motion = KetchTheme.motion
   val color = colors.statusColor(status)
   val glyph = Modifier.size(size).drawWithCache {
@@ -112,7 +112,7 @@ fun KetchDot(
 
 /** The color of [status]'s glyph. */
 internal fun KetchColors.statusColor(status: RowStatus): Color = when (status) {
-  RowStatus.Downloading -> this.status.downloading.color
+  RowStatus.Downloading, RowStatus.Starting -> this.status.downloading.color
   RowStatus.Stalled, RowStatus.Paused -> this.status.paused.color
   RowStatus.Queued -> this.status.queued.color
   RowStatus.Scheduled -> this.status.scheduled.color
@@ -162,7 +162,7 @@ private fun DrawScope.drawStatusGlyph(
   val ring = radius - stroke.width / 2
   val reach = radius * MARK_REACH
   when (status) {
-    RowStatus.Downloading, RowStatus.Stalled -> drawCircle(color)
+    RowStatus.Downloading, RowStatus.Starting, RowStatus.Stalled -> drawCircle(color)
     RowStatus.Queued -> drawCircle(color, ring, style = stroke)
     RowStatus.Scheduled -> {
       drawCircle(color, ring, style = stroke)

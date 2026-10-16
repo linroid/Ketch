@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ComposableOpenTarget
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DeviceScope
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
@@ -132,6 +134,7 @@ class DesktopActions(
  * @param speedMode switches the active device's speed mode; `null` leaves out Slow lane.
  */
 @Composable
+@ComposableOpenTarget(-1)
 fun FrameWindowScope.KetchMenuBar(
   controller: AppController,
   status: DesktopStatus,
@@ -405,6 +408,7 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
         add(item(KetchCommands.ToggleSidebar))
         add(MenuEntry.Separator)
         add(item(KetchCommands.Discover))
+        add(item(KetchCommands.Connections))
         add(item(KetchCommands.Devices))
         add(item(KetchCommands.Activity))
       },
@@ -519,6 +523,7 @@ private val TEXT_EDITING_KEYS = setOf(Key.A, Key.C, Key.V, Key.X, Key.Z)
 private val SHELL_COMMANDS = setOf(
   KetchCommands.Palette,
   KetchCommands.Discover,
+  KetchCommands.Connections,
   KetchCommands.Devices,
   KetchCommands.ToggleSidebar,
   KetchCommands.Activity,
@@ -775,7 +780,8 @@ internal class DesktopCommands(
     val speedMode = controller.speedMode ?: return
     val previous = speedMode.settings.value.mode
     if (previous == mode) return
-    val device = localDeviceNoun()
+    val device = state.instances.value.firstOrNull { it is EmbeddedInstance }?.displayName
+      ?: localDeviceNoun()
     controller.scope.launch {
       try {
         speedMode.setMode(mode)

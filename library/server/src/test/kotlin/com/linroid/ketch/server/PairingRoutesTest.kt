@@ -1,5 +1,6 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.PairingRequest
 import com.linroid.ketch.endpoints.model.PairingState
 import com.linroid.ketch.endpoints.model.PairingStatus
@@ -36,8 +37,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.assertIs
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -48,6 +48,7 @@ class PairingRoutesTest {
   private fun ApplicationTestBuilder.pairingServer(
     apiToken: String? = TOKEN,
     approver: PairingApprover? = PairingApprover { _, _ -> true },
+    open: () -> Boolean = { true },
   ): HttpClient {
     application {
       val server = KetchServer(
@@ -55,6 +56,7 @@ class PairingRoutesTest {
         apiToken = apiToken,
         corsAllowedHosts = listOf("*"),
         pairingApprover = approver,
+        pairingOpen = open,
       )
       with(server) { configureServer() }
     }
@@ -109,6 +111,42 @@ class PairingRoutesTest {
     val ticket = client.ask().body<PairingTicket>()
 
     assertEquals(PairingStatus(PairingState.DENIED), client.answer(ticket.id))
+  }
+
+  @Test
+  fun `requests while pairing is off are refused unasked`() = testApplication {
+    var asked = false
+    var open = false
+    val client = pairingServer(
+      approver = { _, _ ->
+        asked = true
+        true
+      },
+      open = { open },
+    )
+
+    val refused = client.ask()
+
+    assertEquals(HttpStatusCode.Forbidden, refused.status)
+    assertEquals("pairing_closed", refused.body<ErrorResponse>().error)
+    assertEquals(false, asked)
+    // Refused requests are no strike against the address.
+    open = true
+    assertEquals(HttpStatusCode.Accepted, client.ask().status)
+  }
+
+  @Test
+  fun `denied address waits before it may ask again`() = testApplication {
+    val client = pairingServer(approver = { _, _ -> false })
+    val ticket = client.ask().body<PairingTicket>()
+    client.answer(ticket.id)
+
+    val again = client.ask()
+
+    assertEquals(HttpStatusCode.TooManyRequests, again.status)
+    assertEquals("pairing_paused", again.body<ErrorResponse>().error)
+    // The first wait is 30 seconds, part of which has passed: rounded up, not down to 29.
+    assertEquals("30", again.headers[HttpHeaders.RetryAfter])
   }
 
   @Test
@@ -250,7 +288,8 @@ class PairingRoutesTest {
         timeout = 50.milliseconds,
         retention = 5.seconds,
       )
-      val ticket = assertNotNull(sessions.open(request, "192.168.1.30"))
+      val ticket = assertIs<PairingSessions.Opened.Asking>(sessions.open(request, "192.168.1.30"))
+        .ticket
 
       val status = withTimeout(5.seconds) {
         var status = sessions.status(ticket.id)
@@ -274,10 +313,10 @@ class PairingRoutesTest {
       val sessions = PairingSessions({ _, _ -> awaitCancellation() }, TOKEN, scope)
 
       repeat(PairingSessions.MAX_PENDING) {
-        assertNotNull(sessions.open(request, "192.168.1.${30 + it}"))
+        assertIs<PairingSessions.Opened.Asking>(sessions.open(request, "192.168.1.${30 + it}"))
       }
 
-      assertNull(sessions.open(request, "192.168.1.99"))
+      assertEquals(PairingSessions.Opened.Busy, sessions.open(request, "192.168.1.99"))
     } finally {
       scope.cancel()
     }

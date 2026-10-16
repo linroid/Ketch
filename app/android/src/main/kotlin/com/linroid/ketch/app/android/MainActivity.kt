@@ -20,6 +20,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.withStarted
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -37,37 +39,44 @@ import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.MessageTap
 import com.linroid.ketch.app.feedback.NotificationLink
+import com.linroid.ketch.app.feedback.open
 import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.platform.LocalAppUpdates
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
-import com.linroid.ketch.app.state.StatusFilter
-import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.SettingsTarget
 import com.linroid.ketch.app.ui.onboarding.KetchSplash
 import com.linroid.ketch.config.AppearanceConfig
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : ComponentActivity() {
 
   private val model: MainModel by viewModels()
   private var notificationLink: NotificationLink? by mutableStateOf(null)
   private var messageTap: MessageTap? by mutableStateOf(null)
+  private var sharingRequested by mutableStateOf(false)
   private val ketchApplication get() = application as KetchApplication
   private val requestNotificationPermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { }
+  private val requestLocalNetworkPermission = registerForActivityResult(
+    ActivityResultContracts.RequestPermission(),
+  ) { }
+  private var localNetworkOffer: Job? = null
+  private var localNetworkAsked = false
   private val requestExternalStoragePermission = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { }
@@ -88,7 +97,9 @@ class MainActivity : ComponentActivity() {
       // A recreated activity finds the service already bound.
       snapshotFlow { model.service }.collect { connected ->
         notificationOffer?.cancel()
+        localNetworkOffer?.cancel()
         if (connected == null) return@collect
+        offerLocalNetwork(connected)
         connected.setInFront(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
         // The controller is set before the service.
         offerNotifications(connected.instanceManager, model.controller?.state?.aiDiscover)
@@ -121,11 +132,19 @@ class MainActivity : ComponentActivity() {
         MessageNotifications.open(controller.messages, tap.id, tap.postedAt)
         messageTap = null
       }
-      App(
-        controller,
-        activityEvents = svc.activityEvents,
-        fileLogger = ketchApplication.fileLogger,
-      )
+      val sharing = sharingRequested
+      LaunchedEffect(controller, sharing) {
+        if (!sharing) return@LaunchedEffect
+        controller.state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+        sharingRequested = false
+      }
+      CompositionLocalProvider(LocalAppUpdates provides model.updates) {
+        App(
+          controller,
+          activityEvents = svc.activityEvents,
+          fileLogger = ketchApplication.fileLogger,
+        )
+      }
     }
   }
 
@@ -151,6 +170,10 @@ class MainActivity : ComponentActivity() {
    * handled: a `.torrent` file, a `magnet:` link or a `ketch://pair` link.
    */
   private fun handleIntent(intent: Intent?) {
+    if (AndroidNotifier.opensSharing(intent)) {
+      sharingRequested = true
+      return
+    }
     val tap = AndroidNotifier.messageTapOf(intent)
     if (tap != null) {
       messageTap = tap
@@ -206,6 +229,43 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  /**
+   * Asks for the local network from Android 17, which blocks it until granted, once this device
+   * has a remote device to reach or is shared: those would otherwise just time out. Searching
+   * the network and adding a device ask for themselves. Asked once per activity; the system
+   * stops showing it after two denials. Local peer discovery asks too, the first time it wants
+   * the LAN (on, while a public torrent runs), and only once: it works without the permission
+   * on the internet, so a denial is not asked again.
+   */
+  private fun offerLocalNetwork(service: KetchService) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) return
+    val permission = Manifest.permission.ACCESS_LOCAL_NETWORK
+    if (localNetworkAsked || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+      return
+    }
+    val manager = service.instanceManager
+    val remote = manager.instances.map { list -> list.any { it is RemoteInstance } }
+    val shared = manager.serverState.map { it is ServerState.Running }
+    val peers = if (permissionPrefs.getBoolean(KEY_LOCAL_PEERS_OFFERED, false)) {
+      flowOf(false)
+    } else {
+      service.lanPeerSearchStarted
+    }
+    localNetworkOffer = lifecycleScope.launch {
+      combine(remote, shared, peers) { hasRemote, isShared, searching ->
+        hasRemote || isShared || searching
+      }.first { it }
+      withStarted {
+        if (localNetworkAsked) return@withStarted
+        localNetworkAsked = true
+        if (service.lanPeerSearchStarted.value) {
+          permissionPrefs.edit { putBoolean(KEY_LOCAL_PEERS_OFFERED, true) }
+        }
+        requestLocalNetworkPermission.launch(permission)
+      }
+    }
+  }
+
   @RequiresApi(Build.VERSION_CODES.TIRAMISU)
   private fun shouldOfferNotifications(): Boolean {
     val permission = Manifest.permission.POST_NOTIFICATIONS
@@ -258,6 +318,7 @@ class MainActivity : ComponentActivity() {
     const val PERMISSION_PREFS = "permissions"
     const val KEY_NOTIFICATIONS_OFFERED = "notifications_offered"
     const val KEY_NOTIFICATIONS_DUE = "notifications_due"
+    const val KEY_LOCAL_PEERS_OFFERED = "local_peers_offered"
   }
 }
 
@@ -285,6 +346,15 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
       log.d { "Couldn't read the appearance for the splash: ${e.describeCauses()}" }
       AppearanceConfig()
     }
+  }
+
+  /** Only the direct distribution supplies updates; retained across activity recreation. */
+  val updates by lazy {
+    createAppUpdates(
+      scope = viewModelScope,
+      app = getApplication<KetchApplication>(),
+      controller = checkNotNull(controller),
+    )
   }
 
   private var bound = false
@@ -328,27 +398,4 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
     bound = false
     getApplication<Application>().unbindService(connection)
   }
-}
-
-// A tap can start the app before its device has loaded the task.
-private val TASK_LOAD_TIMEOUT = 10.seconds
-
-/**
- * Shows what a notification tap asks for: the device it is about, the status tab or the task,
- * which Retry also retries.
- */
-private suspend fun AppState.open(link: NotificationLink) {
-  val key = link.taskKey
-  val entry = instances.value.firstOrNull { it.deviceId == (key?.deviceId ?: LOCAL_DEVICE_ID) }
-    ?: return
-  if (entry != activeInstance.value) switchInstance(entry)
-  link.filter?.let { statusFilter = it }
-  if (key == null) return
-  val task = withTimeoutOrNull(TASK_LOAD_TIMEOUT) {
-    entry.instance.tasks.mapNotNull { tasks -> tasks.firstOrNull { it.taskId == key.taskId } }
-      .first()
-  } ?: return
-  if (!statusFilter.matches(task.state.value)) statusFilter = StatusFilter.All
-  inspect(key)
-  if (link.retry) retry(task)
 }

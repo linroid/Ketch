@@ -583,9 +583,9 @@ private fun digitPick(event: KeyEvent, entries: List<SwitcherEntry>): SwitcherEn
  * name, and the system it runs, as in "nas.local:8642 · Linux".
  */
 internal fun switcherSubtitle(device: DevicePresence): UiText = listOfNotNull(
-  device.detail.takeIf { device.name != verbatim(it) },
-  device.systemName,
-).map(::verbatim).joinText()
+  device.detail.takeIf { it != device.name },
+  device.systemName?.let(::verbatim),
+).joinText()
 
 /**
  * What the switcher says under [device]'s name: its speed while it downloads, the Slow lane, how

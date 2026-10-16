@@ -13,11 +13,13 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.config.TorrentSettings
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_call_failed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,6 +43,8 @@ import kotlinx.coroutines.sync.withLock
  * @param scope scope that runs the calls to [api].
  * @param applyTorrent hands saved torrent settings to the embedded
  *   instance, so they take effect without a restart.
+ * @param trackerList what each of the embedded instance's subscribed tracker lists holds.
+ * @param refreshTrackerList downloads those lists again now.
  * @param savedSpeedLimit the speed limit saved with download settings the
  *   instance accepted: its standing cap, which a slow lane holding the
  *   instance back for now must not replace.
@@ -50,6 +54,8 @@ class InstanceSettingsController(
   private val local: AppSettingsController?,
   private val scope: CoroutineScope,
   private val applyTorrent: suspend (TorrentSettings) -> Unit = {},
+  trackerList: Flow<List<TrackerListStatus>>? = null,
+  private val refreshTrackerList: () -> Unit = {},
   private val savedSpeedLimit: (DownloadConfig) -> SpeedLimit = { it.speedLimit },
 ) {
   /** Download settings, or `null` while a remote's are loading. */
@@ -73,6 +79,12 @@ class InstanceSettingsController(
    * one, whose trackers are set in its own config file.
    */
   val torrent: TorrentSettings? get() = local?.config?.torrent
+
+  /**
+   * What each subscribed tracker list holds, or `null` for a remote instance or one without
+   * torrent support.
+   */
+  val trackerList: Flow<List<TrackerListStatus>>? = trackerList?.takeIf { local != null }
 
   /** Why the torrent settings could not be applied. */
   var torrentError by mutableStateOf<UiText?>(null)
@@ -163,9 +175,9 @@ class InstanceSettingsController(
   }
 
   /**
-   * Saves [settings] and applies them to the embedded instance, where
-   * torrents pick them up as they start or resume. Does nothing for a
-   * remote instance.
+   * Saves [settings] and applies them to the embedded instance: the upload mode and limit reach
+   * running torrents at once, extra trackers and tracker lists reach torrents as they start or
+   * resume. Does nothing for a remote instance.
    */
   fun updateTorrent(settings: TorrentSettings) {
     val app = local ?: return
@@ -182,6 +194,11 @@ class InstanceSettingsController(
         }
       }
     }
+  }
+
+  /** Downloads the embedded instance's subscribed tracker lists again now. */
+  fun refreshTrackerList() {
+    if (local != null) refreshTrackerList.invoke()
   }
 
   /**
@@ -206,7 +223,7 @@ class InstanceSettingsController(
           // A newer selection is queued behind this one; let it decide.
           if (pendingNetworkIds == null) networks = confirmedNetworks ?: current
         }) {
-          val updated = api.updateNetworkInterfaces(NetworkInterfaceConfig(requested))
+          val updated = api.selectNetworkInterfaces(NetworkInterfaceConfig(requested))
           confirmedNetworks = updated
           if (pendingNetworkIds == null) {
             networks = updated

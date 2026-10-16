@@ -13,6 +13,17 @@ internal expect fun resolveChildPath(
 ): String
 
 /**
+ * The folder [folderName] inside [directory], such as a category folder. A path is only joined,
+ * and the folder is created later with the file in it. On Android, a `content://` tree has the
+ * folder found, or else created, as a document, and its document URI is returned, which
+ * [resolveChildPath] creates files in.
+ */
+internal expect fun resolveChildFolder(
+  directory: String,
+  folderName: String,
+): String
+
+/**
  * Whether [directory] is a URI that [resolveChildPath] can create files in
  * on this platform (Android `content://` documents), rather than a path.
  */

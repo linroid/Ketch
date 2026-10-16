@@ -12,11 +12,11 @@
   <string name="settings_category_general">General</string>
   <string name="settings_category_general_description">Appearance, startup and the name of this device</string>
   <string name="settings_category_notifications">Notifications</string>
-  <string name="settings_category_notifications_description">What Ketch tells you about, and how</string>
+  <string name="settings_category_notifications_description">Downloads, devices and sounds</string>
   <string name="settings_category_integration">Integration</string>
   <string name="settings_category_integration_description">Browser extension, magnet links and the clipboard</string>
   <string name="settings_category_discover">Discover</string>
-  <string name="settings_category_discover_description">The AI model, web search and the websites it may open</string>
+  <string name="settings_category_discover_description">AI model, web search and page access</string>
   <string name="settings_category_about">About</string>
   <string name="settings_category_about_description">Version, licenses and logs</string>
   <string name="settings_category_downloads">Downloads</string>
@@ -24,11 +24,11 @@
   <string name="settings_category_speed">Speed</string>
   <string name="settings_category_speed_description">Speed modes, Slow lane and Auto rules</string>
   <string name="settings_category_network">Network</string>
-  <string name="settings_category_network_description">The networks downloads are spread across</string>
+  <string name="settings_category_network_description">Networks downloads use</string>
   <string name="settings_category_bittorrent">BitTorrent</string>
-  <string name="settings_category_bittorrent_description">Extra trackers for public torrents</string>
+  <string name="settings_category_bittorrent_description">Uploading and extra trackers</string>
   <string name="settings_category_sharing">Sharing</string>
-  <string name="settings_category_sharing_description">Pair a phone or browser to control this device</string>
+  <string name="settings_category_sharing_description">Pair a phone or browser to control Ketch on this device</string>
 
   <!-- Around the pages. -->
   <string name="settings_title">Settings</string>
@@ -120,19 +120,22 @@
   <string name="settings_theme_light">Light</string>
   <string name="settings_theme_dark">Dark</string>
   <string name="settings_general_accent">Accent color</string>
-  <!-- The names of the accent palettes, under their swatches. -->
-  <string name="settings_accent_signal">Signal</string>
-  <string name="settings_accent_harbor">Harbor</string>
-  <string name="settings_accent_fathom">Fathom</string>
-  <string name="settings_accent_beacon">Beacon</string>
+  <!-- The names of the accent palettes, under their swatches. Each is the name of its color. -->
+  <string name="settings_accent_indigo">Indigo</string>
+  <string name="settings_accent_purple">Purple</string>
+  <string name="settings_accent_pink">Pink</string>
+  <string name="settings_accent_orange">Orange</string>
+  <string name="settings_accent_green">Green</string>
+  <string name="settings_accent_teal">Teal</string>
+  <string name="settings_accent_blue">Blue</string>
   <string name="settings_general_density">Density</string>
   <string name="settings_general_density_hint">Auto: compact with a mouse, roomier with touch.</string>
   <string name="settings_density_auto">Auto</string>
   <string name="settings_density_compact">Compact</string>
   <string name="settings_density_comfortable">Comfortable</string>
   <string name="settings_general_reduce_motion">Reduce motion</string>
-  <string name="settings_general_reduce_motion_on">Lanes and panels change without animating.</string>
-  <string name="settings_general_reduce_motion_system">Your system reduces motion, so Ketch does too.</string>
+  <string name="settings_general_reduce_motion_on">Turns off animations.</string>
+  <string name="settings_general_reduce_motion_system">On in your system settings.</string>
   <string name="settings_general_reduce_motion_auto">Auto follows your system's setting.</string>
   <string name="settings_general_language">Language</string>
   <!-- The language the app shows, named in that language itself: English, Deutsch, 日本語. -->
@@ -167,6 +170,13 @@
   <string name="settings_general_badge_active">Active downloads</string>
   <string name="settings_general_badge_failures">Failures only</string>
   <string name="settings_general_badge_off">Nothing</string>
+  <!-- macOS: the download speed after the Ketch icon in the menu bar while downloads run. -->
+  <string name="settings_general_menu_bar_speed">Show speed in the menu bar</string>
+  <!-- The group of settings about the power of the device the app runs on. -->
+  <string name="settings_general_power">Power</string>
+  <string name="settings_general_keep_awake">Keep awake while downloading</string>
+  <!-- Under Keep awake while downloading. %1$s is how the app names the device it runs on, at the start of the sentence: "This Mac", "This PC", "This phone". -->
+  <string name="settings_general_keep_awake_hint">%1$s won't go to sleep on its own while downloads run. The screen can still turn off.</string>
 
   <!-- Notifications. -->
   <!-- The group of what Ketch reports about downloads. -->
@@ -185,7 +195,7 @@
   <string name="settings_notifications_all_finished_off">Follows Download finished, which is off.</string>
   <string name="settings_notifications_background">Only when Ketch is in the background</string>
   <string name="settings_notifications_background_none">Nothing is set to Notify.</string>
-  <string name="settings_notifications_background_on">While Ketch is in front, they show inside it.</string>
+  <string name="settings_notifications_background_on">Shown inside Ketch while it's in front.</string>
   <string name="settings_notifications_background_off">Notifications also show while Ketch is in front.</string>
   <!-- The group of what Ketch reports about devices. -->
   <string name="settings_notifications_devices_group">Devices</string>
@@ -203,7 +213,7 @@
   <string name="settings_notifications_success_vibration_hint">A short buzz, also in vibrate mode.</string>
   <string name="settings_notifications_success_footer">When a download finishes or Discover finds downloads.</string>
   <!-- The footer on phones; Do Not Disturb as the system names it. -->
-  <string name="settings_notifications_success_footer_phone">When a download finishes or Discover finds downloads. Silent mode and Do Not Disturb mute it, and notifications in the background use their own sound.</string>
+  <string name="settings_notifications_success_footer_phone">When a download finishes or Discover finds downloads. Muted in silent mode and Do Not Disturb.</string>
   <!-- The web app: whether the browser lets Ketch notify. -->
   <string name="settings_notifications_browser">Browser notifications</string>
   <string name="settings_notifications_allowed">Notifications are allowed</string>
@@ -228,8 +238,8 @@
   <string name="settings_integration_is_default">Ketch is the default</string>
   <string name="settings_integration_make_default">Make default</string>
   <!-- Under Default apps when the system did not make Ketch the default. -->
-  <string name="settings_integration_magnet_refused">Ketch couldn't make itself open magnet links. Choose it in your system's settings.</string>
-  <string name="settings_integration_torrent_refused">Ketch couldn't make itself open .torrent files. Choose it in your system's settings.</string>
+  <string name="settings_integration_magnet_refused">Couldn't make Ketch the default for magnet links. Choose it in your system settings.</string>
+  <string name="settings_integration_torrent_refused">Couldn't make Ketch the default for .torrent files. Choose it in your system settings.</string>
   <!-- Under Default apps when asking the system failed. %1$s is why. -->
   <string name="settings_integration_magnet_failed">Couldn't make Ketch open magnet links: %1$s</string>
   <string name="settings_integration_torrent_failed">Couldn't make Ketch open .torrent files: %1$s</string>
@@ -250,7 +260,7 @@
   <!-- Discover: AI discovery's model, web search and page access. -->
   <string name="settings_ai_discovery">AI discovery</string>
   <string name="settings_ai_content_filter">Content filter</string>
-  <string name="settings_ai_content_filter_hint">Hides results that look unsafe: shortened links, download aggregators, piracy, look-alike websites and installers over plain HTTP. Links into your own network stay hidden either way.</string>
+  <string name="settings_ai_content_filter_hint">Hides shortened links, download aggregators, piracy, look-alike sites and installers over plain HTTP. Links into your own network are always hidden.</string>
   <string name="settings_ai_provider">Provider</string>
   <string name="settings_ai_api_key">API key</string>
   <!-- The row with the model's id. -->
@@ -263,29 +273,21 @@
   <string name="settings_ai_status_unsupported">Runs in the desktop and Android apps.</string>
   <string name="settings_ai_status_needs_provider">Choose a provider and add its key below.</string>
   <string name="settings_ai_status_needs_search">Add the missing web search credentials.</string>
-  <string name="settings_ai_status_off">Lets Discover find downloads for you.</string>
+  <string name="settings_ai_status_off">Find downloads by describing them.</string>
   <!-- %1$s is the provider, such as Anthropic, %2$s the model, such as claude-sonnet-5. -->
   <string name="settings_ai_status_ready">Ready · %1$s · %2$s</string>
-  <!-- The group of the provider, key, model and endpoint. -->
-  <string name="settings_ai_model_group">Model</string>
   <!-- The buttons that pick a provider. Ollama runs models on the computer itself. -->
   <string name="settings_ai_provider_ollama">Ollama · runs locally, no key</string>
   <string name="settings_ai_provider_compatible">Custom (OpenAI-compatible)</string>
   <!-- A provider with an endpoint that speaks OpenAI's API, as summaries name it. -->
   <string name="settings_ai_provider_compatible_name">OpenAI-compatible</string>
-  <!-- Under Provider: where to get a key for it. -->
-  <string name="settings_ai_hint_openai">Get a key at platform.openai.com.</string>
-  <string name="settings_ai_hint_anthropic">Get a key at console.anthropic.com.</string>
-  <string name="settings_ai_hint_gemini">Get a key at aistudio.google.com/apikey.</string>
+  <!-- Under Provider: where to get a key for it. %1$s is the page, such as platform.openai.com/api-keys. -->
+  <string name="settings_ai_hint_key">Get a key at %1$s.</string>
   <!-- %1$s is a model's name, such as qwen3; "ollama pull" is a command, keep it as it is. -->
   <string name="settings_ai_hint_ollama">Pull a model first: ollama pull %1$s</string>
   <string name="settings_ai_hint_compatible">OpenRouter, DeepSeek, LM Studio, vLLM and similar servers.</string>
   <string name="settings_ai_api_key_env">Using the key from the environment. One here overrides it.</string>
   <string name="settings_ai_api_key_plain">Stored as plain text in this device's config file.</string>
-  <string name="settings_ai_model_required">Required. Use a model with tool support.</string>
-  <string name="settings_ai_model_any">Any model with tool support works.</string>
-  <!-- In the empty model field of a provider without a default model. -->
-  <string name="settings_ai_model_placeholder">Model id</string>
   <string name="settings_ai_endpoint_compatible_hint">Any OpenAI-compatible endpoint, with or without /v1.</string>
   <!-- The button that tests the connection, and the same while it runs. -->
   <string name="settings_ai_test_button">Test</string>
@@ -305,6 +307,45 @@
   <string name="settings_ai_test_unsupported">AI discovery isn't available on this platform.</string>
   <string name="settings_ai_test_connection_failed">Connection failed.</string>
   <string name="settings_ai_engine_failed">Could not start the discovery engine.</string>
+  <!-- Why the provider's models could not be listed, when it gave no reason. -->
+  <string name="settings_ai_models_failed">Couldn't list the models.</string>
+  <!-- The saved LLM providers, each with its own key, endpoint and models. -->
+  <string name="settings_ai_providers">Providers</string>
+  <string name="settings_ai_providers_footer">Discover uses the checked provider. Switch providers and models from its search box too.</string>
+  <string name="settings_ai_providers_none">No provider yet</string>
+  <string name="settings_ai_providers_none_hint">Add one with its API key to start searching.</string>
+  <string name="settings_ai_provider_add">Add provider</string>
+  <!-- The button that makes Discover use a saved provider, and what shows on the one it uses. -->
+  <string name="settings_ai_provider_use">Use</string>
+  <string name="settings_ai_provider_in_use">In use</string>
+  <string name="settings_ai_provider_edit">Edit</string>
+  <!-- %1$s is the provider's name, such as Anthropic or Work. -->
+  <string name="settings_ai_provider_edit_title">Edit %1$s</string>
+  <string name="settings_ai_provider_save">Save</string>
+  <!-- The second click of Remove, which removes the provider and its key. -->
+  <string name="settings_ai_provider_remove_confirm">Remove for good</string>
+  <!-- On a saved provider that cannot be called yet. -->
+  <string name="settings_ai_provider_incomplete">Needs a key or model</string>
+  <string name="settings_ai_provider_env">Key from the environment</string>
+  <string name="settings_ai_provider_choose">Choose where your models run.</string>
+  <!-- Groups of providers: hosted services, ones based in China, servers on the user's computer and any other. -->
+  <string name="settings_ai_provider_group_hosted">Hosted</string>
+  <string name="settings_ai_provider_group_china">Hosted in China</string>
+  <string name="settings_ai_provider_group_local">On your computer</string>
+  <string name="settings_ai_provider_group_custom">Other</string>
+  <string name="settings_ai_provider_name">Name</string>
+  <string name="settings_ai_provider_name_hint">Tells keys of the same provider apart, such as Work and Personal.</string>
+  <string name="settings_ai_models">Models</string>
+  <string name="settings_ai_models_hint">Discover calls the selected one. Add others to switch to them from the search box. Use models with tool support.</string>
+  <string name="settings_ai_models_add_placeholder">Add a model id</string>
+  <string name="settings_ai_models_fetch">Load models from the provider</string>
+  <string name="settings_ai_models_loading">Loading models…</string>
+  <string name="settings_ai_models_no_match">None of the provider's models match. Add it as typed.</string>
+  <!-- Over the models the provider listed that are not added yet; typing in the field above narrows them. -->
+  <plurals name="settings_ai_models_available">
+    <item quantity="one">%1$d model from the provider. Type to filter.</item>
+    <item quantity="other">%1$d models from the provider. Type to filter.</item>
+  </plurals>
   <string name="settings_ai_search_footer">Without a search provider, Discover only reads the pages you give it.</string>
   <string name="settings_ai_search_provider">Search provider</string>
   <!-- The search provider that is no provider: Discover searches nothing. -->
@@ -324,7 +365,7 @@
   <string name="settings_ai_access_allow_hint">Opens any website a search needs without asking.</string>
   <string name="settings_ai_access_ask_site">Ask for each new site</string>
   <!-- A chat is one Discover search with its follow-ups. Always allow is a choice Discover offers when it asks. -->
-  <string name="settings_ai_access_ask_site_hint">Asks the first time a chat opens a site. Always allow remembers a site.</string>
+  <string name="settings_ai_access_ask_site_hint">Asks once per site in each chat, unless you choose Always allow.</string>
   <string name="settings_ai_access_ask">Ask every time</string>
   <string name="settings_ai_access_ask_hint">Asks before every page and file check.</string>
   <!-- The row listing the websites Discover opens without asking, each with its subdomains. -->
@@ -335,7 +376,7 @@
   <string name="settings_ai_access_add">Add a site, such as ubuntu.com</string>
   <!-- Under that field when what was typed is not a website's name, such as a word without a dot. -->
   <string name="settings_ai_access_add_invalid">Enter a website's name, such as ubuntu.com.</string>
-  <string name="settings_ai_access_footer">Searches you limit to websites never ask: you chose those sites yourself.</string>
+  <string name="settings_ai_access_footer">Searches limited to websites you name never ask.</string>
 
   <!-- About. -->
   <!-- Under the app's name: what the name means. -->
@@ -356,10 +397,10 @@
   <string name="settings_about_getting_started">Getting started</string>
   <string name="settings_about_checklist">Show setup checklist</string>
   <string name="settings_about_checklist_hint">The setup steps on an empty Downloads page.</string>
-  <string name="settings_about_checklist_done">Done. It shows while the Downloads list is empty.</string>
+  <string name="settings_about_checklist_done">Shows while the Downloads list is empty.</string>
   <string name="settings_about_welcome">Show welcome again</string>
   <string name="settings_about_welcome_hint">Where downloads go, and how you use Ketch on this device.</string>
-  <string name="settings_about_welcome_done">Done. The welcome screens show next time you open Ketch.</string>
+  <string name="settings_about_welcome_done">Shows next time you open Ketch.</string>
   <string name="settings_about_troubleshooting">Troubleshooting</string>
   <string name="settings_about_logs_footer">Logs include download names and links. Check them before posting.</string>
   <!-- Updates of the desktop app itself, on the About page. -->
@@ -375,7 +416,7 @@
   <!-- %1$s is the running version. -->
   <string name="settings_about_update_available_hint">You have %1$s.</string>
   <!-- When the app runs from source code and cannot install the update itself. -->
-  <string name="settings_about_update_source_hint">This copy runs from source. The release page has the installers.</string>
+  <string name="settings_about_update_source_hint">Built from source. Get installers from the release page.</string>
   <string name="settings_about_update_downloading">Downloading Ketch %1$s…</string>
   <!-- Downloaded and total size of the update, such as "12.4 MB of 70.1 MB". -->
   <string name="settings_about_update_progress">%1$s of %2$s</string>
@@ -391,12 +432,46 @@
   <string name="settings_about_update_auto_hint">Once a day, from Ketch's releases on GitHub.</string>
   <!-- Opens the release notes. %1$s is the version. -->
   <string name="settings_about_update_notes">What's new in %1$s</string>
+  <!-- Opens every release with its changes. -->
+  <string name="settings_about_history">Release history</string>
+  <!-- %1$s is the first release listed, such as 0.1.0. -->
+  <string name="settings_about_history_hint">Every release since %1$s</string>
+  <!-- Over the release history: %1$d releases, from the version %2$s on. -->
+  <plurals name="settings_about_history_count">
+    <item quantity="one">%1$d release since %2$s</item>
+    <item quantity="other">%1$d releases since %2$s</item>
+  </plurals>
+  <!-- How many changes a release in the history lists. -->
+  <plurals name="settings_about_history_changes">
+    <item quantity="one">%1$d change</item>
+    <item quantity="other">%1$d changes</item>
+  </plurals>
   <string name="settings_about_update_check">Check now</string>
   <!-- Button: downloads the update. -->
   <string name="settings_about_update_install">Update</string>
   <string name="settings_about_update_restart">Restart to update</string>
   <string name="settings_about_update_open_installer">Open installer</string>
   <string name="settings_about_update_release_page">Release page</string>
+  <!-- Toast after Ketch started on a newer version than the one that ran before. -->
+  <string name="settings_about_update_installed">Updated to Ketch %1$s</string>
+  <!-- Toast button: shows the release notes. -->
+  <string name="settings_about_update_whats_new">What's new</string>
+  <!-- The release notes dialog, titled with settings_about_update_notes. -->
+  <string name="settings_about_notes_loading">Loading the release notes…</string>
+  <string name="settings_about_notes_failed">Couldn't load the release notes</string>
+  <!-- When the release came out. %1$s is the date, such as Oct 8. -->
+  <string name="settings_about_notes_released">Released %1$s</string>
+  <!-- The notes of %1$d releases, those after the version %2$s. -->
+  <plurals name="settings_about_notes_since">
+    <item quantity="one">%1$d release since %2$s</item>
+    <item quantity="other">%1$d releases since %2$s</item>
+  </plurals>
+  <!-- Headings over the kinds of changes in a release. -->
+  <string name="settings_about_notes_new">New</string>
+  <string name="settings_about_notes_fixed">Fixed</string>
+  <string name="settings_about_notes_improved">Improved</string>
+  <!-- A release whose changes only concern Ketch's developers. -->
+  <string name="settings_about_notes_quiet">Maintenance and behind-the-scenes improvements.</string>
   <!-- How the desktop app hands over its log files. -->
   <string name="settings_logs_open">Open log folder</string>
   <!-- When the folder could not be opened. %1$s is why. -->
@@ -435,6 +510,48 @@
   <!-- %1$s is the folder's name. -->
   <string name="settings_downloads_unpin">Unpin %1$s</string>
   <string name="settings_downloads_pin">Pin</string>
+  <!-- Category folders: rules that sort downloads into folders inside the download folder. -->
+  <string name="settings_categories">Category folders</string>
+  <string name="settings_categories_footer">Downloads that don't choose a folder go to the first category they match, inside the download folder. They match by extension or media type, and by site when sites are listed.</string>
+  <string name="settings_categories_add">Add category</string>
+  <string name="settings_categories_empty">Everything goes to the download folder</string>
+  <string name="settings_categories_empty_hint">Sort videos, music, documents and archives into folders of their own.</string>
+  <string name="settings_categories_suggested">Use suggested</string>
+  <!-- A device whose Ketch is too old for category folders. %1$s is its name. -->
+  <string name="settings_categories_unsupported">Update Ketch on %1$s to sort its downloads into folders.</string>
+  <!-- The summary under a category without rules. -->
+  <string name="settings_categories_no_rules">Add an extension, media type or site</string>
+  <!-- In a category's summary, after its first extensions: how many more it has. -->
+  <string name="settings_categories_more">+%1$d</string>
+  <!-- In a category's summary: the sites it is limited to, such as "github.com, gitlab.com". -->
+  <string name="settings_categories_from_sites">From %1$s</string>
+  <string name="settings_categories_folder">Folder</string>
+  <string name="settings_categories_folder_hint">Inside the download folder. Use / for a folder inside another.</string>
+  <string name="settings_categories_folder_invalid">Use a folder inside the download folder</string>
+  <string name="settings_categories_extensions">Extensions</string>
+  <!-- Example extensions in the empty field. -->
+  <string name="settings_categories_extensions_placeholder">mp4, mkv, webm</string>
+  <string name="settings_categories_types">Media types</string>
+  <string name="settings_categories_types_hint">As servers report them; video/* covers every video.</string>
+  <!-- Example media types in the empty field. -->
+  <string name="settings_categories_types_placeholder">video/*</string>
+  <string name="settings_categories_types_invalid">Write media types as type/subtype, such as video/mp4</string>
+  <string name="settings_categories_sites">Sites</string>
+  <string name="settings_categories_sites_hint">example.com also covers its subdomains.</string>
+  <!-- In the empty Sites field: the category takes downloads from every site. -->
+  <string name="settings_categories_sites_placeholder">Any site</string>
+  <string name="settings_categories_move_up">Move up</string>
+  <string name="settings_categories_move_down">Move down</string>
+  <string name="settings_categories_remove">Remove</string>
+  <!-- The folder of a category just added, until it is renamed. -->
+  <string name="settings_categories_new_folder">New folder</string>
+  <!-- Folder names of the suggested categories, created inside the download folder. -->
+  <string name="settings_category_video">Video</string>
+  <string name="settings_category_music">Music</string>
+  <string name="settings_category_pictures">Pictures</string>
+  <string name="settings_category_documents">Documents</string>
+  <string name="settings_category_archives">Archives</string>
+  <string name="settings_category_programs">Programs</string>
   <string name="settings_downloads_queue">Queue</string>
   <string name="settings_downloads_queue_footer">Lowering a limit lets running downloads finish. Retries apply as downloads start or resume.</string>
   <!-- A count of 0 on a stepper: no limit. -->
@@ -471,6 +588,18 @@
   <string name="settings_downloads_retries_never_state">Never retries</string>
   <string name="settings_downloads_retries_fewer">Fewer retries</string>
   <string name="settings_downloads_retries_more">More retries</string>
+  <string name="settings_downloads_retries_unlimited_state">Retries until paused</string>
+  <!-- A row under Retries: how long a connection may receive no data before it is dropped and
+       retried. Its stepper shows a duration, or the Off label. -->
+  <string name="settings_downloads_stall">Stalled connections</string>
+  <string name="settings_downloads_stall_hint">Retry a connection that receives nothing for this long.</string>
+  <string name="settings_downloads_stall_off">Off</string>
+  <!-- What screen readers say for the stalled connections stepper, and its buttons.
+       %1$s is a duration, such as 30s or 2 min. -->
+  <string name="settings_downloads_stall_off_state">Waits on stalled connections</string>
+  <string name="settings_downloads_stall_state">Retries after %1$s without data</string>
+  <string name="settings_downloads_stall_sooner">Retry sooner</string>
+  <string name="settings_downloads_stall_later">Wait longer</string>
 
   <!-- Speed. -->
   <!-- The speed modes, as the Speed page names them. -->
@@ -486,20 +615,20 @@
   <string name="settings_speed_mode_group">Mode</string>
   <string name="settings_speed_mode">Speed mode</string>
   <!-- Under Speed mode: what the mode does now. %1$s is a speed limit, such as 20 MB/s. -->
-  <string name="settings_speed_full_unlimited">Downloads use all the speed they can get.</string>
+  <string name="settings_speed_full_unlimited">No speed limit.</string>
   <string name="settings_speed_full_capped">Downloads share up to %1$s.</string>
-  <string name="settings_speed_slow_lane_summary">Downloads share at most %1$s, leaving room for calls.</string>
-  <string name="settings_speed_auto_no_rules">Add a rule below to turn the Slow lane on by itself.</string>
+  <string name="settings_speed_slow_lane_summary">Downloads share at most %1$s.</string>
+  <string name="settings_speed_auto_no_rules">Add a rule to schedule the Slow lane.</string>
   <!-- %1$s is what Auto mode does now, such as "Slow lane on until 18:00". -->
   <string name="settings_speed_auto_summary">%1$s.</string>
   <string name="settings_speed_limits_group">Limits</string>
   <string name="settings_speed_full_cap">Full speed cap</string>
-  <string name="settings_speed_full_cap_hint">The most downloads share outside the Slow lane.</string>
+  <string name="settings_speed_full_cap_hint">Shared limit outside the Slow lane.</string>
   <string name="settings_speed_slow_lane">Slow lane speed</string>
   <!-- %1$s is the suggested speed, such as 1.5 MB/s; %2$d the share of the top speed it is. -->
   <string name="settings_speed_slow_lane_suggested">≈ %1$s suggested, %2$d% of the top speed seen this week.</string>
   <!-- %1$s is the speed used until then, such as 1 MB/s. -->
-  <string name="settings_speed_slow_lane_unknown">%1$s until Ketch has seen how fast this connection goes.</string>
+  <string name="settings_speed_slow_lane_unknown">%1$s until Ketch measures this connection.</string>
   <!-- %1$s is the full speed cap, such as 1 MB/s. -->
   <string name="settings_speed_slow_lane_capped">The full speed cap of %1$s is lower and applies instead.</string>
   <string name="settings_speed_rules">Auto rules</string>
@@ -559,12 +688,88 @@
   <string name="settings_network_http_only">HTTP only. FTP and torrents use the system default.</string>
   <!-- A network picked before that the device no longer has. %1$s is its name, such as en5. -->
   <string name="settings_network_gone">%1$s · not connected</string>
+  <string name="settings_proxy">Proxy</string>
+  <string name="settings_proxy_mode">Connect through</string>
+  <!-- How downloads reach servers: the system's proxy settings, no proxy, or one typed here. -->
+  <string name="settings_proxy_system">System proxy</string>
+  <string name="settings_proxy_direct">No proxy</string>
+  <string name="settings_proxy_manual">Manual proxy</string>
+  <!-- %1$s is the device's name. -->
+  <string name="settings_proxy_system_hint">Follows the proxy settings of %1$s.</string>
+  <string name="settings_proxy_address">Address</string>
+  <string name="settings_proxy_address_hint">An HTTP or SOCKS5 proxy.</string>
+  <!-- An example address in the empty field. Keep the URL as it is. -->
+  <string name="settings_proxy_address_placeholder">socks5://127.0.0.1:1080</string>
+  <!-- Keep http://host:port and socks5://host:port as they are. -->
+  <string name="settings_proxy_address_invalid">Use http://host:port or socks5://host:port</string>
+  <string name="settings_proxy_username">Username</string>
+  <string name="settings_proxy_password">Password</string>
+  <!-- Placeholder of a field that can stay empty. -->
+  <string name="settings_proxy_optional">Optional</string>
+  <!-- Hosts that skip the proxy. -->
+  <string name="settings_proxy_bypass">Connect directly to</string>
+  <!-- Example entries in the empty field. Keep them, and the ASCII comma between them, as they are. -->
+  <string name="settings_proxy_bypass_placeholder">*.lan, 10.0.0.0/8</string>
+  <string name="settings_proxy_bypass_hint">Hosts, IP addresses or ranges, separated by commas. Subdomains are included.</string>
+  <!-- %1$s is what was typed, such as "a/b". -->
+  <string name="settings_proxy_bypass_invalid">%1$s isn't a host, address or range</string>
+  <string name="settings_proxy_footer">For HTTP downloads as they start or resume. FTP and torrents connect directly.</string>
+  <!-- %1$s is the device's name. -->
+  <string name="settings_proxy_unsupported">%1$s can't use a proxy. Update Ketch there to choose one.</string>
 
   <!-- BitTorrent. -->
+  <!-- The group on top of the BitTorrent page: what this device uploads to peers. -->
+  <string name="settings_torrent_upload">Uploading</string>
+  <string name="settings_torrent_upload_mode">Share with peers</string>
+  <!-- The choices of Share with peers, each with the hint under it once chosen. -->
+  <string name="settings_torrent_upload_off">Off</string>
+  <string name="settings_torrent_upload_while_downloading">While downloading</string>
+  <string name="settings_torrent_upload_seed">Keep seeding</string>
+  <string name="settings_torrent_upload_off_hint">Peers can't download anything from this device.</string>
+  <string name="settings_torrent_upload_while_downloading_hint">Peers can download the pieces you have while your torrents download.</string>
+  <string name="settings_torrent_upload_seed_hint">Finished torrents keep uploading until you stop them or turn this off, also after Ketch restarts.</string>
+  <string name="settings_torrent_upload_wifi_only">Only on Wi-Fi</string>
+  <!-- Under Only on Wi-Fi: uploading resumes by itself on Wi-Fi or another unmetered network. -->
+  <string name="settings_torrent_upload_wifi_only_hint">Pauses uploading on mobile data and other metered networks.</string>
+  <string name="settings_torrent_upload_limit">Upload limit</string>
+  <!-- Under Upload limit: one cap for all torrents together, not one per torrent. -->
+  <string name="settings_torrent_upload_limit_hint">Shared by all torrents.</string>
+  <string name="settings_torrent_upload_footer">Peers you upload to see this device's IP address. Private torrents only share with their tracker's peers.</string>
+  <string name="settings_torrent_connections">Connections</string>
+  <string name="settings_torrent_encryption">Encryption</string>
+  <string name="settings_torrent_encryption_preferred">Preferred</string>
+  <string name="settings_torrent_encryption_required">Required</string>
+  <string name="settings_torrent_encryption_off">Off</string>
+  <string name="settings_torrent_encryption_preferred_hint">Connects encrypted when peers support it, and unencrypted otherwise.</string>
+  <string name="settings_torrent_encryption_required_hint">Only connects to peers that encrypt. Fewer peers, but harder for networks to recognize or slow down.</string>
+  <string name="settings_torrent_encryption_off_hint">Never encrypts. Peers that require encryption can't connect.</string>
+  <string name="settings_torrent_utp">uTP</string>
+  <string name="settings_torrent_utp_hint">Also reaches peers over UDP, which works with more peers behind routers and slows down while your other traffic needs the bandwidth.</string>
+  <string name="settings_torrent_port_mapping">Port forwarding</string>
+  <string name="settings_torrent_port_mapping_hint">Asks your router (UPnP or NAT-PMP) to forward a port, so more peers can connect to this device.</string>
+  <string name="settings_torrent_local_discovery">Local peer discovery</string>
+  <string name="settings_torrent_local_discovery_hint">Finds devices on your local network that download or share the same public torrents, so they exchange pieces directly.</string>
+  <string name="settings_torrent_connections_footer">Encryption hides what the traffic is, not who you connect to.</string>
   <string name="settings_torrent_trackers">Extra trackers</string>
   <string name="settings_torrent_no_trackers">No extra trackers</string>
   <!-- On the page of a device that is not this one, %1$s. config.toml is a file name. -->
-  <string name="settings_torrent_remote">Change the extra trackers on %1$s itself, or in its config.toml.</string>
+  <string name="settings_torrent_remote">Change the BitTorrent settings on %1$s itself, or in its config.toml.</string>
+  <!-- Whether peers on the internet can connect to a device. %1$s is the device's name, %2$d the
+       port peers are told to use. -->
+  <string name="settings_torrent_reach_reachable">Peers can connect to %1$s on port %2$d.</string>
+  <!-- %3$d is how many routers (NAT layers) forward the port, the home router first. -->
+  <plurals name="settings_torrent_reach_forwarded">
+    <item quantity="one">Port %2$d is forwarded to %1$s through %3$d router, so peers can connect.</item>
+    <item quantity="other">Port %2$d is forwarded to %1$s through %3$d routers, so peers can connect.</item>
+  </plurals>
+  <!-- A router forwards the port, but a NAT outside it does not, such as a provider's
+       carrier-grade NAT, so peers cannot connect. -->
+  <string name="settings_torrent_reach_blocked">Peers can't connect to %1$s: its router forwards port %2$d, but a network outside it, often your provider's, doesn't.</string>
+  <string name="settings_torrent_reach_not_forwarded">No router forwards port %2$d to %1$s, so peers may not be able to connect. Turn on Port forwarding, or forward the port on your router.</string>
+  <!-- After settings_torrent_reach_blocked or _not_forwarded. Hole punching lets two devices
+       behind routers connect with a third peer's help. -->
+  <string name="settings_torrent_reach_hole_punching">Downloads still work, and hole punching reaches peers behind routers.</string>
+  <string name="settings_torrent_reach_no_hole_punching">Downloads still work. Turn on uTP so hole punching can reach peers behind routers.</string>
   <!-- After Remove all, with Undo. -->
   <plurals name="settings_torrent_removed">
     <item quantity="one">Removed %1$d tracker.</item>
@@ -595,6 +800,46 @@
     <item quantity="one">and %1$d more.</item>
     <item quantity="other">and %1$d more.</item>
   </plurals>
+  <!-- The group for the tracker lists the device downloads, such as ngosang's trackers_best.txt. -->
+  <string name="settings_torrent_list">Tracker lists</string>
+  <string name="settings_torrent_list_subscribe">Subscribe to tracker lists</string>
+  <string name="settings_torrent_list_subscribe_hint">Public torrents also announce to their trackers. Updates daily.</string>
+  <string name="settings_torrent_list_add">Add a list</string>
+  <!-- %1$s names a tracker list, such as "ngosang/trackerslist · trackers_best.txt". -->
+  <string name="settings_torrent_list_remove">Remove %1$s</string>
+  <string name="settings_torrent_list_none">No tracker lists</string>
+  <!-- Under Add a list: what a tracker list holds. -->
+  <string name="settings_torrent_list_url_hint">One announce URL per line.</string>
+  <!-- Under the address field when what was typed is not a web address. -->
+  <string name="settings_torrent_list_url_invalid">Enter an http or https address.</string>
+  <!-- Puts back the default lists, ngosang's and XIU2's best trackers. -->
+  <string name="settings_torrent_list_default">Use defaults</string>
+  <string name="settings_torrent_list_update">Update now</string>
+  <string name="settings_torrent_list_updating">Updating…</string>
+  <!-- %1$d is how many trackers the list holds, %2$s how long ago it was downloaded, such as "3h 12m". -->
+  <plurals name="settings_torrent_list_status">
+    <item quantity="one">%1$d tracker · updated %2$s ago</item>
+    <item quantity="other">%1$d trackers · updated %2$s ago</item>
+  </plurals>
+  <!-- Before the first download of the default list, which Ketch ships a copy of. -->
+  <plurals name="settings_torrent_list_built_in">
+    <item quantity="one">%1$d built-in tracker until the list downloads.</item>
+    <item quantity="other">%1$d built-in trackers until the list downloads.</item>
+  </plurals>
+  <!-- %1$d is how many trackers the older copy holds, %2$s how long ago it was downloaded. -->
+  <plurals name="settings_torrent_list_stale">
+    <item quantity="one">Couldn't update the list. Using %1$d tracker from %2$s ago.</item>
+    <item quantity="other">Couldn't update the list. Using %1$d trackers from %2$s ago.</item>
+  </plurals>
+  <plurals name="settings_torrent_list_fallback">
+    <item quantity="one">Couldn't download the list. Using %1$d built-in tracker.</item>
+    <item quantity="other">Couldn't download the list. Using %1$d built-in trackers.</item>
+  </plurals>
+    <!-- A row that shows or hides the trackers the downloaded list holds. -->
+  <string name="settings_torrent_list_trackers">Trackers in the lists</string>
+  <string name="settings_torrent_list_hide">Hide</string>
+  <string name="settings_torrent_list_failed">Couldn't download the list.</string>
+  <string name="settings_torrent_list_footer">The lists' servers see this device's IP address.</string>
 
   <!-- Sharing. -->
   <!-- On the page of a device that is not this one, %1$s. "ketch server" is a command. -->
@@ -605,17 +850,22 @@
   <string name="settings_sharing_restart">Restart</string>
   <string name="settings_sharing_pair">Pair a device</string>
   <string name="settings_sharing_stop">Stop sharing</string>
+  <string name="settings_sharing_pairing">Pairing requests</string>
+  <string name="settings_sharing_pairing_off">Devices that find %1$s on your local network can ask to control Ketch there for 3 minutes after you turn this on.</string>
+  <string name="settings_sharing_pairing_on">On for another %1$s · devices on your local network can ask to control Ketch on %2$s</string>
+  <string name="settings_sharing_pairing_turn_on">Turn on</string>
+  <string name="settings_sharing_pairing_turn_off">Turn off</string>
   <!--
     In the strings below, %1$s names this device inside a sentence, such as "this Mac" or
     "this phone".
   -->
   <!-- On phones and tablets. -->
-  <string name="settings_sharing_control_from_computer">Control %1$s from a computer or another device.</string>
+  <string name="settings_sharing_control_from_computer">Control Ketch on %1$s from a computer or another device.</string>
   <!-- On computers and in the browser. -->
-  <string name="settings_sharing_control_from_phone">Control %1$s from your phone, tablet or another browser.</string>
+  <string name="settings_sharing_control_from_phone">Control Ketch on %1$s from your phone, tablet or another browser.</string>
   <!-- %1$s is why sharing did not start, such as a port in use. -->
   <string name="settings_sharing_failed">Couldn't start sharing: %1$s</string>
-  <string name="settings_sharing_open_no_code">Anyone on your network can control %1$s. Allowing a device adds a code.</string>
+  <string name="settings_sharing_open_no_code">Anyone on your network can control Ketch on %1$s. Allowing a device adds a code.</string>
   <string name="settings_sharing_local_only">Only apps on %1$s can connect. Allowing a device shares it on your network, with a code.</string>
   <string name="settings_sharing_off_hint">Ketch shares %1$s on your network, protected by a code.</string>
   <string name="settings_sharing_allow">Allow another device</string>
@@ -632,9 +882,12 @@
   <string name="settings_sharing_copy_link">Copy pairing link</string>
   <string name="settings_sharing_copied">Copied</string>
   <!-- Under the pairing link: whoever has the link. -->
-  <string name="settings_sharing_anyone">Anyone with it can control %1$s.</string>
+  <string name="settings_sharing_anyone">Anyone with it can control Ketch on %1$s.</string>
   <string name="settings_sharing_new_code">New code</string>
   <string name="settings_sharing_new_code_hint">Disconnects the devices paired so far</string>
+  <string name="settings_sharing_new_code_title">Generate a new code?</string>
+  <string name="settings_sharing_new_code_body">Every device paired with %1$s is disconnected and has to pair again. The current pairing link and QR code stop working.</string>
+  <string name="settings_sharing_new_code_confirm">Generate new code</string>
   <!-- The QR code, for screen readers. %1$s is the device's name or address. -->
   <string name="settings_sharing_qr">Pairing code for %1$s</string>
   <string name="settings_sharing_advanced">Advanced</string>
@@ -660,7 +913,7 @@
   <string name="settings_sharing_websites_hint">Such as app.example.com, separated by commas. * allows any.</string>
   <!-- In the empty websites field. -->
   <string name="settings_sharing_websites_none">None</string>
-  <string name="settings_sharing_auto_start">Start sharing when Ketch opens</string>
+  <string name="settings_sharing_auto_start">Share when Ketch opens</string>
 
   <!--
     Settings search. A setting is found by the title of its row on its page, by the description
@@ -672,8 +925,8 @@
   <string name="settings_search_device_name_keywords">hostname, computer, rename</string>
   <string name="settings_search_theme">System, light or dark</string>
   <string name="settings_search_theme_keywords">dark mode, light mode, appearance</string>
-  <!-- %1$s to %4$s are the accents' names: Signal, Harbor, Fathom and Beacon. -->
-  <string name="settings_search_accent">%1$s, %2$s, %3$s or %4$s</string>
+  <!-- %1$s to %7$s are the accents' names: Indigo, Purple, Pink, Orange, Green, Teal and Blue. -->
+  <string name="settings_search_accent">%1$s, %2$s, %3$s, %4$s, %5$s, %6$s or %7$s</string>
   <string name="settings_search_accent_keywords">colour, appearance</string>
   <string name="settings_search_density">Auto, compact or comfortable</string>
   <string name="settings_search_density_keywords">size, spacing, touch, appearance</string>
@@ -686,7 +939,8 @@
   <string name="settings_search_start_hidden_keywords">startup, background, menu bar, tray</string>
   <string name="settings_search_badge">What the Dock or taskbar icon shows</string>
   <string name="settings_search_badge_keywords">count, dock, taskbar</string>
-  <string name="settings_search_shortcuts">Every shortcut in Ketch</string>
+  <string name="settings_search_keep_awake_keywords">sleep, power, battery, prevent sleep, stay awake, wake lock</string>
+  <string name="settings_search_shortcuts">All keyboard shortcuts</string>
   <string name="settings_search_shortcuts_keywords">keys, hotkeys, keybindings</string>
   <string name="settings_search_finished_keywords">complete, done, alert</string>
   <string name="settings_search_failed_keywords">error, alert</string>
@@ -730,6 +984,8 @@
   <string name="settings_search_save_to_keywords">folder, directory, location, path, destination</string>
   <string name="settings_search_folders">Pinned and recent folders</string>
   <string name="settings_search_folders_keywords">favorite, pin, recent</string>
+  <string name="settings_search_categories">Sort downloads into folders by type or site</string>
+  <string name="settings_search_categories_keywords">category, sort, organize, extension, file type, video, music</string>
   <string name="settings_search_run_at_once">Downloads that run together</string>
   <string name="settings_search_run_at_once_keywords">concurrent, parallel, simultaneous, queue, limit</string>
   <string name="settings_search_per_server">Downloads from one website at a time</string>
@@ -745,8 +1001,14 @@
   <string name="settings_search_connections_keywords">segments, threads, parallel, split</string>
   <string name="settings_search_networks">The networks downloads use</string>
   <string name="settings_search_networks_keywords">wifi, wi-fi, ethernet, interface, vpn, multiple networks</string>
+  <string name="settings_search_proxy">How downloads reach servers</string>
+  <string name="settings_search_proxy_keywords">proxy, socks, socks5, http proxy, bypass, firewall</string>
   <string name="settings_search_trackers">Trackers added to public torrents</string>
   <string name="settings_search_trackers_keywords">announce, udp, magnet, add trackers</string>
+  <string name="settings_search_upload">Share pieces with peers and seed finished torrents</string>
+  <string name="settings_search_upload_keywords">upload, seed, seeding, share, ratio, peers</string>
+  <string name="settings_search_upload_wifi_only">Upload to peers only on Wi-Fi</string>
+  <string name="settings_search_upload_wifi_only_keywords">wifi, wi-fi, mobile data, cellular, metered, hotspot, data saver, upload</string>
   <string name="settings_search_pair">Control this device from a phone or browser</string>
   <string name="settings_search_pair_keywords">qr code, phone, pairing, remote, web app, connect</string>
   <string name="settings_search_reachable_keywords">lan, network, remote access</string>

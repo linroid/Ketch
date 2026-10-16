@@ -1,11 +1,15 @@
 package com.linroid.ketch.app.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,26 +19,68 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchSegmented
+import com.linroid.ketch.app.components.SpeedLimitPicker
+import com.linroid.ketch.app.components.SpeedLimitPickerPresets
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.platform.localPeerDiscoverySupported
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
 import com.linroid.ketch.app.state.RejectedTracker
 import com.linroid.ketch.app.state.addTrackers
+import com.linroid.ketch.app.state.isTrackerListUrl
+import com.linroid.ketch.app.state.speedChoices
 import com.linroid.ketch.app.state.trackerHost
+import com.linroid.ketch.app.state.trackerListName
+import com.linroid.ketch.app.state.trackerListStatusText
+import com.linroid.ketch.app.state.unusedListedTrackers
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.app.ui.connect.rememberNearbyAccess
+import com.linroid.ketch.config.TorrentEncryptionMode
+import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentUploadMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_add
+import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_undo
 import ketch.app.shared.generated.resources.settings_torrent_add
 import ketch.app.shared.generated.resources.settings_torrent_add_hint
+import ketch.app.shared.generated.resources.settings_torrent_connections
+import ketch.app.shared.generated.resources.settings_torrent_connections_footer
+import ketch.app.shared.generated.resources.settings_torrent_encryption
+import ketch.app.shared.generated.resources.settings_torrent_encryption_off
+import ketch.app.shared.generated.resources.settings_torrent_encryption_off_hint
+import ketch.app.shared.generated.resources.settings_torrent_encryption_preferred
+import ketch.app.shared.generated.resources.settings_torrent_encryption_preferred_hint
+import ketch.app.shared.generated.resources.settings_torrent_encryption_required
+import ketch.app.shared.generated.resources.settings_torrent_encryption_required_hint
 import ketch.app.shared.generated.resources.settings_torrent_footer
 import ketch.app.shared.generated.resources.settings_torrent_footer_first_only
+import ketch.app.shared.generated.resources.settings_torrent_list
+import ketch.app.shared.generated.resources.settings_torrent_list_add
+import ketch.app.shared.generated.resources.settings_torrent_list_default
+import ketch.app.shared.generated.resources.settings_torrent_list_footer
+import ketch.app.shared.generated.resources.settings_torrent_list_hide
+import ketch.app.shared.generated.resources.settings_torrent_list_none
+import ketch.app.shared.generated.resources.settings_torrent_list_remove
+import ketch.app.shared.generated.resources.settings_torrent_list_subscribe
+import ketch.app.shared.generated.resources.settings_torrent_list_subscribe_hint
+import ketch.app.shared.generated.resources.settings_torrent_list_trackers
+import ketch.app.shared.generated.resources.settings_torrent_list_update
+import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
+import ketch.app.shared.generated.resources.settings_torrent_list_url_invalid
+import ketch.app.shared.generated.resources.settings_torrent_local_discovery
+import ketch.app.shared.generated.resources.settings_torrent_local_discovery_hint
 import ketch.app.shared.generated.resources.settings_torrent_no_trackers
+import ketch.app.shared.generated.resources.settings_torrent_port_mapping
+import ketch.app.shared.generated.resources.settings_torrent_port_mapping_hint
 import ketch.app.shared.generated.resources.settings_torrent_rejected
 import ketch.app.shared.generated.resources.settings_torrent_rejected_line
 import ketch.app.shared.generated.resources.settings_torrent_rejected_many
@@ -45,6 +91,22 @@ import ketch.app.shared.generated.resources.settings_torrent_remove_all
 import ketch.app.shared.generated.resources.settings_torrent_removed
 import ketch.app.shared.generated.resources.settings_torrent_trackers
 import ketch.app.shared.generated.resources.settings_torrent_unused
+import ketch.app.shared.generated.resources.settings_torrent_upload
+import ketch.app.shared.generated.resources.settings_torrent_upload_footer
+import ketch.app.shared.generated.resources.settings_torrent_upload_limit
+import ketch.app.shared.generated.resources.settings_torrent_upload_limit_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_mode
+import ketch.app.shared.generated.resources.settings_torrent_upload_off
+import ketch.app.shared.generated.resources.settings_torrent_upload_off_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_seed
+import ketch.app.shared.generated.resources.settings_torrent_upload_seed_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading
+import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading_hint
+import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only
+import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only_hint
+import ketch.app.shared.generated.resources.settings_torrent_utp
+import ketch.app.shared.generated.resources.settings_torrent_utp_hint
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -52,8 +114,9 @@ import org.jetbrains.compose.resources.stringResource
 private const val MAX_LISTED_REJECTIONS = 3
 
 /**
- * Extra trackers of [device], applied to torrents as they start or resume. Only the embedded
- * device's trackers can be changed here; a remote device gets a note instead.
+ * What [device] uploads to peers, its extra trackers and its tracker list. Uploading applies at
+ * once, trackers to torrents as they start or resume. Only the embedded device's settings can be
+ * changed here; a remote device gets a note instead.
  */
 @Composable
 fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
@@ -61,6 +124,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val torrent = controller.torrent
   // Trackers taken away by "Remove all", offered back until restored.
   var removed by remember { mutableStateOf(emptyList<String>()) }
+  TorrentReachabilityNotice(state, device)
   if (torrent == null) {
     SettingsNotice(
       text = stringResource(Res.string.settings_torrent_remote, device.label),
@@ -73,6 +137,12 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   controller.torrentError?.let {
     SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
   }
+  UploadGroup(
+    settings = torrent,
+    followsNetwork = state.instanceManager.followsUploadNetwork,
+    onChange = controller::updateTorrent,
+  )
+  ConnectionsGroup(settings = torrent, onChange = controller::updateTorrent)
   if (removed.isNotEmpty()) {
     SettingsNotice(
       text = pluralStringResource(
@@ -154,6 +224,307 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
         },
       )
     }
+  }
+  val listStatus = controller.trackerList?.collectAsState(initial = null)?.value
+  TrackerListGroup(
+    settings = torrent,
+    statuses = listStatus,
+    onChange = controller::updateTorrent,
+    onRefresh = controller::refreshTrackerList,
+  )
+}
+
+/**
+ * Whether peers may download from this device, with a hint for the choice; where the device's
+ * uploads follow its network ([followsNetwork], the phone apps), whether they wait for Wi-Fi;
+ * and the upload cap all torrents share. The last two only matter while something is uploaded.
+ */
+@Composable
+private fun UploadGroup(
+  settings: TorrentSettings,
+  followsNetwork: Boolean,
+  onChange: (TorrentSettings) -> Unit,
+) {
+  val uploads = settings.upload != TorrentUploadMode.Off
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_upload),
+    footer = stringResource(Res.string.settings_torrent_upload_footer),
+  ) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_upload_mode),
+      description = stringResource(settings.upload.hint),
+    ) {
+      KetchSegmented(
+        options = TorrentUploadMode.entries,
+        selected = settings.upload,
+        onSelect = { onChange(settings.copy(upload = it)) },
+        label = { stringResource(it.label) },
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        revealInitialSelection = true,
+      )
+    }
+    if (followsNetwork) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_torrent_upload_wifi_only),
+        description = stringResource(Res.string.settings_torrent_upload_wifi_only_hint),
+        checked = settings.uploadWifiOnly,
+        onCheckedChange = { onChange(settings.copy(uploadWifiOnly = it)) },
+        enabled = uploads,
+      )
+    }
+    val limit = settings.uploadLimit
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_upload_limit),
+      description = stringResource(Res.string.settings_torrent_upload_limit_hint),
+      enabled = uploads,
+    ) {
+      SpeedLimitPicker(
+        value = limit,
+        onCommit = { onChange(settings.copy(uploadLimit = it)) },
+        presets = speedChoices(SpeedLimitPickerPresets, limit),
+        enabled = uploads,
+      )
+    }
+  }
+}
+
+/**
+ * How this device reaches peers: protocol encryption, uTP, asking the router to forward its
+ * port and finding peers on the local network. Each applies to connections opened after the
+ * change. Switching local peer discovery on asks for the local network where the system blocks
+ * it (Android 17), as joining the LAN group would otherwise fail silently.
+ */
+@Composable
+private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+  val nearby = rememberNearbyAccess()
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_connections),
+    footer = stringResource(Res.string.settings_torrent_connections_footer),
+  ) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_encryption),
+      description = stringResource(settings.encryption.hint),
+    ) {
+      KetchSegmented(
+        options = TorrentEncryptionMode.entries,
+        selected = settings.encryption,
+        onSelect = { onChange(settings.copy(encryption = it)) },
+        label = { stringResource(it.label) },
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        revealInitialSelection = true,
+      )
+    }
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_torrent_utp),
+      description = stringResource(Res.string.settings_torrent_utp_hint),
+      checked = settings.utp,
+      onCheckedChange = { onChange(settings.copy(utp = it)) },
+    )
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_torrent_port_mapping),
+      description = stringResource(Res.string.settings_torrent_port_mapping_hint),
+      checked = settings.portMapping,
+      onCheckedChange = { onChange(settings.copy(portMapping = it)) },
+    )
+    // Only the embedded device's settings show here, so its platform decides.
+    if (localPeerDiscoverySupported) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_torrent_local_discovery),
+        description = stringResource(Res.string.settings_torrent_local_discovery_hint),
+        checked = settings.localDiscovery,
+        onCheckedChange = { on ->
+          onChange(settings.copy(localDiscovery = on))
+          if (on) nearby.request(search = false) {}
+        },
+      )
+    }
+  }
+}
+
+private val TorrentEncryptionMode.label: StringResource
+  get() = when (this) {
+    TorrentEncryptionMode.Preferred -> Res.string.settings_torrent_encryption_preferred
+    TorrentEncryptionMode.Required -> Res.string.settings_torrent_encryption_required
+    TorrentEncryptionMode.Off -> Res.string.settings_torrent_encryption_off
+  }
+
+private val TorrentEncryptionMode.hint: StringResource
+  get() = when (this) {
+    TorrentEncryptionMode.Preferred -> Res.string.settings_torrent_encryption_preferred_hint
+    TorrentEncryptionMode.Required -> Res.string.settings_torrent_encryption_required_hint
+    TorrentEncryptionMode.Off -> Res.string.settings_torrent_encryption_off_hint
+  }
+
+private val TorrentUploadMode.label: StringResource
+  get() = when (this) {
+    TorrentUploadMode.Off -> Res.string.settings_torrent_upload_off
+    TorrentUploadMode.WhileDownloading -> Res.string.settings_torrent_upload_while_downloading
+    TorrentUploadMode.Seed -> Res.string.settings_torrent_upload_seed
+  }
+
+private val TorrentUploadMode.hint: StringResource
+  get() = when (this) {
+    TorrentUploadMode.Off -> Res.string.settings_torrent_upload_off_hint
+    TorrentUploadMode.WhileDownloading -> Res.string.settings_torrent_upload_while_downloading_hint
+    TorrentUploadMode.Seed -> Res.string.settings_torrent_upload_seed_hint
+  }
+
+/**
+ * The tracker list subscription: a switch, the lists' addresses, which start as
+ * [TorrentSettings.DEFAULT_TRACKER_LISTS], and while subscribed, what each list holds from
+ * [statuses], with their trackers behind Show.
+ */
+@Composable
+private fun TrackerListGroup(
+  settings: TorrentSettings,
+  statuses: List<TrackerListStatus>?,
+  onChange: (TorrentSettings) -> Unit,
+  onRefresh: () -> Unit,
+) {
+  val lists = settings.trackerListAddresses
+  val save = { urls: List<String> -> onChange(settings.withTrackerLists(urls)) }
+  val subscribed = statuses.takeIf { settings.trackerList }.orEmpty()
+  val now = LocalClock.current.now()
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_list),
+    footer = stringResource(Res.string.settings_torrent_list_footer),
+    action = if (subscribed.isNotEmpty()) {
+      {
+        KetchButton(
+          text = stringResource(Res.string.settings_torrent_list_update),
+          onClick = onRefresh,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+          leadingIcon = KetchIcon.Retry,
+          enabled = subscribed.none { it.updating },
+        )
+      }
+    } else {
+      null
+    },
+  ) {
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_torrent_list_subscribe),
+      description = stringResource(Res.string.settings_torrent_list_subscribe_hint),
+      checked = settings.trackerList,
+      onCheckedChange = { onChange(settings.copy(trackerList = it)) },
+    )
+    AddTrackerListRow(
+      onAdd = { url -> if (url !in lists) save(lists + url) },
+      onDefaults = { save(TorrentSettings.DEFAULT_TRACKER_LISTS) }
+        .takeIf { lists != TorrentSettings.DEFAULT_TRACKER_LISTS },
+    )
+    if (lists.isEmpty()) {
+      SettingsRow(title = stringResource(Res.string.settings_torrent_list_none))
+    }
+    for (url in lists) {
+      val name = trackerListName(url)
+      SettingsRow(
+        title = name,
+        description = subscribed.firstOrNull { it.url == url }
+          ?.let { trackerListStatusText(it, now).resolve() } ?: url,
+        trailing = {
+          KetchIconButton(
+            icon = KetchIcon.Close,
+            onClick = { save(lists - url) },
+            size = KetchButtonSize.Small,
+            contentDescription = stringResource(Res.string.settings_torrent_list_remove, name),
+          )
+        },
+      )
+    }
+    val listed = subscribed.flatMap { it.trackers }.distinct()
+    if (listed.isNotEmpty()) ListedTrackers(listed, unusedListedTrackers(settings.trackers, listed))
+  }
+}
+
+/**
+ * Field for a tracker list's address. [onAdd] gets a valid one; [onDefaults], when given, puts
+ * back the default lists.
+ */
+@Composable
+private fun AddTrackerListRow(onAdd: (String) -> Unit, onDefaults: (() -> Unit)?) {
+  var address by remember { mutableStateOf("") }
+  val typed = address.trim()
+  val invalid = typed.isNotEmpty() && !isTrackerListUrl(typed)
+  val invalidText = stringResource(Res.string.settings_torrent_list_url_invalid)
+  val add = {
+    if (typed.isNotEmpty() && !invalid) {
+      onAdd(typed)
+      address = ""
+    }
+  }
+  SettingsRow(
+    title = stringResource(Res.string.settings_torrent_list_add),
+    description = stringResource(Res.string.settings_torrent_list_url_hint),
+    trailing = onDefaults?.let {
+      {
+        KetchButton(
+          text = stringResource(Res.string.settings_torrent_list_default),
+          onClick = it,
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+        )
+      }
+    },
+  ) {
+    Row(
+      verticalAlignment = Alignment.Top,
+      horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+    ) {
+      SettingsTextField(
+        value = address,
+        onValueChange = { address = it },
+        modifier = Modifier.weight(1f),
+        placeholder = "https://lists.example.org/trackers.txt",
+        error = invalidText.takeIf { invalid },
+        onDone = add,
+        mono = true,
+      )
+      KetchButton(
+        text = stringResource(Res.string.action_add),
+        onClick = add,
+        variant = KetchButtonVariant.Secondary,
+        enabled = typed.isNotEmpty() && !invalid,
+      )
+    }
+  }
+}
+
+/** The [trackers] a subscribed list holds, read-only and hidden until shown; [unused] get a badge. */
+@Composable
+private fun ListedTrackers(trackers: List<String>, unused: Set<String>) {
+  var shown by rememberSaveable { mutableStateOf(false) }
+  SettingsRow(
+    title = stringResource(Res.string.settings_torrent_list_trackers),
+    trailing = {
+      KetchButton(
+        text = stringResource(
+          if (shown) Res.string.settings_torrent_list_hide else Res.string.action_show,
+        ),
+        onClick = { shown = !shown },
+        variant = KetchButtonVariant.Ghost,
+        size = KetchButtonSize.Small,
+        leadingIcon = if (shown) KetchIcon.ChevronUp else KetchIcon.ChevronDown,
+      )
+    },
+  )
+  if (!shown) return
+  for (url in trackers) {
+    SettingsRow(
+      title = trackerHost(url),
+      description = url,
+      trailing = if (url in unused) {
+        {
+          KetchBadge(
+            text = stringResource(Res.string.settings_torrent_unused),
+            tone = KetchBadgeTone.Warning,
+          )
+        }
+      } else {
+        null
+      },
+    )
   }
 }
 

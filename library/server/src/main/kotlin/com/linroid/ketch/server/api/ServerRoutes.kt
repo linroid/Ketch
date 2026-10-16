@@ -4,17 +4,24 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.NetworkInterfaceConfig
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.http.HttpRequestLifecycle
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
 import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 private val log = KetchLogger("ServerRoutes")
 
@@ -25,11 +32,20 @@ private val log = KetchLogger("ServerRoutes")
 internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard) {
   get<Api.Status> {
     log.d { "GET /api/status" }
-    call.respond(ketch.status())
+    val status = ketch.status()
+    // The event stream is the server's, whatever the engine behind it.
+    call.respond(status.copy(features = status.features + StreamEvents.FEATURE))
   }
 
   put<Api.Config> {
-    val body = call.receiveJson<DownloadConfig>()
+    val fields = call.receiveJson<JsonObject>()
+    // Fields a client leaves out keep their current values: clients older than a setting, such
+    // as category folders or idle timeouts, must not reset it.
+    val current = ServerJson.encodeToJsonElement(DownloadConfig.serializer(), ketch.status().config)
+    val body = ServerJson.decodeFromJsonElement(
+      DownloadConfig.serializer(),
+      JsonObject(current.jsonObject + fields),
+    )
     log.i { "PUT /api/config: speedLimit=${body.speedLimit}" }
     destinations.checkConfig(body)
     ketch.updateConfig(body)
@@ -43,7 +59,7 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
   put<Api.NetworkInterfaces> {
     val body = call.receiveJson<NetworkInterfaceConfig>()
     try {
-      call.respond(ketch.updateNetworkInterfaces(body))
+      call.respond(ketch.selectNetworkInterfaces(body))
     } catch (e: UnsupportedOperationException) {
       call.respond(
         HttpStatusCode.NotImplemented,
@@ -54,10 +70,10 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
 
   post<Api.Resolve> {
     val body = call.receiveJson<ResolveUrlRequest>()
-    log.i { "POST /api/resolve url=${body.url}" }
+    log.i { "POST /api/resolve url=${redactUrl(body.url)}" }
     val resolved = ketch.resolve(body.url, body.properties)
     call.respond(resolved)
-  }
+  }.stopWhenClientLeaves()
 
   post<Api.Resolve.Content> { resource ->
     val content = readBounded(call, MAX_RESOLVE_CONTENT_BYTES)
@@ -70,7 +86,7 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
     }
     log.i { "POST /api/resolve/content fileName=${resource.fileName} size=${content.size}" }
     try {
-      call.respond(ketch.resolveContent(content, resource.fileName))
+      call.respond(ketch.resolve(content, resource.fileName))
     } catch (e: KetchError.Unsupported) {
       call.respond(
         HttpStatusCode.UnsupportedMediaType,
@@ -85,8 +101,13 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
         ErrorResponse("unsupported", e.message ?: "Resolving file content is unavailable"),
       )
     }
-  }
+  }.stopWhenClientLeaves()
 }
 
-/** Upper bound for uploaded content; `.torrent` metainfo is limited to 4 MiB by default. */
-internal const val MAX_RESOLVE_CONTENT_BYTES = 16 * 1024 * 1024
+/** Upper bound for uploaded content ([ResolveInput.Content.MAX_CONTENT_BYTES]). */
+internal const val MAX_RESOLVE_CONTENT_BYTES = ResolveInput.Content.MAX_CONTENT_BYTES.toInt()
+
+// A resolve may wait for peers as long as it takes, so it stops when its client disconnects.
+private fun Route.stopWhenClientLeaves() {
+  install(HttpRequestLifecycle) { cancelCallOnClose = true }
+}

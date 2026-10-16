@@ -3,6 +3,7 @@ package com.linroid.ketch.core.engine
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
+import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
@@ -24,10 +25,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,8 +41,9 @@ import kotlinx.coroutines.withContext
  * Starts, resumes and stops download executions.
  *
  * @param config provides the current global configuration; each start or
- *   resume takes a snapshot of it
+ *   resume takes a snapshot of it, with the task's own [DownloadRequest.proxy] if it has one
  * @param clock stamps when downloads complete
+ * @param connections the reporter of a task's live connections
  */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -47,8 +52,10 @@ internal class DownloadCoordinator(
   private val globalLimiter: SpeedLimiter = SpeedLimiter.Unlimited,
   private val dispatchers: KetchDispatchers,
   private val clock: Clock = Clock.System,
+  private val connections: (taskId: String) -> ConnectionReporter = { ConnectionReporter.None },
 ) {
-  private val scope: CoroutineScope = CoroutineScope(dispatchers.network)
+  // A supervisor, so one execution that fails does not cancel the others.
+  private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatchers.network)
   private val log = KetchLogger("Coordinator")
   private val mutex = Mutex()
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
@@ -138,6 +145,43 @@ internal class DownloadCoordinator(
     job?.join()
   }
 
+  /**
+   * Joins the task's stopping execution, if any, without touching a running one.
+   */
+  suspend fun awaitStopping(taskId: String) {
+    mutex.withLock { stoppingDownloads[taskId] }?.join()
+  }
+
+  /** Whether the task has a running execution. */
+  suspend fun isActive(taskId: String): Boolean = mutex.withLock {
+    activeDownloads.containsKey(taskId)
+  }
+
+  /**
+   * Whether the task's running execution is finishing: its source returned and it is completing,
+   * so it takes no more selections.
+   */
+  suspend fun isFinishing(taskId: String): Boolean = mutex.withLock {
+    activeDownloads[taskId]?.execution?.isFinishing == true
+  }
+
+  /**
+   * Hands a saved selection to the task's running execution. The caller holds the task's
+   * [TaskHandle.controlLock] and saved the selection first.
+   */
+  suspend fun deliverSelection(
+    taskId: String,
+    fileIds: Set<String>,
+    totalBytes: Long,
+  ): SelectionDelivery = mutex.withLock {
+    val entry = activeDownloads[taskId] ?: return@withLock SelectionDelivery.NOT_RUNNING
+    if (entry.execution.deliverSelection(fileIds, totalBytes)) {
+      SelectionDelivery.DELIVERED
+    } else {
+      SelectionDelivery.FINISHING
+    }
+  }
+
   suspend fun resume(
     handle: TaskHandle,
     destination: Destination? = null,
@@ -155,10 +199,20 @@ internal class DownloadCoordinator(
     }
 
     val taskRecord = handle.record.value
-    val segments = taskRecord.segments ?: return false
+    // A source writing its own files may have created them before the first save, as when the
+    // process exits right after a start: it resumes into the path it chose, as starting over
+    // would pick a new `name (n)` beside the files it already owns.
+    val startedOwnFiles = taskRecord.outputPath != null && managesOwnFileIo(taskRecord)
+    val segments = taskRecord.segments ?: if (startedOwnFiles) emptyList() else return false
     if (segments.isEmpty() && taskRecord.totalBytes > 0 && !managesOwnFileIo(taskRecord)) {
       // Older versions saved [] when a download stopped before its first segments.
       log.i { "No saved progress for taskId=$taskId, starting it again" }
+      return false
+    }
+    if (taskRecord.sourceState == null && !managesOwnFileIo(taskRecord)) {
+      // Nothing to check the saved bytes against, so they are not trusted.
+      log.w { "No saved state to check the progress of taskId=$taskId against; starting over" }
+      handle.mutableSegments.value = emptyList()
       return false
     }
     log.d {
@@ -174,14 +228,11 @@ internal class DownloadCoordinator(
       it.copy(
         state = TaskState.DOWNLOADING,
         updatedAt = Clock.System.now(),
-        outputPath = destination?.value ?: it.outputPath,
-      )
+      ).withDestination(destination)
     }
 
     val resumeInfo = DownloadExecution.ResumeInfo(
-      record = taskRecord.copy(
-        outputPath = destination?.value ?: taskRecord.outputPath,
-      ),
+      record = taskRecord.withDestination(destination),
       segments = segments,
     )
 
@@ -262,6 +313,12 @@ internal class DownloadCoordinator(
         try {
           execution.execute(resumeInfo)
         } catch (e: CancellationException) {
+          // Thrown while this job is still active, it is not a pause, cancel or close of this
+          // task but a failure of the download, such as a timeout leaking from a library.
+          if (currentCoroutineContext().isActive) {
+            fail(handle, KetchError.Unknown(e))
+            return@launch
+          }
           val s = handle.mutableState.value
           when {
             // A download that completed just before the cancellation keeps its state.
@@ -285,21 +342,10 @@ internal class DownloadCoordinator(
             else -> handle.mutableState.value = DownloadState.Canceled
           }
           throw e
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          val error = when (e) {
-            is KetchError -> e
-            else -> KetchError.Unknown(e)
-          }
-          log.e(error) { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
-          handle.record.update {
-            it.copy(
-              state = TaskState.FAILED,
-              error = error,
-              updatedAt = Clock.System.now(),
-            )
-          }
-          handle.mutableState.value = DownloadState.Failed(error)
+        } catch (e: Throwable) {
+          // Errors too, such as a class that fails to load: the task fails on its own and the
+          // other downloads keep running.
+          fail(handle, e as? KetchError ?: KetchError.Unknown(e))
         } finally {
           val finished = currentCoroutineContext()[Job]
           withContext(NonCancellable) {
@@ -315,6 +361,18 @@ internal class DownloadCoordinator(
     }
   }
 
+  private suspend fun fail(handle: TaskHandle, error: KetchError) {
+    log.e(error) { "Download failed for taskId=${handle.taskId}: ${error.describeCauses()}" }
+    handle.record.update {
+      it.copy(
+        state = TaskState.FAILED,
+        error = error,
+        updatedAt = Clock.System.now(),
+      )
+    }
+    handle.mutableState.value = DownloadState.Failed(error)
+  }
+
   /**
    * Whether the record's source writes its own files, like torrents, whose saved segments only
    * mirror progress the source checks itself. Unknown sources count as engine-managed.
@@ -322,7 +380,7 @@ internal class DownloadCoordinator(
   private fun managesOwnFileIo(record: TaskRecord): Boolean {
     val sourceType = record.sourceType ?: return false
     return try {
-      sourceResolver.resolveByType(sourceType).managesOwnFileIo
+      sourceResolver.resolveByType(sourceType, record.request.url).managesOwnFileIo
     } catch (_: KetchError) {
       false
     }
@@ -333,60 +391,35 @@ internal class DownloadCoordinator(
       handle = handle,
       sourceResolver = sourceResolver,
       fileNameResolver = fileNameResolver,
-      config = config(),
+      config = config().forRequest(handle.request),
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
       clock = clock,
+      connections = connections(handle.taskId),
     )
   }
 
   /**
-   * Lets the task's source stop work that outlived the download via
-   * [DownloadSource.release]. The caller must have cancelled the active
-   * download first. No-op for tasks without a recorded source type.
+   * Lets the task's source stop what outlived its download and, with [deleteFiles], delete the
+   * data it wrote ([DownloadSource.cleanup]). The caller must have cancelled the active download
+   * (if any) first. No-op for tasks without a recorded source type; files are only deleted once
+   * the task has an output path, as before that it wrote none.
    */
-  suspend fun release(handle: TaskHandle) {
+  suspend fun cleanup(handle: TaskHandle, deleteFiles: Boolean) {
     val record = handle.record.value
     val sourceType = record.sourceType ?: return
     val source = try {
-      sourceResolver.resolveByType(sourceType)
+      sourceResolver.resolveByType(sourceType, record.request.url)
     } catch (e: KetchError) {
-      log.w(e) { "Skipping release for taskId=${handle.taskId}: unknown source '$sourceType'" }
+      log.w(e) { "Skipping cleanup for taskId=${handle.taskId}: unknown source '$sourceType'" }
       return
     }
-    source.release(handle.taskId, record.sourceResumeState)
-  }
-
-  /**
-   * Deletes any data produced for the given task by dispatching to its
-   * [DownloadSource.cleanup]. The caller must have cancelled the active
-   * download (if any) before invoking this. No-op if the task has no
-   * recorded sourceType or outputPath (nothing to clean up).
-   */
-  suspend fun cleanup(handle: TaskHandle) {
-    val record = handle.record.value
-    val sourceType = record.sourceType
-    val outputPath = record.outputPath
-    if (sourceType == null || outputPath == null) {
-      log.d {
-        "Skipping cleanup for taskId=${handle.taskId} " +
-          "(sourceType=$sourceType, outputPath=$outputPath)"
-      }
-      return
-    }
-    val source = try {
-      sourceResolver.resolveByType(sourceType)
-    } catch (e: KetchError) {
-      log.w(e) {
-        "Skipping cleanup for taskId=${handle.taskId}: " +
-          "unknown source type '$sourceType'"
-      }
-      return
-    }
-    val fa = if (source.managesOwnFileIo) {
+    // An unfinished download is only its partial file: a file at its output path is not its own.
+    val outputPath = record.partialPath ?: record.outputPath
+    val fa = if (source.managesOwnFileIo || outputPath == null) {
       NoOpFileAccessor
     } else {
-      createFileAccessor(outputPath, dispatchers.io)
+      createFileAccessor(outputPath, dispatchers.disk)
     }
     val ctx = DownloadContext(
       taskId = handle.taskId,
@@ -397,28 +430,62 @@ internal class DownloadCoordinator(
       onProgress = { _, _ -> },
       throttle = { _ -> },
       headers = handle.request.headers,
+      preResolved = record.resolvedSource,
       outputPath = outputPath,
-      config = config(),
+      config = config().forRequest(handle.request),
     )
     try {
-      source.cleanup(ctx, record.sourceResumeState)
-    } finally {
-      if (!source.managesOwnFileIo) {
-        fa.close()
+      source.cleanupSaved(ctx, record.sourceState, deleteFiles && outputPath != null) { e ->
+        log.w { "Unreadable saved state of taskId=${handle.taskId}: ${e.describeCauses()}" }
       }
+    } finally {
+      fa.close()
     }
   }
 
   /**
    * Stops every execution. Running tasks pause for [PauseReason.Shutdown] and keep their
    * partial files and DOWNLOADING records.
+   *
+   * @return the job that completes once every execution has finished
    */
-  fun close() {
+  fun close(): Job {
     closing = true
     scope.cancel()
+    return scope.coroutineContext.job
   }
 
   private companion object {
     val FINISHED_STATES = setOf(TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED)
   }
 }
+
+/** What [DownloadCoordinator.deliverSelection] did with a selection. */
+internal enum class SelectionDelivery {
+  /** The running execution took it. */
+  DELIVERED,
+
+  /** The task has no running execution; the next one reads the saved selection. */
+  NOT_RUNNING,
+
+  /** The running execution is finishing and takes no more selections. */
+  FINISHING
+}
+
+/**
+ * This record resumed with [destination], the file it continues in, as when an Android document
+ * URI changed: the download writes there itself. A partial document stands for its own output
+ * path, so its new URI stays the partial file, renamed when the download completes.
+ */
+internal fun TaskRecord.withDestination(destination: Destination?): TaskRecord {
+  if (destination == null) return this
+  val partialDocument = partialPath != null && partialPath == outputPath
+  return copy(
+    outputPath = destination.value,
+    partialPath = destination.value.takeIf { partialDocument },
+  )
+}
+
+/** This configuration as [request] downloads with it: with its own proxy, if it has one. */
+internal fun DownloadConfig.forRequest(request: DownloadRequest): DownloadConfig =
+  request.proxy?.let { copy(proxy = it) } ?: this

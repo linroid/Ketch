@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -73,6 +74,7 @@ data class DiscoverFound(val sessionId: String, val turnId: String, val count: I
  * @param newId makes the ids of sessions, turns and approvals.
  * @param devices the devices a search is for, given the id of the device results go to
  *   ([target]); read as each turn starts.
+ * @param random picks the [examples] a new session offers.
  */
 class AiDiscoverController(
   private val aiSettings: AiSettingsController,
@@ -81,6 +83,7 @@ class AiDiscoverController(
   private val clock: Clock = Clock.System,
   private val newId: () -> String = { Uuid.random().toString() },
   private val devices: (targetId: String?) -> AiSearchDevices = { AiSearchDevices() },
+  private val random: Random = Random.Default,
 ) {
   /** A turn's search; [job] stays `null` while it waits for a slot. */
   private class Run(val sessionId: String, val turnId: String) {
@@ -122,6 +125,10 @@ class AiDiscoverController(
 
   /** Id of the session shown; `null` shows a new, empty one. */
   var currentId by mutableStateOf<String?>(null)
+    private set
+
+  /** Searches the new, empty session offers to try; others each time one is shown. */
+  var examples by mutableStateOf(pickExamples(random))
     private set
 
   /** The session shown; `null` for a new one. */
@@ -177,9 +184,9 @@ class AiDiscoverController(
     }
   }
 
-  /** Shows a new, empty session. */
+  /** Shows a new, empty session, with other [examples] when one shows already. */
   fun newSession() {
-    switchTo(null)
+    if (currentId == null) examples = pickExamples(random, examples) else switchTo(null)
   }
 
   /** Shows the session with [sessionId], if there is one. */
@@ -530,7 +537,9 @@ class AiDiscoverController(
       return
     }
     val request = requestFor(session, turn)
-    editTurn(run) { it.copy(status = TurnStatus.Running) }
+    // What it searches with: a provider or model chosen later applies to the next turn.
+    val model = aiSettings.activeModel
+    editTurn(run) { it.copy(status = TurnStatus.Running, model = model) }
     run.job = scope.launch {
       // The agent reports steps from its own threads; they reach the turn in order, here.
       val reported = Channel<DiscoveryStep>(Channel.UNLIMITED)
@@ -721,6 +730,7 @@ class AiDiscoverController(
     if (sessionId == currentId) return
     currentId = sessionId
     selected = emptySet()
+    if (sessionId == null) examples = pickExamples(random, examples)
   }
 
   private fun visibleIn(turnId: String): List<AiCandidate> {

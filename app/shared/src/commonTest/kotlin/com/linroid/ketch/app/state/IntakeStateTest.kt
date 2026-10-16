@@ -1,7 +1,9 @@
 package com.linroid.ketch.app.state
 
 import androidx.compose.ui.text.input.TextFieldValue
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadProgress
@@ -12,6 +14,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
@@ -460,6 +463,102 @@ class IntakeStateTest {
   }
 
   @Test
+  fun addAnyway_magnetOnSupportingDevice_awaitsFiles() = runTest {
+    val metadata = CompletableDeferred<ResolvedSource>()
+    val api = IntakeTestApi(
+      check = { _, _ -> metadata.await() },
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
+    )
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+
+    session.addAllAnyway {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertTrue(request.awaitFileSelection)
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
+  fun downloadAllNow_magnetOnSupportingDevice_downloadsEveryFile() = runTest {
+    val metadata = CompletableDeferred<ResolvedSource>()
+    val api = IntakeTestApi(
+      check = { _, _ -> metadata.await() },
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
+    )
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+    val entry = session.entries.single()
+
+    // What "Download all files now" does while the magnet looks for its file list.
+    entry.addAnyway = true
+    entry.allFiles = true
+    session.submit {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertFalse(request.awaitFileSelection)
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
+  fun addAnyway_uncheckedLinkOnSupportingDevice_awaitsFiles() = runTest {
+    val api = IntakeTestApi(
+      check = { _, _ -> throw KetchError.Http(404) },
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
+    )
+    val session = session(api, IntakeRequest("https://example.com/show/master.m3u8"))
+    runCurrent()
+
+    session.addAllAnyway {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertTrue(request.awaitFileSelection)
+    assertEquals(emptySet(), request.selectedFileIds)
+  }
+
+  @Test
+  fun addAnyway_olderDevice_downloadsEveryFile() = runTest {
+    val metadata = CompletableDeferred<ResolvedSource>()
+    val api = IntakeTestApi(check = { _, _ -> metadata.await() })
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+
+    session.addAllAnyway {}
+    runCurrent()
+
+    assertFalse(api.base.requests.single().awaitFileSelection)
+  }
+
+  @Test
+  fun submit_magnetWithItsFileList_doesNotAwaitFiles() = runTest {
+    val api = IntakeTestApi(
+      check = { url, _ -> torrent(url) },
+      features = setOf(KetchFeatures.AWAIT_FILE_SELECTION),
+    )
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val session = session(api, IntakeRequest(magnet))
+
+    session.submit {}
+    runCurrent()
+
+    assertFalse(api.base.requests.single().awaitFileSelection)
+  }
+
+  @Test
+  fun torrentSort_chosen_isRememberedForTheNextSheet() = runTest {
+    val (state, session) = stateAndSession(IntakeTestApi(), IntakeRequest(links.first()))
+
+    assertEquals(FileSort(FileOrder.Name), session.torrentSort)
+    session.torrentSort = FileSort(FileOrder.Size).reverse()
+
+    assertEquals("size:asc", state.appSettings.ui.sort[FileSortSurface.Intake.key])
+    assertEquals(FileSort(FileOrder.Size, descending = false), session.torrentSort)
+  }
+
+  @Test
   fun start_bareInfoHashAndMissingScheme_becomeLinks() = runTest {
     val hash = "0123456789abcdef0123456789abcdef01234567"
     val session = session(IntakeTestApi(), IntakeRequest("$hash\nexample.com/files/a.iso"))
@@ -628,6 +727,33 @@ class IntakeStateTest {
   }
 
   @Test
+  fun categoryFolder_singleMatchingLink_namesItsFolderUntilOneIsChosen() = runTest {
+    val video = DownloadCategory(folder = "Media/Video", extensions = listOf("mp4"))
+    val api = IntakeTestApi(
+      features = KetchFeatures.ALL,
+      config = DownloadConfig(categories = listOf(video)),
+    )
+    val seeds = listOf(IntakeSeed("https://example.com/talk.mp4"))
+    val session = session(api, IntakeRequest(seeds = seeds))
+    runCurrent()
+
+    assertEquals("Media/Video", session.categoryFolder)
+    session.folder = "/Volumes/Data"
+    assertNull(session.categoryFolder)
+  }
+
+  @Test
+  fun categoryFolder_deviceWithoutCategoryFolders_isNull() = runTest {
+    val video = DownloadCategory(folder = "Video", extensions = listOf("mp4"))
+    val api = IntakeTestApi(config = DownloadConfig(categories = listOf(video)))
+    val seeds = listOf(IntakeSeed("https://example.com/talk.mp4"))
+    val session = session(api, IntakeRequest(seeds = seeds))
+    runCurrent()
+
+    assertNull(session.categoryFolder)
+  }
+
+  @Test
   fun retry_autoConnectionsOnCapableDevice_setsAuto() = runTest {
     val api = IntakeTestApi(features = KetchFeatures.ALL)
     val failed = api.base.add(
@@ -704,6 +830,93 @@ class IntakeStateTest {
     assertFalse(session.startsOver)
     session.headers.referer = "https://b.example/"
     assertTrue(session.startsOver)
+  }
+
+  @Test
+  fun checksum_singleLinkOnCapableDevice_goesWithTheRequest() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    assertTrue(session.offersChecksum)
+    session.checksumText = "  SHA256:${SHA256.uppercase()} "
+    assertNull(session.checksumError)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(Checksum.parse("sha256:$SHA256"), api.base.requests.single().checksum)
+  }
+
+  @Test
+  fun checksum_notAChecksum_blocksTheAdd() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    session.checksumText = "sha256:abc"
+
+    assertEquals(
+      "Not a checksum. Use sha256:… or the hex digest of an MD5, SHA-1, SHA-256 or SHA-512.",
+      session.checksumError?.load(),
+    )
+    assertFalse(session.canSubmit)
+    session.checksumText = ""
+    assertNull(session.checksumError)
+    assertTrue(session.canSubmit)
+  }
+
+  @Test
+  fun checksum_deviceWithoutChecksums_isNotOfferedOrSent() = runTest {
+    val api = IntakeTestApi()
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+    session.checksumText = "not a checksum"
+
+    assertFalse(session.offersChecksum)
+    assertNull(session.checksumError)
+    session.submit {}
+    runCurrent()
+
+    assertNull(api.base.requests.single().checksum)
+  }
+
+  @Test
+  fun checksum_severalLinksOrATorrent_isNotOffered() = runTest {
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Show"
+    val api = IntakeTestApi(
+      check = { url, _ -> if (url == magnet) torrent(url) else ready(url) },
+      features = KetchFeatures.ALL,
+    )
+
+    assertFalse(session(api, IntakeRequest(links.take(2).joinToString("\n"))).offersChecksum)
+    assertFalse(session(api, IntakeRequest(magnet)).offersChecksum)
+  }
+
+  @Test
+  fun retry_checksumChanged_startsOverWithTheNewOne() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val wrong = Checksum.parse("md5:0123456789abcdef0123456789abcdef")
+    val failed = api.base.add(
+      DownloadState.Failed(KetchError.ChecksumMismatch(wrong.algorithm, wrong.value, "00")),
+      DownloadRequest(links.first(), checksum = wrong),
+    )
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(links.first())),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+    runCurrent()
+
+    assertEquals(wrong.toString(), session.checksumText)
+    assertTrue(session.advancedOpen)
+    assertFalse(session.startsOver)
+    session.checksumText = "sha256:$SHA256"
+    assertTrue(session.startsOver)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("remove deleteFiles=true"), failed.calls)
+    assertEquals(Checksum.parse("sha256:$SHA256"), api.base.requests.single().checksum)
   }
 
   @Test
@@ -894,6 +1107,7 @@ class IntakeStateTest {
 
   private companion object {
     val NOW: Instant = Instant.parse("2026-10-01T12:00:00Z")
+    const val SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   }
 }
 
@@ -904,13 +1118,14 @@ private class IntakeTestApi(
     ready(url)
   },
   private val features: Set<String> = emptySet(),
+  private val config: DownloadConfig = DownloadConfig(maxConcurrentDownloads = 3),
 ) : KetchApi by base {
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    check(url, properties)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
+    check((input as ResolveInput.Url).url, input.headers)
 
   override suspend fun status(): KetchStatus = testStatus(
     name = "This Mac",
-    config = DownloadConfig(maxConcurrentDownloads = 3),
+    config = config,
     version = "1",
     revision = "r",
     system = testSystem(

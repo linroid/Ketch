@@ -117,7 +117,7 @@ jobs:
           path: cli/build/native/nativeCompile/ketch-cli-*.${{ matrix.ext }}
 
   build-android:
-    name: Android APK
+    name: Android
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -136,35 +136,40 @@ jobs:
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
 
-      - name: Build release APK
+      # The APK is the GitHub download; the AAB, built from the play flavor with the same version
+      # code, is the bundle to upload to Google Play, which takes no APKs.
+      - name: Build release APK and Play bundle
         env:
           ANDROID_KEYSTORE_FILE: /tmp/release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          ./gradlew :app:android:assembleRelease -PVERSION_NAME=${KETCH_VERSION#v} \
-            -PversionCode=${{ github.run_number }}
+          ./gradlew :app:android:assembleDirectRelease :app:android:bundlePlayRelease \
+            -PVERSION_NAME=${KETCH_VERSION#v} -PversionCode=${{ github.run_number }}
 
-      - name: Rename APK
+      - name: Rename APK and bundle
         run: |
-          APK=$(find app/android/build/outputs/apk/release -name '*.apk' | head -1)
-          cp "$APK" app/android/build/outputs/apk/release/ketch-android-${KETCH_VERSION#v}.apk
+          APK=$(find app/android/build/outputs/apk/direct/release -name '*.apk' | head -1)
+          cp "$APK" app/android/build/outputs/apk/direct/release/ketch-android-${KETCH_VERSION#v}.apk
+          AAB=$(find app/android/build/outputs/bundle/playRelease -name '*.aab' | head -1)
+          cp "$AAB" app/android/build/outputs/apk/direct/release/ketch-android-${KETCH_VERSION#v}-play.aab
 
       # R8 renames classes and methods, so stack traces from this APK can only be read with the
       # mapping of this exact build. The text file is >100 MB; zipped it is a few MB.
       - name: Package R8 mapping
         run: >
           zip -j -9
-          app/android/build/outputs/apk/release/ketch-android-${KETCH_VERSION#v}-mapping.zip
-          app/android/build/outputs/mapping/release/mapping.txt
+          app/android/build/outputs/apk/direct/release/ketch-android-${KETCH_VERSION#v}-mapping.zip
+          app/android/build/outputs/mapping/directRelease/mapping.txt
 
       - uses: actions/upload-artifact@v7
         with:
           name: ketch-android
           path: |
-            app/android/build/outputs/apk/release/ketch-android-*.apk
-            app/android/build/outputs/apk/release/ketch-android-*-mapping.zip
+            app/android/build/outputs/apk/direct/release/ketch-android-*.apk
+            app/android/build/outputs/apk/direct/release/ketch-android-*-play.aab
+            app/android/build/outputs/apk/direct/release/ketch-android-*-mapping.zip
           if-no-files-found: error
 
   build-desktop:
@@ -305,6 +310,56 @@ jobs:
             app/desktop/build/ketch-desktop-*-mapping.zip
           if-no-files-found: error
 
+  # An unsigned IPA for sideloading: AltStore, SideStore, Sideloadly and the like sign it with
+  # the user's own Apple ID when they install it. The App Store build is made in Xcode.
+  build-ios:
+    name: iOS IPA
+    # Xcode 26 ships the iOS 26 SDK, which Compose Multiplatform needs (see tests.yml).
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      # The Xcode project's build phase runs Gradle, which reads the version from
+      # ORG_GRADLE_PROJECT_VERSION_NAME, prerelease suffix included. CFBundleShortVersionString
+      # takes numbers and periods only, so MARKETING_VERSION drops the suffix (0.3.1-rc2 is
+      # 0.3.1). Linking the release framework needs more than the 4 GB heap gradle.properties
+      # gives the daemon; the runner has 7 GB.
+      - name: Build app
+        run: |
+          version=${KETCH_VERSION#v}
+          ORG_GRADLE_PROJECT_VERSION_NAME=$version \
+          GRADLE_OPTS=-Dorg.gradle.jvmargs=-Xmx6g \
+          xcodebuild build \
+            -project app/ios/Ketch.xcodeproj \
+            -target Ketch \
+            -configuration Release \
+            -sdk iphoneos \
+            MARKETING_VERSION=${version%%-*} \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=
+
+      - name: Package IPA
+        run: |
+          mkdir -p /tmp/ipa/Payload
+          cp -R app/ios/build/Release-iphoneos/Ketch.app /tmp/ipa/Payload/
+          cd /tmp/ipa
+          zip -qry /tmp/ketch-ios-${KETCH_VERSION#v}.ipa Payload
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ketch-ios
+          path: /tmp/ketch-ios-*.ipa
+          if-no-files-found: error
+
   build-web:
     name: Web (WasmJs)
     runs-on: ubuntu-latest
@@ -331,33 +386,96 @@ jobs:
           name: ketch-web
           path: /tmp/ketch-web-*.zip
 
-  build-extension:
-    name: Browser extension
+  # The ketch server image for linux/amd64 and linux/arm64, from the Linux CLI builds. It goes to
+  # GHCR, and to Docker Hub too once the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets are set
+  # (repository variable DOCKERHUB_IMAGE names the repository, linroid/ketch by default).
+  publish-docker:
+    name: Docker image
+    needs: [build-cli]
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: app/browser-extension
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE || 'linroid/ketch' }}
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v5
+      - name: Download Linux CLI builds
+        uses: actions/download-artifact@v8
         with:
-          node-version: 22
+          pattern: ketch-cli-linux-*
+          path: ${{ runner.temp }}/cli
+          merge-multiple: true
 
-      - name: Run unit tests
-        run: node --test
+      # The archives' binaries are UPX-compressed, so each start, health checks included, would
+      # unpack the whole binary into memory; the image keeps them as native-image built them.
+      - name: Unpack the binaries
+        run: |
+          sudo apt-get update && sudo apt-get install -y upx-ucl
+          for arch in x64:amd64 arm64:arm64; do
+            dir="docker/build/linux-${arch#*:}"
+            mkdir -p "$dir"
+            tar -xzf "$RUNNER_TEMP/cli/ketch-cli-${KETCH_VERSION#v}-linux-${arch%%:*}.tar.gz" -C "$dir"
+            if upx -t "$dir/ketch" > /dev/null 2>&1; then upx -d "$dir/ketch"; fi
+          done
+          ls -lR docker/build
 
-      # Manifests only take numeric versions: the run number keeps each release newer than the
-      # last one, and Chromium displays the tag's version.
-      - name: Build browser extension packages
-        run: node build.mjs --version "${KETCH_VERSION#v}" --build "${{ github.run_number }}"
+      - uses: docker/setup-qemu-action@v3
 
-      - uses: actions/upload-artifact@v7
+      - uses: docker/setup-buildx-action@v3
+
+      # Each architecture is started before anything is pushed, arm64 under QEMU.
+      - name: Smoke-test the images
+        run: |
+          for platform in linux/amd64 linux/arm64; do
+            tag="ketch-smoke:${platform#linux/}"
+            docker buildx build --load --platform "$platform" --tag "$tag" docker
+            docker/smoke-test.sh "$tag" "$platform"
+          done
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          name: ketch-extension
-          path: app/browser-extension/build/ketch-extension-*.zip
-          if-no-files-found: error
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      # X.Y.Z for every release; X.Y and latest only for releases that are not pre-releases.
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/ketch
+            name=docker.io/${{ env.DOCKERHUB_IMAGE }},enable=${{ env.DOCKERHUB_TOKEN != '' }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=Ketch
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        env:
+          # Keeps the build record out of the run's artifacts.
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: docker
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: true
 
   publish-maven-central:
     name: Publish to Maven Central
@@ -388,7 +506,14 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-cli, build-android, build-desktop, build-web, build-extension, publish-maven-central]
+    needs:
+      - build-cli
+      - build-android
+      - build-desktop
+      - build-ios
+      - build-web
+      - publish-docker
+      - publish-maven-central
     steps:
       - uses: actions/checkout@v6
         with:
@@ -397,14 +522,30 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
+          # Only the release files: the Docker job's build record is not a zip and fails to
+          # extract.
+          pattern: ketch-*
           path: artifacts
           merge-multiple: true
 
       - name: List artifacts
         run: find artifacts -type f | sort
 
+      # Extension releases are numbered so the highest version is the newest one.
+      - name: Generate download list
+        run: |
+          extension_tag=$(git tag --list 'extension-v*' --sort=-v:refname | head -n 1)
+          python3 .github/scripts/release-notes.py \
+            --artifacts artifacts \
+            --server-url "$GITHUB_SERVER_URL" \
+            --repository "$GITHUB_REPOSITORY" \
+            --docker-image "ghcr.io/$GITHUB_REPOSITORY_OWNER/ketch" \
+            --extension-tag "$extension_tag" \
+            --tag "$KETCH_VERSION" > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           generate_release_notes: true
           files: artifacts/**

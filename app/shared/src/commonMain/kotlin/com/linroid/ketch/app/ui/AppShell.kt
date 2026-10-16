@@ -55,8 +55,8 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.connect.ConnectHost
-import com.linroid.ketch.app.ui.connect.PairingApprovalHost
 import com.linroid.ketch.app.ui.connect.ConnectLanding
+import com.linroid.ketch.app.ui.connections.ConnectionsScreen
 import com.linroid.ketch.app.ui.devices.DevicesScreen
 import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
 import com.linroid.ketch.app.ui.discover.DiscoverScreen
@@ -74,6 +74,7 @@ import com.linroid.ketch.app.ui.palette.CommandPalette
 import com.linroid.ketch.app.ui.pulse.PulseBar
 import com.linroid.ketch.app.ui.pulse.PulseSheet
 import com.linroid.ketch.app.ui.settings.LocalFileLogger
+import com.linroid.ketch.app.ui.settings.ReleaseNotesHost
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import com.linroid.ketch.app.ui.shell.AddFab
 import com.linroid.ketch.app.ui.shell.BOTTOM_BAR_MIN_DESTINATIONS
@@ -281,7 +282,10 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     ShortcutSheet(groups, onDismissRequest = { shell.shortcutsOpen = false })
   }
   if (shell.pulseSheetOpen) {
-    PulseSheet(appState, onDismissRequest = { shell.pulseSheetOpen = false })
+    PulseSheet(
+      state = appState,
+      onDismissRequest = { shell.pulseSheetOpen = false },
+    )
   }
 
   val switcherAsked = appState.showInstanceSelector
@@ -296,7 +300,7 @@ private fun ShellContent(appState: AppState, openSettingsRequests: Flow<Unit>) {
     )
   }
   ConnectHost(appState)
-  PairingApprovalHost(appState)
+  ReleaseNotesHost(appState)
 }
 
 /** Keeps the Downloads tab and search across an Android activity recreation. */
@@ -387,16 +391,20 @@ private fun WideShell(
       }
     },
     top = { BannerHost(appState) },
-    bottom = { PulseBar(appState, barState = shell.pulseBar) },
+    bottom = {
+      // Live connections have their page; the bar's grid of them stays off.
+      PulseBar(state = appState, barState = shell.pulseBar)
+    },
     overlay = {
       // Above the controls a page keeps at the bottom, such as Discover's composer.
       val clearance = LocalBottomChrome.current?.height ?: 0.dp
       ToastHost(
         messages = appState.messages,
         modifier = Modifier
-          .align(Alignment.BottomCenter)
+          .align(Alignment.BottomEnd)
           .padding(horizontal = spacing.s4)
           .padding(bottom = clearance + spacing.s2),
+        horizontalAlignment = Alignment.End,
       )
       if (appState.showInstanceSelector) {
         // Under the page header, by the device chip.
@@ -557,6 +565,7 @@ private fun Destination(
   when (destination) {
     AppDestination.Downloads -> DownloadsScreen(appState, layout.info, Modifier.fillMaxSize())
     AppDestination.Discover -> DiscoverScreen(appState)
+    AppDestination.Connections -> ConnectionsScreen(appState)
     AppDestination.Devices -> DevicesScreen(appState)
   }
 }

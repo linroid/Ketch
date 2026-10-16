@@ -47,10 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.joinText
-import com.linroid.ketch.app.i18n.resolve
-import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
@@ -58,7 +54,6 @@ import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.state.AiDiscoverController
-import com.linroid.ketch.app.state.AiSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DiscoverSession
 import com.linroid.ketch.app.state.PageAccessChoice
@@ -445,6 +440,7 @@ private fun BottomBar(
           focus = focus,
           onSend = controller::send,
           onStop = { controller.stop() },
+          model = { DiscoverModelChip(state) },
           // Until results bring the add bar and its chip, so the device can be picked before a
           // search, which picks builds for it. A phone's add bar keeps it in a menu.
           target = if (!phone && !addBar) {
@@ -684,21 +680,13 @@ private fun DiscoverIntro(
   onExample: (String) -> Unit,
   modifier: Modifier,
 ) {
-  val provider = state.aiSettings.settings.llm.provider
   DiscoverHero(
     title = stringResource(Res.string.discover_hero_title),
-    body = stringResource(Res.string.discover_intro_body, provider.shortLabel.resolve()),
+    body = stringResource(Res.string.discover_intro_body),
     modifier = modifier,
   ) {
-    DiscoverExamples(onClick = onExample)
+    DiscoverExamples(state.aiDiscover.examples, onClick = onExample)
   }
-}
-
-/** The model discovery runs on, such as "Anthropic · claude-opus-5". */
-internal fun modelLabel(ai: AiSettingsController): UiText {
-  val llm = ai.withPlatformCredentials(ai.settings).llm
-  val model = llm.effectiveModel.takeIf { it.isNotBlank() }?.let(::verbatim)
-  return listOfNotNull(llm.provider.shortLabel, model).joinText()
 }
 
 /** Matches the keys of Discover's scope, shared by its composer, rows and chat. */

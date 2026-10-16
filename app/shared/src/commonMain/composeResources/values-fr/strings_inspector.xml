@@ -102,6 +102,9 @@
   <string name="inspector_detail_connections">Connexions</string>
   <string name="inspector_detail_device">Appareil</string>
   <string name="inspector_detail_captured">Provenance</string>
+  <string name="inspector_detail_checksum">Somme de contrôle</string>
+  <string name="inspector_checksum_verified">%1$s · vérifiée</string>
+  <string name="inspector_checksum_pending">%1$s · vérifiée à la fin</string>
   <string name="inspector_section_advanced">Avancé</string>
   <string name="inspector_detail_task_id">ID de la tâche</string>
   <string name="inspector_detail_headers">En-têtes</string>
@@ -119,6 +122,7 @@
   <string name="inspector_copy_failed_connections">Impossible de copier les connexions</string>
   <string name="inspector_copy_failed_device">Impossible de copier l'appareil</string>
   <string name="inspector_copy_failed_captured">Impossible de copier la provenance</string>
+  <string name="inspector_copy_failed_checksum">Impossible de copier la somme de contrôle</string>
   <string name="inspector_copy_failed_task_id">Impossible de copier l'ID de la tâche</string>
   <string name="inspector_copy_failed_headers">Impossible de copier les en-têtes</string>
   <string name="inspector_copy_failed_property">Impossible de copier la propriété</string>
@@ -162,8 +166,8 @@
     <item quantity="other">%1$d terminées · %2$s</item>
   </plurals>
   <string name="inspector_single_connection">Connexion unique</string>
-  <string name="inspector_connections_live">Un nouveau nombre redistribue en direct les octets restants.</string>
-  <string name="inspector_connections_on_resume">Un nouveau nombre s'applique à la reprise du téléchargement.</string>
+  <string name="inspector_connections_live">S'applique immédiatement.</string>
+  <string name="inspector_connections_on_resume">S'applique à la reprise du téléchargement.</string>
   <string name="inspector_lane_description">Connexion %1$d, %2$s, %3$s</string>
   <string name="inspector_percent_spoken">%1$d pour cent</string>
 
@@ -188,10 +192,21 @@
   <string name="inspector_files_filter">Filtrer les fichiers</string>
   <string name="inspector_files_no_match">Aucun fichier ne correspond à « %1$s »</string>
   <string name="inspector_files_sort">Trier les fichiers</string>
-  <string name="inspector_sort_incomplete">Incomplets d'abord</string>
-  <string name="inspector_sort_name">Nom</string>
-  <string name="inspector_sort_size">Taille</string>
   <string name="inspector_file_unnamed">Fichier %1$d</string>
   <string name="inspector_file_description">%1$s, %2$s, %3$s</string>
   <string name="inspector_file_description_no_share">%1$s, %2$s</string>
+  <plurals name="inspector_files_pending">
+    <item quantity="one">%1$d fichier · %2$s</item>
+    <item quantity="other">%1$d fichiers · %2$s</item>
+  </plurals>
+  <string name="inspector_files_apply">Appliquer</string>
+  <string name="inspector_files_reset">Réinitialiser</string>
+  <string name="inspector_files_start">Télécharger</string>
+  <string name="inspector_files_choose">Choisissez les fichiers à télécharger</string>
+  <string name="inspector_files_keep_one">Gardez au moins un fichier</string>
+  <string name="inspector_files_hint">Les fichiers cochés sont téléchargés ; les fichiers décochés restent où ils sont.</string>
+  <string name="inspector_seeding_status">En partage · ↑ %1$s · %2$s envoyés</string>
+  <string name="inspector_seeding_stop">Arrêter le partage</string>
+  <string name="inspector_seeding_start">Partager</string>
+  <string name="inspector_seeding_waiting">En attente de partage</string>
 </resources>

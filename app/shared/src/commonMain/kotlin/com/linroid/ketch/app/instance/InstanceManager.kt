@@ -3,8 +3,10 @@ package com.linroid.ketch.app.instance
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -18,6 +20,7 @@ import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.remote.RemoteKetch
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_server_start_failed
 import kotlinx.coroutines.CancellationException
@@ -35,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -44,6 +48,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
+import kotlin.time.Duration
 
 /**
  * Manages the list of configured instances, the currently active
@@ -68,6 +73,12 @@ import kotlin.time.Clock
  * @param context dispatcher of the coroutines that connect devices and follow them; a [Job] in
  *   it becomes the parent of those coroutines, and cancelling it stops them like [close].
  * @param clock current time of [presence].
+ * @param standIn a remote device that runs this device's downloads in its place, for a manager
+ *   without an embedded device, such as the `ketch server` the desktop app finds running them
+ *   when it starts. Like an embedded device, it is listed first and shown at launch unless
+ *   another device was shown last, and it is never saved with the remote devices; one of those
+ *   at the same address stands in instead and stays saved, with the stand-in's token and
+ *   scheme, as the server there uses them now.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class InstanceManager(
@@ -77,6 +88,7 @@ class InstanceManager(
   private val keepAlive: KeepAlivePolicy = KeepAlivePolicy(),
   context: CoroutineContext = Dispatchers.Default,
   private val clock: Clock = Clock.System,
+  standIn: RemoteConfig? = null,
 ) {
   private val log = KetchLogger("InstanceManager")
   private val scope = CoroutineScope(context + SupervisorJob(context[Job]))
@@ -136,6 +148,17 @@ class InstanceManager(
   val serverState: StateFlow<ServerState> =
     _serverState.asStateFlow()
 
+  /**
+   * Whether the embedded device's uploads pause on metered networks under
+   * [TorrentSettings.uploadWifiOnly]: only where the factory reports the network
+   * ([InstanceFactory.uploadNetwork]), as the phone apps do.
+   */
+  val followsUploadNetwork: Boolean =
+    embeddedInstance != null && factory.uploadNetwork != null && factory.pauseUploads != null
+
+  // The embedded device's torrent settings as last saved, which its uploads follow.
+  private val torrentSettings = MutableStateFlow(TorrentSettings())
+
   private val inForeground = MutableStateFlow(true)
   private val backgroundExpired = MutableStateFlow(false)
   private val localSpeedMode = MutableStateFlow<Flow<SpeedMode>>(flowOf(SpeedMode.Full))
@@ -146,6 +169,9 @@ class InstanceManager(
   private val started = mutableMapOf<String, KetchApi>()
   private val learning = mutableMapOf<String, Job>()
   private val connected = MutableStateFlow<Set<String>>(emptySet())
+
+  // The stand-in device, which persistRemotes leaves out, until it is removed.
+  private var unsavedId: String? = null
 
   /**
    * What each configured device is doing, in the order of [instances]. Built on first use; it
@@ -167,10 +193,18 @@ class InstanceManager(
   init {
     val saved = configStore?.load()
     for (remote in initialRemotes) add(remote)
+    val standInEntry = standIn?.let(::addStandIn)
     restoreActive(saved?.ui?.lastDeviceId)
+    if (_activeInstance.value == null && standInEntry != null) {
+      _activeInstance.value = standInEntry
+      _activeApi.value = standInEntry.instance
+      _deviceScope.value = DeviceScope.Single(standInEntry.deviceId)
+    }
     embeddedInstance?.instance?.let { ketch ->
       scope.launch { ketch.start() }
     }
+    saved?.torrent?.let { torrentSettings.value = it }
+    followNetworkForUploads()
     if (isLocalServerSupported && saved?.server?.autoStart == true) {
       startServer()
     }
@@ -192,6 +226,13 @@ class InstanceManager(
       }
     }
     scope.launch { appForegroundChanges().collect { setInForeground(it) } }
+    scope.launch {
+      inForeground.collect { front ->
+        connectionLock.withLock {
+          started.values.filterIsInstance<RemoteKetch>().forEach { it.foreground = front }
+        }
+      }
+    }
   }
 
   /**
@@ -225,9 +266,11 @@ class InstanceManager(
   }
 
   /**
-   * Tells the manager whether the app is in front. [KeepAlivePolicy.backgroundGrace] after it
-   * leaves, the remote devices other than the active one disconnect; they connect again when
-   * it returns. The mobile hosts call it; iOS also reports it on its own.
+   * Tells the manager whether the app is in front. While it is not, remote devices send only
+   * their tasks' lifecycle and state changes ([RemoteKetch.foreground]), and
+   * [KeepAlivePolicy.backgroundGrace] after it leaves, the remote devices other than the active
+   * one disconnect; they connect again when it returns. The mobile hosts call it; iOS also
+   * reports it on its own.
    */
   fun setInForeground(inForeground: Boolean) {
     this.inForeground.value = inForeground
@@ -262,17 +305,28 @@ class InstanceManager(
   /** Stop the local HTTP server if running. */
   fun stopServer() {
     factory.stopServer()
+    // Pairing ends with sharing, so starting it again never takes requests unasked.
+    pairingRequests.close()
     _serverState.value = ServerState.Stopped
   }
 
   /**
-   * Applies saved torrent [settings] to the embedded instance; torrents
-   * pick them up as they start or resume. Does nothing when the embedded
-   * instance has no torrent support, or there is none.
+   * Applies saved torrent [settings] to the embedded instance: the upload mode and limit reach
+   * running torrents at once, extra trackers and tracker lists reach torrents as they start or
+   * resume, and where uploads follow the network ([followsUploadNetwork]), whether they pause
+   * on metered networks applies at once too. Does nothing when the embedded instance has no
+   * torrent support, or there is none.
    */
   suspend fun applyTorrentSettings(settings: TorrentSettings) {
+    torrentSettings.value = settings
     factory.applyTorrentSettings?.invoke(settings)
   }
+
+  /** What each of the embedded instance's subscribed tracker lists holds; `null` without torrents. */
+  val trackerList: Flow<List<TrackerListStatus>>? get() = factory.trackerList
+
+  /** Downloads the embedded instance's subscribed tracker lists again now. */
+  fun refreshTrackerList() = factory.refreshTrackerList()
 
   /**
    * Replaces [old] with a new remote instance that reaches it over HTTPS when [secure] or HTTP
@@ -347,6 +401,8 @@ class InstanceManager(
     connectionLock.withLock {
       val removed = entryOf(deviceId) ?: return
       _instances.update { list -> list.filterNot { it.deviceId == deviceId } }
+      // A device added at its address later is the user's own, and saved.
+      if (deviceId == unsavedId) unsavedId = null
       forget(deviceId)
       removed.instance.close()
       reconcile()
@@ -366,6 +422,15 @@ class InstanceManager(
     embeddedInstance?.instance?.close()
   }
 
+  // Pauses the embedded device's uploads while it is on a metered network, if the factory says
+  // where it is.
+  private fun followNetworkForUploads() {
+    val network = factory.uploadNetwork ?: return
+    val pause = factory.pauseUploads ?: return
+    if (embeddedInstance == null) return
+    scope.launch { followUploadNetwork(torrentSettings, network, pause) }
+  }
+
   private fun entryOf(deviceId: String): InstanceEntry? =
     _instances.value.firstOrNull { it.deviceId == deviceId }
 
@@ -374,6 +439,28 @@ class InstanceManager(
     if (existing is RemoteInstance) return existing
     val entry = factory.createRemote(config.copy(name = deviceNameOrNull(config.name)))
     _instances.update { it + entry }
+    return entry
+  }
+
+  // Lists the stand-in first, where the embedded device would be, unless a saved device has its
+  // address already: that one is the same server, and takes the token and scheme it uses now.
+  private fun addStandIn(config: RemoteConfig): RemoteInstance {
+    require(embeddedInstance == null)
+    val existing = entryOf("${config.host}:${config.port}")
+    if (existing is RemoteInstance) {
+      val saved = existing.remoteConfig
+      if (saved.apiToken == config.apiToken && saved.secure == config.secure) return existing
+      // Not started yet, as devices connect once the manager is built.
+      existing.instance.close()
+      val current = saved.copy(apiToken = config.apiToken, secure = config.secure)
+      val live = factory.createRemote(current)
+      _instances.update { list -> list.map { if (it.deviceId == live.deviceId) live else it } }
+      persistRemotes()
+      return live
+    }
+    val entry = factory.createRemote(config.copy(name = deviceNameOrNull(config.name)))
+    unsavedId = entry.deviceId
+    _instances.update { listOf(entry) + it }
     return entry
   }
 
@@ -448,6 +535,7 @@ class InstanceManager(
     val deviceId = entry.deviceId
     log.i { "Connecting to $deviceId" }
     started[deviceId] = entry.instance
+    (entry.instance as? RemoteKetch)?.foreground = inForeground.value
     try {
       entry.instance.start()
     } catch (e: CancellationException) {
@@ -496,8 +584,10 @@ class InstanceManager(
 
   private fun persistRemotes() {
     val store = configStore ?: return
+    val unsaved = unsavedId
     val remotes = _instances.value
       .filterIsInstance<RemoteInstance>()
+      .filter { it.deviceId != unsaved }
       .map { it.remoteConfig }
     val current = store.load()
     store.save(current.copy(remotes = remotes))
@@ -515,7 +605,7 @@ private object DisconnectedApi : KetchApi {
 
   override suspend fun download(request: DownloadRequest): DownloadTask = notConnected()
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
     notConnected()
 
   override suspend fun status(): KetchStatus = notConnected()
@@ -523,6 +613,9 @@ private object DisconnectedApi : KetchApi {
   override suspend fun updateConfig(config: DownloadConfig) {}
   override suspend fun start() {}
   override fun close() {}
+
+  // Nothing to follow before a device is connected.
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
 
   private fun notConnected(): Nothing =
     throw IllegalStateException("No instance connected. Add a remote server first.")

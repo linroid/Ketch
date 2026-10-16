@@ -3,10 +3,12 @@ package com.linroid.ketch.sqlite
 import app.cash.sqldelight.db.SqlDriver
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.SourceState
+import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.TaskStore
@@ -31,7 +33,9 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
   private val json = Json { ignoreUnknownKeys = true }
   private val errorSerializer = KetchError.serializer()
   private val segmentListSerializer = ListSerializer(Segment.serializer())
-  private val resumeStateSerializer = SourceResumeState.serializer()
+  private val stateSerializer = SourceState.serializer()
+  private val controlSerializer = TaskControl.serializer()
+  private val resolvedSerializer = ResolvedSource.serializer()
 
   /**
    * Saves a [TaskRecord] to the SQLite database. If a record with the same
@@ -48,9 +52,11 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
     val errorJson = record.error?.let {
       json.encodeToString(errorSerializer, it)
     }
-    val resumeStateJson = record.sourceResumeState?.let {
-      json.encodeToString(resumeStateSerializer, it)
+    val resumeStateJson = record.sourceState?.let {
+      json.encodeToString(stateSerializer, it)
     }
+    val controlJson = record.control?.let { json.encodeToString(controlSerializer, it) }
+    val resolvedJson = record.resolvedSource?.let { json.encodeToString(resolvedSerializer, it) }
     queries.transaction {
       queries.insertOrIgnore(
         task_id = record.taskId,
@@ -64,6 +70,9 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         error_json = errorJson,
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
         completed_at = record.completedAt?.toEpochMilliseconds(),
+        control_json = controlJson,
+        partial_path = record.partialPath,
+        resolved_source_json = resolvedJson,
       )
       queries.update(
         task_id = record.taskId,
@@ -77,6 +86,9 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         error_json = errorJson,
         download_time_ms = record.downloadTime?.inWholeMilliseconds,
         completed_at = record.completedAt?.toEpochMilliseconds(),
+        control_json = controlJson,
+        partial_path = record.partialPath,
+        resolved_source_json = resolvedJson,
       )
     }
   }
@@ -141,12 +153,12 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
         }
       },
       sourceType = source_type,
-      sourceResumeState = source_resume_state_json?.let {
+      sourceState = source_resume_state_json?.let {
         try {
-          json.decodeFromString(resumeStateSerializer, it)
+          json.decodeFromString(stateSerializer, it)
         } catch (e: Exception) {
           log.w(e) {
-            "Failed to deserialize resume state for task: $task_id"
+            "Failed to deserialize source state for task: $task_id"
           }
           null
         }
@@ -155,6 +167,23 @@ class SqliteTaskStore(driver: SqlDriver) : TaskStore {
       createdAt = Instant.fromEpochMilliseconds(created_at),
       updatedAt = Instant.fromEpochMilliseconds(updated_at),
       completedAt = completed_at?.let(Instant::fromEpochMilliseconds),
+      control = control_json?.let {
+        try {
+          json.decodeFromString(controlSerializer, it)
+        } catch (e: Exception) {
+          log.w { "Unreadable control state for taskId=$task_id: ${e.describeCauses()}" }
+          null
+        }
+      },
+      partialPath = partial_path,
+      resolvedSource = resolved_source_json?.let {
+        try {
+          json.decodeFromString(resolvedSerializer, it)
+        } catch (e: Exception) {
+          log.w { "Unreadable resolution for taskId=$task_id: ${e.describeCauses()}" }
+          null
+        }
+      },
     )
   }
 }

@@ -2,16 +2,39 @@
 <resources>
   <string name="discover_title">搜尋</string>
   <string name="discover_settings">搜尋設定</string>
-  <string name="discover_hero_title">說說想下載什麼，Ketch 幫你找。</string>
-  <string name="discover_intro_body">「搜尋」會透過 %1$s 搜尋網路、閱讀網頁，並列出它認為可信的檔案。手動新增後才會開始下載。</string>
-  <string name="discover_example_blender">適用於 Apple 晶片的 Blender</string>
-  <string name="discover_example_ubuntu">Ubuntu 24.04 伺服器版 ISO</string>
+  <string name="discover_hero_title">想下載什麼？</string>
+  <string name="discover_intro_body">AI 會幫你搜尋網路，列出找到的可下載檔案。手動新增後才會開始下載。</string>
+  <string name="discover_example_bootable_usb">製作 USB 開機隨身碟的工具</string>
+  <string name="discover_example_photo_editor">免費開源的修圖軟體</string>
+  <string name="discover_example_video_editor">適合新手的免費影片剪輯軟體</string>
+  <string name="discover_example_screen_recorder">錄製教學影片的螢幕錄影軟體</string>
+  <string name="discover_example_podcast">錄製 Podcast 的軟體</string>
+  <string name="discover_example_password_manager">開源密碼管理器</string>
+  <string name="discover_example_office">可離線使用的免費辦公室軟體</string>
+  <string name="discover_example_planetarium">用於觀星的星空軟體</string>
+  <string name="discover_example_games">可離線遊玩的開源遊戲</string>
+  <string name="discover_example_old_laptop">適合舊筆電的輕量 Linux</string>
+  <string name="discover_example_raspberry_pi">Raspberry Pi 作業系統</string>
+  <string name="discover_example_local_ai">能在筆電上本機執行的 AI 模型</string>
   <string name="discover_example_footage">公有領域的 4K 自然景觀影片</string>
+  <string name="discover_example_music">影片可用的免版稅音樂</string>
+  <string name="discover_example_audiobooks">經典小說的免費有聲書</string>
+  <string name="discover_example_films">公有領域的經典老電影</string>
+  <string name="discover_example_fonts">可免費商用的字型</string>
+  <string name="discover_example_sound_effects">創用 CC 授權的音效</string>
+  <string name="discover_example_textures">3D 模型可用的免費材質貼圖</string>
+  <string name="discover_example_paintings">名畫 4K 桌布</string>
+  <string name="discover_example_mars">NASA 拍攝的全解析度火星照片</string>
+  <string name="discover_example_lectures">免費的電腦科學課程影片</string>
+  <string name="discover_example_wikipedia">可離線閱讀的維基百科</string>
+  <string name="discover_example_hdr_test">測試電視用的 4K HDR 影片</string>
+  <string name="discover_example_speed_test">測試下載速度的大型檔案</string>
+  <string name="discover_example_datasets">練習 SQL 的公開資料集</string>
   <string name="discover_example_quoted">「%1$s」</string>
 
-  <string name="discover_setup_body">「搜尋」會透過 AI 模型搜尋網路、閱讀網頁，並列出它認為可信的檔案。搜尋內容會傳送給所選的服務供應商。</string>
+  <string name="discover_setup_body">「搜尋」使用 AI 模型搜尋網路，列出找到的可下載檔案。搜尋內容會傳送給你選擇的服務供應商。</string>
   <string name="discover_setup_unsupported">「搜尋」可在電腦或 Android 手機上的 Ketch 中使用。</string>
-  <string name="discover_setup_pending">完成搜尋設定後，就會立即搜尋「%1$s」。</string>
+  <string name="discover_setup_pending">完成搜尋設定後就會搜尋「%1$s」。</string>
   <string name="discover_setup_choose_model">選擇模型</string>
   <string name="discover_setup_local_provider">%1$s · 在本機執行，不需金鑰</string>
   <string name="discover_setup_finish">完成 %1$s 的設定</string>
@@ -24,6 +47,8 @@
   <string name="discover_send">傳送</string>
   <string name="discover_stop">停止</string>
   <string name="discover_sites_limit">限定網站</string>
+  <string name="discover_model_menu_title">模型</string>
+  <string name="discover_model_manage">管理服務商</string>
   <plurals name="discover_sites_count">
     <item quantity="other">%1$d 個網站</item>
   </plurals>
@@ -75,9 +100,9 @@
   <string name="discover_error_title">無法完成這次搜尋</string>
   <string name="discover_failed">搜尋失敗</string>
   <string name="discover_none_title">找不到可下載的檔案</string>
-  <string name="discover_none_body">「搜尋」只列出來自可信來源的檔案。試著補充版本、平台或檔案的發布網站。</string>
+  <string name="discover_none_body">試著補充版本、平台或網站。</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">內容過濾器隱藏了 %1$d 個看起來不安全的結果。可以在「搜尋設定」中關閉過濾器。</item>
+    <item quantity="other">內容過濾器隱藏了 %1$d 個結果。可在「搜尋設定」中關閉。</item>
   </plurals>
   <string name="discover_search_everywhere">搜尋整個網路</string>
   <string name="discover_stopped">已停止</string>
@@ -124,7 +149,7 @@
   <string name="discover_history_clear">清除搜尋歷史</string>
   <string name="discover_turn_off">關閉搜尋</string>
   <string name="discover_turned_off">搜尋已關閉</string>
-  <string name="discover_turned_off_detail">可在「設定」的「搜尋」中重新開啟。</string>
+  <string name="discover_turned_off_detail">可在「設定 › 搜尋」中重新開啟。</string>
   <string name="discover_history_filter">搜尋歷史記錄</string>
   <string name="discover_history_empty">你執行過的搜尋會顯示在這裡。</string>
   <string name="discover_history_no_match">沒有符合「%1$s」的搜尋</string>

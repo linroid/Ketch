@@ -1,14 +1,19 @@
 # Torrent control protocol, version 1
 
 This contract implements the API boundary decision in [roadmap #162][roadmap]. The types live in
-`library:api`, so WebAssembly and remote clients can use them without linking a torrent engine.
+`library:torrent-api` (`com.linroid.ketch.torrent.api`), which has the targets of `library:api`, so
+WebAssembly and remote clients can use them without linking a torrent engine. `library:api` and
+`library:core` name no torrent type: `KetchApi.controller(key)` looks controllers up by a
+`ControlKey`, here `TorrentController.Key`, and a `DownloadSource` contributes one through
+`DownloadSource.attach`, which returns a `SourceExtension`.
 This PR defines inspection, capability negotiation, ordering, and command preconditions. Runtime
 wiring and the typed mutation methods ship with their capabilities, with SDK/HTTP/SSE parity checked
 in roadmap step 27. A contract declaration is not an implemented runtime capability.
 
 ## Availability and negotiation
 
-`KetchApi.torrents` is nullable and defaults to null for existing backend implementations. Null means
+`ketch.controller(TorrentController)` is nullable and defaults to null for existing backend
+implementations. Null means
 no typed control protocol, not no torrent downloader. Local and remote adapters expose a controller
 only when they implement inspection. They advertise only executable features. The backend's
 platform determines capabilities: a browser connected to a daemon can have capabilities unavailable
@@ -89,6 +94,61 @@ Operation cancellation has its own idempotency key and operation revision. Error
 unsupported capability, invalid input, conflict, policy denial, resource exhaustion, storage failure,
 integrity failure, not found, and cancellation. They must not expose tracker credentials or raw
 untrusted paths. Unsupported requests fail before any side effect or network access.
+
+## Version 1 runtime
+
+`Ketch` and `RemoteKetch` implement version 1 for torrent tasks. `Ketch.controller(TorrentController)`
+returns the controller of the first registered source whose `SourceExtension` offers one: the
+torrent source's `TorrentControls` (in `library:torrent`), which builds `KetchTorrentController`
+over the task records and ledgered commands of core's `SourceHost`;
+`RemoteKetch.controller(TorrentController)` calls a server's `/api/torrents` routes and their
+`events` stream (`RemoteTorrentController`). Servers list `torrent.control` in `KetchStatus.features` when they
+serve them. What the runtime does, where it narrows the contract above:
+
+- **Capabilities.** `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`, plus
+  `seeding` only while the configured upload policy is `SEED_AFTER_COMPLETION`, also while uploads
+  are paused (`TorrentDownloadSource.setUploadsPaused`, as the phone apps pause them off Wi-Fi):
+  the pause is a network condition, not a policy, so clients keep offering Seed. `utp` and
+  `mse-pe` say the engine speaks uTP and protocol encryption, whether or not `utp` is on and
+  `encryption` is off in the settings at the moment. Every other name is never advertised.
+  `maxPageSize` is 1000, `maxSubscriptions` 16, and `backgroundTransfers` is false: seeding runs
+  only while the process runs. The remote adapter fails closed: it checks the server's capabilities,
+  read once per connection, before every command and refuses with `UNSUPPORTED` before sending
+  anything when a capability is missing, as with older servers, and a response, or a capabilities
+  answer, that arrives after the connection changed fails with `CONNECTION_CHANGED`.
+- **Preconditions.** `expectedRevision` is selection-scoped: it must be at least the revision of the
+  task's last control change (a selection or seeding change) in the same epoch, so progress-only
+  revisions never make a command conflict. A stale one fails with `CONFLICT` and the current
+  revision.
+- **Retry ledger.** Each task keeps its last 32 commands for 15 minutes in its record, saved in the
+  same write as the change, so an exact retry returns its first outcome across restarts. A 33rd
+  command inside the window fails with `RESOURCE_EXHAUSTED` rather than evicting an entry. The
+  ledger goes with the task: a command for a removed task fails with `NOT_FOUND`, not its recorded
+  outcome. Keys are scoped to the task; a server has one principal, its API token.
+- **Selection.** `select` takes 1 to 100,000 stable file IDs and applies them at once, live in a
+  running session; there are no priorities, sequential mode or deadlines, and no operation ID.
+  Completion shows as `selectionComplete` of the selection's generation. Expanding a completed
+  selection needs no explicit restart: the task reopens and downloads the new files. Empty
+  selections cannot be represented yet; `DownloadRequest.awaitFileSelection` expresses waiting for a
+  choice instead.
+- **Seeding.** `setSeeding` starts (after a recheck, on a free engine slot only, else
+  `RESOURCE_EXHAUSTED`) or stops sharing a completed task, and records the intent that restores
+  seeding, on hosts that restore it, after a restart, when uploads resume and on a live switch to
+  `SEED_AFTER_COMPLETION`; `POLICY_DENIED` while the configured policy does not seed,
+  `INVALID_STATE` for a task that is not completed. While uploads are paused under
+  `SEED_AFTER_COMPLETION`, `setSeeding(true)` is accepted: it saves the intent and reports
+  `seeding` true while the activity stays `STOPPED`, and on hosts that restore seeding the task
+  seeds, after a recheck, once uploads resume. `setSeeding(false)` clears the intent either way.
+  Snapshots carry the same answer as `TorrentSnapshot.seeding` (the saved intent or a live seeding
+  session; `null` from older servers), and subscriptions get a new snapshot whenever the intent
+  changes, so clients can offer Stop seeding for a task that waits to seed. There are no ratio or
+  duration goals and no separate seed queue: seeders use free engine slots and yield them to
+  waiting downloads, and to paused uploads, keeping their intent.
+- **Counters.** Received and uploaded payload and upload speed come from a live session; without
+  one, as for a completed task that does not seed, they are `null`.
+- **File pages.** `files` sorts by `TorrentFileOrder` (torrent, natural name, size, extension,
+  selected first; each names a `FileOrder` of `library:api`), optionally descending. Cursors bind the task, the epoch, the selection generation
+  and the order; one used after any of them changed fails with `STALE_CURSOR`.
 
 ## Migration gates
 

@@ -12,8 +12,8 @@
     <item quantity="one">%1$d téléchargement requiert votre attention</item>
     <item quantity="other">%1$d téléchargements requièrent votre attention</item>
   </plurals>
-  <string name="pulse_all_quiet">Tout est calme</string>
-  <string name="pulse_all_quiet_free">Tout est calme · %1$s libres sur %2$s</string>
+  <string name="pulse_all_quiet">Inactif</string>
+  <string name="pulse_all_quiet_free">Inactif · %1$s libres sur %2$s</string>
   <string name="pulse_connecting">Connexion à %1$s</string>
   <string name="pulse_needs_token">%1$s a besoin d'un jeton</string>
   <string name="pulse_offline">%1$s est hors ligne · nouvelle tentative</string>
@@ -91,14 +91,14 @@
   <string name="pulse_use_as_slow_lane">Utiliser comme limite en vitesse réduite</string>
   <string name="pulse_speed_settings">Réglages de vitesse…</string>
   <string name="pulse_update_failed">Impossible de mettre à jour %1$s · %2$s</string>
-  <string name="pulse_caption_full">Les téléchargements vont aussi vite que le réseau le permet.</string>
+  <string name="pulse_caption_full">Aucune limite de vitesse.</string>
   <string name="pulse_caption_capped">Les téléchargements sont limités à %1$s.</string>
-  <string name="pulse_caption_slow_lane">La vitesse totale des téléchargements est limitée à %1$s pour laisser de la bande passante aux autres apps.</string>
+  <string name="pulse_caption_slow_lane">Les téléchargements se partagent %1$s.</string>
   <string name="pulse_caption_no_rules">Aucune règle de vitesse pour l'instant. Ajoutez-en dans les Réglages de vitesse.</string>
   <string name="pulse_caption_rule_slow_lane">Une règle maintient la vitesse réduite activée.</string>
   <string name="pulse_caption_rule_full">Pleine vitesse jusqu'à ce qu'une règle active la vitesse réduite.</string>
-  <string name="pulse_caption_slow_lane_until">Vitesse réduite jusqu'à %1$s, puis vos règles décident.</string>
-  <string name="pulse_caption_full_until">Pleine vitesse jusqu'à %1$s, puis vos règles décident.</string>
+  <string name="pulse_caption_slow_lane_until">Vitesse réduite jusqu'à %1$s, puis vos règles s'appliquent.</string>
+  <string name="pulse_caption_full_until">Pleine vitesse jusqu'à %1$s, puis vos règles s'appliquent.</string>
   <string name="pulse_limit_for_slow_lane">Utilisée chaque fois que la vitesse réduite est activée.</string>
   <string name="pulse_limit_for_device">S'applique à tous les téléchargements sur %1$s.</string>
   <string name="pulse_limit_after_slow_lane">S'applique une fois la vitesse réduite désactivée.</string>
@@ -124,4 +124,44 @@
   <string name="pulse_timeline_limit">Limite → %1$s</string>
   <string name="pulse_timeline_limit_removed">Limite retirée</string>
   <string name="pulse_timeline_priority">Priorité → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">Connexions</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="one">%1$d connexion</item>
+    <item quantity="other">%1$d connexions</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="one">%1$d de plus</item>
+    <item quantity="other">%1$d de plus</item>
+  </plurals>
+  <string name="pulse_connections_none">Aucune connexion active</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="one">%1$d appareil n'indique pas ses connexions</item>
+    <item quantity="other">%1$d appareils n'indiquent pas leurs connexions</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">Téléchargement</string>
+  <string name="pulse_connections_legend_upload">Envoi</string>
+  <string name="pulse_connections_legend_both">Les deux</string>
+  <string name="pulse_connections_legend_idle">Inactif</string>
+  <string name="pulse_connection_outgoing">Sortante</string>
+  <string name="pulse_connection_incoming">Entrante</string>
+  <string name="pulse_connection_direct">Directe</string>
+  <string name="pulse_connection_via_http_proxy">Via un proxy HTTP</string>
+  <string name="pulse_connection_via_socks_proxy">Via un proxy SOCKS5</string>
+  <string name="pulse_connection_secure">Chiffrée</string>
+  <string name="pulse_connection_received">Reçu : %1$s</string>
+  <string name="pulse_connection_sent">Envoyé : %1$s</string>
+  <string name="pulse_connection_open_for">Ouverte depuis %1$s</string>
+  <string name="pulse_connection_peer_choking">Le pair n'envoie rien pour l'instant</string>
+  <string name="pulse_connection_upload_slot">Envoi vers ce pair</string>
+  <string name="pulse_connection_show_task">Afficher le téléchargement</string>
+  <string name="pulse_connections_tooltip">Connexions actives</string>
+  <string name="pulse_connection_description">%1$s, %2$s, %3$s, réception %4$s, envoi %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="one">%1$d connexion, %2$d en téléchargement, %3$d en envoi</item>
+    <item quantity="other">%1$d connexions, %2$d en téléchargement, %3$d en envoi</item>
+  </plurals>
 </resources>

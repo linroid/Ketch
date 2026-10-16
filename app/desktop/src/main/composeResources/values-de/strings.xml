@@ -19,6 +19,7 @@
   <string name="tray_recent">Zuletzt abgeschlossen</string>
   <string name="tray_show_ketch">Ketch anzeigen</string>
   <string name="tray_speed">Geschwindigkeit</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">Anzeigen</string>
   <string name="tray_enter_token">Token eingeben…</string>
   <string name="tray_retry_now">Jetzt erneut versuchen</string>
@@ -64,7 +65,7 @@
   <string name="message_update_ready">Ketch %1$s ist bereit zur Installation</string>
   <string name="message_update_installed">Auf Ketch %1$s aktualisiert</string>
   <string name="message_update_failed">Ketch %1$s konnte nicht installiert werden</string>
-  <string name="message_update_failed_hint">Die Fehlerursache steht in der Datei update.log im Protokollordner.</string>
+  <string name="message_update_failed_hint">Siehe update.log im Protokollordner.</string>
   <string name="message_update">Aktualisieren</string>
   <string name="message_restart">Neu starten</string>
   <string name="message_open_installer">Installationsprogramm öffnen</string>
@@ -83,6 +84,11 @@
     <item quantity="other">%1$d Links kopiert</item>
   </plurals>
   <string name="message_window_error">Etwas ist schiefgelaufen</string>
+  <string name="message_downloads_run_by">%1$s (Prozess %2$d) führt die Downloads dieses Computers aus</string>
+  <string name="message_downloads_run_elsewhere">Ein anderer Ketch-Prozess führt die Downloads dieses Computers aus</string>
+  <string name="message_downloads_run_hint">Stoppe ihn, dann beende Ketch und öffne es erneut, um sie hier auszuführen</string>
+  <string name="message_command_stopped">%1$s wurde beendet</string>
+  <string name="message_command_stopped_hint">Beende Ketch und öffne es erneut, um die Downloads dieses Computers hier auszuführen</string>
   <string name="open_torrent_title">Torrent-Datei öffnen</string>
 
   <string name="close_keep_running_title">Im Hintergrund weiter herunterladen?</string>
@@ -132,4 +138,6 @@
   </plurals>
 
   <string name="settings_window_title">Einstellungen</string>
+
+  <string name="keep_awake_reason">Downloads laufen</string>
 </resources>

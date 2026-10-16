@@ -148,7 +148,6 @@ internal fun barVerbs(
     verb(RowAction.CopyPath, Res.string.bar_copy_paths.text(), counted = true),
     verb(RowAction.DownloadAgain, counted = true),
     verb(RowAction.StopAndDiscard, Res.string.bar_discard.text(), counted = true),
-    verb(RowAction.Remove),
   )
   return bar to more
 }

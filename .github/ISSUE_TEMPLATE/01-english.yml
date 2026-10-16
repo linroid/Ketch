@@ -1,0 +1,52 @@
+name: "English (Recommended)"
+description: "Report a bug, suggest an improvement, or ask a question."
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Issue type"
+      options:
+        - "Bug report"
+        - "Feature request"
+        - "Question"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description"
+      description: "What happened, what did you expect, or what would you like to see?"
+      placeholder: "Describe the issue with any relevant context."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      description: "For bug reports, list the steps that reproduce the problem."
+      placeholder: "1. ...\n2. ..."
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "Include your Ketch version and platform when relevant."
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        Collect logs from **Settings → About → Troubleshooting**:
+        - **Desktop:** Select **Open log folder**.
+        - **Android or iOS:** Select **Share logs**.
+        - **Web:** Open your browser's developer console.
+        - **CLI:** Copy the relevant terminal output.
+        See the [logging guide](https://github.com/linroid/Ketch/blob/main/docs/logging.md) for details.
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs"
+      description: "Paste relevant excerpts here, or attach log files in a comment after submitting. Remove sensitive information before sharing."
+      placeholder: "Paste relevant log excerpts here."
+    validations:
+      required: false

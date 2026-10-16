@@ -7,6 +7,7 @@
   <string name="command_palette">Paleta de comandos</string>
   <string name="command_search">Buscar descargas</string>
   <string name="command_discover">Descubrir</string>
+  <string name="command_connections">Conexiones</string>
   <string name="command_devices">Dispositivos</string>
   <string name="command_device_all">Todos los dispositivos</string>
   <string name="command_device_switcher">Cambiar de dispositivo…</string>
@@ -36,7 +37,7 @@
   <string name="command_list_toggle">Pausar o reanudar</string>
   <string name="command_list_open">Abrir</string>
   <string name="command_list_reveal">Mostrar en la carpeta</string>
-  <string name="command_list_remove">Quitar de la lista</string>
+  <string name="command_list_remove">Quitar</string>
   <string name="command_list_remove_and_trash">Quitar y mover los archivos a la papelera…</string>
   <string name="command_list_copy_link">Copiar enlace</string>
   <string name="command_list_copy_path">Copiar ruta del archivo</string>

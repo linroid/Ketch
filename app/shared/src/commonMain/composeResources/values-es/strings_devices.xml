@@ -42,9 +42,9 @@
   <string name="device_not_connected">No conectado</string>
 
   <string name="device_problem_unauthorized">Necesita un token de acceso nuevo</string>
-  <string name="device_problem_token_rejected">Rechazó el token de acceso guardado para él.</string>
-  <string name="device_problem_over_limit">Ketch solo mantiene unos pocos dispositivos conectados a la vez. Se conecta a este mientras se muestra.</string>
-  <string name="device_problem_not_kept">Ketch se conecta a él mientras se muestra o mientras está marcado para mantenerse conectado.</string>
+  <string name="device_problem_token_rejected">Se rechazó el token de acceso guardado.</string>
+  <string name="device_problem_over_limit">Ketch se conecta a pocos dispositivos a la vez. Este se conecta mientras se muestra.</string>
+  <string name="device_problem_not_kept">Se conecta mientras se muestra o si Mantener conectado está activado.</string>
   <string name="device_problem_connecting">Conectando…</string>
   <string name="device_problem_offline_for">Sin conexión desde hace %1$s · reintentando</string>
   <string name="device_problem_offline">Sin conexión · reintentando</string>
@@ -84,7 +84,7 @@
   <string name="device_free_space_unknown">Espacio libre desconocido</string>
   <string name="device_chip_networks">Redes por las que descarga</string>
   <string name="device_chip_sharing_settings">Ajustes de Compartir</string>
-  <string name="device_chip_share_tooltip">Permitir que otros dispositivos lo controlen</string>
+  <string name="device_chip_share_tooltip">Permitir que otros dispositivos controlen Ketch en él</string>
   <string name="device_chip_not_shared">Sin compartir · Compartir…</string>
   <plurals name="device_retry_failed">
     <item quantity="one">Reintentar %1$d fallida</item>
@@ -106,7 +106,7 @@
   <string name="device_rename_local_hint">Tus otros dispositivos verán este nombre después de reiniciar.</string>
   <string name="device_rename_name">Nombre</string>
   <string name="device_remove_title">¿Quitar %1$s?</string>
-  <string name="device_remove_body">Ketch dejará de mostrar aquí sus descargas. Seguirán en curso en %1$s y podrás volver a añadirlo más tarde.</string>
+  <string name="device_remove_body">Sus descargas seguirán en curso en %1$s. Puedes volver a añadirlo más tarde.</string>
 
   <string name="device_speed_of">Velocidad de %1$s</string>
 
@@ -148,8 +148,8 @@
   <string name="connect_code_no_longer_accepted">%1$s ya no acepta el código que tiene Ketch. Pega un enlace de vinculación nuevo desde Ajustes › Compartir en ese dispositivo o introduce su código de acceso.</string>
   <string name="connect_scan_hint">Escanea con la app de cámara el código de vinculación que aparece en Ajustes › Compartir en el otro dispositivo, o pega su enlace de vinculación.</string>
   <string name="connect_paste_hint">Pega el enlace de vinculación de Ajustes › Compartir del otro dispositivo o escribe su dirección.</string>
-  <string name="connect_find_on_network">Buscar en la red</string>
-  <string name="connect_on_your_network">En tu red</string>
+  <string name="connect_find_on_network">Buscar en la red local</string>
+  <string name="connect_on_your_network">En tu red local</string>
   <string name="connect_searching">Buscando…</string>
   <string name="connect_search_again">Buscar de nuevo</string>
   <string name="connect_looking">Buscando dispositivos con Ketch en esta red…</string>
@@ -163,10 +163,12 @@
   <string name="connect_approval_enter_code">Introducir su código de acceso</string>
   <string name="connect_approval_denied">%1$s no ha permitido este dispositivo. Vuelve a pedirlo o introduce su código de acceso.</string>
   <string name="connect_approval_expired">Nadie respondió en %1$s. Vuelve a pedirlo o introduce su código de acceso.</string>
-  <string name="connect_approval_busy">%1$s aún está decidiendo sobre otra solicitud de este dispositivo. Vuelve a pedirlo en un momento o introduce su código de acceso.</string>
+  <string name="connect_approval_busy">%1$s está respondiendo a otra solicitud de este dispositivo. Vuelve a intentarlo en un momento o introduce su código de acceso.</string>
+  <string name="connect_approval_paused">%1$s no acepta solicitudes de vinculación de este dispositivo por ahora. Vuelve a intentarlo más tarde o introduce su código de acceso.</string>
+  <string name="connect_approval_closed">%1$s no acepta solicitudes de vinculación. Activa la vinculación en Ajustes › Compartir de ese dispositivo y vuelve a pedirlo, o introduce su código de acceso.</string>
   <string name="connect_approval_ask_again">Volver a solicitar acceso</string>
   <string name="connect_added_badge">Añadido</string>
-  <string name="connect_share_instead">¿Quieres controlar %1$s desde otro dispositivo?</string>
+  <string name="connect_share_instead">¿Quieres controlar Ketch en %1$s desde otro dispositivo?</string>
   <string name="connect_show_pairing_code">Mostrar su código de vinculación</string>
 
   <string name="connect_landing_title">Conéctate a un dispositivo con Ketch</string>
@@ -184,9 +186,9 @@
   <string name="connect_pairing_known">Ya añadiste %1$s. Al conectar, se mostrará.</string>
   <string name="connect_pairing_known_code">Ya añadiste %1$s. Al conectar, se mostrará y recibirá el código de este enlace.</string>
   <string name="connect_pairing_has_code">El enlace incluye su código de acceso.</string>
-  <string name="pairing_request_title">¿Permitir que %1$s controle %2$s?</string>
+  <string name="pairing_request_title">¿Permitir que %1$s controle Ketch en %2$s?</string>
   <string name="pairing_request_check">Permítelo solo si %1$s muestra este código:</string>
-  <string name="pairing_request_note">Podrá añadir, pausar y eliminar descargas aquí. Para retirarle el acceso más adelante, elige Código nuevo en Ajustes › Compartir.</string>
+  <string name="pairing_request_note">Podrá añadir, pausar y quitar descargas aquí. Para retirarle el acceso, elige Código nuevo en Ajustes › Compartir.</string>
   <string name="pairing_request_allow">Permitir</string>
   <string name="pairing_request_deny">No permitir</string>
 

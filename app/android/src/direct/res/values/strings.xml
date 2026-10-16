@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="update_install_failed">Couldn\'t open the installer. Return to About and try again.</string>
+</resources>

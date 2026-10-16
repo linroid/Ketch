@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.KetchDispatchers
@@ -11,12 +12,12 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +25,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -32,6 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.builtins.serializer
 
 /**
  * Verifies that [DownloadCoordinator.cancel] does not return until the
@@ -42,26 +43,27 @@ import kotlin.time.Duration.Companion.seconds
  */
 class DownloadCoordinatorCancelTest {
 
-  private class SuspendingSource : DownloadSource {
+  private class SuspendingSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     val downloadStarted = CompletableDeferred<Unit>()
     var downloadFinallyRan: Boolean = false
 
     override val type: String = "suspend"
-    override fun canHandle(url: String): Boolean = true
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
 
-    override suspend fun resolve(
-      url: String,
-      properties: Map<String, String>,
-    ): ResolvedSource = ResolvedSource(
-      url = url,
-      sourceType = type,
-      totalBytes = 16L,
-      supportsResume = false,
-      suggestedFileName = "file.bin",
-      maxSegments = 1,
-    )
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url,
+        sourceType = type,
+        totalBytes = 16L,
+        supportsResume = false,
+        suggestedFileName = "file.bin",
+        maxSegments = 1,
+      )
+    }
 
-    override suspend fun download(context: DownloadContext) {
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       downloadStarted.complete(Unit)
       try {
         awaitCancellation()
@@ -70,15 +72,7 @@ class DownloadCoordinatorCancelTest {
       }
     }
 
-    override suspend fun resume(
-      context: DownloadContext,
-      resumeState: SourceResumeState,
-    ) = Unit
 
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
-    ): SourceResumeState = SourceResumeState(type, "")
   }
 
   private fun createHandle(destination: String): TaskHandle {
@@ -103,11 +97,12 @@ class DownloadCoordinatorCancelTest {
       override val mutableSegments =
         MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
+      override val controlLock = Mutex()
       override val record = AtomicSaver(record) {}
     }
   }
 
-  private fun createCoordinator(source: DownloadSource): DownloadCoordinator =
+  private fun createCoordinator(source: DownloadSource<*>): DownloadCoordinator =
     DownloadCoordinator(
       sourceResolver = SourceResolver(listOf(source)),
       config = { DownloadConfig() },
@@ -115,7 +110,7 @@ class DownloadCoordinatorCancelTest {
       dispatchers = KetchDispatchers(
         main = Dispatchers.Default,
         network = Dispatchers.Default,
-        io = Dispatchers.Default,
+        disk = Dispatchers.Default,
       ),
     )
 

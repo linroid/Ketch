@@ -23,16 +23,29 @@ internal actual fun rememberNearbyAccess(): NearbyAccess {
     pending = null
   }
   return remember(context, launcher) {
-    NearbyAccess { onDone ->
-      val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-        ContextCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES) ==
+    NearbyAccess { search, onDone ->
+      val permission = localNetworkPermission(search)
+      val granted = permission == null ||
+        ContextCompat.checkSelfPermission(context, permission) ==
         PackageManager.PERMISSION_GRANTED
       if (granted) {
         onDone()
       } else {
         pending = onDone
-        launcher.launch(Manifest.permission.NEARBY_WIFI_DEVICES)
+        launcher.launch(permission)
       }
     }
   }
+}
+
+/**
+ * The permission this Android version needs for the local network: `ACCESS_LOCAL_NETWORK` from
+ * Android 17, `NEARBY_WIFI_DEVICES` on 13 to 16 when it [search]es (mDNS), else `null`.
+ */
+private fun localNetworkPermission(search: Boolean): String? = when {
+  Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN ->
+    Manifest.permission.ACCESS_LOCAL_NETWORK
+  search && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+    Manifest.permission.NEARBY_WIFI_DEVICES
+  else -> null
 }

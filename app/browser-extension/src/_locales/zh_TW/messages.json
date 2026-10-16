@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "已新增下載項目"
   },
-  "notify_fallback_browser": {
-    "message": "改用瀏覽器下載"
-  },
-  "notify_fallback_magnet": {
-    "message": "改用其他應用程式開啟磁力連結"
-  },
-  "notify_send_failed": {
-    "message": "無法傳送到 $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch 無法下載此內容"
   },
@@ -115,6 +101,9 @@
   },
   "error_app_connect_failed": {
     "message": "無法連線至 Ketch 應用程式"
+  },
+  "error_app_pick_unsupported": {
+    "message": "請更新 Ketch 應用程式，以便在這裡選擇資料夾"
   },
   "error_app_invalid_reply": {
     "message": "Ketch 應用程式傳回了無效的回應"
@@ -402,14 +391,6 @@
   "popup_add_button": {
     "message": "下載"
   },
-  "popup_added": {
-    "message": "已新增 $NAME$",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "請輸入 http、https、ftp 或磁力連結。"
   },
@@ -616,20 +597,8 @@
   "error_media_unsupported": {
     "message": "此 Ketch 執行個體不支援媒體播放清單。傳送連結前請先更新。"
   },
-  "review_setting": {
-    "message": "傳送前確認下載"
-  },
-  "review_title": {
-    "message": "確認下載"
-  },
-  "review_name": {
-    "message": "檔案名稱（選填）"
-  },
   "review_folder": {
     "message": "所選裝置上的資料夾（選填）"
-  },
-  "review_detail": {
-    "message": "資料夾留空時使用裝置的預設資料夾。伺服器控制允許使用的資料夾。種子保留其檔案結構。關閉此頁面會將暫停的下載交還瀏覽器。"
   },
   "review_cancel": {
     "message": "取消"
@@ -642,5 +611,119 @@
   },
   "safari_detail": {
     "message": "Safari 將確認過的連結和頁面資源傳送到已設定的 Ketch 伺服器。在 Ketch 中開啟共享，然後在此輸入位址和存取權杖。不支援自動擷取下載或啟動應用程式。"
+  },
+  "dialog_title": {
+    "message": "新增下載"
+  },
+  "dialog_name_label": {
+    "message": "檔案名稱"
+  },
+  "dialog_send_to": {
+    "message": "傳送到"
+  },
+  "dialog_save_in": {
+    "message": "儲存到"
+  },
+  "dialog_folder_default": {
+    "message": "預設資料夾"
+  },
+  "dialog_folder_browse": {
+    "message": "瀏覽…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "選擇這台電腦上的資料夾"
+  },
+  "dialog_device_checking": {
+    "message": "正在檢查…"
+  },
+  "dialog_device_ready": {
+    "message": "就緒"
+  },
+  "dialog_device_free": {
+    "message": "可用 $SIZE$",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "已關閉 · 傳送時啟動"
+  },
+  "dialog_device_offline": {
+    "message": "無法連線"
+  },
+  "dialog_torrent_layout": {
+    "message": "種子會保留自己的資料夾結構。"
+  },
+  "dialog_space_warning": {
+    "message": "$DEVICE$ 上僅剩 $SIZE$ 可用空間。",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "在瀏覽器中下載"
+  },
+  "dialog_sending": {
+    "message": "正在傳送…"
+  },
+  "dialog_folder_auto": {
+    "message": "自動"
+  },
+  "dialog_folder_auto_match": {
+    "message": "自動 · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "由裝置決定：下載資料夾，或與此檔案相符的分類資料夾。"
+  },
+  "dialog_folder_recent": {
+    "message": "最近使用：$FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "傳送前確認下載"
+  },
+  "notify_fallback_browser": {
+    "message": "改用瀏覽器下載"
+  },
+  "notify_fallback_magnet": {
+    "message": "改用其他應用程式開啟磁力連結"
+  },
+  "notify_send_failed": {
+    "message": "無法傳送到 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "已新增 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch 不接受此擴充功能副本"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch 只連線來自 Chrome 線上應用程式商店的擴充功能，或透過「載入未封裝項目」載入的版本 chrome-unpacked 套件。請安裝其中之一後再試一次。"
   }
 }

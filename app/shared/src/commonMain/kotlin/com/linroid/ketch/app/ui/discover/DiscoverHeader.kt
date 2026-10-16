@@ -65,8 +65,8 @@ internal class HistoryToggle(
 
 /**
  * The page header of wide windows: "Discover", the History toggle with how many other searches
- * wait for an OK, then the ⋯ menu ([discoverMenu]), New search and the model Discover searches
- * with, which opens its settings. Until Discover is set up only the title, the menu and, with
+ * wait for an OK, then the ⋯ menu ([discoverMenu]) and New search; the composer shows the model
+ * ([DiscoverModelChip]). Until Discover is set up only the title, the menu and, with
  * saved searches, History show.
  */
 @Composable
@@ -93,7 +93,7 @@ internal fun DiscoverHeader(
       modifier = Modifier.padding(end = spacing.s1),
     )
     if (history.offered) HistoryButton(controller, history)
-    // At the end; on a narrow page the model's name gives way first.
+    // At the end.
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s1, Alignment.End),
@@ -109,15 +109,6 @@ internal fun DiscoverHeader(
           leadingIcon = KetchIcon.Compose,
           shortcut = KetchCommands.DiscoverNewSearch.shortcutLabel(),
           modifier = Modifier.padding(start = spacing.s1),
-        )
-        KetchButton(
-          text = modelLabel(state.aiSettings).resolve(),
-          onClick = { state.openSettings(SettingsTarget(SettingsTarget.Page.Discover)) },
-          variant = KetchButtonVariant.Ghost,
-          size = KetchButtonSize.Small,
-          leadingIcon = KetchIcon.Ai,
-          tooltip = stringResource(Res.string.discover_settings),
-          modifier = Modifier.weight(1f, fill = false),
         )
       }
     }

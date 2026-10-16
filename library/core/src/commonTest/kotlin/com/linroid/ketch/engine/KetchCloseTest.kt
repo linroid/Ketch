@@ -5,13 +5,13 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.PauseReason
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
-import com.linroid.ketch.core.engine.SourceResumeState
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
@@ -19,9 +19,11 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 class KetchCloseTest {
@@ -52,7 +54,8 @@ class KetchCloseTest {
       val paused = assertIs<DownloadState.Paused>(task.state.value)
       assertEquals(PauseReason.Shutdown, paused.reason)
       assertEquals(4L, paused.progress.downloadedBytes)
-      assertEquals(4L, platformFileSystem.metadataOrNull(output)?.size)
+      assertEquals(4L, platformFileSystem.metadataOrNull(folder / "partial.bin.ketch")?.size)
+      assertFalse(platformFileSystem.exists(output))
       // The next start() resumes it.
       assertEquals(TaskState.DOWNLOADING, store.load(task.taskId)?.state)
     } finally {
@@ -87,35 +90,38 @@ class KetchCloseTest {
   }
 
   /** Never finishes resolving. */
-  private class StuckSource : DownloadSource {
+  private class StuckSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "stuck"
-    override fun canHandle(url: String): Boolean = url.startsWith("stuck:")
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("stuck:")
+    }
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
       awaitCancellation()
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) = awaitCancellation()
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      awaitCancellation()
+    override suspend fun download(context: DownloadContext, state: Unit?) = awaitCancellation()
   }
 
   /** Writes the first half of an 8-byte file, then waits until it is cancelled. */
-  private class HalfWaySource : DownloadSource {
+  private class HalfWaySource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "fixture"
-    override fun canHandle(url: String): Boolean = url.startsWith("fixture:")
-    override suspend fun resolve(url: String, properties: Map<String, String>) = ResolvedSource(
-      url = url, sourceType = type, totalBytes = 8, supportsResume = true,
-      suggestedFileName = "partial.bin", maxSegments = 1,
-    )
-    override fun buildResumeState(resolved: ResolvedSource, totalBytes: Long) =
-      SourceResumeState(type, "")
-    override suspend fun download(context: DownloadContext) {
+    override fun canHandle(input: ResolveInput): Boolean {
+      val url = (input as? ResolveInput.Url)?.url ?: return false
+      return url.startsWith("fixture:")
+    }
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 8, supportsResume = true,
+        suggestedFileName = "partial.bin", maxSegments = 1,
+      )
+    }
+    override suspend fun download(context: DownloadContext, state: Unit?) {
       context.fileAccessor.writeAt(0, byteArrayOf(1, 2, 3, 4))
       context.segments.value = listOf(Segment(0, 0, 7, 4))
       context.onProgress(4, 8)
       awaitCancellation()
     }
-    override suspend fun resume(context: DownloadContext, resumeState: SourceResumeState) =
-      download(context)
   }
 }

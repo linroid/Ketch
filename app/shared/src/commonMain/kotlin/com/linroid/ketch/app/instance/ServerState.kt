@@ -1,7 +1,6 @@
 package com.linroid.ketch.app.instance
 
 import com.linroid.ketch.app.i18n.UiText
-import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.config.ServerConfig
 
 /** State of the optional HTTP server exposing the embedded instance. */

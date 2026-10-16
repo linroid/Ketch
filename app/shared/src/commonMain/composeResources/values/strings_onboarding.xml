@@ -11,7 +11,7 @@
 
   <!-- Step 1 on iOS: downloads go to Ketch's folder in the Files app. -->
   <string name="onboarding_files_title">Your downloads, in Files</string>
-  <string name="onboarding_files_body">Ketch saves what you download where the Files app can open it, share it and move it.</string>
+  <string name="onboarding_files_body">Open, share and move them in the Files app.</string>
   <!-- Where the Files app shows the downloads. %1$s is iPhone or iPad. Use the name the Files
        app gives "On My iPhone" in your language; Ketch and Downloads are folder names. -->
   <string name="onboarding_files_path">On My %1$s › Ketch › Downloads</string>
@@ -20,7 +20,7 @@
        with a no-break space. -->
   <string name="onboarding_folder_title">Where should downloads&#160;go?</string>
   <!-- Download is the name of Android's shared downloads folder. -->
-  <string name="onboarding_folder_body">Other apps can't open Ketch's own folder. Save to Download, and your files show up everywhere.</string>
+  <string name="onboarding_folder_body">Other apps can't open Ketch's own folder. Save to Download so they can.</string>
   <string name="onboarding_folder_use_download">Use the Download folder</string>
   <string name="onboarding_folder_not_now">Not now</string>
   <string name="onboarding_folder_choose_another">Choose another folder</string>
@@ -32,7 +32,7 @@
   <!-- Step 2: download on this device, or control a computer. The title keeps its last two
        words together with a no-break space. -->
   <string name="onboarding_use_title">How will you use Ketch&#160;here?</string>
-  <string name="onboarding_use_body">Pick one to start. You can always do the other later.</string>
+  <string name="onboarding_use_body">Pick one for now. You can do both later.</string>
   <!-- %1$s is this device inside a sentence, such as "this phone". -->
   <string name="onboarding_use_download">Download on %1$s</string>
   <string name="onboarding_use_download_ios">Downloads can pause while Ketch is in the background.</string>
@@ -48,15 +48,15 @@
   <string name="onboarding_intake_start">Start downloading</string>
   <string name="onboarding_intake_share">Share from your browser</string>
   <!-- Share is the system's share button; use the name it has in your language. -->
-  <string name="onboarding_intake_share_body">Tap Share, then Ketch. The download starts without leaving the page.</string>
+  <string name="onboarding_intake_share_body">Tap Share, then Ketch.</string>
   <string name="onboarding_intake_select">Select a link</string>
   <!-- Download with Ketch is the item the Android app adds to the menu over selected text; use
        the name it has in your language. -->
   <string name="onboarding_intake_select_body">Choose Download with Ketch in the menu over any selected text.</string>
   <string name="onboarding_intake_copy">Copy a link</string>
-  <string name="onboarding_intake_copy_body">Come back to Ketch, and it offers to download the link.</string>
+  <string name="onboarding_intake_copy_body">Ketch offers to download it when you come back.</string>
   <string name="onboarding_intake_torrents">Open magnets and .torrent files</string>
-  <string name="onboarding_intake_torrents_body">They open in Ketch, ready to choose the files you want.</string>
+  <string name="onboarding_intake_torrents_body">Pick the files you want in Ketch.</string>
   <string name="onboarding_intake_notify">Hear when downloads finish</string>
-  <string name="onboarding_intake_notify_body">Ketch lets you know when a download finishes or fails; choose what in Settings.</string>
+  <string name="onboarding_intake_notify_body">Get notified when downloads finish or fail.</string>
 </resources>

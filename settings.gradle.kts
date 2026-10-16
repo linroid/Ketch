@@ -43,7 +43,10 @@ include(":library:ktor")
 include(":library:kermit")
 include(":library:sqlite")
 include(":library:ftp")
+include(":library:hls")
+include(":library:dash")
 include(":library:torrent")
+include(":library:torrent-api")
 include(":library:server")
 include(":library:mcp")
 
@@ -55,6 +58,7 @@ include(":config")
 
 // Self-update of the apps and the CLI
 include(":updater")
+include(":hooks")
 
 // App modules
 include(":app:shared")

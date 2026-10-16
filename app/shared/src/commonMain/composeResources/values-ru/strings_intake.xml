@@ -215,7 +215,7 @@
   </plurals>
   <string name="intake_advanced_hide">Скрыть дополнительные параметры</string>
   <string name="intake_advanced_show">Дополнительные параметры…</string>
-  <string name="intake_advanced_caption">Имя файла, реферер, cookie и другие заголовки</string>
+  <string name="intake_advanced_caption">Имя файла, контрольная сумма, реферер, cookie и другие заголовки</string>
   <string name="intake_speed_limit">Ограничение скорости</string>
   <string name="intake_priority">Приоритет</string>
   <string name="intake_start">Запуск</string>
@@ -249,6 +249,7 @@
   <string name="intake_save_to">Сохранить в</string>
   <string name="intake_folder_downloads">Загрузки</string>
   <string name="intake_default_folder">Папка по умолчанию</string>
+  <string name="intake_category_folder">Попадёт в %1$s</string>
   <string name="intake_recent">Недавние</string>
   <string name="intake_pinned">Закреплённые</string>
   <string name="intake_unpin">Открепить %1$s</string>
@@ -262,6 +263,9 @@
   <string name="intake_also_sent">С этой ссылкой также отправляются: %1$s</string>
   <string name="intake_file_name">Имя файла</string>
   <string name="intake_server_file_name">Используется имя файла с сервера</string>
+  <string name="intake_checksum">Контрольная сумма</string>
+  <string name="intake_checksum_caption">Проверяется после загрузки: MD5, SHA-1, SHA-256 или SHA-512, в hex или base64.</string>
+  <string name="intake_checksum_invalid">Это не контрольная сумма. Используйте sha256:… или шестнадцатеричный хеш MD5, SHA-1, SHA-256 или SHA-512.</string>
   <string name="intake_user_agent_custom">Свой</string>
   <string name="intake_add_header">Добавить заголовок</string>
   <string name="intake_paste_curl">Вставить cURL</string>
@@ -345,14 +349,14 @@
   <plurals name="intake_outcome_start_now">
     <item quantity="one">%1$d начнётся сейчас</item>
     <item quantity="few">%1$d начнутся сейчас</item>
-    <item quantity="many">%1$d начнётся сейчас</item>
-    <item quantity="other">%1$d начнётся сейчас</item>
+    <item quantity="many">%1$d начнутся сейчас</item>
+    <item quantity="other">%1$d начнутся сейчас</item>
   </plurals>
   <plurals name="intake_outcome_start_now_slots">
     <item quantity="one">%1$d начнётся сейчас (%2$s)</item>
     <item quantity="few">%1$d начнутся сейчас (%2$s)</item>
-    <item quantity="many">%1$d начнётся сейчас (%2$s)</item>
-    <item quantity="other">%1$d начнётся сейчас (%2$s)</item>
+    <item quantity="many">%1$d начнутся сейчас (%2$s)</item>
+    <item quantity="other">%1$d начнутся сейчас (%2$s)</item>
   </plurals>
   <plurals name="intake_outcome_queued_count">
     <item quantity="one">%1$d в очереди</item>

@@ -11,7 +11,6 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.SystemClipboard
-import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.deviceId
@@ -123,7 +122,7 @@ class DesktopCommandsTest {
       assertEquals(SpeedLimitMode.SlowLane, speedMode.settings.value.mode)
       val message = fleet.messages().last()
       val speed = speedLimitText(speedMode.slowLaneSpeed).load()
-      assertEquals("Slow lane on for ${localDeviceNoun().load()} · $speed", message.title.load())
+      assertEquals("Slow lane on for Lins-MacBook-Pro · $speed", message.title.load())
       message.actions.single { it.label.load() == "Undo" }.onClick()
       runCurrent()
       assertEquals(SpeedLimitMode.Full, speedMode.settings.value.mode)

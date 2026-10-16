@@ -1,5 +1,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
+import org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -18,16 +21,21 @@ dependencies {
   implementation(projects.library.core)
   implementation(projects.library.ktor)
   implementation(projects.library.ftp)
+  implementation(projects.library.hls)
+  implementation(projects.library.dash)
   implementation(projects.library.torrent)
   implementation(projects.library.remote)
   implementation(projects.library.server)
   implementation(projects.library.sqlite)
   implementation(projects.updater)
+  implementation(projects.hooks)
   implementation(compose.desktop.currentOs)
   // The menu bar, tray and dialog strings in src/main/composeResources.
   implementation(libs.compose.components.resources)
   implementation(libs.kotlinx.coroutinesSwing)
   implementation(libs.kotlinx.serialization.json)
+  // Hides the Dock icon on macOS while no window is open (MacDock).
+  implementation(libs.jna)
   // SLF4J backend for Ktor server and Koog; much smaller than Logback.
   runtimeOnly(libs.slf4j.simple)
 
@@ -220,7 +228,7 @@ configurations.runtimeClasspath {
 //   ProGuard task does not, such as Ktor's and kotlinx.coroutines' for their atomic fields.
 // - The names of the services in META-INF/services: ServiceLoader finds a service's providers by
 //   the name of its interface. proguard-rules.pro keeps the providers the app uses.
-val proguardRules by tasks.registering {
+val proguardRules = tasks.register("proguardRules") {
   val libraries = objects.fileCollection().from(configurations.runtimeClasspath)
   val mapping = layout.buildDirectory.file("outputs/proguard/mapping.txt")
   val rules = layout.buildDirectory.file("generated/proguard/rules.pro")
@@ -254,10 +262,31 @@ compose.desktop {
     // Keep the initial heap small on high-memory desktops. Native graphics and JVM memory
     // sit outside this limit; downloads stream their contents rather than retaining files.
     jvmArgs += listOf("-Xms32m", "-Xmx512m")
+    // Skia keeps up to 256 MB of GPU textures by default (layers, glyphs, images), which each
+    // resize or animation can fill and nothing gives back while the window shows.
+    jvmArgs += "-Dskiko.gpu.resourceCacheLimit=64M"
+    // The JVM prints its own warnings to stdout, before main runs. As the browser extension's
+    // native messaging host (NativeMessagingHost), stdout carries length-prefixed messages, and a
+    // warning there breaks the reply, so they go to stderr. These come after JAVA_TOOL_OPTIONS, so
+    // diagnostic logging asked for there only reaches a file (`-Xlog:cds:file=cds.log`).
+    jvmArgs += listOf("-Xlog:all=off:stdout", "-Xlog:all=warning:stderr")
+    // Downloads following the system's proxy (Proxy.System) ask the JVM's default
+    // ProxySelector, which only reads the operating system's proxies with this set at startup.
+    jvmArgs += "-Djava.net.useSystemProxies=true"
+    // kotlinx.coroutines' shared pool: Dispatchers.IO at 16 threads rather than 64, and idle
+    // workers end after 10 s rather than 60. Ketch's own blocking work runs on pools of its own;
+    // what is left there, such as ktor-network's socket loops, never blocks for long.
+    jvmArgs += listOf(
+      "-Dkotlinx.coroutines.io.parallelism=16",
+      "-Dkotlinx.coroutines.scheduler.keep.alive.sec=10",
+    )
     providers.gradleProperty("desktopJavaHome").orNull?.let { javaHome = it }
 
     buildTypes.release.proguard {
       obfuscate.set(true)
+      // One desktop.jar rather than a jar per library; see the AbstractProguardTask step below
+      // for the service files this merges.
+      joinOutputJars.set(true)
       configurationFiles.from(
         proguardRules,
         rootDir.resolve("app/proguard-rules.pro"),
@@ -338,6 +367,52 @@ compose.desktop {
       }
       packageVersion = installerVersion(providers.gradleProperty("VERSION_NAME").get())
     }
+  }
+}
+
+// ProGuard joins the release jars into one and keeps only the first copy of a file several of
+// them carry, so a META-INF/services file several jars provide would lose the providers of all
+// but one. Each service file then lists the providers of every jar again, in the order the
+// separate jars were on the classpath (the main jar, then by name), so ServiceLoader finds the
+// same providers, first to last, as it did before.
+tasks.withType<AbstractProguardTask>().configureEach {
+  doLast {
+    val task = this as AbstractProguardTask
+    if (task.joinOutputJars.orNull != true) return@doLast
+    val services = "META-INF/services/"
+    val main = task.mainJar.get().asFile
+    val inputs = listOf(main) +
+      task.inputFiles.files.filter { it.name.endsWith(".jar") && it != main }.sortedBy { it.name }
+    val providers = linkedMapOf<String, LinkedHashSet<String>>()
+    for (input in inputs) {
+      ZipFile(input).use { zip ->
+        for (entry in zip.entries()) {
+          if (entry.isDirectory || !entry.name.startsWith(services)) continue
+          val lines = zip.getInputStream(entry).reader().readLines()
+            .map { it.substringBefore('#').trim() }
+            .filter { it.isNotEmpty() }
+          providers.getOrPut(entry.name) { linkedSetOf() } += lines
+        }
+      }
+    }
+    val jar = task.destinationDir.file(main.name).get().asFile
+    val merged = File(jar.parentFile, "${jar.name}.services")
+    ZipFile(jar).use { zip ->
+      ZipOutputStream(merged.outputStream()).use { out ->
+        for (entry in zip.entries()) {
+          if (entry.name in providers) continue
+          out.putNextEntry(ZipEntry(entry.name).apply { time = entry.time })
+          zip.getInputStream(entry).use { it.copyTo(out) }
+          out.closeEntry()
+        }
+        for ((name, lines) in providers) {
+          out.putNextEntry(ZipEntry(name))
+          out.write(lines.joinToString("\n", postfix = "\n").toByteArray())
+          out.closeEntry()
+        }
+      }
+    }
+    Files.move(merged.toPath(), jar.toPath(), StandardCopyOption.REPLACE_EXISTING)
   }
 }
 

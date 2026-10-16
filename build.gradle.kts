@@ -1,7 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
   // this is necessary to avoid the plugins to be loaded multiple times
@@ -42,6 +44,35 @@ subprojects {
   }
 }
 
+// Every module here is Ketch's own, so it may use and implement what library:api reserves.
+val ketchOptIns = listOf(
+  "com.linroid.ketch.api.InternalKetchApi",
+  "com.linroid.ketch.api.KetchImplementationApi",
+)
+// Tests drive virtual time with kotlinx-coroutines-test, whose scheduler controls are experimental.
+val testOptIn = "kotlinx.coroutines.ExperimentalCoroutinesApi"
+
+subprojects {
+  tasks.withType<KotlinCompilationTask<*>>().configureEach {
+    compilerOptions.optIn.addAll(ketchOptIns)
+  }
+  // The IDE reads the settings of shared source sets, such as commonMain, from the extension and
+  // never from a compile task, so multiplatform modules opt in there too.
+  pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
+    extensions.configure<KotlinMultiplatformExtension> {
+      compilerOptions.optIn.addAll(ketchOptIns)
+      sourceSets.matching { it.name.endsWith("Test") }.configureEach {
+        languageSettings.optIn(testOptIn)
+      }
+    }
+  }
+  pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+    extensions.configure<KotlinJvmProjectExtension> {
+      sourceSets.named("test") { languageSettings.optIn(testOptIn) }
+    }
+  }
+}
+
 // Multiplatform modules run their JVM tests with `jvmTest`, but JVM-only modules (the kotlinJvm
 // plugin) with `test`, which `./gradlew jvmTest` never selects. CI runs this task to cover both.
 val allJvmTests = tasks.register("allJvmTests") {
@@ -73,4 +104,33 @@ subprojects {
       compilePublishedMetadata.configure { dependsOn(metadata) }
     }
   }
+}
+
+// Simulator tests declare their inputs (the test binary, arguments and device) but the Kotlin
+// plugin does not cache them. Caching them, as Gradle does JVM tests, lets a module whose test
+// binary did not change reuse its results instead of running the suite on the simulator again.
+subprojects {
+  tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+    outputs.cacheIf { true }
+  }
+}
+
+// Engines built without a download folder save to `~/Downloads` on the JVM, so tests that build
+// one that way would fill the developer's own folder with `file`, `file (1)`, ... Each JVM test
+// task gets a home of its own under build/ instead, with an empty Downloads folder in it.
+subprojects {
+  tasks.withType<Test>().configureEach {
+    val home = layout.buildDirectory.dir("test-home/$name")
+    jvmArgumentProviders.add(TestHome(home))
+    doFirst {
+      val downloads = home.get().asFile.resolve("Downloads")
+      downloads.deleteRecursively()
+      downloads.mkdirs()
+    }
+  }
+}
+
+/** Points `user.home` at [home], which is not an input: it only moves where tests write. */
+class TestHome(@get:Internal val home: Provider<Directory>) : CommandLineArgumentProvider {
+  override fun asArguments(): List<String> = listOf("-Duser.home=${home.get().asFile.absolutePath}")
 }

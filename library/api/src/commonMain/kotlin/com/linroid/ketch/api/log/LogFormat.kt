@@ -1,18 +1,18 @@
 package com.linroid.ketch.api.log
 
+import com.linroid.ketch.api.InternalKetchApi
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * One-line summary of this error and its causes, for log lines that do not print a
- * stack trace, such as retry warnings:
+ * This error and its causes on one line, URLs redacted, for logs without a stack trace:
  * `Network: Network error occurred <- ConnectTimeoutException: Connect timeout has expired`.
- * URLs quoted in the messages pass through [redactUrl].
  *
- * @suppress This is internal API and should not be used directly by library users.
+ * @suppress
  */
+@InternalKetchApi
 fun Throwable.describeCauses(): String {
   val seen = mutableListOf<Throwable>()
   var current: Throwable? = this
@@ -31,13 +31,12 @@ fun Throwable.describeCauses(): String {
 }
 
 /**
- * [url] in a form that is safe to log: the password in its user info and the values of
- * credential-like query parameters (such as `passkey`, `token` or `X-Amz-Signature`) are
- * masked, and a magnet link keeps only its topic and display name, because tracker and
- * source URLs can carry passkeys.
+ * [url] safe to log: its password and credential-like query values (`passkey`, `token`,
+ * `X-Amz-Signature`) masked, and a magnet link cut to its topic and name.
  *
- * @suppress This is internal API and should not be used directly by library users.
+ * @suppress
  */
+@InternalKetchApi
 fun redactUrl(url: String): String {
   if (url.startsWith("magnet:", ignoreCase = true)) return redactMagnet(url)
   val schemeEnd = url.indexOf("://")
@@ -46,8 +45,7 @@ fun redactUrl(url: String): String {
 }
 
 private fun redactUserInfo(url: String, authorityStart: Int): String {
-  // Like FtpUrl, only a slash ends the credentials: an unencoded password may contain ? or #.
-  // A query that holds an @ before any path is over-redacted, which never leaks.
+  // Only a slash ends the credentials, as passwords may hold ? or #; over-redacting never leaks.
   val authorityEnd = url.indexOf('/', authorityStart).let { if (it < 0) url.length else it }
   val at = url.lastIndexOf('@', authorityEnd - 1)
   if (at < authorityStart) return url
@@ -83,20 +81,20 @@ private fun redactMagnet(url: String): String {
 }
 
 /**
- * Every URL or magnet link quoted in [text] passed through [redactUrl]. Exception messages,
- * such as Ktor's timeouts, quote the full request URL.
+ * [text] with every URL and magnet link [redacted][redactUrl], as exception messages quote them.
  *
- * @suppress This is internal API and should not be used directly by library users.
+ * @suppress
  */
+@InternalKetchApi
 fun redactUrlsIn(text: String): String = EMBEDDED_URL.replace(text) { redactUrl(it.value) }
 
 /**
- * Formats a log record as `2026-01-31 14:03:12.345 [INFO] message`, followed by the stack
- * trace of [throwable] when present, so one write keeps a record together. URLs in the stack
- * trace's messages are redacted like those in log messages.
+ * A log record as `2026-01-31 14:03:12.345 [INFO] message`, followed by [throwable]'s stack
+ * trace with URLs redacted.
  *
- * @suppress This is internal API and should not be used directly by library users.
+ * @suppress
  */
+@InternalKetchApi
 fun formatLogLine(level: LogLevel, message: String, throwable: Throwable? = null): String {
   val line = "${logTimestamp()} [${level.name}] $message"
   if (throwable == null) return line
@@ -124,7 +122,7 @@ private val logTimeZone: TimeZone by lazy {
 
 private fun Int.pad(length: Int): String = toString().padStart(length, '0')
 
-/** Causes followed when describing or redacting an error chain, which may be cyclic. */
+/** How many causes of a (possibly cyclic) error chain are followed. */
 internal const val MAX_LOGGED_CAUSES = 8
 
 private val EMBEDDED_URL = Regex("""(?:[A-Za-z][A-Za-z0-9+.-]*://|magnet:\?)[^\s,;"'()\[\]]+""")

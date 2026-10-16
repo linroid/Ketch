@@ -3,15 +3,10 @@ package com.linroid.ketch.api
 import kotlinx.serialization.Serializable
 
 /**
- * Represents a byte-range segment of a download.
+ * A byte range of a download, fetched alongside the others.
  *
- * A file is split into one or more segments that download concurrently.
- * Each segment tracks its own progress independently.
- *
- * @property index zero-based segment index
- * @property start inclusive start byte offset in the file
- * @property end inclusive end byte offset in the file
- * @property downloadedBytes number of bytes downloaded so far in this segment
+ * @property start first byte offset, inclusive
+ * @property end last byte offset, inclusive
  */
 @Serializable
 data class Segment(
@@ -20,19 +15,19 @@ data class Segment(
   val end: Long,
   val downloadedBytes: Long = 0,
 ) {
-  /** Total number of bytes this segment is responsible for. */
+  /** Bytes in this range. */
   val totalBytes: Long
     get() = end - start + 1
 
-  /** The next byte offset to write at (`start + downloadedBytes`). */
+  /** The next offset to write. */
   val currentOffset: Long
     get() = start + downloadedBytes
 
-  /** `true` when [downloadedBytes] has reached [totalBytes]. */
+  /** Whether every byte is downloaded. */
   val isComplete: Boolean
     get() = downloadedBytes >= totalBytes
 
-  /** Number of bytes still to be downloaded. */
+  /** Bytes left to download. */
   val remainingBytes: Long
     get() = totalBytes - downloadedBytes
 }

@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "ダウンロードを追加しました"
   },
-  "notify_fallback_browser": {
-    "message": "代わりにブラウザでダウンロードします"
-  },
-  "notify_fallback_magnet": {
-    "message": "マグネットリンクを別のアプリで開きます"
-  },
-  "notify_send_failed": {
-    "message": "$NAME$に送信できませんでした",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketchではダウンロードできません"
   },
@@ -115,6 +101,9 @@
   },
   "error_app_connect_failed": {
     "message": "Ketchアプリへの接続に失敗しました"
+  },
+  "error_app_pick_unsupported": {
+    "message": "ここでフォルダを選ぶにはKetchアプリを更新してください"
   },
   "error_app_invalid_reply": {
     "message": "Ketchアプリから無効な応答が返されました"
@@ -402,14 +391,6 @@
   "popup_add_button": {
     "message": "ダウンロード"
   },
-  "popup_added": {
-    "message": "$NAME$を追加しました",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "http、https、ftp、またはマグネットリンクを入力してください。"
   },
@@ -616,20 +597,8 @@
   "error_media_unsupported": {
     "message": "このKetchはメディアプレイリストに対応していません。リンクを送信する前に更新してください。"
   },
-  "review_setting": {
-    "message": "送信前にダウンロードを確認"
-  },
-  "review_title": {
-    "message": "ダウンロードの確認"
-  },
-  "review_name": {
-    "message": "ファイル名（任意）"
-  },
   "review_folder": {
     "message": "選択したデバイスのフォルダ（任意）"
-  },
-  "review_detail": {
-    "message": "空欄の場合はデバイスの既定フォルダを使用します。許可されたフォルダはサーバーが管理します。トレントは元のファイル構成を保持します。このページを閉じると、一時停止中のダウンロードをブラウザに戻します。"
   },
   "review_cancel": {
     "message": "キャンセル"
@@ -642,5 +611,119 @@
   },
   "safari_detail": {
     "message": "Safariは確認済みリンクとページリソースを設定したKetchサーバーに送信します。Ketchで共有を開始し、ここにアドレスとアクセストークンを入力してください。自動ダウンロード取得とアプリ起動は利用できません。"
+  },
+  "dialog_title": {
+    "message": "新しいダウンロード"
+  },
+  "dialog_name_label": {
+    "message": "ファイル名"
+  },
+  "dialog_send_to": {
+    "message": "送信先"
+  },
+  "dialog_save_in": {
+    "message": "保存先"
+  },
+  "dialog_folder_default": {
+    "message": "既定のフォルダ"
+  },
+  "dialog_folder_browse": {
+    "message": "参照…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "このコンピュータのフォルダを選択"
+  },
+  "dialog_device_checking": {
+    "message": "確認中…"
+  },
+  "dialog_device_ready": {
+    "message": "準備完了"
+  },
+  "dialog_device_free": {
+    "message": "空き $SIZE$",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "終了中 · 送信時に起動"
+  },
+  "dialog_device_offline": {
+    "message": "接続できません"
+  },
+  "dialog_torrent_layout": {
+    "message": "トレントは独自のフォルダ構成を保持します。"
+  },
+  "dialog_space_warning": {
+    "message": "$DEVICE$ の空きは $SIZE$ しかありません。",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "ブラウザでダウンロード"
+  },
+  "dialog_sending": {
+    "message": "送信中…"
+  },
+  "dialog_folder_auto": {
+    "message": "自動"
+  },
+  "dialog_folder_auto_match": {
+    "message": "自動 · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "デバイスが選びます：ダウンロードフォルダ、またはこのファイルに合うカテゴリフォルダ。"
+  },
+  "dialog_folder_recent": {
+    "message": "最近使用：$FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "送信前にダウンロードを確認"
+  },
+  "notify_fallback_browser": {
+    "message": "代わりにブラウザでダウンロードします"
+  },
+  "notify_fallback_magnet": {
+    "message": "マグネットリンクを別のアプリで開きます"
+  },
+  "notify_send_failed": {
+    "message": "$NAME$に送信できませんでした",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$を追加しました",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch はこの拡張機能のコピーを受け付けません"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch が接続するのは、Chrome ウェブストアの拡張機能か、リリースの chrome-unpacked パッケージを「パッケージ化されていない拡張機能を読み込む」で読み込んだものだけです。いずれかをインストールしてから、もう一度お試しください。"
   }
 }

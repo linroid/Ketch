@@ -43,6 +43,15 @@ internal class PathFileAccessor(
     }
   }
 
+  override suspend fun readAt(
+    offset: Long,
+    buffer: ByteArray,
+    bufferOffset: Int,
+    byteCount: Int,
+  ): Int = withContext(dispatcher) {
+    getOrCreateHandle().read(offset, buffer, bufferOffset, byteCount)
+  }
+
   override suspend fun flush() {
     withContext(dispatcher) {
       handle?.flush()

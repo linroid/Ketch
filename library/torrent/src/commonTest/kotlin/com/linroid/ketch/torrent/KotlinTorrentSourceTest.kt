@@ -5,7 +5,18 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerWire
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -73,7 +84,8 @@ class KotlinTorrentSourceTest {
               ))))
           val metadata = TorrentMetadata.fromBencode(metainfo)
           val http = Http(metainfo, listener.local)
-          val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), http)
+          val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+            dhtEnabled = false), http)
           val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
             "ketch-source-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
           val output = root / "custom-name"
@@ -116,7 +128,7 @@ class KotlinTorrentSourceTest {
             val resolved = source.resolve("http://fixture/bundle.torrent", emptyMap())
             assertEquals(8L, resolved.totalBytes)
             val first = context(resolved)
-            source.download(first)
+            source.download(first, null)
             assertEquals(listOf(1), first.segments.value.map { it.index })
             assertEquals(2L, first.segments.value.single().downloadedBytes)
             assertContentEquals(byteArrayOf(3, 4),
@@ -124,16 +136,17 @@ class KotlinTorrentSourceTest {
             assertFalse(FileSystem.SYSTEM.exists(output / "skip-a"))
             assertFalse(FileSystem.SYSTEM.exists(output / "skip-b"))
             assertFalse("completed" in http.events) // Only a subset of the torrent is present.
-            val saved = assertNotNull(source.updateResumeState(first))
+            val saved = assertNotNull(source.store(first))
             source.close()
             server.cancelAndJoin()
             network.close()
-            val restored = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+            val restored = TorrentDownloadSource(
+              TorrentConfig(encryption = TorrentEncryption.DISABLED, dhtEnabled = false))
             try {
               val second = context(null)
-              restored.resume(second, saved)
+              restored.download(second, saved)
               assertEquals(2L, second.segments.value.single().downloadedBytes)
-              restored.cleanup(second, assertNotNull(restored.updateResumeState(second)))
+              restored.cleanup(second, assertNotNull(restored.store(second)), deleteFiles = true)
               assertFalse(FileSystem.SYSTEM.exists(output / "selected"))
             } finally { restored.close() }
             assertFalse(http.closed)

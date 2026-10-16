@@ -1,15 +1,7 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.TorrentEngine
+
 internal actual fun createTorrentEngine(config: TorrentConfig): TorrentEngine =
   KotlinTorrentEngine(config)
-
-internal actual fun platformTorrentFileSystem(): okio.FileSystem =
-  when {
-    System.getProperty("os.name").startsWith("Mac") -> MacTorrentFileSystem
-    System.getProperty("os.name").startsWith("Windows") -> WindowsTorrentFileSystem
-    else -> SafeTorrentFileSystem
-  }
-
-internal actual fun platformTorrentFileIdentity(path: okio.Path): String? =
-  if (System.getProperty("os.name").startsWith("Windows")) WindowsTorrentFileSystem.identity(path)
-  else nioTorrentFileIdentity(path)

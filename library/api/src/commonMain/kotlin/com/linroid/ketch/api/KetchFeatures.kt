@@ -10,9 +10,43 @@ object KetchFeatures {
   /** [DownloadTask.queuePosition] reports positions. */
   const val QUEUE_POSITION: String = "task.queuePosition"
 
-  /** Finite, clear single-stream HLS and DASH downloads, with restart rather than byte resume. */
+  /** [DownloadConfig.proxy] and [DownloadRequest.proxy] are applied to HTTP(S) downloads. */
+  const val PROXY: String = "http.proxy"
+
+  /** Both [FINITE_HLS] and [FINITE_DASH]; kept for older clients. */
   const val FINITE_MEDIA: String = "media.finite"
 
-  /** Every feature this version of Ketch supports. */
-  val ALL: Set<String> = setOf(AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, FINITE_MEDIA)
+  /** Finite, unencrypted HLS downloads, restarted on resume. */
+  const val FINITE_HLS: String = "hls.finite"
+
+  /** Finite, unencrypted DASH downloads, restarted on resume. */
+  const val FINITE_DASH: String = "dash.finite"
+
+  /** [DownloadConfig.categories] sort downloads into folders. */
+  const val CATEGORY_FOLDERS: String = "download.categories"
+
+  /**
+   * [DownloadConfig.idleTimeoutMs], [DownloadConfig.minSpeed], [DownloadConfig.unlimitedRetries]
+   * and [DownloadConfig.maxRetryDelayMs] apply.
+   */
+  const val TRANSFER_TIMEOUTS: String = "download.timeouts"
+
+  /** [DownloadTask.selectFiles] works; listed by the sources that implement it. */
+  const val FILE_SELECTION: String = "download.fileSelection"
+
+  /** [DownloadRequest.awaitFileSelection] works; listed by the sources that implement it. */
+  const val AWAIT_FILE_SELECTION: String = "download.awaitFileSelection"
+
+  /** [DownloadRequest.checksum] and digests servers publish are verified. */
+  const val CHECKSUM: String = "download.checksum"
+
+  /** [Interest.Connections] reports live connections. */
+  const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
+
+  /** Every feature named here; other modules name their controllers' own. */
+  val ALL: Set<String> = setOf(
+    AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
+    CATEGORY_FOLDERS, TRANSFER_TIMEOUTS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS,
+    CHECKSUM
+  )
 }

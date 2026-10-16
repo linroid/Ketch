@@ -48,6 +48,22 @@ class AiDiscoverArgsTest {
   }
 
   @Test
+  fun `provider and model pick what one run searches with`() {
+    assertEquals(
+      AiDiscoverArgs.Discover(query = "krita", provider = "work", model = "gpt-6-luna"),
+      parseAiDiscoverArgs(listOf("--provider", " work ", "krita", "--model", "gpt-6-luna")),
+    )
+    assertEquals(
+      AiDiscoverArgs.Invalid("--model requires a model id"),
+      parseAiDiscoverArgs(listOf("krita", "--model", " ")),
+    )
+    assertEquals(
+      AiDiscoverArgs.Invalid("--provider requires a value"),
+      parseAiDiscoverArgs(listOf("krita", "--provider")),
+    )
+  }
+
+  @Test
   fun `unknown options are rejected rather than searched for`() {
     assertEquals(
       AiDiscoverArgs.Invalid("unknown option '--yess'"),

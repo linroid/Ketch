@@ -2,16 +2,39 @@
 <resources>
   <string name="discover_title">Entdecken</string>
   <string name="discover_settings">Einstellungen für Entdecken</string>
-  <string name="discover_hero_title">Sag, was du suchst. Ketch findet die passenden Dateien.</string>
-  <string name="discover_intro_body">Entdecken durchsucht mit %1$s das Web, liest die gefundenen Seiten und zeigt Dateien an, die es für vertrauenswürdig hält. Downloads starten erst, wenn du sie hinzufügst.</string>
-  <string name="discover_example_blender">Blender für Apple Silicon</string>
-  <string name="discover_example_ubuntu">Ubuntu 24.04 Server-ISO</string>
+  <string name="discover_hero_title">Was möchtest du herunterladen?</string>
+  <string name="discover_intro_body">Entdecken durchsucht das Web und zeigt die gefundenen Downloads. Erst wenn du etwas hinzufügst, wird es heruntergeladen.</string>
+  <string name="discover_example_bootable_usb">Tools für einen bootfähigen USB-Stick</string>
+  <string name="discover_example_photo_editor">Kostenlose Open-Source-Bildbearbeitung</string>
+  <string name="discover_example_video_editor">Kostenloser Videoeditor für Einsteiger</string>
+  <string name="discover_example_screen_recorder">Bildschirmrekorder für Tutorials</string>
+  <string name="discover_example_podcast">Software zum Aufnehmen eines Podcasts</string>
+  <string name="discover_example_password_manager">Open-Source-Passwortmanager</string>
+  <string name="discover_example_office">Kostenloses Offline-Office-Paket</string>
+  <string name="discover_example_planetarium">Planetarium-Software zur Sternbeobachtung</string>
+  <string name="discover_example_games">Open-Source-Spiele zum Offline-Spielen</string>
+  <string name="discover_example_old_laptop">Schlankes Linux für einen alten Laptop</string>
+  <string name="discover_example_raspberry_pi">Betriebssystem für einen Raspberry Pi</string>
+  <string name="discover_example_local_ai">Lokale KI-Modelle für meinen Laptop</string>
   <string name="discover_example_footage">Gemeinfreie 4K-Naturaufnahmen</string>
+  <string name="discover_example_music">Lizenzfreie Musik für Videos</string>
+  <string name="discover_example_audiobooks">Kostenlose Hörbücher klassischer Romane</string>
+  <string name="discover_example_films">Gemeinfreie Filmklassiker</string>
+  <string name="discover_example_fonts">Kostenlose Schriften für kommerzielle Nutzung</string>
+  <string name="discover_example_sound_effects">Soundeffekte unter Creative Commons</string>
+  <string name="discover_example_textures">Kostenlose Texturen für 3D-Modelle</string>
+  <string name="discover_example_paintings">Berühmte Gemälde als 4K-Hintergrundbilder</string>
+  <string name="discover_example_mars">NASA-Fotos vom Mars in voller Auflösung</string>
+  <string name="discover_example_lectures">Kostenlose Informatik-Vorlesungen</string>
+  <string name="discover_example_wikipedia">Wikipedia zum Offline-Lesen</string>
+  <string name="discover_example_hdr_test">4K-HDR-Testvideos für meinen Fernseher</string>
+  <string name="discover_example_speed_test">Große Testdateien für einen Speedtest</string>
+  <string name="discover_example_datasets">Öffentliche Datensätze zum SQL-Üben</string>
   <string name="discover_example_quoted">„%1$s“</string>
 
-  <string name="discover_setup_body">Entdecken durchsucht mit einem KI-Modell das Web, liest die gefundenen Seiten und zeigt Dateien an, die es für vertrauenswürdig hält. Deine Suchanfragen werden an den gewählten Anbieter gesendet.</string>
+  <string name="discover_setup_body">Entdecken durchsucht mit einem KI-Modell das Web und zeigt die gefundenen Downloads. Deine Suchanfragen gehen an den gewählten Anbieter.</string>
   <string name="discover_setup_unsupported">Entdecken läuft in der Ketch-App auf einem Computer oder einem Android-Telefon.</string>
-  <string name="discover_setup_pending">Deine Suche nach „%1$s“ startet, sobald Entdecken eingerichtet ist.</string>
+  <string name="discover_setup_pending">„%1$s“ startet, sobald Entdecken eingerichtet ist.</string>
   <string name="discover_setup_choose_model">Modell wählen</string>
   <string name="discover_setup_local_provider">%1$s · läuft lokal, kein Schlüssel nötig</string>
   <string name="discover_setup_finish">Einrichtung von %1$s abschließen</string>
@@ -24,6 +47,8 @@
   <string name="discover_send">Senden</string>
   <string name="discover_stop">Stopp</string>
   <string name="discover_sites_limit">Auf Websites beschränken</string>
+  <string name="discover_model_menu_title">Modell</string>
+  <string name="discover_model_manage">Anbieter verwalten</string>
   <plurals name="discover_sites_count">
     <item quantity="one">%1$d Website</item>
     <item quantity="other">%1$d Websites</item>
@@ -80,10 +105,10 @@
   <string name="discover_error_title">Entdecken konnte diese Suche nicht abschließen</string>
   <string name="discover_failed">Suche fehlgeschlagen</string>
   <string name="discover_none_title">Keine Downloads gefunden</string>
-  <string name="discover_none_body">Entdecken zeigt nur Dateien aus vertrauenswürdigen Quellen an. Gib eine Version, eine Plattform oder die Website an, auf der die Datei angeboten wird.</string>
+  <string name="discover_none_body">Gib eine Version, Plattform oder Website an.</string>
   <plurals name="discover_none_filtered">
-    <item quantity="one">Der Inhaltsfilter hat %1$d Ergebnis ausgeblendet, das unsicher wirkte. Du kannst den Filter in den Einstellungen für Entdecken ausschalten.</item>
-    <item quantity="other">Der Inhaltsfilter hat %1$d Ergebnisse ausgeblendet, die unsicher wirkten. Du kannst den Filter in den Einstellungen für Entdecken ausschalten.</item>
+    <item quantity="one">Der Inhaltsfilter hat %1$d Ergebnis ausgeblendet. Du kannst ihn in den Einstellungen für Entdecken ausschalten.</item>
+    <item quantity="other">Der Inhaltsfilter hat %1$d Ergebnisse ausgeblendet. Du kannst ihn in den Einstellungen für Entdecken ausschalten.</item>
   </plurals>
   <string name="discover_search_everywhere">Im ganzen Web suchen</string>
   <string name="discover_stopped">Gestoppt</string>
@@ -136,7 +161,7 @@
   <string name="discover_history_clear">Verlauf löschen</string>
   <string name="discover_turn_off">Entdecken ausschalten</string>
   <string name="discover_turned_off">Entdecken ist aus</string>
-  <string name="discover_turned_off_detail">Du kannst es in den Einstellungen unter Entdecken wieder einschalten.</string>
+  <string name="discover_turned_off_detail">Wieder einschalten unter Einstellungen › Entdecken.</string>
   <string name="discover_history_filter">Verlauf durchsuchen</string>
   <string name="discover_history_empty">Deine Suchen erscheinen hier.</string>
   <string name="discover_history_no_match">Keine Suchanfragen zu „%1$s“ gefunden</string>

@@ -14,6 +14,7 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isDirectory
@@ -21,6 +22,7 @@ import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.api.resolve
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageCenter
@@ -38,6 +40,7 @@ import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.DiscoveredServer
+import com.linroid.ketch.app.instance.EmbeddedFeatures
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.InstanceManager
@@ -48,6 +51,8 @@ import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.instance.toPulseScope
 import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
+import com.linroid.ketch.app.platform.ReleaseNotesRequest
+import com.linroid.ketch.app.platform.localDeviceNounInSentence
 import com.linroid.ketch.app.util.LinkKind
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.TaskOrigin
@@ -59,9 +64,14 @@ import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFeatures
+import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_review
+import ketch.app.shared.generated.resources.action_row_choose_files
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
@@ -79,6 +89,7 @@ import ketch.app.shared.generated.resources.discover_undo_discard
 import ketch.app.shared.generated.resources.feedback_add_failed
 import ketch.app.shared.generated.resources.feedback_add_failed_count
 import ketch.app.shared.generated.resources.feedback_added
+import ketch.app.shared.generated.resources.feedback_choose_files
 import ketch.app.shared.generated.resources.feedback_cleared
 import ketch.app.shared.generated.resources.feedback_cleared_missing
 import ketch.app.shared.generated.resources.feedback_device_offline
@@ -155,6 +166,7 @@ import ketch.app.shared.generated.resources.notify_download_complete
 import ketch.app.shared.generated.resources.notify_download_failed
 import ketch.app.shared.generated.resources.notify_downloads_finished
 import ketch.app.shared.generated.resources.notify_on_device
+import ketch.app.shared.generated.resources.notify_pairing_title
 import ketch.app.shared.generated.resources.row_files
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -165,6 +177,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -174,6 +187,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -267,6 +281,13 @@ class AppState(
   /** AI discovery sessions, their searches and the requests to open websites they wait on. */
   val aiDiscover: AiDiscoverController =
     AiDiscoverController(aiSettings, scope, discoverHistory, clock, devices = ::discoverDevices)
+
+  /**
+   * Whether Settings › Sharing of this device shows in a window in front, as the page reports
+   * it: pairing requests and whether pairing is on show there, and elsewhere a toast and a
+   * banner tell about them.
+   */
+  var sharingShown by mutableStateOf(false)
 
   /** How many requests to open a website wait for the user's answer, for Discover's badge. */
   val discoverWaitingCount: Int get() = aiDiscover.approvals.size
@@ -390,6 +411,20 @@ class AppState(
   var inspectedTask by mutableStateOf<TaskKey?>(null)
     private set
 
+  /**
+   * A task whose files the inspector should show on its Files tab, as [chooseFiles] asks; the
+   * inspector clears it with [filesRequestHandled] once it switched.
+   */
+  var filesRequest by mutableStateOf<TaskKey?>(null)
+    private set
+
+  /**
+   * A task whose connections the inspector should show on its Connections tab, as
+   * [showConnections] asks; the inspector clears it with [connectionsRequestHandled].
+   */
+  var connectionsRequest by mutableStateOf<TaskKey?>(null)
+    private set
+
   /** Selected rows of the task list. */
   var selectedKeys by mutableStateOf(emptySet<TaskKey>())
 
@@ -397,10 +432,24 @@ class AppState(
   var sendConfirmation by mutableStateOf<SendConfirmation?>(null)
     private set
 
+  /**
+   * Release notes the user asked to read from a toast about an update, which the shell shows in
+   * a dialog until it is closed and this is set back to `null`.
+   */
+  var releaseNotesRequest by mutableStateOf<ReleaseNotesRequest?>(null)
+
   private val focusSearch = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
   /** Emits when the search field should take focus, such as on ⌘F. */
   val focusSearchRequests: SharedFlow<Unit> = focusSearch.asSharedFlow()
+
+  private val titleBarClicks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+  /**
+   * Emits when the window's title bar, which a host may lay under the page header, is clicked
+   * where nothing in the app takes the click; see [titleBarClicked].
+   */
+  val titleBarClickRequests: SharedFlow<Unit> = titleBarClicks.asSharedFlow()
 
   private val showDownloadsRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -527,6 +576,24 @@ class AppState(
     scope = scope,
   )
 
+  /**
+   * Live connections of the shown devices that report them, for the Pulse bar's grid. Each
+   * device's stream runs only while the grid is on screen.
+   */
+  val connectionGrid: ConnectionGridModel = ConnectionGridModel(
+    sources = shownInstances.flatMapLatest { entries ->
+      if (entries.isEmpty()) {
+        flowOf(emptyList())
+      } else {
+        combine(entries.map(::connectionSourceOf)) { it.toList() }
+      }
+    },
+    rows = combine(taskList.view, taskList.allRows) { view, all ->
+      if (view.rows.size == all.size) view.rows else (view.rows + all).distinctBy { it.key }
+    },
+    scope = scope,
+  )
+
   // Devices named by the last add of each kind this session, by device id.
   private val lastTargets = mutableMapOf<IntakeKind, String>()
 
@@ -558,6 +625,8 @@ class AppState(
       }
     }
     scope.launch { announceApprovals() }
+    scope.launch { announcePairingRequests() }
+    scope.launch { endPairingWindows() }
     scope.launch {
       incoming.failures.collect {
         postError(Res.string.feedback_open_failed.text(it.label), detail = it.reason)
@@ -613,6 +682,8 @@ class AppState(
         local = appSettings.takeIf { entry is EmbeddedInstance },
         scope = scope,
         applyTorrent = instanceManager::applyTorrentSettings,
+        trackerList = instanceManager.trackerList,
+        refreshTrackerList = instanceManager::refreshTrackerList,
         savedSpeedLimit = { config -> standingCap(config.speedLimit) },
       )
     }
@@ -847,9 +918,103 @@ class AppState(
     }
   }
 
+  /**
+   * Posts a toast for each device that asks to pair with this one while Settings › Sharing does
+   * not show it in a window in front, with Review, which opens Sharing, where the owner answers.
+   * Once the request is answered or ends, or Sharing shows it, the toast leaves the screen and
+   * the activity history. The hosts notify about requests while the app is not in front
+   * ([com.linroid.ketch.app.feedback.PairingNotices]), so the toasts never do.
+   */
+  private suspend fun announcePairingRequests() {
+    val requests = instanceManager.pairingRequests
+    val toasts = mutableMapOf<Long, Long>()
+    combine(requests.pending, snapshotFlow { sharingShown }, ::Pair)
+      .collect { (asks, shown) ->
+        val waiting = asks.mapTo(HashSet()) { it.id }
+        toasts.keys.filter { it !in waiting || shown }.forEach { id ->
+          toasts.remove(id)?.let(messages::withdraw)
+        }
+        if (shown) return@collect
+        for (ask in asks) {
+          if (ask.id in toasts) continue
+          toasts[ask.id] = messages.post(
+            level = MessageLevel.Info,
+            title = Res.string.notify_pairing_title.text(ask.name, localDeviceNounInSentence()),
+            actions = listOf(
+              MessageAction(Res.string.action_review.text()) {
+                openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
+              },
+            ),
+            toast = ToastMode.Sticky,
+          ).id
+        }
+      }
+  }
+
+  /** Turns pairing off once its window ends, so the page and the banner stop showing it. */
+  private suspend fun endPairingWindows() {
+    val requests = instanceManager.pairingRequests
+    requests.openUntil.collectLatest {
+      while (true) delay(requests.timeLeft() ?: break)
+      requests.closeIfEnded()
+    }
+  }
+
   /** Shows [key] in the inspector, or clears it with `null`. */
   fun inspect(key: TaskKey?) {
     inspectedTask = key
+  }
+
+  /**
+   * Shows the files of [key]'s torrent in the inspector, on the Downloads page, to choose which
+   * to download; switches to its device when it is not shown.
+   */
+  fun chooseFiles(key: TaskKey) {
+    val entry = instances.value.firstOrNull { it.deviceId == key.deviceId }
+    if (entry != null && entry !in shownInstances.value) switchInstance(entry)
+    showDownloads()
+    inspectedTask = key
+    filesRequest = key
+  }
+
+  /** Clears [filesRequest] once the inspector shows the Files tab. */
+  fun filesRequestHandled() {
+    filesRequest = null
+  }
+
+  /**
+   * Shows [key] in the inspector on the Downloads page, on its Connections tab when [segments]
+   * is set and the task has one, such as for an HTTP or FTP download.
+   */
+  fun showConnections(key: TaskKey, segments: Boolean) {
+    showDownloads(statusFilter)
+    inspectedTask = key
+    connectionsRequest = if (segments) key else null
+  }
+
+  /** Clears [connectionsRequest] once the inspector shows the Connections tab. */
+  fun connectionsRequestHandled() {
+    connectionsRequest = null
+  }
+
+  /**
+   * The torrent controller of the device [deviceId] when its features list
+   * [TorrentFeatures.CONTROL]; `null` otherwise.
+   */
+  fun torrentControllerOf(deviceId: String): TorrentController? {
+    if (TorrentFeatures.CONTROL !in featuresOf(deviceId)) return null
+    return instances.value.firstOrNull { it.deviceId == deviceId }?.instance
+      ?.controller(TorrentController)
+  }
+
+  /**
+   * The snapshots of the torrent task [key] names, from its device, or `null` when the device
+   * has no torrent controls; see [TorrentInterest].
+   */
+  fun torrentSnapshotsOf(key: TaskKey): Flow<TorrentSnapshot?>? {
+    if (TorrentFeatures.CONTROL !in featuresOf(key.deviceId)) return null
+    return instances.value.firstOrNull { it.deviceId == key.deviceId }?.instance
+      ?.subscribe(TorrentInterest(key.taskId))
   }
 
   /**
@@ -867,6 +1032,14 @@ class AppState(
   fun closeInspector() {
     inspectedTask = null
     if (selectedKeys.size >= 2) selectedKeys = emptySet()
+  }
+
+  /**
+   * Tells the page that the host's title bar was clicked: on the Downloads page that deselects
+   * the rows and closes the inspector, as a click on the header's empty space does.
+   */
+  fun titleBarClicked() {
+    titleBarClicks.tryEmit(Unit)
   }
 
   /** Asks the search field to take focus. */
@@ -939,7 +1112,7 @@ class AppState(
     scope.launch {
       runCatching {
         val content = file.readBytes(MAX_DROPPED_FILE_BYTES)
-        api.resolveContent(content, file.name)
+        api.resolve(content, file.name)
       }.onSuccess { result ->
         if (droppedFile === file) {
           resolveState = ResolveState.Resolved(result)
@@ -1629,6 +1802,18 @@ class AppState(
         monitorAdds[event.taskKey] = message.id
         while (monitorAdds.size > RECENT_ADDS_LIMIT) monitorAdds.remove(monitorAdds.keys.first())
       }
+      is ActivityEvent.FilesNeeded -> messages.post(
+        level = MessageLevel.Info,
+        title = onDevice(
+          event.taskKey.deviceId,
+          Res.string.feedback_choose_files.text(displayName(event.request)),
+        ),
+        taskKey = event.taskKey,
+        deviceId = event.taskKey.deviceId,
+        actions = listOf(
+          MessageAction(Res.string.action_row_choose_files.text()) { chooseFiles(event.taskKey) },
+        ),
+      )
       is ActivityEvent.Completed -> messages.post(
         level = MessageLevel.Success,
         title = onDevice(event.taskKey.deviceId, Res.string.notify_download_complete.text()),
@@ -1703,7 +1888,7 @@ class AppState(
    */
   fun featuresOf(deviceId: String): Set<String> {
     val entry = instances.value.firstOrNull { it.deviceId == deviceId } ?: return emptySet()
-    if (entry !is RemoteInstance) return KetchFeatures.ALL
+    if (entry !is RemoteInstance) return EmbeddedFeatures
     return instanceManager.presence.value.firstOrNull { it.deviceId == deviceId }
       ?.status?.features.orEmpty()
   }
@@ -1711,7 +1896,7 @@ class AppState(
   /** [featuresOf] the device of [entry], as it changes. */
   internal fun featuresFlow(entry: InstanceEntry): Flow<Set<String>> {
     // The embedded engine is this build of Ketch, which supports everything it lists.
-    if (entry !is RemoteInstance) return flowOf(KetchFeatures.ALL)
+    if (entry !is RemoteInstance) return flowOf(EmbeddedFeatures)
     val deviceId = entry.deviceId
     return instanceManager.presence
       .map { devices ->
@@ -1774,7 +1959,24 @@ class AppState(
         is RemoteInstance -> entry.connectionState.map { it.toDeviceHealth() }
         else -> serverState.map { it.toDeviceHealth() }
       },
+      features = featuresFlow(entry),
     )
+  }
+
+  private fun connectionSourceOf(entry: InstanceEntry): Flow<ConnectionSource> {
+    val online = when (entry) {
+      is RemoteInstance -> entry.connectionState.map { it == ConnectionState.Connected }
+      else -> flowOf(true)
+    }
+    return combine(featuresFlow(entry), online.distinctUntilChanged()) { features, up ->
+      ConnectionSource(
+        deviceId = entry.deviceId,
+        name = entry.displayName,
+        api = entry.instance,
+        supported = KetchFeatures.ACTIVE_CONNECTIONS in features,
+        online = up,
+      )
+    }
   }
 
   private fun deferRemoval(
@@ -2180,11 +2382,8 @@ internal fun credentialWarningText(
 internal const val COOKIE_HEADER = "Cookie"
 internal const val AUTHORIZATION_HEADER = "Authorization"
 
-/**
- * Largest dropped `.torrent` file read; matches the daemon's upload limit, while torrent metainfo
- * is 4 MiB by default.
- */
-internal const val MAX_DROPPED_FILE_BYTES = 16L * 1024 * 1024
+/** Largest dropped file read: what a remote instance accepts. */
+internal const val MAX_DROPPED_FILE_BYTES = ResolveInput.Content.MAX_CONTENT_BYTES
 
 /** Largest link list read from a dropped file. */
 internal const val MAX_LINK_LIST_BYTES = 1L * 1024 * 1024

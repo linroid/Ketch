@@ -2,6 +2,7 @@
 <resources>
   <string name="shell_destination_downloads">下载</string>
   <string name="shell_destination_discover">搜索</string>
+  <string name="shell_destination_connections">连接</string>
   <string name="shell_destination_devices">设备</string>
   <string name="shell_settings">设置</string>
   <string name="shell_devices">设备</string>
@@ -38,7 +39,6 @@
   <string name="shell_devices_online">%1$d/%2$d 台在线</string>
 
   <string name="sidebar_all_devices_tooltip">所有设备的下载</string>
-  <string name="sidebar_add_device">添加设备</string>
   <string name="sidebar_device_menu">设备菜单</string>
   <string name="sidebar_menu_pause_all">暂停此设备上的全部下载</string>
   <string name="sidebar_menu_resume_all">继续此设备上的全部下载</string>
@@ -52,7 +52,7 @@
 
   <string name="switcher_overview">概览</string>
   <string name="switcher_add_device">添加设备…</string>
-  <string name="switcher_find_on_network">在网络中查找</string>
+  <string name="switcher_find_on_network">在局域网中查找</string>
   <string name="switcher_share">共享%1$s…</string>
 
   <string name="shell_device_button">%1$s，切换设备</string>
@@ -79,6 +79,7 @@
   <string name="banner_retrying">正在重试</string>
   <string name="banner_retry_now">立即重试</string>
   <string name="banner_switch_to">切换到 %1$s</string>
+  <string name="banner_pairing_on">配对已开启，还剩 %1$s · 局域网中的设备可以请求控制%2$s上的 Ketch</string>
   <string name="banner_unauthorized">%1$s 需要新的访问令牌</string>
   <string name="banner_enter_token">输入令牌</string>
   <string name="toast_subject_reason">%1$s：%2$s</string>

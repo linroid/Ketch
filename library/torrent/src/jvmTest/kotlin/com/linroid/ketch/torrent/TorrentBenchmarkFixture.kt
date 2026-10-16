@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.torrent.metainfo.Bencode
 import java.io.File
 import java.security.MessageDigest
 import java.util.Random

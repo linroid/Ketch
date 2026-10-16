@@ -16,11 +16,11 @@ import ketch.app.shared.generated.resources.settings_ai_access_trusted
 import ketch.app.shared.generated.resources.settings_ai_api_key
 import ketch.app.shared.generated.resources.settings_ai_discovery
 import ketch.app.shared.generated.resources.settings_ai_endpoint
-import ketch.app.shared.generated.resources.settings_ai_endpoint_optional
 import ketch.app.shared.generated.resources.settings_ai_model
-import ketch.app.shared.generated.resources.settings_ai_provider
+import ketch.app.shared.generated.resources.settings_ai_providers
 import ketch.app.shared.generated.resources.settings_ai_test
 import ketch.app.shared.generated.resources.settings_ai_web_search
+import ketch.app.shared.generated.resources.settings_categories
 import ketch.app.shared.generated.resources.settings_downloads_folders
 import ketch.app.shared.generated.resources.settings_downloads_per_server
 import ketch.app.shared.generated.resources.settings_downloads_retries
@@ -31,6 +31,7 @@ import ketch.app.shared.generated.resources.settings_general_badge
 import ketch.app.shared.generated.resources.settings_general_close
 import ketch.app.shared.generated.resources.settings_general_density
 import ketch.app.shared.generated.resources.settings_general_device_name
+import ketch.app.shared.generated.resources.settings_general_keep_awake
 import ketch.app.shared.generated.resources.settings_general_language
 import ketch.app.shared.generated.resources.settings_general_open_at_login
 import ketch.app.shared.generated.resources.settings_general_reduce_motion
@@ -46,6 +47,7 @@ import ketch.app.shared.generated.resources.settings_logs_open
 import ketch.app.shared.generated.resources.settings_logs_share
 import ketch.app.shared.generated.resources.settings_network_networks
 import ketch.app.shared.generated.resources.settings_network_spread
+import ketch.app.shared.generated.resources.settings_proxy
 import ketch.app.shared.generated.resources.settings_notifications_all_finished
 import ketch.app.shared.generated.resources.settings_notifications_background
 import ketch.app.shared.generated.resources.settings_notifications_browser
@@ -70,10 +72,13 @@ import ketch.app.shared.generated.resources.settings_search_badge
 import ketch.app.shared.generated.resources.settings_search_badge_keywords
 import ketch.app.shared.generated.resources.settings_search_browser_notifications
 import ketch.app.shared.generated.resources.settings_search_browser_notifications_keywords
+import ketch.app.shared.generated.resources.settings_search_categories
+import ketch.app.shared.generated.resources.settings_search_categories_keywords
 import ketch.app.shared.generated.resources.settings_search_checklist_keywords
 import ketch.app.shared.generated.resources.settings_search_clipboard_keywords
 import ketch.app.shared.generated.resources.settings_search_close
 import ketch.app.shared.generated.resources.settings_search_close_keywords
+import ketch.app.shared.generated.resources.settings_search_keep_awake_keywords
 import ketch.app.shared.generated.resources.settings_search_code_keywords
 import ketch.app.shared.generated.resources.settings_search_connections_keywords
 import ketch.app.shared.generated.resources.settings_search_density
@@ -100,6 +105,8 @@ import ketch.app.shared.generated.resources.settings_search_magnet_keywords
 import ketch.app.shared.generated.resources.settings_search_model_keywords
 import ketch.app.shared.generated.resources.settings_search_networks
 import ketch.app.shared.generated.resources.settings_search_networks_keywords
+import ketch.app.shared.generated.resources.settings_search_proxy
+import ketch.app.shared.generated.resources.settings_search_proxy_keywords
 import ketch.app.shared.generated.resources.settings_search_offline_keywords
 import ketch.app.shared.generated.resources.settings_search_open_at_login_keywords
 import ketch.app.shared.generated.resources.settings_search_pair
@@ -133,6 +140,10 @@ import ketch.app.shared.generated.resources.settings_search_theme_keywords
 import ketch.app.shared.generated.resources.settings_search_torrent_keywords
 import ketch.app.shared.generated.resources.settings_search_trackers
 import ketch.app.shared.generated.resources.settings_search_trackers_keywords
+import ketch.app.shared.generated.resources.settings_search_upload
+import ketch.app.shared.generated.resources.settings_search_upload_keywords
+import ketch.app.shared.generated.resources.settings_search_upload_wifi_only
+import ketch.app.shared.generated.resources.settings_search_upload_wifi_only_keywords
 import ketch.app.shared.generated.resources.settings_search_version_keywords
 import ketch.app.shared.generated.resources.settings_search_web_search
 import ketch.app.shared.generated.resources.settings_search_web_search_keywords
@@ -152,6 +163,8 @@ import ketch.app.shared.generated.resources.settings_speed_mode
 import ketch.app.shared.generated.resources.settings_speed_rules
 import ketch.app.shared.generated.resources.settings_speed_slow_lane
 import ketch.app.shared.generated.resources.settings_torrent_trackers
+import ketch.app.shared.generated.resources.settings_torrent_upload_mode
+import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only
 
 /**
  * Every setting search finds, page by page. Titles and anchors are the resources of the rows and
@@ -175,10 +188,7 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.General,
     title = Res.string.settings_general_accent,
     description = Res.string.settings_search_accent.text(
-      KetchAccent.Signal.displayName,
-      KetchAccent.Harbor.displayName,
-      KetchAccent.Fathom.displayName,
-      KetchAccent.Beacon.displayName,
+      *KetchAccent.entries.map { it.displayName }.toTypedArray(),
     ),
     keywords = Res.string.settings_search_accent_keywords,
   ),
@@ -224,6 +234,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     description = Res.string.settings_search_badge.text(),
     keywords = Res.string.settings_search_badge_keywords,
     needs = SettingsFeature.Desktop,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.General,
+    title = Res.string.settings_general_keep_awake,
+    keywords = Res.string.settings_search_keep_awake_keywords,
+    needs = SettingsFeature.KeepAwake,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.General,
@@ -326,7 +342,7 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
-    title = Res.string.settings_ai_provider,
+    title = Res.string.settings_ai_providers,
     description = Res.string.settings_search_provider.text(),
     keywords = Res.string.settings_search_provider_keywords,
   ),
@@ -334,22 +350,25 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_api_key,
     keywords = Res.string.settings_search_api_key_keywords,
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_model,
     keywords = Res.string.settings_search_model_keywords,
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_endpoint,
     keywords = Res.string.settings_search_endpoint_keywords,
-    anchors = listOf(Res.string.settings_ai_endpoint, Res.string.settings_ai_endpoint_optional),
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
     title = Res.string.settings_ai_test,
     keywords = Res.string.settings_search_test_keywords,
+    anchors = listOf(Res.string.settings_ai_providers),
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Discover,
@@ -403,6 +422,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.Downloads,
     title = Res.string.settings_downloads_save_to_row,
     keywords = Res.string.settings_search_save_to_keywords,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Downloads,
+    title = Res.string.settings_categories,
+    description = Res.string.settings_search_categories.text(),
+    keywords = Res.string.settings_search_categories_keywords,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Downloads,
@@ -465,7 +490,26 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     keywords = Res.string.settings_search_networks_keywords,
     anchors = listOf(Res.string.settings_network_networks, Res.string.settings_network_spread),
   ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Network,
+    title = Res.string.settings_proxy,
+    description = Res.string.settings_search_proxy.text(),
+    keywords = Res.string.settings_search_proxy_keywords,
+  ),
   // BitTorrent
+  SettingsIndexEntry(
+    category = SettingsCategory.BitTorrent,
+    title = Res.string.settings_torrent_upload_mode,
+    description = Res.string.settings_search_upload.text(),
+    keywords = Res.string.settings_search_upload_keywords,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.BitTorrent,
+    title = Res.string.settings_torrent_upload_wifi_only,
+    description = Res.string.settings_search_upload_wifi_only.text(),
+    keywords = Res.string.settings_search_upload_wifi_only_keywords,
+    needs = SettingsFeature.UploadWifiOnly,
+  ),
   SettingsIndexEntry(
     category = SettingsCategory.BitTorrent,
     title = Res.string.settings_torrent_trackers,

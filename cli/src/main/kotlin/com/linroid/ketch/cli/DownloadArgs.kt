@@ -1,10 +1,17 @@
 package com.linroid.ketch.cli
 
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileOrder
+import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.isName
+import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.core.engine.RequestHeaders
 import java.io.File
 
@@ -21,23 +28,163 @@ internal sealed interface DownloadArgs {
     val destination: String?,
     val speedLimit: SpeedLimit = SpeedLimit.Unlimited,
     val priority: DownloadPriority = DownloadPriority.NORMAL,
-    val maxConcurrent: Int = 3,
+    val maxConcurrent: Int = DownloadConfig.Default.maxConcurrentDownloads,
     val headers: Map<String, String> = emptyMap(),
+    /** `--proxy` or `--no-proxy`, in place of the configured proxy; `null` for that one. */
+    val proxy: Proxy? = null,
+    /**
+     * `--files`: the IDs of the files to download of a download with several, such as a torrent,
+     * one for a choice of variants; empty for the source's default (every file).
+     */
+    val fileIds: Set<String> = emptySet(),
+    /** `--list-files`: list the files of the URL instead of downloading it. */
+    val listFiles: Boolean = false,
+    /** `--sort` of `--list-files`. */
+    val fileOrder: FileOrder = FileOrder.SOURCE,
+    /** `--reverse` of `--list-files`. */
+    val reverse: Boolean = false,
+    /** `--checksum`: the digest the file must have; `null` checks only a published one. */
+    val checksum: Checksum? = null,
   ) : DownloadArgs
 }
 
-private val valueOptions = setOf(
-  "--speed-limit", "--priority", "--max-concurrent", "-H", "--header", "--user-agent", "--referer",
-)
+/** The option that sets [DownloadRequest.checksum]. */
+internal const val CHECKSUM_OPTION = "--checksum"
+
+/** The checksum a `--checksum` [value] names, or why it cannot be used. */
+internal fun parseChecksumOption(value: String): Result<Checksum> = try {
+  Result.success(Checksum.parse(value))
+} catch (e: IllegalArgumentException) {
+  Result.failure(
+    IllegalArgumentException(
+      "$CHECKSUM_OPTION expects <algorithm>:<digest>, such as sha256:<hex>; ${e.message}",
+      e,
+    ),
+  )
+}
 
 /**
  * [DownloadRequest.properties] key naming the client a task was added from. Ketch never reads
  * it; apps group and filter downloads by it.
  */
-private const val ORIGIN_PROPERTY = "ketch.origin"
+internal const val ORIGIN_PROPERTY = "ketch.origin"
 
 /** Value of [ORIGIN_PROPERTY] on downloads started from the command line. */
-private const val CLI_ORIGIN = "cli"
+internal const val CLI_ORIGIN = "cli"
+
+/** Options that set a request header: `-H 'Name: value'`, `--user-agent` and `--referer`. */
+internal val HEADER_OPTIONS = setOf("-H", "--header", "--user-agent", "--referer")
+
+/** The request headers [HEADER_OPTIONS] give, in the order given. */
+internal class HeaderOptions {
+  private val headers = LinkedHashMap<String, String>()
+
+  /**
+   * Applies [option], one of [HEADER_OPTIONS], with its [value], returning why it cannot be used
+   * or `null`. Header names ignore case, so a later option replaces an earlier one however it is
+   * spelled.
+   */
+  fun apply(option: String, value: String): String? {
+    when (option) {
+      "-H", "--header" -> {
+        val separator = value.indexOf(':')
+        if (separator <= 0) return "$option expects 'Name: value'"
+        set(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
+      }
+      "--user-agent" -> set("User-Agent", value)
+      "--referer" -> set("Referer", value)
+      else -> return "unknown option '$option'"
+    }
+    return null
+  }
+
+  /** The headers, or why one of them cannot be sent. */
+  fun build(): Result<Map<String, String>> = try {
+    RequestHeaders.requireValid(headers)
+    Result.success(headers.toMap())
+  } catch (e: IllegalArgumentException) {
+    Result.failure(e)
+  }
+
+  private fun set(name: String, value: String) {
+    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
+    headers[name] = value
+  }
+}
+
+/** Options that choose a download's proxy with a value: `--proxy` and `--proxy-bypass`. */
+internal val PROXY_OPTIONS = setOf("--proxy", "--proxy-bypass")
+
+/** The flag that downloads without a proxy. */
+internal const val NO_PROXY_OPTION = "--no-proxy"
+
+/**
+ * The proxy [PROXY_OPTIONS] and [NO_PROXY_OPTION] give a download, in place of the configured
+ * one.
+ */
+internal class ProxyOptions {
+  private var url: String? = null
+  private var bypass: List<String>? = null
+  private var direct = false
+
+  /** Notes [NO_PROXY_OPTION]. */
+  fun noProxy() {
+    direct = true
+  }
+
+  /** Applies [option], one of [PROXY_OPTIONS], with its [value], returning why it cannot be used. */
+  fun apply(option: String, value: String): String? {
+    when (option) {
+      "--proxy" -> url = value
+      "--proxy-bypass" -> {
+        val entries = value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        entries.firstOrNull { !Proxy.Manual.isValidBypass(it) }?.let {
+          return "invalid host '$it' in --proxy-bypass"
+        }
+        bypass = entries
+      }
+      else -> return "unknown option '$option'"
+    }
+    return null
+  }
+
+  /** The proxy, `null` to keep the configured one, or why the options cannot be used together. */
+  fun build(): Result<Proxy?> {
+    val proxyUrl = url
+    val problem = when {
+      direct && proxyUrl != null -> "--proxy and --no-proxy cannot be used together"
+      bypass != null && proxyUrl == null -> "--proxy-bypass requires --proxy"
+      else -> null
+    }
+    if (problem != null) return Result.failure(IllegalArgumentException(problem))
+    if (direct) return Result.success(Proxy.Direct)
+    if (proxyUrl == null) return Result.success(null)
+    return try {
+      Result.success(Proxy.Manual(proxyUrl, bypass.orEmpty()))
+    } catch (_: IllegalArgumentException) {
+      val message = "invalid proxy '$proxyUrl' (expected http://host:port or socks5://host:port)"
+      Result.failure(IllegalArgumentException(message))
+    }
+  }
+}
+
+private val valueOptions =
+  setOf("--speed-limit", "--priority", "--max-concurrent", "--files", "--sort", CHECKSUM_OPTION) +
+    HEADER_OPTIONS + PROXY_OPTIONS
+
+/** The orders `--sort` names: `type` sorts by file extension. */
+private val FILE_ORDERS = mapOf(
+  "name" to FileOrder.NAME,
+  "size" to FileOrder.SIZE,
+  "type" to FileOrder.EXTENSION,
+)
+
+/** The file IDs of a `--files` [value], or `null` when it is not comma-separated IDs. */
+private fun parseFileIds(value: String): Set<String>? {
+  val ids = value.split(',').map { it.trim() }
+  if (ids.any { it.isEmpty() || it.length > DownloadTask.MAX_FILE_ID_LENGTH }) return null
+  return ids.toCollection(LinkedHashSet())
+}
 
 /** Parses [args], which no longer contain the global flags. */
 internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
@@ -45,19 +192,23 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var destination: String? = null
   var speedLimit = SpeedLimit.Unlimited
   var priority = DownloadPriority.NORMAL
-  var maxConcurrent = 3
-  val headers = LinkedHashMap<String, String>()
-  // Header names ignore case, so a later option replaces an earlier one however it is spelled.
-  fun setHeader(name: String, value: String) {
-    headers.keys.removeAll { it.equals(name, ignoreCase = true) }
-    headers[name] = value
-  }
+  var maxConcurrent = DownloadConfig.Default.maxConcurrentDownloads
+  val headers = HeaderOptions()
+  val proxy = ProxyOptions()
+  var fileIds = emptySet<String>()
+  var listFiles = false
+  var fileOrder: FileOrder? = null
+  var reverse = false
+  var checksum: Checksum? = null
 
   var i = 0
   while (i < args.size) {
     val arg = args[i]
     when {
       arg == "--help" || arg == "-h" -> return DownloadArgs.Help
+      arg == NO_PROXY_OPTION -> proxy.noProxy()
+      arg == "--list-files" -> listFiles = true
+      arg == "--reverse" -> reverse = true
       arg in valueOptions -> {
         val value = args.getOrNull(i + 1)
           ?: return DownloadArgs.Invalid("$arg requires a value")
@@ -75,13 +226,17 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
               return DownloadArgs.Invalid("--max-concurrent must be > 0")
             }
           }
-          "-H", "--header" -> {
-            val separator = value.indexOf(':')
-            if (separator <= 0) return DownloadArgs.Invalid("$arg expects 'Name: value'")
-            setHeader(value.substring(0, separator).trim(), value.substring(separator + 1).trim())
+          "--files" -> fileIds = parseFileIds(value)
+            ?: return DownloadArgs.Invalid(
+              "--files expects comma-separated file IDs, such as 0,2,5"
+            )
+          "--sort" -> fileOrder = FILE_ORDERS[value.trim().lowercase()]
+            ?: return DownloadArgs.Invalid("invalid sort '$value' (valid values: name, size, type)")
+          CHECKSUM_OPTION -> checksum = parseChecksumOption(value).getOrElse {
+            return DownloadArgs.Invalid(it.message ?: "invalid checksum")
           }
-          "--user-agent" -> setHeader("User-Agent", value)
-          "--referer" -> setHeader("Referer", value)
+          in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
+          else -> headers.apply(arg, value)?.let { return DownloadArgs.Invalid(it) }
         }
         i++
       }
@@ -94,10 +249,14 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   }
 
   if (url == null) return DownloadArgs.Invalid("missing <url>")
-  try {
-    RequestHeaders.requireValid(headers)
-  } catch (e: IllegalArgumentException) {
-    return DownloadArgs.Invalid(e.message ?: "invalid header")
+  if (listFiles && fileIds.isNotEmpty()) {
+    return DownloadArgs.Invalid("--list-files and --files cannot be used together")
+  }
+  if (!listFiles && (fileOrder != null || reverse)) {
+    return DownloadArgs.Invalid("--sort and --reverse require --list-files")
+  }
+  if (listFiles && checksum != null) {
+    return DownloadArgs.Invalid("--list-files and $CHECKSUM_OPTION cannot be used together")
   }
   return DownloadArgs.Download(
     url = url,
@@ -105,7 +264,17 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     speedLimit = speedLimit,
     priority = priority,
     maxConcurrent = maxConcurrent,
-    headers = headers,
+    headers = headers.build().getOrElse {
+      return DownloadArgs.Invalid(it.message ?: "invalid header")
+    },
+    proxy = proxy.build().getOrElse {
+      return DownloadArgs.Invalid(it.message ?: "invalid proxy")
+    },
+    fileIds = fileIds,
+    listFiles = listFiles,
+    fileOrder = fileOrder ?: FileOrder.SOURCE,
+    reverse = reverse,
+    checksum = checksum,
   )
 }
 
@@ -118,7 +287,42 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
     priority = priority,
     headers = headers,
     properties = mapOf(ORIGIN_PROPERTY to CLI_ORIGIN),
+    proxy = proxy,
+    selectedFileIds = fileIds,
+    checksum = checksum,
   )
+
+/**
+ * The rows `--list-files` prints for [source]: a header, then one `ID  SIZE  PATH` row per file,
+ * sorted by [order] and reversed when [reverse]. Empty when the source has no files to choose.
+ */
+internal fun fileListRows(
+  source: ResolvedSource,
+  order: FileOrder = FileOrder.SOURCE,
+  reverse: Boolean = false,
+): List<String> {
+  if (source.files.isEmpty()) return emptyList()
+  val files = source.files.sortedByFileOrder(
+    order = order,
+    descending = reverse,
+    path = { it.metadata["path"] ?: it.name },
+    size = { it.size },
+    selected = { true },
+  )
+  val rows = files.map { file ->
+    Triple(
+      file.id,
+      if (file.size >= 0) formatBytes(file.size) else "-",
+      // Paths come from the torrent: printed as one line of plain text.
+      (file.metadata["path"] ?: file.name).printable(),
+    )
+  }
+  val idWidth = maxOf("ID".length, rows.maxOf { it.first.length })
+  val sizeWidth = maxOf("SIZE".length, rows.maxOf { it.second.length })
+  return listOf(Triple("ID", "SIZE", "PATH")).plus(rows).map { (id, size, path) ->
+    "${id.padEnd(idWidth)}  ${size.padStart(sizeWidth)}  $path"
+  }
+}
 
 /**
  * Resolves the destination argument against the current directory, like other command-line

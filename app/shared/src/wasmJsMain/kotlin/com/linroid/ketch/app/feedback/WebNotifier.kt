@@ -69,7 +69,10 @@ class WebNotifier(private val onClick: (ActivityEvent) -> Unit = {}) : SystemNot
 fun reportWebActivity(controller: AppController): Flow<ActivityEvent> {
   val state = controller.state
   val manager = controller.instanceManager
-  val notifier = WebNotifier { event -> ActivityRouting.taskKeyOf(event)?.let(state::inspect) }
+  // The device's files are not in the browser, so a click always shows the task in Ketch.
+  val notifier = WebNotifier { event ->
+    controller.scope.launch { state.open(NotificationLink.of(event)) }
+  }
   val devices = ActivityRouting.devices(manager)
   val monitor = ActivityMonitor(devices, controller.scope)
   val toasts = Channel<ActivityEvent>(Channel.UNLIMITED)

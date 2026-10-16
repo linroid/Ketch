@@ -4,8 +4,10 @@ import ai.koog.agents.core.tools.ToolRegistry
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SystemInfo
 import kotlinx.coroutines.CompletableDeferred
@@ -13,8 +15,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -242,6 +246,8 @@ class KetchMcpServerTest {
           "cancelDownload" to listOf("taskId"),
           "removeDownload" to listOf("taskId"),
           "resolveUrl" to listOf("url"),
+          "listDownloadFiles" to listOf("taskId"),
+          "selectDownloadFiles" to listOf("taskId", "fileIds"),
           "getStatus" to emptyList(),
           "setSpeedLimit" to listOf("taskId", "speedLimit"),
           "setPriority" to listOf("taskId", "priority"),
@@ -253,9 +259,30 @@ class KetchMcpServerTest {
       )
       // Optional parameters are still described
       assertEquals(
-        setOf("url", "destination", "connections", "priority", "speedLimit", "headers"),
+        setOf(
+          "url", "destination", "connections", "priority", "speedLimit", "headers", "requestId",
+          "fileIds", "checksum",
+        ),
         schemas.getValue("startDownload").getValue("properties").jsonObject.keys,
       )
+      assertEquals(
+        setOf("taskId", "cursor", "limit", "sort", "descending"),
+        schemas.getValue("listDownloadFiles").getValue("properties").jsonObject.keys,
+      )
+      val descending = schemas.getValue("listDownloadFiles").getValue("properties").jsonObject
+        .getValue("descending").jsonObject
+      assertEquals("boolean", descending.getValue("type").jsonPrimitive.content)
+    }
+
+  @Test
+  fun `tools call reports why the instance could not be reached as a tool error`() =
+    runTest(timeout = 10.seconds) {
+      val mcp = KetchMcpServer { throw IllegalStateException("Ketch isn't running") }
+      val reply = exchange(mcp, INITIALIZE, INITIALIZED, LIST_DOWNLOADS).last()
+      val result = assertNotNull(reply["result"], "Request failed: $reply").jsonObject
+
+      assertEquals(true, result["isError"]?.jsonPrimitive?.booleanOrNull, "$result")
+      assertTrue("Ketch isn't running" in result.toString(), "$result")
     }
 
   @Test
@@ -347,6 +374,9 @@ class KetchMcpServerTest {
   }
 
   private class FakeKetchApi(private val statusDelay: Duration = Duration.ZERO) : KetchApi {
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+      flow { throw UnsupportedOperationException("Not followed in tests") }
+
     var config = DownloadConfig()
       private set
 
@@ -356,10 +386,7 @@ class KetchMcpServerTest {
     override suspend fun download(request: DownloadRequest): DownloadTask =
       throw UnsupportedOperationException()
 
-    override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-      throw UnsupportedOperationException()
-
-    override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
+    override suspend fun resolve(input: ResolveInput): ResolvedSource =
       throw UnsupportedOperationException()
 
     override suspend fun start() {}

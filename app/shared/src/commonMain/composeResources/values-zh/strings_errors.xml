@@ -25,7 +25,7 @@
   <string name="error_disk_hint_free">%2$s 上可用 %1$s。请检查空间和文件夹权限。</string>
   <string name="error_disk_hint_free_short">%2$s 上可用 %1$s</string>
 
-  <string name="error_unsupported">此服务器无法完成这个下载</string>
+  <string name="error_unsupported">此服务器不支持此下载</string>
   <string name="error_unsupported_hint">它未提供文件大小，也不支持分段下载。</string>
   <string name="error_unsupported_hint_short">它未提供文件大小，也不支持分段下载</string>
   <string name="error_file_changed">服务器上的文件已更改</string>
@@ -34,6 +34,11 @@
   <string name="error_corrupt_resume">保存的进度已损坏</string>
   <string name="error_corrupt_resume_hint">已下载的部分无法再使用。</string>
   <string name="error_corrupt_resume_hint_short">已下载的部分无法再使用</string>
+  <string name="error_checksum_mismatch">文件与校验和不符</string>
+  <string name="error_checksum_mismatch_hint">文件的 %1$s 与输入的校验和不符，已被删除。请重新下载，或检查校验和。</string>
+  <string name="error_checksum_mismatch_hint_short">%1$s 与输入的校验和不符</string>
+  <string name="error_checksum_mismatch_published_hint">文件的 %1$s 与服务器公布的校验和不符，已被删除。文件可能在传输中损坏，请重新下载。</string>
+  <string name="error_checksum_mismatch_published_hint_short">%1$s 与服务器公布的校验和不符</string>
   <string name="error_canceled">已取消</string>
   <string name="error_wrong_credentials">用户名或密码错误</string>
   <string name="error_wrong_credentials_hint">%1$s 服务器拒绝了登录。</string>
@@ -44,9 +49,9 @@
   <string name="error_source">%1$s 服务器报告了错误</string>
 
   <string name="error_http_sign_in">需要登录（%1$d）</string>
-  <string name="error_http_sign_in_hint">%1$s 要求登录。请通过 Ketch 浏览器扩展发送，以便一并带上 Cookie。</string>
+  <string name="error_http_sign_in_hint">%1$s 要求登录。请通过 Ketch 浏览器扩展添加，以便带上 Cookie。</string>
   <string name="error_http_sign_in_hint_short">%1$s 要求登录</string>
-  <string name="error_http_sign_in_hint_server">服务器要求登录。请通过 Ketch 浏览器扩展发送，以便一并带上 Cookie。</string>
+  <string name="error_http_sign_in_hint_server">服务器要求登录。请通过 Ketch 浏览器扩展添加，以便带上 Cookie。</string>
   <string name="error_http_sign_in_hint_server_short">服务器要求登录</string>
   <string name="error_http_forbidden">拒绝访问（403）</string>
   <string name="error_http_forbidden_hint">链接可能已过期。</string>

@@ -4,54 +4,52 @@ import kotlinx.coroutines.CloseableCoroutineDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 
 /**
- * Dispatchers used by the Ketch download engine.
+ * Dispatchers used by the Ketch download engine:
+ * - [main]: task coordination (scheduling, queue operations, state transitions). Each [Ketch]
+ *   runs its coordination on a serial view of its own, so it needs no thread of its own.
+ * - [network]: network operations (HTTP requests, segment downloads).
+ * - [disk]: blocking file I/O (writes, reads, preallocation).
  *
- * Provides dedicated dispatchers for different workloads:
- * - [main]: Single-threaded dispatcher for task management (scheduling,
- *   queue operations, state transitions). Serialized execution eliminates
- *   Mutex contention for coordination logic.
- * - [network]: Thread pool for network operations (HTTP requests, segment
- *   downloads). Sized to match expected download parallelism.
- * - [io]: Thread pool for blocking file I/O (writes, reads, preallocate).
- *
- * Pass your own [CoroutineDispatcher] instances for full control, or use
- * `KetchDispatchers(networkThreads, ioThreads)` for platform-appropriate
- * defaults with configurable pool sizes.
+ * Every [Ketch] uses [Default] unless given others. [Ketch.close] closes the dispatchers it was
+ * given once its coroutines have finished, never [Default].
  */
 class KetchDispatchers(
-  /** Single-threaded dispatcher for task coordination. */
+  /** Dispatcher for task coordination; each [Ketch] runs one coroutine on it at a time. */
   val main: CoroutineDispatcher,
-  /** Thread pool for network operations. */
+  /** Dispatcher for network operations. */
   val network: CoroutineDispatcher,
-  /** Thread pool for blocking file I/O. */
-  val io: CoroutineDispatcher,
+  /** Dispatcher for blocking file I/O. */
+  val disk: CoroutineDispatcher,
 ) {
   /**
-   * Creates platform-default dispatchers with dedicated thread pools.
-   *
-   * @param networkThreads number of threads in the network pool;
-   *   must be positive
-   * @param ioThreads number of threads in the I/O pool; must be positive
-   */
-  constructor(
-    networkThreads: Int = 8,
-    ioThreads: Int = 4,
-  ) : this(
-    main = createMainDispatcher(),
-    network = createNetworkDispatcher(networkThreads),
-    io = createIoDispatcher(ioThreads),
-  )
-
-  /**
-   * Releases dispatcher resources (thread pools).
-   *
-   * Only closes dispatchers that implement [CloseableCoroutineDispatcher]
-   * (e.g., those created via pool-size constructor). User-provided
-   * dispatchers like `Dispatchers.IO` are left untouched.
+   * Closes the dispatchers that implement [CloseableCoroutineDispatcher], such as thread pools
+   * the caller created; others, like `Dispatchers.IO`, are left untouched. Does nothing for
+   * [Default], which every [Ketch] in the process shares.
    */
   fun close() {
+    if (isDefault) return
     (main as? CloseableCoroutineDispatcher)?.close()
     (network as? CloseableCoroutineDispatcher)?.close()
-    (io as? CloseableCoroutineDispatcher)?.close()
+    (disk as? CloseableCoroutineDispatcher)?.close()
+  }
+
+  /** Whether this is [Default], which nothing may close. */
+  internal val isDefault: Boolean
+    get() = default.isInitialized() && default.value === this
+
+  companion object {
+    private val default = lazy { createDefaultDispatchers() }
+
+    /**
+     * The dispatchers every [Ketch] in the process shares unless given others, created on first
+     * use. On the JVM and Android they run on Ketch's own daemon threads, apart from the
+     * application's `Dispatchers.IO` and `Dispatchers.Default`: at most 8 for [network]
+     * (`ketch-network-N`) and 8 for [disk] (`ketch-disk-N`), started only when every thread is
+     * busy and ended once idle for 30 seconds. iOS keeps two pools of 8 threads; JS and WasmWasi use
+     * `Dispatchers.Default`. [main] is [network] itself: each [Ketch] coordinates on a serial
+     * view of its own, so instances never wait for each other.
+     */
+    val Default: KetchDispatchers
+      get() = default.value
   }
 }

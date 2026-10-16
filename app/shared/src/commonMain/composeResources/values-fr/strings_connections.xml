@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="connections_search">Rechercher des points de terminaison, téléchargements et protocoles</string>
+  <string name="connections_filter_all">Toutes</string>
+  <string name="connections_column_endpoint">Point de terminaison</string>
+  <string name="connections_column_device">Appareil</string>
+  <string name="connections_column_task">Téléchargement</string>
+  <string name="connections_column_protocol">Protocole</string>
+  <string name="connections_column_route">Route</string>
+  <string name="connections_column_peer">Pair</string>
+  <string name="connections_column_down">Réception</string>
+  <string name="connections_column_up">Envoi</string>
+  <string name="connections_column_received">Reçu</string>
+  <string name="connections_column_sent">Envoyé</string>
+  <string name="connections_column_open">Ouverte depuis</string>
+  <string name="connections_route_direct">Directe</string>
+  <string name="connections_route_http_proxy">Proxy HTTP</string>
+  <string name="connections_route_socks_proxy">Proxy SOCKS5</string>
+  <string name="connections_peer_choked">Bloqué</string>
+  <string name="connections_peer_unchoked">Débloqué</string>
+  <string name="connections_peer_uploading">Envoi en cours</string>
+  <string name="connections_empty_body">Les connexions s'affichent ici pendant les téléchargements ou le partage de torrents.</string>
+  <string name="connections_no_match">Aucune connexion ne correspond</string>
+  <string name="connections_unsupported_title">Cet appareil ne signale pas ses connexions</string>
+  <string name="connections_unsupported_body">Mettez Ketch à jour sur cet appareil pour les voir ici.</string>
+  <plurals name="connections_more">
+    <item quantity="one">%1$d connexion plus lente n'est pas listée</item>
+    <item quantity="other">%1$d connexions plus lentes ne sont pas listées</item>
+  </plurals>
+</resources>

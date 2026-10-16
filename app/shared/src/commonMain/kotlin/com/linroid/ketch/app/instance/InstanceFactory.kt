@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.RemoteKetch
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Creates [KetchApi] instances for each instance type.
@@ -23,6 +24,14 @@ import com.linroid.ketch.remote.RemoteKetch
  * @param applyTorrentSettings applies changed torrent settings to the
  *   torrent source of the embedded instance, so they take effect without
  *   a restart. `null` when the embedded instance has no torrent support.
+ * @param trackerList what each of the embedded instance's subscribed tracker lists holds; `null` when it
+ *   has no torrent support.
+ * @param refreshTrackerList downloads the subscribed tracker lists again now.
+ * @param uploadNetwork whether the device is on Wi-Fi or another unmetered network, as it
+ *   changes. With [pauseUploads], [InstanceManager] pauses the embedded instance's uploads while
+ *   it is not and [TorrentSettings.uploadWifiOnly] is on; `null` where uploads ignore the
+ *   network, as on desktop.
+ * @param pauseUploads pauses (`true`) or resumes the uploads of the embedded instance's torrents.
  * @param remoteFactory creates a new, unconnected client for a remote device; a [RemoteKetch]
  *   by default. [InstanceManager] calls it each time it connects to the device again.
  */
@@ -31,6 +40,10 @@ class InstanceFactory(
   private val embeddedFactory: (() -> KetchApi)? = null,
   private val localServerFactory: ((KetchApi, PairingRequests) -> LocalServerHandle)? = null,
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
+  internal val trackerList: Flow<List<TrackerListStatus>>? = null,
+  internal val refreshTrackerList: () -> Unit = {},
+  internal val uploadNetwork: Flow<Boolean>? = null,
+  internal val pauseUploads: (suspend (Boolean) -> Unit)? = null,
   private val remoteFactory: (RemoteConfig) -> RemoteInstance = ::remoteKetchInstance,
 ) {
   /** Whether an embedded instance is available. */

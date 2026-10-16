@@ -25,6 +25,14 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 class KetchApplication : Application() {
+  init {
+    // First, before content providers and any property here use kotlinx.coroutines: its shared
+    // pool caps Dispatchers.IO at 16 threads rather than 64, and idle workers end after 10 s
+    // rather than 60. Ketch's own blocking work runs on pools of its own; what is left there,
+    // such as ktor-network's socket loops, never blocks for long.
+    System.setProperty("kotlinx.coroutines.io.parallelism", "16")
+    System.setProperty("kotlinx.coroutines.scheduler.keep.alive.sec", "10")
+  }
 
   /**
    * Files opened with Ketch. Held here rather than in the activity so a file stays pending

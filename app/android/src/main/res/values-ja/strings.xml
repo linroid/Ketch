@@ -4,7 +4,7 @@
   <string name="quick_add_no_link">ダウンロードできるリンクがありません</string>
 
   <string name="notifications_offer_title">ダウンロードとディスカバーの通知</string>
-  <string name="notifications_offer_message">ほかのアプリを使っている間も、ダウンロードの完了や失敗を通知します。ディスカバーでウェブサイトへのアクセス許可が必要なときもお知らせします。</string>
+  <string name="notifications_offer_message">ほかのアプリの使用中も、ダウンロードの完了や失敗、ディスカバーの承認が必要なときに通知します。</string>
   <string name="notifications_offer_allow">許可</string>
   <string name="notifications_offer_not_now">今はしない</string>
 </resources>

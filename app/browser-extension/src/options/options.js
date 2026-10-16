@@ -26,8 +26,8 @@ localizePage();
 const toggles = {
   interceptDownloads: $('intercept-downloads'),
   forwardCookies: $('forward-cookies'),
-  confirmDownloads: $('confirm-downloads'),
   captureMagnetLinks: $('capture-magnet-links'),
+  reviewDownloads: $('review-downloads'),
   notifications: $('notifications'),
   captureUnknownSize: $('capture-unknown-size'),
 };
@@ -44,7 +44,7 @@ async function init() {
   if (remoteOnly) {
     $('browser-limits').hidden = false;
     for (const id of ['intercept-downloads', 'min-file-size', 'capture-unknown-size',
-      'file-type-mode', 'file-extensions', 'excluded-hosts', 'confirm-downloads', 'notifications']) {
+      'file-type-mode', 'file-extensions', 'excluded-hosts', 'review-downloads', 'notifications']) {
       $(id).closest('label').hidden = true;
     }
     for (const key of ['options_help_this_computer', 'options_help_this_computer_detail']) {
@@ -254,8 +254,8 @@ async function persist() {
     defaultInstanceId: defaultCard?.dataset.id,
     interceptDownloads: toggles.interceptDownloads.checked,
     forwardCookies: toggles.forwardCookies.checked,
-    confirmDownloads: toggles.confirmDownloads.checked,
     captureMagnetLinks: toggles.captureMagnetLinks.checked,
+    reviewDownloads: toggles.reviewDownloads.checked,
     notifications: toggles.notifications.checked,
     captureUnknownSize: toggles.captureUnknownSize.checked,
     fileTypeMode: $('file-type-mode').value,

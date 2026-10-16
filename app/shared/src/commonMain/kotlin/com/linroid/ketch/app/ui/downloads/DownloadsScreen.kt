@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,12 +29,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
+import com.linroid.ketch.app.input.onContextClick
+import com.linroid.ketch.app.input.onEmptyClick
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.platform.localDeviceNoun
@@ -68,6 +74,7 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.downloads_retry_all_count
 import kotlinx.coroutines.flow.drop
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 /** Width tiers of the window, which set how the app lays itself out. */
 enum class LayoutTier {
@@ -278,7 +285,8 @@ private fun PageEffects(page: DownloadsPage, view: TaskListView) {
     if (!pointer) return@LaunchedEffect
     // The arrow keys and ⌘-clicks that leave one row selected show it, as a click does.
     snapshotFlow { state.selectedKeys.singleOrNull() }.drop(1).collect { key ->
-      if (key != null) state.inspect(key)
+      // A click waits to see whether it is the first of a double-click.
+      if (key != null && key != actions.selection.pendingInspect) state.inspect(key)
     }
   }
   LaunchedEffect(page) {
@@ -341,7 +349,7 @@ private fun pageContent(state: AppState, view: TaskListView): PageContent {
     rows.isEmpty() -> PageContent.Blank
     view.rows.isNotEmpty() -> PageContent.Rows
     // The view trails the rows for a moment after they first arrive.
-    view.query.isEmpty && rows.any { view.filter.matches(it.state) } -> PageContent.Blank
+    view.query.isEmpty && rows.any { view.filter.matches(it) } -> PageContent.Blank
     else -> PageContent.Empty
   }
 }
@@ -383,6 +391,14 @@ private fun WideDownloads(
   val hover = remember { MutableInteractionSource() }
   val hovering by hover.collectIsHoveredAsState()
   LaunchedEffect(hovering) { page.hovering = hovering }
+  // A click on the header's empty space deselects the rows and closes the inspector. Where the
+  // host's title bar lies under the header, the click reaches the title bar, which reports it.
+  val clearSelection = {
+    page.actions.selection.clear()
+    state.closeInspector()
+  }
+  LaunchedEffect(page) { state.titleBarClickRequests.collect { clearSelection() } }
+  val underTitleBar = KetchTheme.windowChrome.top > 0.dp
   Column(Modifier.fillMaxSize()) {
     DownloadsHeader(
       page = page,
@@ -391,6 +407,7 @@ private fun WideDownloads(
       tableFits = tableFits,
       showsTable = showsTable,
       hasRows = !firstRun,
+      modifier = if (underTitleBar) Modifier else Modifier.onEmptyClick(clearSelection),
     )
     if (!firstRun) TabArea(page, view, showsTable)
     if (!firstRun && !view.query.isEmpty) SearchFacetRow(state, view)
@@ -491,6 +508,32 @@ private fun PageBody(
   showsTable: Boolean,
   phone: Boolean,
 ) {
+  var menuAt by remember { mutableStateOf<Offset?>(null) }
+  Box(Modifier.fillMaxSize().onContextClick { menuAt = it }) {
+    PageBodyContent(page, view, content, showsTable, phone)
+    val at = menuAt
+    if (at != null) {
+      Box(Modifier.absoluteOffset { IntOffset(at.x.roundToInt(), at.y.roundToInt()) }) {
+        DownloadsMenu(
+          page = page,
+          showsTable = showsTable,
+          expanded = true,
+          onDismissRequest = { menuAt = null },
+          offset = DpOffset(0.dp, -KetchTheme.spacing.s1),
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun PageBodyContent(
+  page: DownloadsPage,
+  view: TaskListView,
+  content: PageContent,
+  showsTable: Boolean,
+  phone: Boolean,
+) {
   val state = page.state
   val spacing = KetchTheme.spacing
   val density = KetchTheme.density
@@ -509,6 +552,7 @@ private fun PageBody(
       }
     }
   }
+  if (content == PageContent.Rows) WatchShownTasks(state, page.listState)
   when (content) {
     PageContent.Blank -> Box(Modifier.fillMaxSize())
     PageContent.Loading -> SkeletonRows(
@@ -597,7 +641,7 @@ private fun SearchFacetRow(state: AppState, view: TaskListView) {
   val filter = view.filter
   FacetRow(
     query = view.query,
-    rows = remember(rows, filter) { rows.filter { filter.matches(it.state) } },
+    rows = remember(rows, filter) { rows.filter { filter.matches(it) } },
     matched = view.matched,
     total = view.total,
     onQueryChange = { state.searchQuery = it.format() },

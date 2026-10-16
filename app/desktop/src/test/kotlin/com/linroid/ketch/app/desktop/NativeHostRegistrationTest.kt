@@ -54,8 +54,11 @@ class NativeHostRegistrationTest {
     assertEquals("com.linroid.ketch", chromeManifest["name"]?.jsonPrimitive?.content)
     assertEquals(script.absolutePath, chromeManifest["path"]?.jsonPrimitive?.content)
     assertEquals(
-      "chrome-extension://kddcjkhnjcjhekohejnehplbnjclbdbl/",
-      chromeManifest["allowed_origins"]?.jsonArray?.single()?.jsonPrimitive?.content,
+      listOf(
+        "chrome-extension://kddcjkhnjcjhekohejnehplbnjclbdbl/",
+        "chrome-extension://flnjeochbgpaipiofdjmoijaeooemhka/",
+      ),
+      chromeManifest["allowed_origins"]?.jsonArray?.map { it.jsonPrimitive.content },
     )
     val firefoxManifest = Json.parseToJsonElement(firefox.readText()).jsonObject
     assertEquals(

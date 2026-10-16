@@ -1,5 +1,8 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.Proxy
+
 /**
  * Abstraction over the HTTP layer used by Ketch.
  *
@@ -67,6 +70,33 @@ interface HttpEngine {
     return url
   }
 
+  /**
+   * Whether [withProxy] accepts proxies other than [Proxy.System]. Ketch lists
+   * [com.linroid.ketch.api.KetchFeatures.PROXY], and accepts such proxies, only when it does.
+   */
+  val supportsProxies: Boolean get() = false
+
+  /**
+   * Returns an engine whose requests reach their servers as [proxy] says, sharing this engine's
+   * resources. It stays usable until this engine is closed; closing it does nothing.
+   *
+   * An engine follows the system's proxy settings ([Proxy.System]) by itself, so Ketch only
+   * asks for other proxies. Engines that wrap another must override this method to keep wrapping
+   * the engine it returns. Engines that override it must also report [supportsProxies]. The
+   * default returns this engine for [Proxy.System] and refuses any other proxy with
+   * [KetchError.Unsupported], so a download never silently skips the proxy it was given.
+   */
+  fun withProxy(proxy: Proxy): HttpEngine {
+    if (proxy == Proxy.System) return this
+    throw KetchError.Unsupported(
+      cause = UnsupportedOperationException("This HTTP engine cannot choose a proxy"),
+    )
+  }
+
   /** Releases underlying resources (e.g., the HTTP client). */
   fun close()
 }
+
+/** This engine for [Proxy.System], which it follows by itself, else [HttpEngine.withProxy]. */
+internal fun HttpEngine.through(proxy: Proxy): HttpEngine =
+  if (proxy == Proxy.System) this else withProxy(proxy)

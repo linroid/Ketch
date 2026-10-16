@@ -9,6 +9,16 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.TorrentSessionState
+import com.linroid.ketch.torrent.engine.TorrentTaskSpec
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -77,7 +87,7 @@ class TorrentActiveLimitTest {
           "ketch-active-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
         torrentFileSystem.createDirectories(root)
         val seeder = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
-          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           maxActiveTorrents = 1))
         // Unlimited simultaneous downloads: Ketch admits every torrent at once.

@@ -10,6 +10,7 @@
   <string name="row_status_downloading">ダウンロード中</string>
   <string name="row_status_stalled">停滞中</string>
   <string name="row_status_paused">一時停止中</string>
+  <string name="row_status_starting">開始中</string>
   <string name="row_status_queued">キュー待ち</string>
   <string name="row_status_scheduled">予約済み</string>
   <string name="row_status_done">完了</string>
@@ -23,6 +24,8 @@
   <string name="row_saved_on">%1$sに保存済み</string>
   <string name="row_missing_file">ファイルが移動または削除されました</string>
   <string name="row_completed">完了</string>
+  <string name="row_choose_files">ダウンロードするファイルを選択</string>
+  <string name="row_seeding">シード中</string>
   <string name="row_took">所要時間：%1$s</string>
   <plurals name="row_files">
     <item quantity="other">%1$d個のファイル</item>
@@ -58,6 +61,10 @@
   <string name="sort_origin">追加元</string>
   <string name="sort_priority">優先度</string>
   <string name="sort_device">デバイス</string>
+  <string name="sort_kind">種類</string>
+  <string name="sort_selected_first">選択済みを先頭に</string>
+  <string name="sort_torrent_order">トレントの順序</string>
+  <string name="sort_reverse">逆順</string>
   <string name="group_smart">スマート</string>
   <string name="group_status">状態</string>
   <string name="group_day">日付</string>
@@ -102,6 +109,7 @@
   <plurals name="queue_position_ahead">
     <item quantity="other">前に%1$d件</item>
   </plurals>
+  <string name="row_finding_peers">ピアを検索中</string>
   <string name="queue_starting">開始中</string>
 
   <string name="action_row_pause">一時停止</string>
@@ -127,10 +135,12 @@
   <string name="action_row_open_source_page">ソースページを開く</string>
   <string name="action_row_copy_error">エラーをコピー</string>
   <string name="action_row_copy_details">詳細をコピー</string>
-  <string name="action_row_stop_and_discard">停止して進捗を破棄…</string>
-  <string name="action_row_remove">リストから削除</string>
-  <string name="action_row_remove_and_trash">リストから削除してファイルをゴミ箱へ…</string>
-  <string name="action_row_remove_and_delete">リストから削除してファイルも削除…</string>
+  <string name="action_row_stop_and_discard">ダウンロードをキャンセル…</string>
+  <string name="action_row_remove">削除…</string>
+  <string name="action_row_choose_files">ファイルを選択…</string>
+  <string name="action_row_download_all_files">すべてのファイルをダウンロード</string>
+  <string name="action_row_stop_seeding">シードを停止</string>
+  <string name="action_row_seed">シード</string>
   <plurals name="batch_pause">
     <item quantity="other">%1$d件のダウンロードを一時停止</item>
   </plurals>
@@ -157,19 +167,16 @@
     <item quantity="other">%1$d個のファイルをもう一度ダウンロード</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="other">%1$d件のダウンロードの進捗を破棄…</item>
+    <item quantity="other">%1$d件のダウンロードをキャンセル…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="other">%1$d件のダウンロードをリストから削除</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="other">%1$d件のダウンロードとファイルを削除…</item>
+    <item quantity="other">%1$d件のダウンロードを削除…</item>
   </plurals>
   <string name="bar_speed">速度</string>
   <string name="bar_copy_links">リンクをコピー</string>
   <string name="bar_remove">削除…</string>
   <string name="bar_copy_paths">ファイルパスをコピー</string>
-  <string name="bar_discard">進捗を破棄…</string>
+  <string name="bar_discard">ダウンロードをキャンセル…</string>
   <string name="bar_label_count">%1$s（%2$d）</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">選択した%3$d件中%2$d件を%1$s</string>

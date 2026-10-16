@@ -172,3 +172,9 @@ test('servers saved without an explicit grant only forward cookies on loopback',
   assert.equal(settings.instances[0].forwardCookies, false);
   assert.equal(settings.instances[1].forwardCookies, true);
 });
+
+test('the download review is on by default, whatever the old opt-in setting saved', () => {
+  assert.equal(normalizeSettings(undefined).reviewDownloads, true);
+  assert.equal(normalizeSettings({ confirmDownloads: false }).reviewDownloads, true);
+  assert.equal(normalizeSettings({ reviewDownloads: false }).reviewDownloads, false);
+});

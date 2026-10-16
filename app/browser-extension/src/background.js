@@ -4,12 +4,15 @@
  * the top level because the browser may stop this script whenever it is idle.
  */
 
-import { FailureKind } from './lib/ketch-client.js';
 import { ext, remoteOnly } from './lib/ext.js';
+import { FailureKind } from './lib/ketch-client.js';
 import { failureHint, nameFromUrl, taskName, withHint } from './lib/format.js';
 import { cookieStoreIdForTab, sendToKetch } from './lib/handoff.js';
 import { t } from './lib/i18n.js';
-import { openReview, sendReview, cancelReview, closeReviews } from './lib/review.js';
+import {
+  cancelReview, closeReviews, directReview, openReview, reopenReview, sendReview,
+  startBrowserDownload,
+} from './lib/review.js';
 import { RequestContext } from './lib/request-context.js';
 import { captureDecision } from './lib/intercept.js';
 import { fileNameFromPath, isSupportedLinkUrl } from './lib/request.js';
@@ -43,6 +46,16 @@ ext.contextMenus.onClicked.addListener((info, tab) => {
   handleMenuClick(info, tab).catch((error) => console.error('Ketch: menu action failed', error));
 });
 
+// A review whose page goes away, closed or navigated from, is canceled.
+ext.runtime.onConnect?.addListener((port) => {
+  if (port.sender?.id !== ext.runtime.id || !port.name.startsWith('review:') ||
+    !port.sender.url?.startsWith(ext.runtime.getURL('review/'))) return;
+  port.onDisconnect.addListener(() => {
+    cancelReview(port.name.slice('review:'.length))
+      .catch((error) => console.warn('Ketch: could not close review', error));
+  });
+});
+
 ext.tabs?.onRemoved.addListener((id) => {
   closeReviews(id).catch((error) => console.warn('Ketch: could not close review', error));
 });
@@ -50,21 +63,31 @@ ext.tabs?.onRemoved.addListener((id) => {
 ext.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('popup/')) &&
     message?.type === 'review-open') {
-    openReview(message.instanceId, message.download).then(() => sendResponse({ ok: true }),
-      (error) => sendResponse({ ok: false, message: error.message }));
+    openReview(message.instanceId, message.download, { tabId: message.tabId })
+      .then(() => sendResponse({ ok: true }),
+        (error) => sendResponse({ ok: false, message: error.message }));
     return true;
   }
+  if (sender.id === ext.runtime.id && message?.type === 'review-overlay-failed' &&
+    Number.isInteger(sender.tab?.id)) {
+    reopenReview(String(message.id), sender.tab.id)
+      .catch((error) => console.warn('Ketch: could not reopen the review', error));
+    return false;
+  }
   if (sender.id === ext.runtime.id && sender.url?.startsWith(ext.runtime.getURL('review/')) &&
-    ['review-send', 'review-cancel'].includes(message?.type)) {
+    ['review-send', 'review-cancel', 'review-direct'].includes(message?.type)) {
     const action = message.type === 'review-send'
       ? sendReview(message.id, message.instanceId, message.fileName, message.folder)
-      : cancelReview(message.id);
+        .then((task) => notifyReviewSent(message.instanceId, task))
+      : message.type === 'review-direct'
+        ? directReview(message.id, message.fileName)
+        : cancelReview(message.id);
     action.then(() => sendResponse({ ok: true }), (error) =>
       sendResponse({ ok: false, message: error.message, kind: error.kind }));
     return true;
   }
   if (sender.id !== ext.runtime.id || message?.type !== 'magnet') return false;
-  handleMagnet(message.url).then(sendResponse, (error) => {
+  handleMagnet(message.url, sender.tab?.id).then(sendResponse, (error) => {
     console.error('Ketch: magnet hand-off failed', error);
     sendResponse({ handled: false });
   });
@@ -101,8 +124,9 @@ if (!remoteOnly && ext.downloads?.onDeterminingFilename) {
 }
 
 /**
- * Sends a download the browser started to the default instance. `gate.release()` gives the
- * download back to the browser; it runs for skipped downloads and when Ketch can't take it.
+ * Hands a download the browser started to the default instance: through the review dialog, or
+ * straight to Ketch with reviews off. `gate.release()` gives the download back to the browser;
+ * it runs for skipped downloads and when Ketch can't take it.
  */
 async function captureDownload(item, gate) {
   const release = () => gate.release().catch((error) => {
@@ -115,8 +139,8 @@ async function captureDownload(item, gate) {
     console.error('Ketch: could not load settings', error);
     return release();
   }
-  const decision = captureDecision(
-    requestContext.forDownload(item), settings, ext.runtime.id);
+  const context = requestContext.forDownload(item);
+  const decision = captureDecision(context, settings, ext.runtime.id);
   if (!decision.capture) {
     console.debug(`Ketch: leaving download ${item.id} to the browser: ${decision.reason}`);
     return release();
@@ -124,18 +148,26 @@ async function captureDownload(item, gate) {
   await gate.hold();
   const instance = findInstance(settings);
   const fileName = fileNameFromPath(item.filename);
-  if (settings.confirmDownloads) {
-    // Finish Chromium's filename hook before asking the browser to pause. If the download
-    // already completed or cannot pause, keep it in the browser without submitting a copy.
-    await release();
+  if (settings.reviewDownloads) {
+    // Take the download from the browser before it shows its own download UI or Save As
+    // dialog; Download in browser starts it again. One that already finished stays there.
     try {
-      await ext.downloads.pause(item.id);
-      await openReview(instance.id, {
-        url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
-        cookieStoreId: item.cookieStoreId, browserDownloadId: item.id,
-      });
+      await ext.downloads.cancel(item.id);
     } catch {
-      await ext.downloads.resume(item.id).catch(() => {});
+      return release();
+    }
+    await ext.downloads.erase({ id: item.id }).catch(() => {});
+    const download = {
+      url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
+      cookieStoreId: item.cookieStoreId,
+      size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
+    };
+    try {
+      await openReview(instance.id, download, { tabId: await pageTabFor(context) });
+    } catch (error) {
+      console.error('Ketch: could not open the review, downloading in the browser', error);
+      await startBrowserDownload(download.url, { cookieStoreId: download.cookieStoreId })
+        .catch(() => notify(t('notify_direct_failed'), t('notify_direct_hint')));
     }
     return;
   }
@@ -163,6 +195,20 @@ async function captureDownload(item, gate) {
   notifySent(settings, instance, taskName(task) || fileName);
 }
 
+/**
+ * The tab showing the page a download came from. A link that opened a tab of its own only to
+ * download closes it again, so its opener, or else the active tab, shows the review instead.
+ */
+async function pageTabFor(item) {
+  const urls = [item.url, item.finalUrl, 'about:blank', ''];
+  const shows = (tab) => tab && !urls.includes(tab.pendingUrl ?? tab.url ?? '');
+  const tab = item.tabId >= 0 ? await ext.tabs.get(item.tabId).catch(() => undefined) : undefined;
+  if (shows(tab)) return tab.id;
+  if (tab?.openerTabId !== undefined) return tab.openerTabId;
+  const [active] = await ext.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []);
+  return shows(active) ? active.id : undefined;
+}
+
 async function removeBrowserDownload(downloadId) {
   try {
     await ext.downloads.cancel(downloadId);
@@ -173,15 +219,20 @@ async function removeBrowserDownload(downloadId) {
   }
 }
 
-async function handleMagnet(url) {
+async function handleMagnet(url, tabId) {
   const settings = await loadSettings();
   if (!settings.captureMagnetLinks || !/^magnet:/i.test(String(url))) return { handled: false };
   const instance = findInstance(settings);
-  try {
-    if (settings.confirmDownloads) {
-      await openReview(instance.id, { url });
+  if (settings.reviewDownloads) {
+    try {
+      await openReview(instance.id, { url }, { tabId });
       return { handled: true };
+    } catch (error) {
+      console.error('Ketch: could not open the review for a magnet link', error);
+      return { handled: false };
     }
+  }
+  try {
     const task = await sendToKetch(instance, { url }, settings, { timeoutMs: CAPTURE_TIMEOUT_MS });
     notifySent(settings, instance, taskName(task));
     return { handled: true };
@@ -210,7 +261,7 @@ async function handleMenuClick(info, tab) {
   const instance = findInstance(settings, target.instanceId);
   const url = target.kind === 'link' ? info.linkUrl : info.srcUrl;
   if (!url || !isSupportedLinkUrl(url)) {
-    if (remoteOnly) { await openReview(instance.id, { url }); return; }
+    if (remoteOnly) { await openReview(instance.id, { url }, { tabId: tab?.id }); return; }
     notify(t('notify_unsupported'), url?.startsWith('blob:')
       ? t('notify_unsupported_stream')
       : t('notify_unsupported_scheme'));
@@ -222,8 +273,10 @@ async function handleMenuClick(info, tab) {
       referrer: info.frameUrl || info.pageUrl,
       cookieStoreId: await cookieStoreIdForTab(tab),
     };
-    if (settings.confirmDownloads) {
-      await openReview(instance.id, download);
+    if (settings.reviewDownloads) {
+      // The review can still hand a link back to the browser, in the tab's context.
+      await openReview(instance.id, { ...download, incognito: tab?.incognito || undefined },
+        { tabId: tab?.id });
       return;
     }
     const task = await sendToKetch(instance, download, settings);
@@ -233,24 +286,12 @@ async function handleMenuClick(info, tab) {
   }
 }
 
-/** Starts a browser download; its byExtensionId keeps it out of automatic capture. */
+/** Downloads the clicked item in the browser, leaving Ketch out of this one download. */
 async function downloadDirectly(info, tab) {
-  const url = info.linkUrl || info.srcUrl;
-  const firefox = !ext.downloads.onDeterminingFilename;
-  // Chromium's spanning background cannot select a private download context. Leave that
-  // case to the browser's native save command instead of using the regular cookie store.
-  if (!/^https?:\/\//i.test(url ?? '') || (tab?.incognito && !firefox)) {
-    notify(t('notify_direct_failed'), t('notify_direct_hint'));
-    return;
-  }
-  const options = { url };
-  if (firefox) {
-    if (tab?.cookieStoreId) options.cookieStoreId = tab.cookieStoreId;
-    if (tab?.incognito) options.incognito = true;
-  }
   try {
-    // Let the browser choose the name, cookies and whether to show its Save As dialog.
-    await ext.downloads.download(options);
+    await startBrowserDownload(info.linkUrl || info.srcUrl, {
+      cookieStoreId: tab?.cookieStoreId, incognito: tab?.incognito,
+    });
   } catch {
     console.warn('Ketch: could not start the browser download');
     notify(t('notify_direct_failed'), t('notify_direct_hint'));
@@ -324,6 +365,11 @@ function parseMenuId(menuId) {
   const kind = separator < 0 ? menuId : menuId.slice(0, separator);
   if (!MENUS.some((menu) => menu.kind === kind)) return null;
   return { kind, instanceId: separator < 0 ? undefined : menuId.slice(separator + 1) };
+}
+
+async function notifyReviewSent(instanceId, task) {
+  const settings = await loadSettings().catch(() => undefined);
+  if (settings) notifySent(settings, findInstance(settings, instanceId), taskName(task));
 }
 
 function notifySent(settings, instance, name) {

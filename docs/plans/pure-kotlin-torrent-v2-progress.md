@@ -5,10 +5,12 @@ The approved scope and acceptance gates are tracked in
 A roadmap row may span multiple PRs; it is complete only when all of its acceptance gates
 have evidence.
 
-## Current status — 2026-09-20
+## Current status — 2026-10-10
 
 The consolidated implementation stack #231–#238 and public workflow #240 have landed.
-The integrated baseline is `e822e8bd0383e008486ca5a3384181eaaba9a1a7`.
+The integrated baseline is `e822e8bd0383e008486ca5a3384181eaaba9a1a7`. The v2 swarm
+completeness stack (`torrent-v2-swarm`) adds incoming routing, upload and seeding, proof
+serving, peer exchange and dual-swarm participation on top of it.
 **Public v2/hybrid download and restart integration is complete. The production v2 release
 roadmap remains open.** Original phases below retain their acceptance gates; a merged slice
 does not complete a broader phase.
@@ -18,7 +20,7 @@ does not complete a broader phase.
 | Contracts and resource admission | #231 | Inspection models, conformance harness and bounded admission; runtime controller adapters and production resource gates remain |
 | Identity and integrity | #232 | Full v2 identity, metainfo, SHA-256/Merkle verification and hybrid layout validation |
 | Verified storage and recovery | #233–#234 | Owned storage, catalog/checkpoints, creation journals and crash fixtures; full migration/power-loss/mobile gates remain |
-| Wire and scheduling | #235–#236 | V2 negotiation, authenticated hash exchange, bounded transport and download scheduling; incoming routing, uploads and complete Fast Extension/dual-swarm integration remain |
+| Wire and scheduling | #235–#236, `torrent-v2-swarm` | V2 negotiation, authenticated hash exchange, bounded transport and download scheduling; incoming routing, uploads, hash serving, PEX and dual-swarm landed; complete Fast Extension remains |
 | Trackers and privacy | #237 | Lifecycle, internal edits/revisions/scrape and tracker-only privacy; public controller/remote commands and full network-policy gates remain |
 | Engine lifecycle | #238 | Shared ownership/admission, joined shutdown, request rate controls and checkpoint restoration |
 | Public download/restart | #240 | Metainfo and btih/btmh/dual-topic inputs, authenticated layers, selection, verified progress, tracker/DHT discovery, shared/live limits, pause/resume, TaskStore restart and owned removal |
@@ -34,7 +36,9 @@ does not complete a broader phase.
 - [x] **Foundation slice:** inspection contracts, pinned-client conformance harness and resource
   admission (#231). Step 01 still needs its complete production profiles/performance/harness gates.
 - [x] **Integrity slice:** incremental SHA-256, Merkle verification, bounded layers and authenticated
-  hash-response validation (#232/#235). Step 05 remains open for proof-serving primitives.
+  hash-response validation (#232/#235). Step 05's proof serving (piece and block layers, a cached
+  upper tree, rejection of unknown roots and out-of-range selectors) landed with
+  `torrent-v2-swarm`, checked against an independent oracle and libtorrent.
 - [x] **Recovery slice:** catalog/checkpoints, owned storage, creation journal and public TaskStore
   restart with rechecking (#234/#238/#240). Step 07 still needs its complete migration/GC gates.
 - [x] **Download slice:** outgoing v2 wire/scheduling, metainfo/magnet acquisition, selected payload,
@@ -43,7 +47,10 @@ does not complete a broader phase.
 - [x] **Tracker slice:** internal lifecycle, edits/revisions, scrape and tracker-only privacy (#237).
   Step 11 retains its complete private-network evidence gate and remaining integration work.
 - [x] **Public integration milestone:** v2/hybrid download and restart through Ketch/source (#240).
-  Steps 27–28 still require the complete torrent controller and equivalent product controls.
+  Steps 27–28 are partly delivered by `torrent-v2-selection`: a runtime `TorrentController` in
+  `Ketch` and `RemoteKetch` (inspection, file pages, live selection and seeding commands with
+  revisions and a retry ledger, REST and SSE), with selection in the SDK, daemon, MCP, CLI and
+  apps and seeding control in the SDK, daemon and apps. The other command families remain.
 
 Checks describe the merged baseline and recorded tests, not uncommitted fixes or production
 release qualification. All other original phase checkboxes remain open.
@@ -56,21 +63,30 @@ Its final reviewed head `de5623c5` passed all required CI checks, as recorded in
 [workflow update](https://github.com/linroid/Ketch/issues/162#issuecomment-5748957160).
 These are recorded results from that revision, not a fresh validation of subsequent local edits.
 
-Pure v2 and hybrid magnet downloads passed against the pinned test-only libtorrent peer.
-This does not satisfy the two-independent-engine, bidirectional format gate: v2 incoming
-routing, upload/seeding, PEX, hybrid v1-only peers and a second independent v2 implementation
-remain outstanding. No production qualification or release is claimed.
+Pure v2 and hybrid magnet downloads passed against the pinned test-only libtorrent peer. With
+`torrent-v2-swarm`, libtorrent also downloads pure v2 and hybrid torrents from a seeding Ketch
+engine (`btmh`, dual-topic and `btih`-only magnets, the last over the v1 route), and Transmission,
+which knows only v1, downloads a hybrid from Ketch and seeds one to it. These runs were recorded
+at `f6940ba0a`; see
+[verification](../development/torrent-verification.md#v2-swarm-completeness-torrent-v2-swarm).
+A second independent v2 implementation remains outstanding, so the two-independent-engine format
+gate is still open. No production qualification or release is claimed.
 
 ### Remaining delivery priorities
 
-1. Complete v2 incoming routing, upload/seeding, PEX and hybrid dual-swarm participation;
-   then satisfy the independent-client download/upload format gate.
+1. Done with `torrent-v2-swarm`, except the complete Fast Extension and evidence from a second
+   independent v2 implementation: v2 incoming routing, upload/seeding, PEX and hybrid dual-swarm
+   participation, with libtorrent and Transmission download/upload evidence.
 2. Complete runtime readiness and network policy. iOS still uses 5 ms polling; production
    profiles, aggregate memory/RSS and responsiveness acceptance remain open.
 3. Deliver uTP, MSE/PE, PCP/NAT-PMP/UPnP, hole punching, proxy routing, local discovery and web seeds.
-4. Deliver live selection/verified streaming, durable seed goals/queue, storage management,
-   mobile destinations/lifecycle, creation/export and equivalent SDK/daemon/CLI/app/remote controls.
-   `TorrentController` currently supplies inspection contracts; runtime adapters and mutations remain.
+4. Live selection for v1, v2 and hybrid (without reconnecting, waiting magnets, completed tasks
+   that reopen), the local and remote controller adapters, and seeding start, stop and restore
+   after a restart were delivered with `torrent-v2-selection`; see
+   [its evidence](../development/torrent-verification.md#live-file-selection-torrent-v2-selection).
+   Verified streaming, file priorities, seed goals and a seed queue, storage management, mobile
+   destinations/lifecycle (including background seeding), creation/export and the remaining
+   controller command families remain.
 5. Complete shaped-network, adversarial/performance, physical-device, migration/package and
    72-hour soak evidence. Preserve all original release requirements and exclusions.
 

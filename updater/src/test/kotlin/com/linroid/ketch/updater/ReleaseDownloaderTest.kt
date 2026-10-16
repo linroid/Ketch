@@ -4,12 +4,12 @@ import com.linroid.ketch.api.log.Logger
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -38,7 +38,8 @@ class ReleaseDownloaderTest {
   fun download_otherDigest_deletesTheFile() = runTest {
     val file = File(dir, "ketch.tar.gz")
     val error = assertFailsWith<UpdateException> {
-      downloader(FakeHttpEngine(mapOf(url to content))).download(asset(sha256 = "00"), file)
+      downloader(FakeHttpEngine(mapOf(url to content)))
+        .download(asset(sha256 = "0".repeat(64)), file)
     }
     assertContains(error.message.orEmpty(), "checksum")
     assertFalse(file.exists())
@@ -63,11 +64,12 @@ class ReleaseDownloaderTest {
   }
 
   @Test
-  fun sha256_knownAnswer() {
-    assertEquals(
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-      sha256(File(dir, "abc").apply { writeText("abc") }),
-    )
+  fun download_malformedDigest_failsBeforeDownloading() = runTest {
+    val engine = FakeHttpEngine(mapOf(url to content))
+    assertFailsWith<UpdateException> {
+      downloader(engine).download(asset(sha256 = "00"), File(dir, "ketch.tar.gz"))
+    }
+    assertTrue(engine.requests.isEmpty())
   }
 
   private fun downloader(engine: FakeHttpEngine) = ReleaseDownloader({ engine }, Logger.None)
@@ -76,5 +78,5 @@ class ReleaseDownloaderTest {
     ReleaseAsset("ketch.tar.gz", url, content.size.toLong(), sha256)
 
   private fun sha256Of(bytes: ByteArray): String =
-    sha256(File(dir, "expected").apply { writeBytes(bytes) })
+    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }

@@ -23,6 +23,7 @@ import ketch.app.shared.generated.resources.sort_speed
 import ketch.app.shared.generated.resources.sort_status
 import ketch.app.shared.generated.resources.sort_time_left
 import org.jetbrains.compose.resources.StringResource
+import kotlin.math.roundToInt
 
 /**
  * A column of the Downloads table after its Name column, in the order the table shows them by
@@ -103,20 +104,29 @@ internal enum class TableColumn(
  *
  * @property visible whether the user shows it; it may still hide when the table is narrow.
  * @property width its width, cell padding included.
+ * @property chosen whether the user set [width], which [TableLayout.withHeaderRoom] then keeps
+ *   even when it equals the default.
  */
 @Immutable
 internal data class ColumnSetting(
   val column: TableColumn,
   val visible: Boolean = !column.optional,
   val width: Dp = column.width,
+  val chosen: Boolean = false,
 )
 
 /**
  * The columns of one tab of the Downloads table after Name, in order, with their widths and
  * whether they show. Saved per tab in `UiPreferences.table` with [encode].
+ *
+ * @property nameWidth width of Name, cell padding included, once a divider was dragged; `null`
+ *   lets Name take what the columns leave. See [arrange].
  */
 @Immutable
-internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumns()) {
+internal data class TableLayout(
+  val columns: List<ColumnSetting> = defaultColumns(),
+  val nameWidth: Dp? = null,
+) {
   /** The columns the user shows, in order. */
   val shown: List<ColumnSetting>
     get() = columns.filter { it.visible || it.column.fixed }
@@ -125,17 +135,22 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
   fun withVisible(column: TableColumn, visible: Boolean): TableLayout =
     update(column) { it.copy(visible = visible || column.fixed) }
 
-  /** This layout with [column] [width] wide, kept between [TableColumn.MinWidth] and MaxWidth. */
-  fun withWidth(column: TableColumn, width: Dp): TableLayout =
-    update(column) { it.copy(width = width.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth)) }
+  /**
+   * This layout with [column] [width] wide, in whole dp as [encode] saves it, kept between
+   * [TableColumn.MinWidth] and MaxWidth.
+   */
+  fun withWidth(column: TableColumn, width: Dp): TableLayout = update(column) {
+    val whole = width.value.roundToInt().dp
+    it.copy(width = whole.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth), chosen = true)
+  }
 
   /**
    * This layout with each column still at its default width widened to [room], the width its
    * header needs, so a header longer than the English one is not cut. Widths the user chose stay.
    */
-  fun withHeaderRoom(room: (TableColumn) -> Dp): TableLayout = TableLayout(
-    columns.map { setting ->
-      if (setting.width != setting.column.width) return@map setting
+  fun withHeaderRoom(room: (TableColumn) -> Dp): TableLayout = copy(
+    columns = columns.map { setting ->
+      if (setting.chosen) return@map setting
       val needed = room(setting.column).coerceAtMost(TableColumn.MaxWidth)
       if (needed > setting.width) setting.copy(width = needed) else setting
     },
@@ -143,36 +158,89 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
 
   /**
    * The columns that fit a table [available] wide with [padding] on each side, after the status
-   * dot column and Name at its minimum width. Columns hide in [TableColumn.HideOrder], optional
-   * ones first; Progress and Speed always stay.
+   * dot column and Name at its minimum width. Columns widened past their own width give that
+   * back first, down to [floor] (the width their header needs), each in proportion to how much
+   * wider it is; only then do columns hide, in [TableColumn.HideOrder], optional ones first.
+   * Progress and Speed always stay.
    */
-  fun fit(available: Dp, padding: Dp): List<ColumnSetting> {
+  fun fit(
+    available: Dp,
+    padding: Dp,
+    floor: (TableColumn) -> Dp = { it.width },
+  ): List<ColumnSetting> {
     val fitted = shown.toMutableList()
     val hideable = fitted.filter { it.column.optional }.reversed().map { it.column } +
       TableColumn.HideOrder
-    fun needed() = padding * 2 + TableColumn.StatusDotWidth + TableColumn.NameMinWidth +
-      fitted.fold(0.dp) { sum, it -> sum + it.width }
+    fun narrowest(setting: ColumnSetting) =
+      setting.width.coerceAtMost(maxOf(setting.column.width, floor(setting.column)))
+    val room = available - padding * 2 - TableColumn.StatusDotWidth - TableColumn.NameMinWidth
+    fun narrowestTotal() = fitted.fold(0.dp) { sum, it -> sum + narrowest(it) }
     for (column in hideable) {
-      if (needed() <= available) break
+      if (narrowestTotal() <= room) break
       fitted.removeAll { it.column == column }
     }
-    return fitted
+    val over = fitted.fold(0.dp) { sum, it -> sum + it.width } - room
+    val extra = fitted.fold(0.dp) { sum, it -> sum + (it.width - narrowest(it)) }
+    if (over <= 0.dp || extra <= 0.dp) return fitted
+    val kept = 1f - (over / extra).coerceAtMost(1f)
+    return fitted.map { setting ->
+      val least = narrowest(setting)
+      setting.copy(width = least + (setting.width - least) * kept)
+    }
   }
 
   /**
-   * Encodes this layout as its column ids in order, each followed by `:width` when not the
-   * default and preceded by `-` when hidden: `size,progress:160,speed,left,-added`.
+   * The [fitted] columns laid out in [content], the width Name and the columns share: Name
+   * [nameWidth] wide, or what the columns leave when `null`, kept between
+   * [TableColumn.NameMinWidth] and what leaves the last column its own width, and the last column
+   * stretched to the table's end.
    */
-  fun encode(): String = columns.joinToString(",") { setting ->
-    buildString {
-      if (!setting.visible && !setting.column.fixed) append('-')
-      append(setting.column.id)
-      if (setting.width != setting.column.width) append(':').append(setting.width.value.toInt())
+  fun arrange(fitted: List<ColumnSetting>, content: Dp): TableGeometry {
+    val room = content - fitted.fold(0.dp) { sum, it -> sum + it.width }
+    val name = (nameWidth ?: room).coerceAtMost(room).coerceAtLeast(TableColumn.NameMinWidth)
+    val stretch = (room - name).coerceAtLeast(0.dp)
+    val columns = fitted.mapIndexed { index, setting ->
+      if (index == fitted.lastIndex) setting.copy(width = setting.width + stretch) else setting
     }
+    return TableGeometry(name, columns, stretch)
+  }
+
+  /**
+   * This layout with the divider before [geometry]'s column [index] moved so the column before it,
+   * Name for 0, is [width] wide. The columns after the divider keep their widths and follow it, as
+   * the last column gives or takes the room, never narrower than its own width. Name keeps its
+   * width when another column changes.
+   */
+  fun withDivider(geometry: TableGeometry, index: Int, width: Dp): TableLayout {
+    val before = if (index == 0) geometry.name else geometry.columns[index - 1].width
+    val min = if (index == 0) TableColumn.NameMinWidth else TableColumn.MinWidth
+    val max = if (index == 0) Dp.Infinity else TableColumn.MaxWidth
+    val widest = (before + geometry.stretch).coerceAtMost(max).coerceAtLeast(min)
+    val target = width.coerceIn(min, widest)
+    if (index == 0) return copy(nameWidth = target.value.roundToInt().dp)
+    return copy(nameWidth = geometry.name.value.roundToInt().dp)
+      .withWidth(geometry.columns[index - 1].column, target)
+  }
+
+  /**
+   * Encodes this layout as `name:width` when Name has one, then its column ids in order, each
+   * followed by `:width` when the user chose it and preceded by `-` when hidden:
+   * `name:300,size,progress:160,speed,left,-added`.
+   */
+  fun encode(): String {
+    val name = nameWidth?.let { listOf("$NAME_ID:${it.value.roundToInt()}") }.orEmpty()
+    val rest = columns.map { setting ->
+      buildString {
+        if (!setting.visible && !setting.column.fixed) append('-')
+        append(setting.column.id)
+        if (setting.chosen) append(':').append(setting.width.value.toInt())
+      }
+    }
+    return (name + rest).joinToString(",")
   }
 
   private fun update(column: TableColumn, change: (ColumnSetting) -> ColumnSetting): TableLayout =
-    TableLayout(columns.map { if (it.column == column) change(it) else it })
+    copy(columns = columns.map { if (it.column == column) change(it) else it })
 
   companion object {
     /** Every column at its default width, the optional ones hidden. */
@@ -184,18 +252,30 @@ internal data class TableLayout(val columns: List<ColumnSetting> = defaultColumn
      */
     fun decode(value: String?): TableLayout {
       if (value.isNullOrBlank()) return TableLayout()
+      val nameWidth = value.split(',').map { it.trim() }
+        .firstOrNull { it.substringBefore(':') == NAME_ID }
+        ?.substringAfter(':', "")?.toIntOrNull()?.dp
+        ?.coerceAtLeast(TableColumn.NameMinWidth)
       val read = value.split(',').mapNotNull { part ->
         val entry = part.trim()
         val hidden = entry.startsWith('-')
         val id = entry.removePrefix("-").substringBefore(':')
         val column = TableColumn.fromId(id) ?: return@mapNotNull null
         val width = entry.substringAfter(':', "").toIntOrNull()?.dp
-          ?.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth) ?: column.width
-        ColumnSetting(column, visible = !hidden || column.fixed, width = width)
+          ?.coerceIn(TableColumn.MinWidth, TableColumn.MaxWidth)
+        ColumnSetting(
+          column = column,
+          visible = !hidden || column.fixed,
+          width = width ?: column.width,
+          chosen = width != null,
+        )
       }.distinctBy { it.column }
       val missing = TableColumn.entries.filter { column -> read.none { it.column == column } }
-      return TableLayout(read + missing.map(::ColumnSetting))
+      return TableLayout(read + missing.map(::ColumnSetting), nameWidth)
     }
+
+    /** The id [encode] saves Name's width under; older versions skip it as unknown. */
+    private const val NAME_ID = "name"
   }
 }
 
@@ -220,3 +300,17 @@ internal enum class RowDensity(val id: String, private val resource: StringResou
     fun fromId(value: String?): RowDensity = entries.firstOrNull { it.id == value } ?: Default
   }
 }
+
+/**
+ * A table's columns as laid out by [TableLayout.arrange].
+ *
+ * @property name width of Name, cell padding included.
+ * @property columns the columns after Name, the last one stretched to the table's end.
+ * @property stretch how much wider than its own width the last column is.
+ */
+@Immutable
+internal data class TableGeometry(
+  val name: Dp,
+  val columns: List<ColumnSetting>,
+  val stretch: Dp,
+)

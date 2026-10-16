@@ -37,6 +37,11 @@
   <string name="error_corrupt_resume">Сохранённый прогресс повреждён</string>
   <string name="error_corrupt_resume_hint">Скачанную часть нельзя использовать повторно.</string>
   <string name="error_corrupt_resume_hint_short">скачанную часть нельзя использовать повторно</string>
+  <string name="error_checksum_mismatch">Файл не совпадает с контрольной суммой</string>
+  <string name="error_checksum_mismatch_hint">Его %1$s не совпадает с введённой контрольной суммой, поэтому файл удалён. Скачайте его снова или проверьте контрольную сумму.</string>
+  <string name="error_checksum_mismatch_hint_short">его %1$s не совпадает с введённой контрольной суммой</string>
+  <string name="error_checksum_mismatch_published_hint">Его %1$s не совпадает с суммой, опубликованной сервером, поэтому файл удалён. Возможно, он повредился при передаче; скачайте его снова.</string>
+  <string name="error_checksum_mismatch_published_hint_short">его %1$s не совпадает с суммой сервера</string>
   <string name="error_canceled">Отменено</string>
   <string name="error_wrong_credentials">Неверное имя пользователя или пароль</string>
   <string name="error_wrong_credentials_hint">Сервер %1$s отклонил вход.</string>
@@ -47,9 +52,9 @@
   <string name="error_source">Сервер %1$s сообщил об ошибке</string>
 
   <string name="error_http_sign_in">Требуется вход (%1$d)</string>
-  <string name="error_http_sign_in_hint">%1$s требует входа в аккаунт. Отправьте загрузку из расширения браузера Ketch, чтобы передать ваши cookie.</string>
+  <string name="error_http_sign_in_hint">%1$s требует входа в аккаунт. Добавьте загрузку из расширения браузера Ketch, чтобы передать cookie.</string>
   <string name="error_http_sign_in_hint_short">%1$s требует входа в аккаунт</string>
-  <string name="error_http_sign_in_hint_server">Сервер требует входа в аккаунт. Отправьте загрузку из расширения браузера Ketch, чтобы передать ваши cookie.</string>
+  <string name="error_http_sign_in_hint_server">Сервер требует входа в аккаунт. Добавьте загрузку из расширения браузера Ketch, чтобы передать cookie.</string>
   <string name="error_http_sign_in_hint_server_short">сервер требует входа в аккаунт</string>
   <string name="error_http_forbidden">Доступ запрещён (403)</string>
   <string name="error_http_forbidden_hint">Возможно, срок действия ссылки истёк.</string>

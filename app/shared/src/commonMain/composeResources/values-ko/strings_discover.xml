@@ -2,16 +2,39 @@
 <resources>
   <string name="discover_title">찾기</string>
   <string name="discover_settings">찾기 설정</string>
-  <string name="discover_hero_title">원하는 파일, Ketch가 찾아 드립니다.</string>
-  <string name="discover_intro_body">찾기는 %1$s로 웹을 검색하고 찾은 페이지를 읽어 신뢰할 수 있다고 판단한 파일을 보여 줍니다. 직접 추가하기 전에는 다운로드가 시작되지 않습니다.</string>
-  <string name="discover_example_blender">Apple 실리콘용 Blender</string>
-  <string name="discover_example_ubuntu">Ubuntu 24.04 서버 ISO</string>
+  <string name="discover_hero_title">무엇을 다운로드할까요?</string>
+  <string name="discover_intro_body">AI가 웹을 검색해 찾은 다운로드를 보여 줍니다. 직접 추가하기 전에는 다운로드되지 않습니다.</string>
+  <string name="discover_example_bootable_usb">부팅 USB를 만드는 도구</string>
+  <string name="discover_example_photo_editor">무료 오픈 소스 사진 편집기</string>
+  <string name="discover_example_video_editor">초보자를 위한 무료 동영상 편집기</string>
+  <string name="discover_example_screen_recorder">튜토리얼 제작용 화면 녹화 프로그램</string>
+  <string name="discover_example_podcast">팟캐스트 녹음 소프트웨어</string>
+  <string name="discover_example_password_manager">오픈 소스 비밀번호 관리자</string>
+  <string name="discover_example_office">오프라인에서 쓰는 무료 오피스 프로그램</string>
+  <string name="discover_example_planetarium">별 관측용 플라네타륨 소프트웨어</string>
+  <string name="discover_example_games">오프라인으로 즐기는 오픈 소스 게임</string>
+  <string name="discover_example_old_laptop">오래된 노트북용 가벼운 리눅스</string>
+  <string name="discover_example_raspberry_pi">라즈베리 파이용 운영체제</string>
+  <string name="discover_example_local_ai">노트북에서 돌리는 로컬 AI 모델</string>
   <string name="discover_example_footage">퍼블릭 도메인 4K 자연 영상</string>
+  <string name="discover_example_music">영상에 쓸 수 있는 저작권 무료 음악</string>
+  <string name="discover_example_audiobooks">고전 소설 무료 오디오북</string>
+  <string name="discover_example_films">퍼블릭 도메인 고전 영화</string>
+  <string name="discover_example_fonts">상업적으로 쓸 수 있는 무료 글꼴</string>
+  <string name="discover_example_sound_effects">크리에이티브 커먼즈 효과음</string>
+  <string name="discover_example_textures">3D 모델용 무료 텍스처</string>
+  <string name="discover_example_paintings">명화 4K 배경화면</string>
+  <string name="discover_example_mars">원본 해상도 NASA 화성 사진</string>
+  <string name="discover_example_lectures">무료 컴퓨터 과학 강의</string>
+  <string name="discover_example_wikipedia">오프라인으로 읽는 위키백과</string>
+  <string name="discover_example_hdr_test">TV 확인용 4K HDR 테스트 영상</string>
+  <string name="discover_example_speed_test">다운로드 속도 테스트용 대용량 파일</string>
+  <string name="discover_example_datasets">SQL 연습용 공개 데이터셋</string>
   <string name="discover_example_quoted">“%1$s”</string>
 
-  <string name="discover_setup_body">찾기는 AI 모델로 웹을 검색하고 찾은 페이지를 읽어 신뢰할 수 있다고 판단한 파일을 보여 줍니다. 검색 내용은 선택한 제공업체로 전송됩니다.</string>
+  <string name="discover_setup_body">찾기는 AI 모델로 웹을 검색해 찾은 다운로드를 보여 줍니다. 검색 내용은 선택한 제공업체로 전송됩니다.</string>
   <string name="discover_setup_unsupported">찾기는 컴퓨터나 Android 휴대폰의 Ketch 앱에서 사용할 수 있습니다.</string>
-  <string name="discover_setup_pending">찾기 설정이 끝나면 “%1$s” 검색이 바로 실행됩니다.</string>
+  <string name="discover_setup_pending">찾기 설정이 끝나면 “%1$s” 검색이 실행됩니다.</string>
   <string name="discover_setup_choose_model">모델 선택</string>
   <string name="discover_setup_local_provider">%1$s · 로컬에서 실행, 키 불필요</string>
   <string name="discover_setup_finish">%1$s 설정 마치기</string>
@@ -24,6 +47,8 @@
   <string name="discover_send">보내기</string>
   <string name="discover_stop">중지</string>
   <string name="discover_sites_limit">특정 웹사이트로 제한</string>
+  <string name="discover_model_menu_title">모델</string>
+  <string name="discover_model_manage">제공자 관리</string>
   <plurals name="discover_sites_count">
     <item quantity="other">웹사이트 %1$d개</item>
   </plurals>
@@ -75,9 +100,9 @@
   <string name="discover_error_title">찾기에서 이 검색을 완료하지 못했습니다</string>
   <string name="discover_failed">검색 실패</string>
   <string name="discover_none_title">다운로드할 파일을 찾지 못했습니다</string>
-  <string name="discover_none_body">찾기는 신뢰할 수 있는 출처의 파일만 보여 줍니다. 버전이나 플랫폼, 또는 배포하는 웹사이트를 함께 입력해 보세요.</string>
+  <string name="discover_none_body">버전, 플랫폼 또는 웹사이트를 추가해 보세요.</string>
   <plurals name="discover_none_filtered">
-    <item quantity="other">안전하지 않아 보이는 결과 %1$d개를 콘텐츠 필터가 숨겼습니다. 필터는 찾기 설정에서 끌 수 있습니다.</item>
+    <item quantity="other">콘텐츠 필터가 결과 %1$d개를 숨겼습니다. 찾기 설정에서 끌 수 있습니다.</item>
   </plurals>
   <string name="discover_search_everywhere">웹 전체 검색</string>
   <string name="discover_stopped">중지됨</string>
@@ -124,7 +149,7 @@
   <string name="discover_history_clear">기록 지우기</string>
   <string name="discover_turn_off">찾기 끄기</string>
   <string name="discover_turned_off">찾기가 꺼졌습니다</string>
-  <string name="discover_turned_off_detail">설정의 찾기에서 다시 켤 수 있습니다.</string>
+  <string name="discover_turned_off_detail">설정 › 찾기에서 다시 켤 수 있습니다.</string>
   <string name="discover_history_filter">기록 검색</string>
   <string name="discover_history_empty">실행한 검색이 여기에 표시됩니다.</string>
   <string name="discover_history_no_match">“%1$s”에 해당하는 검색이 없습니다</string>

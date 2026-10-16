@@ -162,16 +162,18 @@ class RowActionRunnerTest {
   }
 
   @Test
-  fun menu_completedRowWhereFilesGoToTheTrash_offersRemoveAndTrash() =
-    actionsTest(canTrash = true) { f ->
-      val row = rowOf(f.add(completed))
+  fun run_remove_asksWithTheFilesBoxUnchecked() = actionsTest { f ->
+    val task = f.add(completed)
+    val rows = listOf(rowOf(task), rowOf(f.add(downloading)))
 
-      val menu = f.runner.menu(row)
+    f.runner.run(RowAction.Remove, rows.take(1))
+    assertEquals(RowDialog.Remove(rows.take(1), withFiles = false), f.runner.dialog)
+    f.runner.run(RowAction.Remove, rows)
+    runCurrent()
 
-      assertTrue(RowAction.RemoveAndTrash in menu)
-      assertFalse(RowAction.RemoveAndDelete in menu)
-      assertFalse(RowAction.RemoveAndTrash in f.runner.menu(rowOf(row.task, RemoteDevice)))
-    }
+    assertEquals(RowDialog.Remove(rows, withFiles = false), f.runner.dialog)
+    assertTrue(task.calls.isEmpty())
+  }
 
   @Test
   fun checkFile_missingFile_offersDownloadAgainInsteadOfOpen() = actionsTest { f ->

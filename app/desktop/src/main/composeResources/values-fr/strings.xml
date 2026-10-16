@@ -19,6 +19,7 @@
   <string name="tray_recent">Récents</string>
   <string name="tray_show_ketch">Afficher Ketch</string>
   <string name="tray_speed">Vitesse</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">Afficher</string>
   <string name="tray_enter_token">Saisir le jeton…</string>
   <string name="tray_retry_now">Réessayer maintenant</string>
@@ -64,7 +65,7 @@
   <string name="message_update_ready">Ketch %1$s est prêt à être installé</string>
   <string name="message_update_installed">Ketch a été mis à jour vers la version %1$s</string>
   <string name="message_update_failed">Impossible de passer à Ketch %1$s</string>
-  <string name="message_update_failed_hint">Le fichier update.log du dossier des journaux indique ce qui n'a pas fonctionné.</string>
+  <string name="message_update_failed_hint">Consultez update.log dans le dossier des journaux.</string>
   <string name="message_update">Mettre à jour</string>
   <string name="message_restart">Redémarrer</string>
   <string name="message_open_installer">Ouvrir le programme d'installation</string>
@@ -83,6 +84,11 @@
     <item quantity="other">%1$d liens copiés</item>
   </plurals>
   <string name="message_window_error">Une erreur s'est produite</string>
+  <string name="message_downloads_run_by">%1$s (processus %2$d) exécute les téléchargements de cet ordinateur</string>
+  <string name="message_downloads_run_elsewhere">Un autre processus Ketch exécute les téléchargements de cet ordinateur</string>
+  <string name="message_downloads_run_hint">Arrêtez-le, puis quittez et rouvrez Ketch pour les exécuter ici</string>
+  <string name="message_command_stopped">%1$s s'est arrêté</string>
+  <string name="message_command_stopped_hint">Quittez et rouvrez Ketch pour exécuter ici les téléchargements de cet ordinateur</string>
   <string name="open_torrent_title">Ouvrir un fichier torrent</string>
 
   <string name="close_keep_running_title">Continuer à télécharger en arrière-plan ?</string>
@@ -132,4 +138,6 @@
   </plurals>
 
   <string name="settings_window_title">Réglages</string>
+
+  <string name="keep_awake_reason">Des téléchargements sont en cours</string>
 </resources>

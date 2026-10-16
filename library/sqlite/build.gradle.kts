@@ -10,6 +10,11 @@ plugins {
 }
 
 kotlin {
+  // DriverFactory is an expect class, which Kotlin still calls Beta.
+  compilerOptions {
+    freeCompilerArgs.add("-Xexpect-actual-classes")
+  }
+
   android {
     namespace = "com.linroid.ketch.sqlite"
     compileSdk = libs.versions.android.compileSdk.get().toInt()

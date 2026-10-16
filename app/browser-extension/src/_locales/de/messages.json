@@ -37,20 +37,6 @@
   "notify_download_added": {
     "message": "Download hinzugefügt"
   },
-  "notify_fallback_browser": {
-    "message": "Wird stattdessen im Browser heruntergeladen"
-  },
-  "notify_fallback_magnet": {
-    "message": "Magnet-Link wird in einer anderen App geöffnet"
-  },
-  "notify_send_failed": {
-    "message": "Senden an $NAME$ nicht möglich",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "notify_unsupported": {
     "message": "Ketch kann das nicht herunterladen"
   },
@@ -115,6 +101,9 @@
   },
   "error_app_connect_failed": {
     "message": "Die Ketch-App konnte keine Verbindung herstellen"
+  },
+  "error_app_pick_unsupported": {
+    "message": "Aktualisiere die Ketch-App, um hier Ordner auszuwählen"
   },
   "error_app_invalid_reply": {
     "message": "Die Ketch-App hat eine ungültige Antwort gesendet"
@@ -402,14 +391,6 @@
   "popup_add_button": {
     "message": "Herunterladen"
   },
-  "popup_added": {
-    "message": "$NAME$ hinzugefügt",
-    "placeholders": {
-      "name": {
-        "content": "$1"
-      }
-    }
-  },
   "popup_unsupported_link": {
     "message": "Gib einen http-, https-, ftp- oder Magnet-Link ein."
   },
@@ -616,20 +597,8 @@
   "error_media_unsupported": {
     "message": "Diese Ketch-Instanz unterstützt keine Medien-Playlists. Aktualisiere sie, bevor du diesen Link sendest."
   },
-  "review_setting": {
-    "message": "Downloads vor dem Senden prüfen"
-  },
-  "review_title": {
-    "message": "Download prüfen"
-  },
-  "review_name": {
-    "message": "Dateiname (optional)"
-  },
   "review_folder": {
     "message": "Ordner auf dem ausgewählten Gerät (optional)"
-  },
-  "review_detail": {
-    "message": "Ohne Ordnerangabe wird der Standard des Geräts verwendet. Der Server bestimmt die erlaubten Ordner. Torrents behalten ihre Dateistruktur. Beim Schließen dieser Seite übernimmt der Browser einen pausierten Download wieder."
   },
   "review_cancel": {
     "message": "Abbrechen"
@@ -642,5 +611,119 @@
   },
   "safari_detail": {
     "message": "Safari sendet geprüfte Links und Seitenressourcen an einen eingerichteten Ketch-Server. Aktiviere die Freigabe in Ketch und gib hier Adresse und Zugriffstoken ein. Automatische Download-Erfassung und App-Start sind nicht verfügbar."
+  },
+  "dialog_title": {
+    "message": "Neuer Download"
+  },
+  "dialog_name_label": {
+    "message": "Dateiname"
+  },
+  "dialog_send_to": {
+    "message": "Senden an"
+  },
+  "dialog_save_in": {
+    "message": "Speichern in"
+  },
+  "dialog_folder_default": {
+    "message": "Standardordner"
+  },
+  "dialog_folder_browse": {
+    "message": "Durchsuchen…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Einen Ordner auf diesem Computer auswählen"
+  },
+  "dialog_device_checking": {
+    "message": "Wird geprüft…"
+  },
+  "dialog_device_ready": {
+    "message": "Bereit"
+  },
+  "dialog_device_free": {
+    "message": "$SIZE$ frei",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_device_app_closed": {
+    "message": "Geschlossen · startet beim Senden"
+  },
+  "dialog_device_offline": {
+    "message": "Nicht erreichbar"
+  },
+  "dialog_torrent_layout": {
+    "message": "Torrents behalten ihre eigene Ordnerstruktur."
+  },
+  "dialog_space_warning": {
+    "message": "Nur $SIZE$ frei auf $DEVICE$.",
+    "placeholders": {
+      "size": {
+        "content": "$1"
+      },
+      "device": {
+        "content": "$2"
+      }
+    }
+  },
+  "dialog_download_browser": {
+    "message": "Im Browser herunterladen"
+  },
+  "dialog_sending": {
+    "message": "Wird gesendet…"
+  },
+  "dialog_folder_auto": {
+    "message": "Automatisch"
+  },
+  "dialog_folder_auto_match": {
+    "message": "Automatisch · $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "dialog_folder_auto_detail": {
+    "message": "Das Gerät wählt: seinen Download-Ordner oder den passenden Kategorieordner."
+  },
+  "dialog_folder_recent": {
+    "message": "Zuletzt verwendet: $FOLDER$",
+    "placeholders": {
+      "folder": {
+        "content": "$1"
+      }
+    }
+  },
+  "review_setting": {
+    "message": "Downloads vor dem Senden prüfen"
+  },
+  "notify_fallback_browser": {
+    "message": "Wird stattdessen im Browser heruntergeladen"
+  },
+  "notify_fallback_magnet": {
+    "message": "Magnet-Link wird in einer anderen App geöffnet"
+  },
+  "notify_send_failed": {
+    "message": "Senden an $NAME$ nicht möglich",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "popup_added": {
+    "message": "$NAME$ hinzugefügt",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "error_app_not_allowed": {
+    "message": "Ketch akzeptiert diese Kopie der Erweiterung nicht"
+  },
+  "hint_app_not_allowed": {
+    "message": "Ketch verbindet sich nur mit der Erweiterung aus dem Chrome Web Store oder mit dem Paket chrome-unpacked eines Releases, geladen über „Entpackte Erweiterung laden“. Installiere eine davon und versuche es erneut."
   }
 }

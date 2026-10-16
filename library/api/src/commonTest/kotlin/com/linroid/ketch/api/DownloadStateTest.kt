@@ -8,6 +8,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
+private val lenientJson = Json { ignoreUnknownKeys = true }
+
 class DownloadStateTest {
 
   @Test
@@ -102,6 +104,27 @@ class DownloadStateTest {
   }
 
   @Test
+  fun pauseReason_awaitingFileSelection_usesWireType() {
+    val json = Json.encodeToString(PauseReason.serializer(), PauseReason.AwaitingFileSelection)
+
+    assertEquals("""{"type":"awaiting_file_selection"}""", json)
+    assertEquals(
+      PauseReason.AwaitingFileSelection,
+      Json.decodeFromString(PauseReason.serializer(), json)
+    )
+  }
+
+  @Test
+  fun completed_jsonWithoutSharing_decodesNotSharing() {
+    val json = """{"type":"completed","outputPath":"/a","totalBytes":1}"""
+
+    val state = Json.decodeFromString(DownloadState.serializer(), json)
+
+    assertEquals(DownloadState.Completed("/a", 1), state)
+    assertFalse((state as DownloadState.Completed).sharing)
+  }
+
+  @Test
   fun pauseReason_unknownType_decodesAsUser() {
     // A newer server may send a reason this version does not know.
     val json = """
@@ -109,8 +132,7 @@ class DownloadStateTest {
        "reason":{"type":"thermal","celsius":90}}
     """.trimIndent()
 
-    val state = Json { ignoreUnknownKeys = true }
-      .decodeFromString(DownloadState.serializer(), json)
+    val state = lenientJson.decodeFromString(DownloadState.serializer(), json)
 
     assertEquals(PauseReason.User, (state as DownloadState.Paused).reason)
   }

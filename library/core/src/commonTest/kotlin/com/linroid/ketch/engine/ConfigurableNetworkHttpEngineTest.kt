@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.ConfigurableNetworkHttpEngine
 import com.linroid.ketch.core.engine.HttpEngine
@@ -26,13 +27,13 @@ class ConfigurableNetworkHttpEngineTest {
     try {
       assertTrue(ketch.networkInterfaces().supported)
       assertEquals(listOf("wifi", "ethernet"), ketch.networkInterfaces().available.map { it.id })
-      val selected = ketch.updateNetworkInterfaces(config("wifi", "ethernet"))
+      val selected = ketch.selectNetworkInterfaces(config("wifi", "ethernet"))
       assertEquals(listOf("wifi", "ethernet"), selected.config.interfaceIds)
       repeat(4) { engine.download("url", null) {} }
       assertEquals(listOf("wifi", "ethernet", "wifi", "ethernet"), provider.calls)
       assertEquals(1, provider.engines.first().closed)
 
-      ketch.updateNetworkInterfaces(NetworkInterfaceConfig())
+      ketch.selectNetworkInterfaces(NetworkInterfaceConfig())
       engine.head("url")
       assertEquals("default", provider.calls.last())
       assertTrue(ketch.networkInterfaces().config.interfaceIds.isEmpty())
@@ -56,7 +57,7 @@ class ConfigurableNetworkHttpEngineTest {
     }
     val request = async { engine.download("url", null) {} }
     started.await()
-    engine.updateNetworkInterfaces(config("wifi"))
+    engine.selectNetworkInterfaces(config("wifi"))
     engine.download("url", null) {}
     assertEquals(listOf("default", "wifi"), provider.calls)
     assertEquals(0, original.closed)
@@ -78,14 +79,14 @@ class ConfigurableNetworkHttpEngineTest {
     }
     val request = async { engine.download("url", null) {} }
     started.await()
-    engine.updateNetworkInterfaces(config("wifi"))
+    engine.selectNetworkInterfaces(config("wifi"))
     request.cancelAndJoin()
     assertEquals(1, provider.engines.first().closed)
     engine.close()
     engine.close()
     assertTrue(provider.engines.all { it.closed == 1 })
     assertFailsWith<IllegalStateException> { engine.download("url", null) {} }
-    assertFailsWith<IllegalStateException> { engine.updateNetworkInterfaces(config("wifi")) }
+    assertFailsWith<IllegalStateException> { engine.selectNetworkInterfaces(config("wifi")) }
   }
 
   @Test
@@ -93,12 +94,12 @@ class ConfigurableNetworkHttpEngineTest {
     val provider = Provider()
     val engine = ConfigurableNetworkHttpEngine(provider)
     assertFailsWith<IllegalArgumentException> {
-      engine.updateNetworkInterfaces(config("wifi", "missing"))
+      engine.selectNetworkInterfaces(config("wifi", "missing"))
     }
     assertEquals(1, provider.engines.size)
     provider.failOn = "ethernet"
     assertFailsWith<IllegalStateException> {
-      engine.updateNetworkInterfaces(config("wifi", "ethernet"))
+      engine.selectNetworkInterfaces(config("wifi", "ethernet"))
     }
     assertEquals(1, provider.engines.last().closed)
     engine.download("url", null) {}
@@ -112,7 +113,7 @@ class ConfigurableNetworkHttpEngineTest {
     val provider = Provider()
     val engine = ConfigurableNetworkHttpEngine(provider)
     provider.onDiscover = { engine.close() }
-    assertFailsWith<IllegalStateException> { engine.updateNetworkInterfaces(config("wifi")) }
+    assertFailsWith<IllegalStateException> { engine.selectNetworkInterfaces(config("wifi")) }
     assertTrue(provider.engines.all { it.closed == 1 })
   }
 
@@ -121,14 +122,14 @@ class ConfigurableNetworkHttpEngineTest {
     val provider = Provider()
     val engine = ConfigurableNetworkHttpEngine(provider)
     val ids = mutableListOf("wifi", "ethernet")
-    engine.updateNetworkInterfaces(NetworkInterfaceConfig(ids))
+    engine.selectNetworkInterfaces(NetworkInterfaceConfig(ids))
     ids.clear()
     provider.available = emptyList()
     val state = engine.networkInterfaces()
     assertTrue(state.available.isEmpty())
     assertEquals(listOf("wifi", "ethernet"), state.config.interfaceIds)
     assertFailsWith<IllegalArgumentException> {
-      engine.updateNetworkInterfaces(config("wifi"))
+      engine.selectNetworkInterfaces(config("wifi"))
     }
     engine.close()
   }
@@ -139,11 +140,31 @@ class ConfigurableNetworkHttpEngineTest {
     try {
       assertFalse(ketch.networkInterfaces().supported)
       assertFailsWith<UnsupportedOperationException> {
-        ketch.updateNetworkInterfaces(NetworkInterfaceConfig())
+        ketch.selectNetworkInterfaces(NetworkInterfaceConfig())
       }
     } finally {
       ketch.close()
     }
+  }
+
+  @Test
+  fun withProxy_followsSelectionAndAppliesProxyOnEachNetwork() = runTest {
+    val provider = Provider()
+    val engine = ConfigurableNetworkHttpEngine(provider)
+    val proxied = engine.withProxy(Proxy.Manual("http://proxy.test:3128"))
+
+    proxied.head("url")
+    engine.selectNetworkInterfaces(config("wifi", "ethernet"))
+    repeat(2) { proxied.download("url", null) {} }
+    proxied.close()
+    engine.download("url", null) {}
+
+    assertEquals(
+      listOf("default via proxy.test", "wifi via proxy.test", "ethernet via proxy.test", "wifi"),
+      provider.calls,
+    )
+    engine.close()
+    assertTrue(provider.engines.all { it.closed == 1 })
   }
 
   @Test
@@ -199,6 +220,9 @@ class ConfigurableNetworkHttpEngineTest {
       onDownload()
       onData(byteArrayOf(1))
     }
+
+    override fun withProxy(proxy: Proxy): HttpEngine =
+      RecordingEngine("$id via ${(proxy as? Proxy.Manual)?.address?.host}", calls)
 
     override fun close() {
       closed++

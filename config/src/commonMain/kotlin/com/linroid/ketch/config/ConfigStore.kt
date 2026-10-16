@@ -28,5 +28,14 @@ interface ConfigStore {
         indentation = TomlIndentation.NONE,
       ),
     )
+
+    /**
+     * Reads [text] as `config.toml`, with settings written by older versions moved to where this
+     * one keeps them, such as the one provider of `[ai.llm]`.
+     */
+    internal fun decode(text: String): KetchConfig {
+      val config = toml.decodeFromString(KetchConfig.serializer(), text)
+      return config.copy(ai = config.ai.migrated())
+    }
   }
 }

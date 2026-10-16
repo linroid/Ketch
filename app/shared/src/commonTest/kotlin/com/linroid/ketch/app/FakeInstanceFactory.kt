@@ -3,15 +3,20 @@ package com.linroid.ketch.app
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlin.time.Duration
 
 /**
  * Builds the [InstanceFactory] of an [InstanceManager] under test, whose remote devices are
@@ -70,6 +75,8 @@ class FakeRemote(
   private val announcedName: String,
   private val announcedOs: String,
 ) : KetchApi {
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
+
   /** `host:port` of the device. */
   val deviceId: String = "${config.host}:${config.port}"
 
@@ -115,7 +122,7 @@ class FakeRemote(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     throw UnsupportedOperationException("FakeRemote does not support downloads")
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
     throw UnsupportedOperationException("FakeRemote does not support resolve")
 
   override suspend fun updateConfig(config: DownloadConfig) {}

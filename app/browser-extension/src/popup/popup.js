@@ -5,6 +5,7 @@ import { sendToKetch } from '../lib/handoff.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
 import { isSupportedLinkUrl } from '../lib/request.js';
+import { rememberDeviceFolders } from '../lib/review.js';
 import { findInstance, loadSettings, saveSettings } from '../lib/settings.js';
 
 const REFRESH_INTERVAL_MS = 1_500;
@@ -102,6 +103,7 @@ async function refresh() {
 
 function showOnline(status) {
   online = true;
+  rememberDeviceFolders(instance.id, status);
   $('status-dot').dataset.state = 'online';
   $('status-text').textContent = describeStatus(status);
   $('status-hint').hidden = true;
@@ -180,9 +182,13 @@ async function onAdd(event) {
   $('add-button').disabled = true;
   try {
     const current = await loadSettings();
-    if (current.confirmDownloads) {
+    if (current.reviewDownloads) {
+      // The review shows over the page the popup was opened on. A private window's link must
+      // never become a regular browser download.
+      const [tab] = await ext.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+      const incognito = tab?.incognito || ext.extension?.inIncognitoContext || undefined;
       const response = await ext.runtime.sendMessage({ type: 'review-open',
-        instanceId: instance.id, download: { url } });
+        instanceId: instance.id, download: { url, incognito }, tabId: tab?.id });
       if (!response?.ok) throw new Error(response?.message || t('review_unavailable'));
       window.close();
       return;

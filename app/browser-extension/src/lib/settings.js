@@ -35,6 +35,8 @@ export const MAGNET_CAPTURE_KEY = 'captureMagnetLinks';
  * @property {boolean} forwardCookies send the site's cookies and referrer with each download
  * @property {number} minFileSizeMb leave smaller downloads to the browser; 0 sends all
  * @property {string[]} excludedHosts sites whose downloads stay in the browser
+ * @property {boolean} reviewDownloads show the download dialog before sending each download;
+ *   Safari always does
  * @property {boolean} notifications notify when a download is sent or falls back
  */
 
@@ -61,7 +63,7 @@ export function defaultSettings() {
     interceptDownloads: !remoteOnly,
     captureMagnetLinks: true,
     forwardCookies: true,
-    confirmDownloads: remoteOnly,
+    reviewDownloads: true,
     minFileSizeMb: 0,
     captureUnknownSize: true,
     fileTypeMode: 'all',
@@ -167,7 +169,8 @@ export function normalizeSettings(raw) {
       booleanOr(source.interceptDownloads, defaults.interceptDownloads),
     captureMagnetLinks: booleanOr(source.captureMagnetLinks, defaults.captureMagnetLinks),
     forwardCookies: booleanOr(source.forwardCookies, defaults.forwardCookies),
-    confirmDownloads: remoteOnly || booleanOr(source.confirmDownloads, false),
+    // A new key: every install saved the old, opt-in `confirmDownloads` as false.
+    reviewDownloads: remoteOnly || booleanOr(source.reviewDownloads, defaults.reviewDownloads),
     minFileSizeMb: Number.isFinite(minFileSizeMb) && minFileSizeMb > 0 ? minFileSizeMb : 0,
     excludedHosts: parseHostList(source.excludedHosts ?? []),
     captureUnknownSize: booleanOr(source.captureUnknownSize, true),

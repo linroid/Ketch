@@ -17,7 +17,9 @@ struct ContentView: View {
   let incoming: IncomingDownloads
 
   var body: some View {
+    // Compose pads for the safe area itself (WindowInsets.safeDrawing); inside SwiftUI's safe
+    // area it would get the bars' height twice, over a blank band where the bars are.
     ComposeView(incoming: incoming)
-      .ignoresSafeArea(.keyboard)
+      .ignoresSafeArea()
   }
 }

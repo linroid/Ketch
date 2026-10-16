@@ -29,12 +29,12 @@ for (const name of ['downloads', 'webRequest', 'notifications']) {
 const { normalizeSettings } = await import('../src/lib/settings.js');
 
 test('Safari starts with a configured-server entry and cannot enable unavailable features', () => {
-  const settings = normalizeSettings({ interceptDownloads: true, confirmDownloads: false,
+  const settings = normalizeSettings({ interceptDownloads: true, reviewDownloads: false,
     notifications: true, instances: [{ id: 'app', type: 'app' }] });
   assert.equal(settings.instances[0].type, 'server');
   assert.equal(settings.instances[0].url, 'http://127.0.0.1:8642');
   assert.equal(settings.interceptDownloads, false);
-  assert.equal(settings.confirmDownloads, true);
+  assert.equal(settings.reviewDownloads, true);
   assert.equal(settings.notifications, false);
 });
 

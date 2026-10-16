@@ -5,16 +5,27 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.torrent.crypto.sha1Digest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okio.Path.Companion.toPath
+import org.junit.runner.RunWith
+import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.Test
-import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AndroidTorrentSmokeTest {
@@ -43,7 +54,9 @@ class AndroidTorrentSmokeTest {
           // Completion closes the peer connection.
         } finally { connection.close() }
       }
-      val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+      // The peer above speaks plaintext only.
+      val source = TorrentDownloadSource(
+        TorrentConfig(dhtEnabled = false, encryption = TorrentEncryption.DISABLED))
       val output = root.resolve("nested/output")
       val magnet = MagnetUri(metadata.infoHash,
         explicitPeers = listOf("127.0.0.1:${listener.local.port}")).toUri()
@@ -61,10 +74,10 @@ class AndroidTorrentSmokeTest {
         outputPath = output.absolutePath,
       )
       try {
-        source.download(context)
+        source.download(context, null)
         assertContentEquals(bytes, output.readBytes())
         assertEquals(4L, context.segments.value.single().downloadedBytes)
-        source.cleanup(context, source.updateResumeState(context))
+        source.cleanup(context, source.store(context), deleteFiles = true)
         assertEquals(false, output.exists())
       } finally {
         source.close()

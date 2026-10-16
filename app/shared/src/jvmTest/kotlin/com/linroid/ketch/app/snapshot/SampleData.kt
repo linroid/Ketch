@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.snapshot
 
+import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -8,13 +9,16 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
+import com.linroid.ketch.api.NetworkKind
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -55,12 +59,14 @@ import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
 import kotlin.math.PI
@@ -85,6 +91,7 @@ import kotlin.time.Instant
  * @property remotes remote devices; they are never connected, so they show as offline.
  * @property deviceName name of the embedded device.
  * @property ui UI preferences on top of the snapshot's theme and density.
+ * @property connections the live connections the embedded device reports; none by default.
  */
 internal class SampleData(
   val tasks: List<ListTestTask>,
@@ -92,6 +99,7 @@ internal class SampleData(
   val remotes: List<RemoteConfig> = listOf(NAS),
   val deviceName: String = DEVICE_NAME,
   val ui: (UiPreferences) -> UiPreferences = { it },
+  val connections: ActiveConnections = ActiveConnections(NOW),
 ) {
   /** The task shown as [name], such as `"q3-report.pdf"`. */
   fun task(name: String): ListTestTask =
@@ -355,7 +363,7 @@ internal fun lanes(total: Long, done: List<Double>): List<Segment> {
 
 /**
  * A device of the snapshots named [name], on [os] with its downloads in [directory]: its tasks,
- * starting from [initial], its settings and its disk.
+ * starting from [initial], its settings, its disk and the live [connections] it reports.
  */
 internal class SampleKetchApi(
   private val name: String,
@@ -364,9 +372,23 @@ internal class SampleKetchApi(
   private val os: String = "Mac OS X",
   private val directory: String = SampleData.DOWNLOAD_DIR,
   private val version: String = KetchApi.VERSION,
+  private val connections: ActiveConnections = ActiveConnections(SampleData.NOW),
 ) : KetchApi {
   /** The embedded device of [data]. */
-  constructor(data: SampleData) : this(data.deviceName, data.tasks, data.downloadConfig)
+  constructor(data: SampleData) : this(
+    name = data.deviceName,
+    initial = data.tasks,
+    config = data.downloadConfig,
+    connections = data.connections,
+  )
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    if (interest is Interest.Connections) {
+      fixedConnections(connections, interest.limit) as Flow<T>
+    } else {
+      emptyFlow()
+    }
 
   private val taskList = MutableStateFlow(initial)
 
@@ -392,8 +414,9 @@ internal class SampleKetchApi(
     return task
   }
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    ResolvedSource(
+  override suspend fun resolve(input: ResolveInput): ResolvedSource {
+    val url = (input as? ResolveInput.Url)?.url ?: throw KetchError.Unsupported()
+    return ResolvedSource(
       url = url,
       sourceType = "http",
       totalBytes = 734_003_200,
@@ -401,9 +424,7 @@ internal class SampleKetchApi(
       suggestedFileName = extractFilename(url),
       maxSegments = 8,
     )
-
-  override suspend fun resolveContent(content: ByteArray, fileName: String?): ResolvedSource =
-    throw KetchError.Unsupported()
+  }
 
   override suspend fun status(): KetchStatus = KetchStatus(
     name = name,
@@ -448,7 +469,16 @@ internal class SampleDeviceApi(
   private val networks: NetworkInterfaces = NetworkInterfaces(),
   private val download: ((DownloadRequest) -> DownloadTask)? = null,
   private val resolve: (suspend (String) -> ResolvedSource)? = null,
+  private val connections: ActiveConnections = ActiveConnections(SampleData.NOW),
 ) : KetchApi {
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    if (interest is Interest.Connections) {
+      fixedConnections(connections, interest.limit) as Flow<T>
+    } else {
+      emptyFlow()
+    }
+
   override val backendLabel: String = status.name
   override val tasks: StateFlow<List<DownloadTask>> = MutableStateFlow(tasks)
 
@@ -463,13 +493,27 @@ internal class SampleDeviceApi(
   override suspend fun download(request: DownloadRequest): DownloadTask =
     download?.invoke(request) ?: throw UnsupportedOperationException("Not in snapshots")
 
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    resolve?.invoke(url) ?: throw UnsupportedOperationException("Not in snapshots")
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
+    (input as? ResolveInput.Url)?.let { resolve?.invoke(it.url) }
+      ?: throw UnsupportedOperationException("Not in snapshots")
 
   override suspend fun start() {}
 
   override fun close() {}
 }
+
+/**
+ * [connections] cut to the [limit] busiest, as an engine reports them, sent once and kept open.
+ */
+internal fun fixedConnections(connections: ActiveConnections, limit: Int): Flow<ActiveConnections> =
+  flow {
+    val kept = connections.connections
+      .sortedByDescending { it.downloadBps + it.uploadBps }
+      .take(limit)
+      .sortedBy { it.openedAt }
+    emit(connections.copy(connections = kept))
+    awaitCancellation()
+  }
 
 /** What a remote device of the snapshots named [name] reports, up for [uptime]. */
 internal fun sampleStatus(
@@ -674,9 +718,9 @@ internal class NetworkedApi(
   private var networks = NetworkInterfaces(
     supported = true,
     available = listOf(
-      NetworkInterfaceInfo("en0", "en0", en0),
-      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4")),
-      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12")),
+      NetworkInterfaceInfo("en0", "en0", en0, NetworkKind.WIFI),
+      NetworkInterfaceInfo("en7", "en7", listOf("10.0.0.4"), NetworkKind.ETHERNET),
+      NetworkInterfaceInfo("utun3", "utun3", listOf("100.101.7.12"), NetworkKind.VPN),
     ),
     config = NetworkInterfaceConfig(listOf("en0", "en7")),
   )
@@ -686,7 +730,7 @@ internal class NetworkedApi(
     return networks
   }
 
-  override suspend fun updateNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
+  override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     networks = networks.copy(config = config)
     return networks
   }

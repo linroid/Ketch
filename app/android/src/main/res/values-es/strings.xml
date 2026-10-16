@@ -4,7 +4,7 @@
   <string name="quick_add_no_link">No hay ningún enlace que descargar</string>
 
   <string name="notifications_offer_title">Recibe avisos de descargas y de Descubrir</string>
-  <string name="notifications_offer_message">Ketch te avisa cuando una descarga termina o falla, o cuando Descubrir necesita permiso para acceder a un sitio web. Recibirás estos avisos aunque estés usando otras apps.</string>
+  <string name="notifications_offer_message">Recibe avisos cuando las descargas terminen o fallen, o cuando Descubrir necesite tu aprobación, mientras usas otras apps.</string>
   <string name="notifications_offer_allow">Permitir</string>
   <string name="notifications_offer_not_now">Ahora no</string>
 </resources>

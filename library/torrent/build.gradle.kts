@@ -43,7 +43,7 @@ kotlin {
   // Intermediate source set shared between JVM and Android
   applyDefaultHierarchyTemplate()
   sourceSets {
-    val jvmAndAndroidMain by creating {
+    val jvmAndAndroidMain = create("jvmAndAndroidMain") {
       dependsOn(commonMain.get())
     }
     androidMain.get().dependsOn(jvmAndAndroidMain)
@@ -51,8 +51,8 @@ kotlin {
 
     commonMain.dependencies {
       api(projects.library.core)
+      api(projects.library.torrentApi)
       implementation(libs.okio)
-      implementation(libs.ktor.network)
       implementation(libs.ktor.http)
       implementation(projects.library.ktor)
       implementation(libs.kotlinx.coroutines.core)
@@ -60,7 +60,7 @@ kotlin {
     }
     jvmMain.dependencies {
       // OS filesystem calls only; no torrent implementation or torrent native bindings.
-      implementation("net.java.dev.jna:jna:5.19.1")
+      implementation(libs.jna)
     }
     jvmTest.dependencies {
       implementation(projects.library.server)
@@ -97,11 +97,15 @@ tasks.withType<Test>().configureEach {
   // Required evidence must describe this execution, not restored/cached XML from an earlier run.
   val benchmark = providers.environmentVariable("KETCH_TORRENT_BENCHMARK").orNull == "1"
   val measuring = providers.environmentVariable("KETCH_TORRENT_MEMORY").orNull == "1"
+  val throughput = providers.environmentVariable("KETCH_TORRENT_THROUGHPUT").orNull == "1"
   val publicSwarm = providers.gradleProperty("publicTorrentTests").orNull == "true"
   inputs.property("publicTorrentTests", publicSwarm)
-  outputs.upToDateWhen { !conformance && !benchmark && !measuring && !publicSwarm }
-  outputs.cacheIf { !conformance && !benchmark && !measuring && !publicSwarm }
+  val surveying = !providers.environmentVariable("KETCH_TORRENT_SURVEY").orNull.isNullOrBlank()
+  val opted = conformance || benchmark || measuring || publicSwarm || surveying || throughput
+  outputs.upToDateWhen { !opted }
+  outputs.cacheIf { !opted }
   if (!publicSwarm) filter.excludeTestsMatching("*PublicSwarmTest")
+  if (!surveying) filter.excludeTestsMatching("*PeerSurveyTest")
   if (!conformance && providers.environmentVariable("TRANSMISSION_DAEMON").orNull.isNullOrBlank()) {
     filter.excludeTestsMatching("*TransmissionInteropTest")
   }
@@ -109,10 +113,16 @@ tasks.withType<Test>().configureEach {
     filter.excludeTestsMatching("*TorrentBenchmarkTest")
   }
   if (!measuring) filter.excludeTestsMatching("*TorrentSessionMemoryTest")
+  // The throughput payload is held in memory beside the engine's buffers.
+  if (throughput) maxHeapSize = "2g" else filter.excludeTestsMatching("*V1ThroughputTest")
   for (name in listOf("TRANSMISSION_DAEMON", "KETCH_TORRENT_BENCHMARK",
     "KETCH_NATIVE_CLI", "KETCH_JVM_CLI", "KETCH_BENCHMARK_BYTES", "KETCH_BENCHMARK_RUNS",
     "KETCH_BENCHMARK_REVISION", "KETCH_BENCHMARK_REPORT", "KETCH_TORRENT_MEMORY",
-    "KETCH_TORRENT_MEMORY_REPORT")) {
+    "KETCH_TORRENT_MEMORY_REPORT", "KETCH_TORRENT_SURVEY", "KETCH_TORRENT_SURVEY_MINUTES",
+    "KETCH_TORRENT_SURVEY_LOG", "KETCH_TORRENT_SURVEY_ENCRYPTION", "KETCH_TORRENT_THROUGHPUT",
+    "KETCH_THROUGHPUT_PIECES", "KETCH_THROUGHPUT_RTT_MS", "KETCH_THROUGHPUT_SEEDERS",
+    "KETCH_THROUGHPUT_BYTES", "KETCH_THROUGHPUT_DELAYED_BYTES", "KETCH_THROUGHPUT_RUNS",
+    "KETCH_THROUGHPUT_LABEL", "KETCH_THROUGHPUT_REPORT")) {
     val value = providers.environmentVariable(name).orElse("")
     inputs.property(name, value)
     environment(name, value.get())

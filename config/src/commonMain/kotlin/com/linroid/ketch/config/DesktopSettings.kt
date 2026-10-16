@@ -38,7 +38,7 @@ enum class DockBadgeMode {
 /**
  * Desktop app behavior, persisted under `[desktop]`.
  *
- * Only the desktop app reads this section.
+ * The direct Android build also uses [checkForUpdates], keeping the existing update preference.
  *
  * @property closeAction what closing the main window does.
  * @property openAtLogin whether the user asked for Ketch to open at login; the
@@ -46,6 +46,8 @@ enum class DockBadgeMode {
  * @property startHidden whether a launch at login starts hidden in the menu bar
  *   or notification area.
  * @property dockBadge what the Dock or taskbar badge shows.
+ * @property menuBarSpeed whether the macOS menu bar shows the download speed after the Ketch
+ *   icon while downloads run.
  * @property checkForUpdates whether the app looks for a newer release once a day and offers to
  *   install it.
  */
@@ -55,5 +57,6 @@ data class DesktopSettings(
   val openAtLogin: Boolean = false,
   val startHidden: Boolean = true,
   val dockBadge: DockBadgeMode = DockBadgeMode.ActiveCount,
+  val menuBarSpeed: Boolean = true,
   val checkForUpdates: Boolean = true,
 )

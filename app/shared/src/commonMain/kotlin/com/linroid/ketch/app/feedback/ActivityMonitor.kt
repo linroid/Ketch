@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.state.TaskKey
+import com.linroid.ketch.app.state.awaitsFileSelection
 import com.linroid.ketch.app.state.waitsInQueue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,10 +48,11 @@ class ActivitySource(
  * shows up later counts as added only when it was created after the monitor started; older
  * ones, such as tasks the engine restores after an empty first list, join the baseline.
  *
- * Completions are held for up to [COALESCE_WINDOW] while other tasks of the device are still
- * running: more than [COALESCE_LIMIT] of them become one [ActivityEvent.CompletedBatch]. The
- * completion that leaves the device with nothing queued or downloading is reported at once; when
- * more than one task finished since the device was last idle, [ActivityEvent.QueueDrained]
+ * Completions are reported at once. The first one while other tasks of the device are still
+ * running opens a [COALESCE_WINDOW]: up to [COALESCE_LIMIT] completions in it are reported one by
+ * one, and the rest are held until it ends, then reported together as one
+ * [ActivityEvent.CompletedBatch]. When the completion that leaves the device with nothing queued
+ * or downloading follows others since the device was last idle, [ActivityEvent.QueueDrained]
  * replaces it and any completions still held. A device that stays offline for [OFFLINE_GRACE]
  * is reported, and so is its return.
  *
@@ -93,12 +95,16 @@ class ActivityMonitor(
     source.tasks.flatMapLatest(::phases).map { Signal.Tasks(source.deviceId, it) }
   )
 
-  // Progress updates do not matter here, so each task only emits when its kind of state changes.
+  // Progress updates do not matter here, so each task only emits when its kind of state changes,
+  // a pause that waits for files counting as its own kind. A finished torrent that starts or
+  // stops seeding stays Completed, so it is never reported again.
   private fun phases(tasks: List<DownloadTask>): Flow<List<TaskSnapshot>> {
     if (tasks.isEmpty()) return flowOf(emptyList())
     val flows = tasks.map { task ->
       task.state
-        .distinctUntilChanged { old, new -> old::class == new::class }
+        .distinctUntilChanged { old, new ->
+          old::class == new::class && old.awaitsFileSelection == new.awaitsFileSelection
+        }
         .map { TaskSnapshot(task, it) }
     }
     return combine(flows) { it.toList() }
@@ -143,6 +149,8 @@ class ActivityMonitor(
             completions += ActivityEvent.Completed(key, task.request, state)
           state is DownloadState.Failed && previous !is DownloadState.Failed ->
             events += ActivityEvent.Failed(key, task.request, state)
+          state.awaitsFileSelection && !previous.awaitsFileSelection ->
+            events += ActivityEvent.FilesNeeded(key, task.request)
         }
         isBaseline || task.createdAt < startedAt -> {
           preexisting = true
@@ -167,28 +175,43 @@ class ActivityMonitor(
     for (completion in completions) {
       tracker.runFiles++
       tracker.runBytes += completion.state.totalBytes ?: 0
-      tracker.held += completion
     }
     val busy = tasks.any {
       it.state.waitsInQueue || it.state is DownloadState.Downloading
     }
-    when {
-      !busy -> {
-        if (completions.isNotEmpty() && tracker.runFiles > 1) {
-          tracker.held.clear()
-          send(ActivityEvent.QueueDrained(deviceId, tracker.runFiles, tracker.runBytes))
-        } else {
-          flushHeld(tracker)
-        }
-        tracker.windowOpen = false
-        tracker.runFiles = 0
-        tracker.runBytes = 0
-      }
-      tracker.held.isNotEmpty() && !tracker.windowOpen -> {
-        tracker.windowOpen = true
-        val generation = ++tracker.windowGeneration
-        schedule(COALESCE_WINDOW, Signal.WindowEnd(deviceId, generation))
-      }
+    if (busy) {
+      completions.forEach { report(deviceId, tracker, it) }
+      return
+    }
+    if (completions.isNotEmpty() && tracker.runFiles > 1) {
+      tracker.held.clear()
+      send(ActivityEvent.QueueDrained(deviceId, tracker.runFiles, tracker.runBytes))
+    } else {
+      tracker.held += completions
+      flushHeld(tracker)
+    }
+    tracker.windowOpen = false
+    tracker.runFiles = 0
+    tracker.runBytes = 0
+  }
+
+  // Reports a completion while other tasks run, holding it once its window reported the limit.
+  private fun report(
+    deviceId: String,
+    tracker: DeviceTracker,
+    completion: ActivityEvent.Completed,
+  ) {
+    if (!tracker.windowOpen) {
+      tracker.windowOpen = true
+      tracker.windowReported = 0
+      val generation = ++tracker.windowGeneration
+      schedule(COALESCE_WINDOW, Signal.WindowEnd(deviceId, generation))
+    }
+    if (tracker.windowReported < COALESCE_LIMIT) {
+      tracker.windowReported++
+      send(completion)
+    } else {
+      tracker.held += completion
     }
   }
 
@@ -210,11 +233,7 @@ class ActivityMonitor(
     if (tracker.held.isEmpty()) return
     val held = tracker.held.toList()
     tracker.held.clear()
-    if (held.size > COALESCE_LIMIT) {
-      send(ActivityEvent.CompletedBatch(held))
-    } else {
-      held.forEach(::send)
-    }
+    send(held.singleOrNull() ?: ActivityEvent.CompletedBatch(held))
   }
 
   private fun schedule(after: Duration, signal: Signal) {
@@ -230,16 +249,18 @@ class ActivityMonitor(
   }
 
   // Requests can hold credentials and cookies, so only ids are logged.
-  private fun describe(event: ActivityEvent): String = when (event) {
-    is ActivityEvent.Added -> "added taskId=${event.taskKey.taskId} on ${event.taskKey.deviceId}"
-    is ActivityEvent.Completed ->
-      "completed taskId=${event.taskKey.taskId} on ${event.taskKey.deviceId}"
-    is ActivityEvent.CompletedBatch -> "${event.completions.size} completed"
-    is ActivityEvent.Failed -> "failed taskId=${event.taskKey.taskId} on ${event.taskKey.deviceId}"
-    is ActivityEvent.Recovered -> "${event.count} recovered on ${event.deviceId}"
-    is ActivityEvent.QueueDrained -> "queue drained after ${event.files} on ${event.deviceId}"
-    is ActivityEvent.DeviceOffline -> "${event.deviceId} offline"
-    is ActivityEvent.DeviceOnline -> "${event.deviceId} online"
+  private fun describe(event: ActivityEvent): String {
+    ActivityRouting.taskKeyOf(event)?.let { key ->
+      return "${event::class.simpleName} taskId=${key.taskId} on ${key.deviceId}"
+    }
+    return when (event) {
+      is ActivityEvent.CompletedBatch -> "${event.completions.size} completed"
+      is ActivityEvent.Recovered -> "${event.count} recovered on ${event.deviceId}"
+      is ActivityEvent.QueueDrained -> "queue drained after ${event.files} on ${event.deviceId}"
+      is ActivityEvent.DeviceOffline -> "${event.deviceId} offline"
+      is ActivityEvent.DeviceOnline -> "${event.deviceId} online"
+      else -> event::class.simpleName.orEmpty()
+    }
   }
 
   private class DeviceTracker {
@@ -248,6 +269,7 @@ class ActivityMonitor(
     val held = ArrayList<ActivityEvent.Completed>()
     var windowOpen = false
     var windowGeneration = 0
+    var windowReported = 0
     var runFiles = 0
     var runBytes = 0L
     var online: Boolean? = null
@@ -269,10 +291,10 @@ class ActivityMonitor(
   }
 
   companion object {
-    /** How long completions are held to see whether more follow. */
+    /** How long a burst of completions lasts, from its first one, before another may start. */
     val COALESCE_WINDOW: Duration = 10.seconds
 
-    /** Most completions in one window reported one by one; more become a batch. */
+    /** Most completions in one window reported one by one; the rest become one batch. */
     const val COALESCE_LIMIT: Int = 3
 
     /** How long a device stays offline before it is reported. */

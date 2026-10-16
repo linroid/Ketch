@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsCategory
@@ -30,16 +32,19 @@ import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.config.SpeedRule
 import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.TorrentSettings
+import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 /**
  * The device pages of Settings (Downloads, Speed, Network, BitTorrent and Sharing) on their own,
@@ -89,8 +94,39 @@ class SettingsDeviceSnapshots {
   }
 
   @Test
-  fun bitTorrent_trackers_listsThem() {
-    pageSnapshots("settings-bittorrent", SettingsCategory.BitTorrent, sizes = listOf(Pane))
+  fun network_manualProxy_showsAddressCredentialsAndBypass() {
+    pageSnapshots(
+      name = "settings-network-proxy",
+      category = SettingsCategory.Network,
+      sizes = listOf(Pane, PhonePage),
+      setup = DeviceSetup(
+        proxy = Proxy.Manual(
+          "socks5://alex:secret@10.0.0.2:1080",
+          bypass = listOf("*.lan", "10.0.0.0/8"),
+        ),
+      ),
+    )
+  }
+
+  @Test
+  fun bitTorrent_seedingWithTrackers_showsUploadAndTrackers() {
+    pageSnapshots("settings-bittorrent", SettingsCategory.BitTorrent)
+  }
+
+  @Test
+  fun bitTorrent_phoneFollowingTheNetwork_showsOnlyOnWifi() {
+    pageSnapshots(
+      name = "settings-bittorrent-wifi",
+      category = SettingsCategory.BitTorrent,
+      sizes = listOf(PhonePage),
+      setup = DeviceSetup(followsNetwork = true),
+    )
+    pageSnapshots(
+      name = "settings-bittorrent-wifi-upload-off",
+      category = SettingsCategory.BitTorrent,
+      sizes = listOf(PhonePage),
+      setup = DeviceSetup(followsNetwork = true, upload = TorrentUploadMode.Off),
+    )
   }
 
   @Test
@@ -244,6 +280,10 @@ private fun PageFrame(
  * @property pendingPort a port saved after sharing started, which asks for a restart.
  * @property remote whether the pages show the NAS, a remote device, instead of this one.
  * @property networksFail whether asking the device for its networks fails.
+ * @property proxy how the device's downloads reach servers.
+ * @property upload what the device shares with the peers of its torrents.
+ * @property followsNetwork whether its uploads follow the network, as on a phone, which shows
+ *   Only on Wi-Fi.
  */
 private data class DeviceSetup(
   val speed: SpeedSettings = SpeedSettings(
@@ -270,6 +310,9 @@ private data class DeviceSetup(
   val pendingPort: Int? = null,
   val remote: Boolean = false,
   val networksFail: Boolean = false,
+  val proxy: Proxy = Proxy.System,
+  val upload: TorrentUploadMode = TorrentUploadMode.Seed,
+  val followsNetwork: Boolean = false,
 )
 
 /**
@@ -283,7 +326,10 @@ private class DeviceEnvironment(
   density: DensityMode,
 ) : SnapshotEnvironment {
   override val data = SampleData.downloads(
-    SampleData.DOWNLOAD_CONFIG.copy(defaultDirectory = setup.folder ?: SampleData.DOWNLOAD_DIR),
+    SampleData.DOWNLOAD_CONFIG.copy(
+      defaultDirectory = setup.folder ?: SampleData.DOWNLOAD_DIR,
+      proxy = setup.proxy,
+    ),
   ).let { sample ->
     SampleData(
       tasks = sample.tasks,
@@ -308,6 +354,31 @@ private class DeviceEnvironment(
       deviceName = data.deviceName,
       embeddedFactory = { api },
       localServerFactory = PretendServer,
+      trackerList = MutableStateFlow(
+        listOf(
+          TrackerListStatus(
+            TorrentSettings.DEFAULT_TRACKER_LISTS[0],
+            listOf(
+              "udp://tracker.opentrackr.org:1337/announce",
+              "udp://open.stealth.si:80/announce",
+              "udp://tracker.torrent.eu.org:451/announce",
+            ),
+            SampleData.NOW - 3.hours,
+          ),
+          TrackerListStatus(
+            TorrentSettings.DEFAULT_TRACKER_LISTS[1],
+            listOf(
+              "udp://tracker.opentrackr.org:1337/announce",
+              "http://tracker.dler.com:6969/announce",
+            ),
+            SampleData.NOW - 3.hours,
+            failed = true,
+          ),
+        ),
+      ),
+      // A phone on Wi-Fi.
+      uploadNetwork = flowOf(true).takeIf { setup.followsNetwork },
+      pauseUploads = {},
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(
@@ -368,6 +439,8 @@ private class DeviceEnvironment(
             "udp://open.demonii.com:1337/announce",
             "https://tracker.example.org:443/announce",
           ),
+          upload = setup.upload,
+          uploadLimit = SpeedLimit.mbps(1),
         ),
         server = if (setup.sharing) {
           ServerConfig(apiToken = setup.token, mdnsEnabled = true)

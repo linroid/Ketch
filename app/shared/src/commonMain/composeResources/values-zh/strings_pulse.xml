@@ -9,8 +9,8 @@
   <plurals name="pulse_attention">
     <item quantity="other">%1$d 个下载需要处理</item>
   </plurals>
-  <string name="pulse_all_quiet">一切正常</string>
-  <string name="pulse_all_quiet_free">一切正常 · %2$s 上可用 %1$s</string>
+  <string name="pulse_all_quiet">空闲</string>
+  <string name="pulse_all_quiet_free">空闲 · %2$s 上可用 %1$s</string>
   <string name="pulse_connecting">正在连接 %1$s</string>
   <string name="pulse_needs_token">%1$s 需要令牌</string>
   <string name="pulse_offline">%1$s 已离线 · 正在重试</string>
@@ -82,14 +82,14 @@
   <string name="pulse_use_as_slow_lane">设为低速模式的限速</string>
   <string name="pulse_speed_settings">速度设置…</string>
   <string name="pulse_update_failed">无法更新%1$s · %2$s</string>
-  <string name="pulse_caption_full">下载将以网络允许的最快速度进行。</string>
+  <string name="pulse_caption_full">不限速。</string>
   <string name="pulse_caption_capped">下载速度上限为 %1$s。</string>
-  <string name="pulse_caption_slow_lane">所有下载的总速度不超过 %1$s，为其他应用留出带宽。</string>
+  <string name="pulse_caption_slow_lane">所有下载共享 %1$s。</string>
   <string name="pulse_caption_no_rules">尚无速度规则。可在速度设置中添加。</string>
   <string name="pulse_caption_rule_slow_lane">已按规则开启低速模式。</string>
   <string name="pulse_caption_rule_full">当前为全速，规则生效时将开启低速模式。</string>
-  <string name="pulse_caption_slow_lane_until">低速模式将持续到 %1$s，之后按规则调整。</string>
-  <string name="pulse_caption_full_until">全速模式将持续到 %1$s，之后按规则调整。</string>
+  <string name="pulse_caption_slow_lane_until">低速模式持续到 %1$s，之后按规则调整。</string>
+  <string name="pulse_caption_full_until">全速持续到 %1$s，之后按规则调整。</string>
   <string name="pulse_limit_for_slow_lane">开启低速模式时使用。</string>
   <string name="pulse_limit_for_device">适用于%1$s上的所有下载。</string>
   <string name="pulse_limit_after_slow_lane">低速模式关闭后生效。</string>
@@ -115,4 +115,40 @@
   <string name="pulse_timeline_limit">限速 → %1$s</string>
   <string name="pulse_timeline_limit_removed">已取消限速</string>
   <string name="pulse_timeline_priority">优先级 → %1$s</string>
+
+  <!-- Connections grid -->
+  <string name="pulse_connections_title">连接</string>
+  <plurals name="pulse_connections_summary">
+    <item quantity="other">%1$d 个连接</item>
+  </plurals>
+  <string name="pulse_connections_rates">↓ %1$s · ↑ %2$s</string>
+  <string name="pulse_connections_more">+%1$d</string>
+  <plurals name="pulse_connections_more_long">
+    <item quantity="other">还有 %1$d 个</item>
+  </plurals>
+  <string name="pulse_connections_none">没有活动连接</string>
+  <plurals name="pulse_connections_unsupported">
+    <item quantity="other">%1$d 台设备不报告连接</item>
+  </plurals>
+  <string name="pulse_connections_legend_download">下载中</string>
+  <string name="pulse_connections_legend_upload">上传中</string>
+  <string name="pulse_connections_legend_both">上传和下载</string>
+  <string name="pulse_connections_legend_idle">空闲</string>
+  <string name="pulse_connection_outgoing">传出</string>
+  <string name="pulse_connection_incoming">传入</string>
+  <string name="pulse_connection_direct">直连</string>
+  <string name="pulse_connection_via_http_proxy">通过 HTTP 代理</string>
+  <string name="pulse_connection_via_socks_proxy">通过 SOCKS5 代理</string>
+  <string name="pulse_connection_secure">已加密</string>
+  <string name="pulse_connection_received">已接收 %1$s</string>
+  <string name="pulse_connection_sent">已发送 %1$s</string>
+  <string name="pulse_connection_open_for">已连接 %1$s</string>
+  <string name="pulse_connection_peer_choking">节点暂不发送数据</string>
+  <string name="pulse_connection_upload_slot">正在向此节点上传</string>
+  <string name="pulse_connection_show_task">显示下载</string>
+  <string name="pulse_connections_tooltip">活动连接</string>
+  <string name="pulse_connection_description">%1$s，%2$s，%3$s，下行 %4$s，上行 %5$s</string>
+  <plurals name="pulse_connections_grid_description">
+    <item quantity="other">%1$d 个连接，%2$d 个下载中，%3$d 个上传中</item>
+  </plurals>
 </resources>

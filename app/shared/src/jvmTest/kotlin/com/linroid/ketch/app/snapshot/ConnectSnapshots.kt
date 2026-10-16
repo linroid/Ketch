@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.snapshot
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.linroid.ketch.app.App
@@ -10,19 +11,24 @@ import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.MdnsDiscoverer
 import com.linroid.ketch.app.instance.PairingAsk
+import com.linroid.ketch.app.instance.PairingRequests
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LinkSource
+import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.ui.connect.AddDeviceDialog
 import com.linroid.ketch.app.ui.connect.ConnectForm
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
 import com.linroid.ketch.app.ui.connect.DeviceConnector
 import com.linroid.ketch.app.ui.connect.NearbySearch
-import com.linroid.ketch.app.ui.connect.PairingApprovalDialog
 import com.linroid.ketch.app.ui.connect.PairingClient
 import com.linroid.ketch.app.ui.connect.PairingDialog
+import com.linroid.ketch.app.ui.connect.PairingRequestCard
+import com.linroid.ketch.app.ui.connect.PairingWindowRow
 import com.linroid.ketch.app.ui.connect.ProbeResult
 import com.linroid.ketch.app.ui.connect.codeForm
+import com.linroid.ketch.app.ui.settings.NewCodeDialog
+import com.linroid.ketch.app.ui.settings.SettingsGroup
 import com.linroid.ketch.app.util.PairingLink
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.remote.ConnectionState
@@ -35,7 +41,11 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Connecting another device: the web app's connect page, the Add device sheet and the pairing
@@ -156,6 +166,39 @@ class ConnectSnapshots {
   }
 
   @Test
+  fun newCode_asksBeforeDisconnectingPairedDevices() {
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Phone to SnapshotTheme.Dark,
+    )) {
+      snapshot("new-code-confirm", size, theme) { NewCodeDialog(onConfirm = {}, onDismiss = {}) }
+    }
+  }
+
+  @Test
+  fun pairingWindow_offAndCountingDown() {
+    val now = Instant.fromEpochSeconds(1_800_000_000)
+    val clock = object : Clock {
+      override fun now(): Instant = now
+    }
+    val off = PairingRequests(clock)
+    val on = PairingRequests(clock).apply { open(2.minutes + 41.seconds) }
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Phone to SnapshotTheme.Dark,
+    )) {
+      snapshot("pairing-window", size, theme) {
+        CompositionLocalProvider(LocalClock provides clock) {
+          SettingsGroup {
+            PairingWindowRow(off)
+            PairingWindowRow(on)
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   fun pairingRequest_asksTheOwnerWithTheCode() {
     val ask = PairingAsk(1, "Pixel 9", "4821", "Android 16", "192.168.1.30")
     for ((size, theme) in listOf(
@@ -163,7 +206,7 @@ class ConnectSnapshots {
       SnapshotSize.Desktop to SnapshotTheme.Dark,
       SnapshotSize.Phone to SnapshotTheme.Light,
     )) {
-      snapshot("pairing-request", size, theme) { PairingApprovalDialog(ask, onAnswer = {}) }
+      snapshot("pairing-request", size, theme) { PairingRequestCard(ask, onAnswer = {}) }
     }
   }
 

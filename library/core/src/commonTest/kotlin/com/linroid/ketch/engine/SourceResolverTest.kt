@@ -1,17 +1,21 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
-import com.linroid.ketch.core.engine.SourceResumeState
+import com.linroid.ketch.core.engine.canHandle
+import com.linroid.ketch.core.engine.resolve
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.builtins.serializer
 
 class SourceResolverTest {
 
@@ -19,36 +23,30 @@ class SourceResolverTest {
     httpEngine = FakeHttpEngine(),
   )
 
-  private val fakeSource = object : DownloadSource {
+  private val fakeSource = object : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
     override val type = "magnet"
-    override fun canHandle(url: String) =
-      url.startsWith("magnet:")
-    override suspend fun resolve(
-      url: String,
-      properties: Map<String, String>,
-    ) = ResolvedSource(
-      url = url,
-      sourceType = "magnet",
-      totalBytes = 1000,
-      supportsResume = false,
-      suggestedFileName = null,
-      maxSegments = 1,
-    )
-    override suspend fun download(context: DownloadContext) {}
-    override suspend fun resume(
-      context: DownloadContext,
-      resumeState: SourceResumeState,
-    ) {}
-    override fun buildResumeState(
-      resolved: ResolvedSource,
-      totalBytes: Long,
-    ) = SourceResumeState(sourceType = "magnet", data = "{}")
+    override fun canHandle(input: ResolveInput): Boolean =
+      input is ResolveInput.Url &&
+      input.url.startsWith("magnet:")
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url,
+        sourceType = "magnet",
+        totalBytes = 1000,
+        supportsResume = false,
+        suggestedFileName = null,
+        maxSegments = 1,
+      )
+    }
+    override suspend fun download(context: DownloadContext, state: Unit?) {}
   }
 
   @Test
   fun close_duplicateInstance_closedOnceAndCannotResolve() {
     var closeCount = 0
-    val source = object : DownloadSource by fakeSource {
+    val source = object : DownloadSource<Unit> by fakeSource {
       override fun close() { closeCount++ }
     }
     val resolver = SourceResolver(listOf(source, source))
@@ -57,16 +55,18 @@ class SourceResolverTest {
     assertEquals(1, closeCount)
     assertFailsWith<IllegalStateException> { resolver.resolve("magnet:test") }
     assertFailsWith<IllegalStateException> { resolver.resolveByType("magnet") }
-    assertFailsWith<IllegalStateException> { resolver.resolveContent(byteArrayOf(1), null) }
+    assertFailsWith<IllegalStateException> {
+      resolver.resolve(ResolveInput.Content(byteArrayOf(1)))
+    }
   }
 
   @Test
   fun close_failingSource_otherSourcesStillClose() {
     var closed = false
-    val failing = object : DownloadSource by fakeSource {
+    val failing = object : DownloadSource<Unit> by fakeSource {
       override fun close() { error("close failed") }
     }
-    val succeeding = object : DownloadSource by fakeSource {
+    val succeeding = object : DownloadSource<Unit> by fakeSource {
       override fun close() { closed = true }
     }
     SourceResolver(listOf(failing, succeeding)).close()
@@ -117,6 +117,28 @@ class SourceResolverTest {
   }
 
   @Test
+  fun resolveByType_sharedPreviousType_usesUrlAndPrefersExactType() {
+    fun renamed(type: String) = object : DownloadSource<Unit> by fakeSource {
+      override val type: String = type
+      override val previousTypes: Set<String> = setOf("old")
+      override fun canHandle(input: ResolveInput): Boolean {
+        val url = (input as? ResolveInput.Url)?.url ?: return false
+        return url.startsWith("$type:")
+      }
+    }
+    val first = renamed("first")
+    val second = renamed("second")
+    val resolver = SourceResolver(listOf(first, second))
+    assertEquals(first, resolver.resolveByType("old", "first:file"))
+    assertEquals(second, resolver.resolveByType("old", "second:file"))
+    assertFailsWith<KetchError.Unsupported> { resolver.resolveByType("old", "other:file") }
+    assertFailsWith<KetchError.Unsupported> { resolver.resolveByType("old") }
+    val exact = renamed("old")
+    assertEquals(exact,
+      SourceResolver(listOf(first, exact)).resolveByType("old", "first:file"))
+  }
+
+  @Test
   fun resolveByType_unknownType_throwsUnsupported() {
     val resolver = SourceResolver(listOf(httpSource))
     assertFailsWith<KetchError.Unsupported> {
@@ -126,13 +148,13 @@ class SourceResolverTest {
 
   @Test
   fun resolveContent_matchingSource_returnsFirstMatch() {
-    val contentSource = object : DownloadSource by fakeSource {
+    val contentSource = object : DownloadSource<Unit> by fakeSource {
       override val type = "content"
-      override fun canHandleContent(content: ByteArray, fileName: String?) =
-        fileName == "a.torrent"
+      override fun canHandle(input: ResolveInput) =
+        input is ResolveInput.Content && input.fileName == "a.torrent"
     }
     val resolver = SourceResolver(listOf(httpSource, contentSource, fakeSource))
-    val source = resolver.resolveContent(byteArrayOf(1), "a.torrent")
+    val source = resolver.resolve(ResolveInput.Content(byteArrayOf(1), "a.torrent"))
     assertEquals("content", source.type)
   }
 
@@ -140,7 +162,7 @@ class SourceResolverTest {
   fun resolveContent_noSourceAccepts_throwsUnsupported() {
     val resolver = SourceResolver(listOf(httpSource, fakeSource))
     assertFailsWith<KetchError.Unsupported> {
-      resolver.resolveContent(byteArrayOf(1), "a.torrent")
+      resolver.resolve(ResolveInput.Content(byteArrayOf(1), "a.torrent"))
     }
   }
 

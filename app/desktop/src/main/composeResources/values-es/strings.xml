@@ -19,6 +19,7 @@
   <string name="tray_recent">Recientes</string>
   <string name="tray_show_ketch">Mostrar Ketch</string>
   <string name="tray_speed">Velocidad</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">Mostrar</string>
   <string name="tray_enter_token">Introducir token…</string>
   <string name="tray_retry_now">Reintentar ahora</string>
@@ -64,7 +65,7 @@
   <string name="message_update_ready">Ketch %1$s está listo para instalarse</string>
   <string name="message_update_installed">Ketch se actualizó a %1$s</string>
   <string name="message_update_failed">No se pudo actualizar a Ketch %1$s</string>
-  <string name="message_update_failed_hint">update.log, en la carpeta de registros, explica qué falló.</string>
+  <string name="message_update_failed_hint">Consulta update.log en la carpeta de registros.</string>
   <string name="message_update">Actualizar</string>
   <string name="message_restart">Reiniciar</string>
   <string name="message_open_installer">Abrir instalador</string>
@@ -83,6 +84,11 @@
     <item quantity="other">Se copiaron %1$d enlaces</item>
   </plurals>
   <string name="message_window_error">Algo salió mal</string>
+  <string name="message_downloads_run_by">%1$s (proceso %2$d) está ejecutando las descargas de este equipo</string>
+  <string name="message_downloads_run_elsewhere">Otro proceso de Ketch está ejecutando las descargas de este equipo</string>
+  <string name="message_downloads_run_hint">Detenlo y luego sal de Ketch y vuelve a abrirlo para ejecutarlas aquí</string>
+  <string name="message_command_stopped">%1$s se detuvo</string>
+  <string name="message_command_stopped_hint">Sal de Ketch y vuelve a abrirlo para ejecutar aquí las descargas de este equipo</string>
   <string name="open_torrent_title">Abrir archivo torrent</string>
 
   <string name="close_keep_running_title">¿Seguir descargando en segundo plano?</string>
@@ -132,4 +138,6 @@
   </plurals>
 
   <string name="settings_window_title">Ajustes</string>
+
+  <string name="keep_awake_reason">Hay descargas en curso</string>
 </resources>

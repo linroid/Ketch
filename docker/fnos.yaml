@@ -1,0 +1,27 @@
+# 在飞牛 fnOS 上运行 Ketch：打开 Docker 应用 → Compose → 新增项目，选一个文件夹（例如
+# /vol1/1000/docker/ketch）放设置，再粘贴本文件。详见 docs/docker.zh-CN.md。
+#
+# 先把下面的下载文件夹换成你自己的，并把 PUID、PGID 设为拥有它的飞牛用户（SSH 登录后运行
+# `id` 可以看到），下载的文件就归这个用户所有。
+services:
+  ketch:
+    # 拉取 ghcr.io 太慢时，可换成 Docker Hub 上的 linroid/ketch，并在 Docker 设置里开启镜像加速。
+    image: ghcr.io/linroid/ketch:latest
+    container_name: ketch
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Asia/Shanghai
+      # Ketch 各个 App 里显示的设备名
+      KETCH_NAME: 飞牛 NAS
+      # App 和网页版连接时要输入的访问码。留空则首次启动时自动生成，打印在容器日志里，并保存在
+      # 设置文件夹的 api-token 文件中。
+      KETCH_API_TOKEN: ""
+    volumes:
+      - ./config:/config
+      - /vol1/1000/Downloads:/downloads
+    ports:
+      - "8642:8642" # 网页版和 REST API
+      - "16881:16881" # BitTorrent 连接
+      - "16881:16881/udp" # BitTorrent DHT

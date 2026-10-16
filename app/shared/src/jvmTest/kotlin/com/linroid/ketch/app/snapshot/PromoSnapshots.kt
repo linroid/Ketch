@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
@@ -67,7 +68,6 @@ import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.app.ui.discover.modelLabel
 import com.linroid.ketch.app.ui.inspector.tabs.InspectorTab
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.DensityMode
@@ -576,13 +576,12 @@ private object AssetBounds {
     },
     // The top result's row, picked.
     Bound("topResult") { resultRows().first().box },
-    // The header's button with the model Discover searches with, "Ollama · qwen3".
-    Bound("modelChip") { text(modelLabel(controller.state.aiSettings).load()).control().box },
-    // The page's title at the start of that header, "Discover"; the sidebar's entry reads the
-    // same, so it is the one on the model button's row. S08 keeps both inside the frame.
+    // The composer's chip with the model Discover searches with, "qwen3".
+    Bound("modelChip") { text(modelChipLabel(controller)).control().box },
+    // The page's title, "Discover"; the sidebar's entry reads the same, so it is the one
+    // furthest right. S08 keeps it inside the frame.
     Bound("pageTitle") {
-      val row = text(modelLabel(controller.state.aiSettings).load()).box.center.y
-      texts(Res.string.discover_title.text().load()).minBy { abs(it.box.center.y - row) }.box
+      texts(Res.string.discover_title.text().load()).maxBy { it.box.center.x }.box
     },
   )
 
@@ -720,7 +719,7 @@ private fun desktopClip(
         scene.rest(ClipWindow)
       }
       // The clip starts on the first accent.
-      env.controller.appSettings.saveAccent(KetchAccent.Signal)
+      env.controller.appSettings.saveAccent(KetchAccent.Indigo)
       val timeline = timeline()
       timeline.skip(PREROLL_FRAMES + offset, traffic::advance)
       if (count > 0) {
@@ -739,9 +738,9 @@ private fun desktopClip(
       }
       for ((accent, at) in KetchAccent.entries.zip(accentsAt)) {
         val target = PREROLL_FRAMES + at
-        val settle = if (accent == KetchAccent.Signal) 0 else ACCENT_SETTLE_FRAMES
+        val settle = if (accent == KetchAccent.Indigo) 0 else ACCENT_SETTLE_FRAMES
         check(target - timeline.frame >= settle) { "No time for $accent to settle by $at" }
-        if (accent != KetchAccent.Signal) env.controller.appSettings.saveAccent(accent)
+        if (accent != KetchAccent.Indigo) env.controller.appSettings.saveAccent(accent)
         timeline.skip(target - timeline.frame, traffic::advance)
         val name = themed("desktop-accent-${accent.name.lowercase()}", theme)
         timeline.still(name, traffic::advance)
@@ -2035,8 +2034,12 @@ private class ScriptedDiscovery(
 
 /** [base], with magnets resolving to [promoTorrent]. */
 private class PromoResolvingApi(private val base: KetchApi) : KetchApi by base {
-  override suspend fun resolve(url: String, properties: Map<String, String>): ResolvedSource =
-    if (url.startsWith("magnet:")) promoTorrent(url) else base.resolve(url, properties)
+  override suspend fun resolve(input: ResolveInput): ResolvedSource =
+    if (input is ResolveInput.Url && input.url.startsWith("magnet:")) {
+      promoTorrent(input.url)
+    } else {
+      base.resolve(input)
+    }
 }
 
 private fun promoTorrent(url: String): ResolvedSource {
@@ -2330,3 +2333,10 @@ private const val TORRENT_DAYS = 8
 private val TorrentSkipped = listOf("Day 05.flac", "Day 06.flac")
 private const val PROMO_INFO_HASH = "9a3c5e7f1b2d4c6e8f0a1b3c5d7e9f1a2b4c6d8e"
 private const val PROMO_MAGNET = "magnet:?xt=urn:btih:$PROMO_INFO_HASH&dn=Field+Recordings+2026"
+
+/** The label of Discover's model chip, as `DiscoverModelChip` shows it. */
+private fun modelChipLabel(controller: AppController): String {
+  val ai = controller.state.aiSettings
+  val active = ai.withPlatformCredentials(ai.settings).llm
+  return active.effectiveModel.ifBlank { active.displayName }
+}

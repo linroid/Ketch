@@ -73,7 +73,8 @@ fun DevicesScreen(state: AppState) {
   val devices by remember(state) { state.instanceManager.presence }.collectAsState()
   val instances by state.instances.collectAsState()
   val active by state.activeInstance.collectAsState()
-  val work = rememberDeviceWork(remember(devices.map { it.entry }) { devices.map { it.entry } })
+  val entries = remember(devices.map { it.entry }) { devices.map { it.entry } }
+  val work = rememberDeviceWork(entries, state::featuresFlow)
   val phone = LocalKetchLayout.current.navigation == ShellNavigation.Phone
   val padding = KetchTheme.density.pagePadding
   val spacing = KetchTheme.spacing

@@ -6,6 +6,7 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.shell_destination_connections
 import ketch.app.shared.generated.resources.shell_destination_devices
 import ketch.app.shared.generated.resources.shell_destination_discover
 import ketch.app.shared.generated.resources.shell_destination_downloads
@@ -31,6 +32,13 @@ enum class AppDestination(val label: UiText, val icon: KetchIcon, val command: K
     Res.string.shell_destination_discover.text(),
     KetchIcon.Discover,
     KetchCommands.Discover
+  ),
+
+  /** The live connections of the shown devices. */
+  Connections(
+    Res.string.shell_destination_connections.text(),
+    KetchIcon.Lanes,
+    KetchCommands.Connections
   ),
 
   /** Every device the app knows. */

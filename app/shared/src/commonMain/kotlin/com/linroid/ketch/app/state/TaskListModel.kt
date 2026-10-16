@@ -126,6 +126,8 @@ data class TaskRow(
     get() = request.priority
   override val isStalled: Boolean
     get() = content.status == RowStatus.Stalled
+  override val isStarting: Boolean
+    get() = content.status == RowStatus.Starting
   override val isLimited: Boolean
     get() = content.limited || !request.speedLimit.isUnlimited
 
@@ -272,7 +274,7 @@ class TaskListModel(
 
   /** Number of tasks on each status tab. */
   val counts: StateFlow<Map<StatusFilter, Int>> =
-    rows.map { list -> StatusFilter.counts(list.map { it.state }) }
+    rows.map { list -> StatusFilter.counts(list) }
       .flowOn(dispatcher)
       .stateIn(scope, SharingStarted.Eagerly, StatusFilter.entries.associateWith { 0 })
 
@@ -287,7 +289,7 @@ class TaskListModel(
     ) { list, tab, search, order, holding ->
       val now = clock.now()
       val zone = timeZone()
-      val onTab = list.filter { tab.matches(it.state) }
+      val onTab = list.filter { tab.matches(it) }
       val matching = if (search.isEmpty) onTab else onTab.filter { search.matches(it, now, zone) }
       val groups = arranger.arrange(
         rows = matching,

@@ -19,6 +19,7 @@
   <string name="tray_recent">최근 다운로드</string>
   <string name="tray_show_ketch">Ketch 보기</string>
   <string name="tray_speed">속도</string>
+  <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">보기</string>
   <string name="tray_enter_token">토큰 입력…</string>
   <string name="tray_retry_now">지금 재시도</string>
@@ -58,7 +59,7 @@
   <string name="message_update_ready">Ketch %1$s 설치 준비 완료</string>
   <string name="message_update_installed">Ketch %1$s 버전으로 업데이트됨</string>
   <string name="message_update_failed">Ketch %1$s 버전으로 업데이트할 수 없음</string>
-  <string name="message_update_failed_hint">로그 폴더의 update.log에서 원인을 확인할 수 있습니다.</string>
+  <string name="message_update_failed_hint">로그 폴더의 update.log를 확인하세요.</string>
   <string name="message_update">업데이트</string>
   <string name="message_restart">재시작</string>
   <string name="message_open_installer">설치 프로그램 열기</string>
@@ -76,6 +77,11 @@
     <item quantity="other">링크 %1$d개 복사됨</item>
   </plurals>
   <string name="message_window_error">문제가 발생했습니다</string>
+  <string name="message_downloads_run_by">%1$s(프로세스 %2$d)에서 이 컴퓨터의 다운로드를 실행 중입니다</string>
+  <string name="message_downloads_run_elsewhere">다른 Ketch 프로세스에서 이 컴퓨터의 다운로드를 실행 중입니다</string>
+  <string name="message_downloads_run_hint">중지한 뒤 Ketch를 종료하고 다시 열면 여기에서 실행됩니다</string>
+  <string name="message_command_stopped">%1$s 중지됨</string>
+  <string name="message_command_stopped_hint">Ketch를 종료하고 다시 열면 이 컴퓨터의 다운로드를 여기에서 실행합니다</string>
   <string name="open_torrent_title">토렌트 파일 열기</string>
 
   <string name="close_keep_running_title">백그라운드에서 계속 다운로드할까요?</string>
@@ -118,4 +124,6 @@
   </plurals>
 
   <string name="settings_window_title">설정</string>
+
+  <string name="keep_awake_reason">다운로드 진행 중</string>
 </resources>

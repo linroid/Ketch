@@ -175,6 +175,8 @@ export function failureHint(error, instance) {
   switch (error?.kind) {
     case FailureKind.APP_NOT_INSTALLED:
       return t('hint_app_not_installed');
+    case FailureKind.APP_NOT_ALLOWED:
+      return t('hint_app_not_allowed');
     case FailureKind.APP_NOT_RUNNING:
       return t('hint_app_not_running');
     case FailureKind.UNREACHABLE:

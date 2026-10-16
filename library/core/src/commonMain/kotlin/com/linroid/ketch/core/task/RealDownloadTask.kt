@@ -29,7 +29,7 @@ internal class RealDownloadTask(
   taskStore: TaskStore,
   record: TaskRecord,
 ) : DownloadTask, TaskHandle {
-  private val settingsMutex = Mutex()
+  override val controlLock = Mutex()
   private val mutableRequest = MutableStateFlow(request)
   override val requestState: StateFlow<DownloadRequest> = mutableRequest.asStateFlow()
   override val request: DownloadRequest get() = requestState.value
@@ -80,14 +80,14 @@ internal class RealDownloadTask(
 
   // Settings are persisted before they are applied, so an execution that starts in between
   // reads the new value, and tasks that are not running keep it for their next start.
-  override suspend fun setSpeedLimit(limit: SpeedLimit): Unit = settingsMutex.withLock {
+  override suspend fun setSpeedLimit(limit: SpeedLimit): Unit = controlLock.withLock {
     record.update {
       it.copy(request = it.request.copy(speedLimit = limit), updatedAt = Clock.System.now())
     }
     controller.setSpeedLimit(taskId, limit)
   }
 
-  override suspend fun setPriority(priority: DownloadPriority): Unit = settingsMutex.withLock {
+  override suspend fun setPriority(priority: DownloadPriority): Unit = controlLock.withLock {
     record.update {
       it.copy(request = it.request.copy(priority = priority), updatedAt = Clock.System.now())
     }
@@ -96,7 +96,7 @@ internal class RealDownloadTask(
 
   override suspend fun setConnections(connections: Int) {
     require(connections >= 0) { "Connections must not be negative" }
-    settingsMutex.withLock {
+    controlLock.withLock {
       record.update {
         it.copy(
           request = it.request.copy(connections = connections),
@@ -105,6 +105,18 @@ internal class RealDownloadTask(
       }
       controller.setConnections(taskId, connections)
     }
+  }
+
+  override suspend fun selectFiles(fileIds: Set<String>) {
+    require(
+      fileIds.isNotEmpty() && fileIds.size <= DownloadTask.MAX_SELECTED_FILES &&
+        fileIds.all { it.length in 1..DownloadTask.MAX_FILE_ID_LENGTH }
+    ) {
+      "Choose between 1 and ${DownloadTask.MAX_SELECTED_FILES} files, each with an ID of 1 to " +
+        "${DownloadTask.MAX_FILE_ID_LENGTH} characters"
+    }
+    // The controller takes the control lock itself, after joining a finishing execution.
+    controller.selectFiles(this, fileIds)
   }
 
   override suspend fun reschedule(

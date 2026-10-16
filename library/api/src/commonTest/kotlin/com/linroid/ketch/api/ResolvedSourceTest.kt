@@ -146,4 +146,52 @@ class ResolvedSourceTest {
       deserialized.selectionMode,
     )
   }
+
+  @Test
+  fun withoutBulkMetadata_dropsMetainfoKeepsFiles() {
+    val files = listOf(SourceFile("0", "a.mkv", 10), SourceFile("1", "b.srt", 2))
+    val source = ResolvedSource(
+      url = "magnet:?xt=urn:btih:abc",
+      sourceType = "torrent",
+      totalBytes = 12,
+      supportsResume = true,
+      suggestedFileName = "Pack",
+      maxSegments = 2,
+      metadata = mapOf(
+        ResolvedSource.METAINFO_KEY to "short",
+        "comment" to "x".repeat(ResolvedSource.MAX_VIEW_METADATA_CHARS + 1),
+        "name" to "Pack",
+        "edge" to "y".repeat(ResolvedSource.MAX_VIEW_METADATA_CHARS)
+      ),
+      files = files,
+    )
+
+    val view = source.withoutBulkMetadata()
+
+    assertEquals(setOf("name", "edge"), view.metadata.keys)
+    assertEquals(files, view.files)
+    assertEquals(source.copy(metadata = view.metadata), view)
+    val plain = source.copy(metadata = mapOf("name" to "Pack"))
+    assertTrue(plain.withoutBulkMetadata() === plain)
+  }
+
+  @Test
+  fun defaultSelection_followsTheSelectionMode() {
+    val source = ResolvedSource(
+      url = "https://example.com/stream.m3u8",
+      sourceType = "hls",
+      totalBytes = 30,
+      supportsResume = false,
+      suggestedFileName = null,
+      maxSegments = 1,
+      files = listOf(SourceFile("hi", "1080p", 20), SourceFile("lo", "480p", 10)),
+    )
+
+    assertEquals(setOf("hi", "lo"), source.defaultSelection())
+    assertEquals(
+      setOf("hi"),
+      source.copy(selectionMode = FileSelectionMode.SINGLE).defaultSelection()
+    )
+    assertTrue(source.copy(files = emptyList()).defaultSelection().isEmpty())
+  }
 }

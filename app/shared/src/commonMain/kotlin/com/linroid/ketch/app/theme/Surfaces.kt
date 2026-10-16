@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -29,7 +28,7 @@ fun Modifier.ketchSurface(
   val elevation = KetchTheme.elevation
   val highlightFade = with(LocalDensity.current) { TopHighlightFade.toPx() }
   var modifier = this
-  for (shadow in elevation.shadows(level)) modifier = modifier.dropShadow(shape, shadow)
+  for (shadow in elevation.shadows(level)) modifier = modifier.elevationShadow(shape, shadow)
   modifier = modifier.clip(shape).background(fill, shape)
   if (border != null) modifier = modifier.border(1.dp, border, shape)
   if (elevation.isDark && level != KetchElevationLevel.E0) {

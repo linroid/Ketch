@@ -26,9 +26,9 @@ internal actual fun currentSystemInfo(directory: String?): SystemInfo {
   val dir = if (tree) treeVolume(folder) else File(folder)
   return SystemInfo(
     os = "Android ${android.os.Build.VERSION.RELEASE}",
-    arch = System.getProperty("os.arch", "unknown"),
+    arch = System.getProperty("os.arch") ?: "unknown",
     separator = File.separator,
-    javaVersion = System.getProperty("java.version", "unknown"),
+    javaVersion = System.getProperty("java.version") ?: "unknown",
     availableProcessors = runtime.availableProcessors(),
     maxMemory = runtime.maxMemory(),
     totalMemory = runtime.totalMemory(),

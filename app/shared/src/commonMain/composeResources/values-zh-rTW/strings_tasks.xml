@@ -10,6 +10,7 @@
   <string name="row_status_downloading">下載中</string>
   <string name="row_status_stalled">停滯</string>
   <string name="row_status_paused">已暫停</string>
+  <string name="row_status_starting">正在開始</string>
   <string name="row_status_queued">佇列中</string>
   <string name="row_status_scheduled">已排程</string>
   <string name="row_status_done">已完成</string>
@@ -23,6 +24,8 @@
   <string name="row_saved_on">已儲存在 %1$s</string>
   <string name="row_missing_file">檔案已移動或刪除</string>
   <string name="row_completed">已完成</string>
+  <string name="row_choose_files">選擇要下載的檔案</string>
+  <string name="row_seeding">做種中</string>
   <string name="row_took">耗時 %1$s</string>
   <plurals name="row_files">
     <item quantity="other">%1$d 個檔案</item>
@@ -58,6 +61,10 @@
   <string name="sort_origin">新增方式</string>
   <string name="sort_priority">優先順序</string>
   <string name="sort_device">裝置</string>
+  <string name="sort_kind">類型</string>
+  <string name="sort_selected_first">已選優先</string>
+  <string name="sort_torrent_order">種子順序</string>
+  <string name="sort_reverse">反向排序</string>
   <string name="group_smart">智慧</string>
   <string name="group_status">狀態</string>
   <string name="group_day">日期</string>
@@ -102,6 +109,7 @@
   <plurals name="queue_position_ahead">
     <item quantity="other">前面還有 %1$d 個</item>
   </plurals>
+  <string name="row_finding_peers">正在尋找節點</string>
   <string name="queue_starting">即將開始</string>
 
   <string name="action_row_pause">暫停</string>
@@ -127,10 +135,12 @@
   <string name="action_row_open_source_page">開啟來源網頁</string>
   <string name="action_row_copy_error">複製錯誤訊息</string>
   <string name="action_row_copy_details">複製詳細資料</string>
-  <string name="action_row_stop_and_discard">停止並捨棄進度…</string>
-  <string name="action_row_remove">從清單中移除</string>
-  <string name="action_row_remove_and_trash">移除並將檔案移到垃圾桶…</string>
-  <string name="action_row_remove_and_delete">移除並刪除檔案…</string>
+  <string name="action_row_stop_and_discard">取消下載…</string>
+  <string name="action_row_remove">移除…</string>
+  <string name="action_row_choose_files">選擇檔案…</string>
+  <string name="action_row_download_all_files">下載全部檔案</string>
+  <string name="action_row_stop_seeding">停止做種</string>
+  <string name="action_row_seed">做種</string>
   <plurals name="batch_pause">
     <item quantity="other">暫停 %1$d 個下載項目</item>
   </plurals>
@@ -157,19 +167,16 @@
     <item quantity="other">重新下載 %1$d 個檔案</item>
   </plurals>
   <plurals name="batch_discard">
-    <item quantity="other">捨棄 %1$d 個下載項目的進度…</item>
+    <item quantity="other">取消 %1$d 個下載項目…</item>
   </plurals>
   <plurals name="batch_remove">
-    <item quantity="other">從清單中移除 %1$d 個下載項目</item>
-  </plurals>
-  <plurals name="batch_remove_files">
-    <item quantity="other">移除 %1$d 個下載項目及其檔案…</item>
+    <item quantity="other">移除 %1$d 個下載項目…</item>
   </plurals>
   <string name="bar_speed">速度</string>
   <string name="bar_copy_links">複製連結</string>
   <string name="bar_remove">移除…</string>
   <string name="bar_copy_paths">複製檔案路徑</string>
-  <string name="bar_discard">捨棄進度…</string>
+  <string name="bar_discard">取消下載…</string>
   <string name="bar_label_count">%1$s（%2$d）</string>
   <string name="bar_label_number">%1$s %2$d</string>
   <string name="bar_tooltip_counted">%1$s所選下載中的 %2$d 個（共 %3$d 個）</string>
