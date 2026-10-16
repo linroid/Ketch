@@ -16,7 +16,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property droppedWebSeeds web seeds that stopped, which [StallRecovery.RELAUNCH_WEB_SEEDS]
  *   starts again.
  * @property payloadBytes payload received so far, from peers and web seeds.
- * @property throttledMs time spent so far waiting on speed limits, which is never a stall.
+ * @property throttledMs time spent so far waiting on speed limits, which is never a stall: the
+ *   waits of every peer added up, of which a check counts at most the time since the last.
  * @property pieceLength the torrent's piece length.
  */
 internal data class StallSignals(
@@ -87,13 +88,15 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     checkedAt = now
     val received = (signals.payloadBytes - payloadBytes).coerceAtLeast(0)
     payloadBytes = signals.payloadBytes
-    val throttled = (signals.throttledMs - throttledMs).coerceAtLeast(0)
+    // Peers wait on the limits side by side, each adding its own wait: at most the time that
+    // passed counts.
+    val throttled = (signals.throttledMs - throttledMs).coerceIn(0, elapsed)
     throttledMs = signals.throttledMs
     rate = (rate + received * 1000.0 / elapsed) / 2
     if (received > 0) payloadAt = now
     if (throttled > 0) {
-      progressAt += throttled
-      payloadAt += throttled
+      progressAt = minOf(progressAt + throttled, now)
+      payloadAt = minOf(payloadAt + throttled, now)
     }
     if (!signals.downloading) {
       progressed()

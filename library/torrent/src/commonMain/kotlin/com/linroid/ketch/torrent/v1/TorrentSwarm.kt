@@ -262,6 +262,8 @@ internal class TorrentSwarm(
     // Flags peers advertised for endpoints; handed to a worker when it dials one.
     val peerFlags = PeerFlagBook()
     val retryAt = mutableMapOf<PeerEndpoint, Long>()
+    // Known peers that broke the protocol or sent a corrupt piece, which are never retried.
+    val faulty = mutableSetOf<PeerEndpoint>()
     val now = nowMs
     var discoveryClosed = false
     var complete = false
@@ -375,7 +377,7 @@ internal class TorrentSwarm(
     fun revivePeers() {
       var revived = 0
       for (endpoint in attempts.keys.toList()) {
-        if (endpoint in active || endpoint in pending) continue
+        if (endpoint in active || endpoint in pending || endpoint in faulty) continue
         attempts.remove(endpoint)
         attemptedAt.remove(endpoint)
         retryAt.remove(endpoint)
@@ -386,16 +388,17 @@ internal class TorrentSwarm(
     }
     suspend fun checkStall() {
       val published = stall ?: return
-      val health = scheduler.health(MAX_REPORTED_MISSING_PIECES)
       val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
       val running = webSeeds.count { it.isActive }
-      val files = if (health.missing.isEmpty()) emptyList() else {
+      // With nothing connected no piece is missing from what is: it waits for peers.
+      val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else null
+      val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
       }
       val due = watchdog.check(StallSignals(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
-        missingPieces = health.missingCount, missingFileIds = files,
-        lateBlocks = health.lateBlocks, webSeeds = running,
+        missingPieces = health?.missingCount ?: 0, missingFileIds = files,
+        lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
         droppedWebSeeds = webSeeds.size - running, payloadBytes = payloadReceived.load(),
         throttledMs = throttledMs.load(), pieceLength = store.metadata.pieceLength,
       ))
@@ -501,7 +504,12 @@ internal class TorrentSwarm(
         val expired = attemptedAt.filter { (endpoint, time) ->
           now() - time >= 300_000 && endpoint !in active && endpoint !in pending
         }.keys
-        expired.forEach { attempts.remove(it); attemptedAt.remove(it); retryAt.remove(it) }
+        expired.forEach {
+          attempts.remove(it)
+          attemptedAt.remove(it)
+          retryAt.remove(it)
+          faulty.remove(it)
+        }
         val limit = connections().coerceIn(1, 512)
         active.entries.drop(limit).forEach { it.value.cancel() }
         var candidates = pending.size
@@ -604,8 +612,9 @@ internal class TorrentSwarm(
                 attempts.size + pending.size < MAX_CANDIDATES) {
                 pending.addLast(listen)
               }
-            } else if (failure !is IllegalArgumentException &&
-              (attempts[endpoint] ?: 0) < MAX_DIAL_ATTEMPTS && !complete) {
+            } else if (failure is IllegalArgumentException) {
+              faulty += endpoint
+            } else if ((attempts[endpoint] ?: 0) < MAX_DIAL_ATTEMPTS && !complete) {
               retryAt[endpoint] = now() + 1000L * (attempts[endpoint] ?: 1)
               pending.addLast(endpoint)
             }
@@ -1373,7 +1382,6 @@ private const val MAX_CONNECTS_PER_MINUTE = 8
 /** Requests a v1 peer may queue with us (BEP 10 `reqq`); each is a few bytes until served. */
 private const val REQUEST_QUEUE = 500
 
-/** Block requests we keep outstanding with a v1 peer before its rate is known. */
 /** How often a swarm checks whether it stalled. */
 private const val STALL_CHECK_MS = 1_000L
 
@@ -1383,6 +1391,8 @@ private const val MAX_REPORTED_MISSING_PIECES = 4_096
 /** The least and most time a peer may take with blocks before others may ask for them too. */
 private const val MIN_LATE_MS = 4_000L
 private const val MAX_LATE_MS = 30_000L
+
+/** Block requests we keep outstanding with a v1 peer before its rate is known. */
 private const val INITIAL_PIPELINE = 16
 
 /** The fewest block requests we keep outstanding with a peer that serves any. */

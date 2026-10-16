@@ -98,6 +98,19 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun manyPeersWaitingOnLimits_countNoMoreThanTheTimeThatPassed() {
+    // Twenty peers wait on a limit side by side, adding twenty seconds of waits each second.
+    runTo(600_000) { time ->
+      signals(payloadBytes = time / 100, throttledMs = time * 20, peers = 20)
+    }
+    assertNull(watchdog.stall)
+    // The limit is lifted and the peers leave: a stall half a minute later, not hours.
+    val lifted = now
+    runTo(lifted + 31_000) { signals(payloadBytes = lifted / 100, throttledMs = lifted * 20) }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+  }
+
+  @Test
   fun trickleWithoutAPiece_stallsOnceFourPiecesAtSixteenKibAreDue() {
     // 1 KiB a second and no speed limit: four 256 KiB pieces at 16 KiB/s take 64 s.
     runTo(63_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
