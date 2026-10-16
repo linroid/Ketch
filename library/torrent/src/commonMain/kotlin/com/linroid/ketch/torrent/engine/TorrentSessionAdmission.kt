@@ -15,10 +15,10 @@ internal fun admitSession(
   budget: TorrentBufferBudget,
 ): TorrentBufferBudget.Lease {
   require(spec.metadata.contentFiles.size <= config.maxFilesPerTorrent) {
-    "Torrent file limit exceeded"
+    fileLimitExceeded(spec.metadata.contentFiles.size, config)
   }
   require(spec.metadata.pieceHashes.size / 20 <= config.maxPiecesPerTorrent) {
-    "Torrent piece limit exceeded"
+    pieceLimitExceeded(config)
   }
   val bytes = sessionStateWeight(spec)
   check(bytes <= budget.capacity) { "Torrent session state exceeds admission capacity" }
@@ -99,16 +99,23 @@ internal fun admitV2Session(
   budget: TorrentBufferBudget,
   checkpoint: TorrentV2Checkpoint? = null,
 ): TorrentBufferBudget.Lease {
-  require(document.info.rawInfo.size <= config.maxMetadataBytes) { "Torrent info limit exceeded" }
+  require(document.info.rawInfo.size <= config.maxMetadataBytes) {
+    "The torrent's metadata is larger than the ${config.maxMetadataBytes / MIB} MiB Ketch accepts"
+  }
   require(outputLength >= 0)
   require(document.info.files.size <= config.maxFilesPerTorrent &&
-    selectedCount in 0..config.maxFilesPerTorrent) { "Torrent file limit exceeded" }
-  require(document.info.pieceLength <= 16 * 1024 * 1024) { "Torrent piece length limit exceeded" }
+    selectedCount in 0..config.maxFilesPerTorrent) {
+    fileLimitExceeded(document.info.files.size, config)
+  }
+  require(document.info.pieceLength <= MAX_PIECE_LENGTH) {
+    "The torrent's pieces are ${document.info.pieceLength / MIB} MiB, larger than the " +
+      "${MAX_PIECE_LENGTH / MIB} MiB Ketch supports"
+  }
   var pieces = 0L
   for (file in document.info.files) {
     val count = file.length / document.info.pieceLength +
       if (file.length % document.info.pieceLength == 0L) 0 else 1
-    require(count <= config.maxPiecesPerTorrent - pieces) { "Torrent piece limit exceeded" }
+    require(count <= config.maxPiecesPerTorrent - pieces) { pieceLimitExceeded(config) }
     pieces += count
   }
   val recoveryBytes = checkpoint?.let { saved ->
@@ -127,3 +134,14 @@ internal fun admitV2Session(
   check(bytes <= budget.capacity) { "Torrent session state exceeds admission capacity" }
   return checkNotNull(budget.reserve(bytes.toInt())) { "Torrent session state budget exhausted" }
 }
+
+private const val MIB = 1024 * 1024
+
+/** The largest piece a v2 or hybrid torrent may have: each is assembled in memory. */
+private const val MAX_PIECE_LENGTH = 16 * MIB
+
+private fun fileLimitExceeded(files: Int, config: TorrentConfig) =
+  "The torrent has $files files, more than the ${config.maxFilesPerTorrent} Ketch accepts"
+
+private fun pieceLimitExceeded(config: TorrentConfig) =
+  "The torrent has more than ${config.maxPiecesPerTorrent} pieces, the most Ketch accepts"

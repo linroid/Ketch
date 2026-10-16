@@ -77,7 +77,8 @@ class TorrentMetadataExchangeTest {
               TorrentMetadataExchange(network, budget = budgets.metadata)
                 .fetch(hash, listener.local)
             }
-            assertEquals("Unsupported piece length", error.cause?.message)
+            assertEquals("The torrent's pieces are 32 MiB, larger than the 16 MiB Ketch supports",
+              error.cause?.message)
             server.await()
           } finally {
             server.cancelAndJoin()

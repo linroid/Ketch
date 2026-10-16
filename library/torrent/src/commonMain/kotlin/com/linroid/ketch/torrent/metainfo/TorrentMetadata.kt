@@ -88,7 +88,11 @@ internal data class TorrentMetadata(
       validateTorrentComponent(name)
       val folder = diskComponent(name)
       val pieceLength = requireNotNull(info["piece length"]?.integer) { "Missing piece length" }
-      require(pieceLength in 1..16L * 1024 * 1024) { "Unsupported piece length" }
+      require(pieceLength > 0) { "Invalid piece length" }
+      require(pieceLength <= 16L * 1024 * 1024) {
+        "The torrent's pieces are ${pieceLength / (1024 * 1024)} MiB, larger than the 16 MiB " +
+          "Ketch supports"
+      }
       val fileNodes = info["files"]
       require(fileNodes == null || info["length"] == null) { "Conflicting file layouts" }
       val files = if (fileNodes != null) {

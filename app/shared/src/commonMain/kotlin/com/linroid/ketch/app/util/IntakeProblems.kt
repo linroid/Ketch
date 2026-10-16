@@ -167,6 +167,7 @@ private fun Throwable.linkProblem(url: String, discoverAvailable: Boolean): Inta
         "ftp" -> Res.string.intake_problem_ftp.text()
         else -> Res.string.intake_problem_check_failed.text()
       },
+      detail = detail?.takeIf { it.isNotBlank() }?.let(::verbatim),
       actions = listOf(IntakeAction.Retry),
     )
     else -> IntakeProblem(

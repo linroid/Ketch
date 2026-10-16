@@ -65,6 +65,8 @@ class IntakeProblemsTest {
         Expected("Can't reach files.example.com", actions = listOf(Retry)),
       KetchError.SourceError("torrent") to
         Expected("Couldn't read this torrent", actions = listOf(Retry)),
+      KetchError.SourceError("torrent", detail = "The torrent has 20000 files") to
+        Expected("Couldn't read this torrent", "The torrent has 20000 files", listOf(Retry)),
       KetchError.SourceError("ftp") to
         Expected("The FTP server reported an error", actions = listOf(Retry)),
       KetchError.SourceError("hls") to

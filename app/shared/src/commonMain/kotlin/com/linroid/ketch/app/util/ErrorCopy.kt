@@ -387,16 +387,25 @@ private fun checksumCopy(error: KetchError.ChecksumMismatch): ErrorCopy {
 }
 
 private fun sourceCopy(error: KetchError.SourceError): ErrorCopy {
-  // The first cause that has a message, without its class name: "FTP 550: No such file".
-  val cause = error.cause?.describeCauses()?.split(" <- ")
-    ?.firstNotNullOfOrNull { it.substringAfter(": ", "").ifEmpty { null } }
+  // What the source said, which remote devices pass on too, else the first cause that has a
+  // message, without its class name: "FTP 550: No such file".
+  val cause = error.detail?.takeIf { it.isNotBlank() } ?: error.cause?.describeCauses()
+    ?.split(" <- ")?.firstNotNullOfOrNull { it.substringAfter(": ", "").ifEmpty { null } }
   return when (error.sourceType.lowercase()) {
-    "torrent" -> ErrorCopy(
-      title = Res.string.error_torrent_stopped.text(),
-      hint = Res.string.error_torrent_stopped_hint.text(),
-      shortHint = Res.string.error_torrent_stopped_hint_short.text(),
-      primary = RowAction.Retry,
-    )
+    "torrent" -> if (cause != null) {
+      foreignHint(
+        title = Res.string.error_torrent_stopped.text(),
+        hint = cause,
+        primary = RowAction.Retry,
+      )
+    } else {
+      ErrorCopy(
+        title = Res.string.error_torrent_stopped.text(),
+        hint = Res.string.error_torrent_stopped_hint.text(),
+        shortHint = Res.string.error_torrent_stopped_hint_short.text(),
+        primary = RowAction.Retry,
+      )
+    }
     else -> foreignHint(
       title = Res.string.error_source.text(sourceLabel(error.sourceType)),
       hint = cause,

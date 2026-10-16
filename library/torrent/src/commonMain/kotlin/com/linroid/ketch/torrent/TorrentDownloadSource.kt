@@ -1659,15 +1659,21 @@ internal fun torrentPeerLimit(requested: Int, default: Int, max: Int): Int =
  * Maps a torrent failure onto Ketch's retry policy. Peer, tracker and DHT failures are retried
  * inside the swarm, so only timeouts that reach a task (such as magnet metadata resolution) are
  * transient [KetchError.Network]. Storage failures are [KetchError.Disk]; verification, protocol
- * and admission failures are [KetchError.SourceError]. Neither is retried.
+ * and admission failures are [KetchError.SourceError]. Neither is retried. A source error carries
+ * the failure's message, without URLs, as its `detail`, which remote clients receive too: the
+ * apps show it rather than guess at a cause.
  */
 internal fun torrentFailure(error: Throwable): KetchError = when (error) {
   is KetchError -> error
   is TimeoutCancellationException -> KetchError.Network(error)
   is TorrentStorageException -> KetchError.Disk(error.cause)
   is IOException -> KetchError.Disk(error)
-  else -> KetchError.SourceError(TorrentDownloadSource.TYPE, error)
+  else -> KetchError.SourceError(TorrentDownloadSource.TYPE, error,
+    detail = error.message?.let(::withoutUrls)?.trim()?.take(MAX_FAILURE_DETAIL)?.ifEmpty { null })
 }
+
+/** The longest failure message a torrent's source error carries. */
+private const val MAX_FAILURE_DETAIL = 200
 
 /** Platform-specific base64 encoding. */
 internal fun encodeBase64(data: ByteArray): String = Base64.Default.encode(data)

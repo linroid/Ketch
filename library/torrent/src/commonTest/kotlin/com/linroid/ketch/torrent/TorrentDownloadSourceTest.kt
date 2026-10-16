@@ -149,6 +149,12 @@ class TorrentDownloadSourceTest {
     val corrupt = torrentFailure(IllegalStateException("Piece hash mismatch"))
     assertEquals("torrent", assertIs<KetchError.SourceError>(corrupt).sourceType)
     assertFalse(corrupt.isRetryable)
+    // The reason travels with the error, URLs reduced, as remote clients see no cause.
+    assertEquals("Piece hash mismatch", (corrupt as KetchError.SourceError).detail)
+    val quoted = torrentFailure(IllegalStateException(
+      "Rejected by https://tracker.test/announce?passkey=secret"))
+    assertEquals("Rejected by https://tracker.test:443",
+      assertIs<KetchError.SourceError>(quoted).detail)
   }
 
   @Test

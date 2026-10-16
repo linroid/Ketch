@@ -204,6 +204,16 @@ class ErrorCopyTest {
   }
 
   @Test
+  fun toCopy_torrentErrorWithDetail_saysWhyRatherThanBlamingPeers() = runTest {
+    val reason = "The torrent's pieces are 64 MiB, larger than the 16 MiB Ketch supports"
+    // A remote device's error carries no cause, only the detail.
+    val copy = KetchError.SourceError("torrent", detail = reason).toCopy(request, 0, local)
+
+    assertEquals("The torrent stopped", copy.title.load())
+    assertEquals(reason, copy.hint.load())
+  }
+
+  @Test
   fun toCopy_sourceErrorWithoutCauseMessage_hasNoHint() {
     val wrapped = KetchError.SourceError("ftp", IllegalStateException(IllegalStateException()))
 
