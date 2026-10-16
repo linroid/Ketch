@@ -123,6 +123,13 @@ internal class TorrentV2WebSeeds private constructor(
   fun assign(seed: Int, run: List<TorrentV2PieceScheduler.WebSeedClaim>): Boolean =
     assignments[seed].trySend(run).isSuccess
 
+  /**
+   * The run handed to [seed] that it stopped before taking, for the loop to give back; empty
+   * when there is none. The loop asks once it heard the seed [Event.Stopped].
+   */
+  fun reclaim(seed: Int): List<TorrentV2PieceScheduler.WebSeedClaim> =
+    assignments[seed].tryReceive().getOrNull().orEmpty()
+
   /** Runs every seed until they are all dropped or the transfer cancels them. */
   suspend fun run(): Unit = coroutineScope {
     log.i { "Transfer $logLabel: downloading from ${urls.size} web seed(s) too" }

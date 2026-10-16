@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.v2
 
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
+import com.linroid.ketch.torrent.monotonicClock
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.peer.pieceBitfield
@@ -15,7 +16,12 @@ import com.linroid.ketch.torrent.webseed.WebSeedPiece
  * The wanted pieces follow the selection through [retarget]; unwanted pieces are never begun,
  * requested or committed, and their assemblies go once no request is out for them. Web seeds
  * fetch runs of whole pieces it hands out with [claimWebSeedRun], each kept from peers until its
- * [webSeedDone].
+ * [webSeedDone], or until the endgame lets a peer [rescue] it.
+ *
+ * Each request is due at a time its peer's rate sets ([planNext]); once it is late, or in the
+ * endgame, another peer with room may ask for the same block ([planDuplicate]), at most one
+ * duplicate per block. The first copy to arrive wins: the other is canceled ([takeCancels]), and
+ * its block discarded should it still come.
  */
 internal class TorrentV2PieceScheduler private constructor(
   private val layout: TorrentContentLayout,
@@ -24,14 +30,35 @@ internal class TorrentV2PieceScheduler private constructor(
   private val buffers: TorrentBufferBudget,
   private val maxActive: Int,
   private val lease: TorrentBufferBudget.Lease,
+  private val nowMs: () -> Long,
 ) {
   class RequestPlan internal constructor(
     val peer: PeerBlockExchange,
     val request: PeerMessage.Request,
   )
-  private class Assignment(val plan: RequestPlan, var ticket: PeerBlockExchange.Ticket? = null)
+
+  /**
+   * One peer's request for a block, late from [dueAt]. [lost] once the other copy arrived first:
+   * it is canceled, and its block discarded when it comes.
+   */
+  private class Assignment(val plan: RequestPlan, val dueAt: Long) {
+    var ticket: PeerBlockExchange.Ticket? = null
+    var lost = false
+  }
+
+  /** A request whose block another peer delivered first, for [peer] to cancel. */
+  class Cancel internal constructor(
+    val peer: PeerBlockExchange,
+    val ticket: PeerBlockExchange.Ticket,
+  )
+
   private val assemblies = linkedMapOf<Int, TorrentV2PieceAssembly>()
+  // The first request out for each block, and the duplicates of late ones, never more than one
+  // per block: a block has a duplicate only while its first request is out.
   private val assignments = mutableMapOf<PeerMessage.Request, Assignment>()
+  private val copies = mutableMapOf<PeerMessage.Request, Assignment>()
+  private val copiesByPeer = mutableMapOf<PeerBlockExchange, Int>()
+  private val cancels = mutableListOf<Cancel>()
   private val commits = mutableMapOf<TorrentV2CommitWorker.Ticket, Int>()
   private var busy = ByteArray((verified.size + 7) / 8)
   private var closed = false
@@ -299,39 +326,184 @@ internal class TorrentV2PieceScheduler private constructor(
     }
   }
 
-  /** Reserve without network I/O. Availability must be an actor-owned view of the peer's state. */
-  fun planNext(peer: PeerBlockExchange, available: (Int) -> Boolean): RequestPlan? {
+  /**
+   * Reserve without network I/O. Availability must be an actor-owned view of the peer's state.
+   * The block is due within [lateAfterMs]; after that, another peer may ask for it too.
+   */
+  fun planNext(
+    peer: PeerBlockExchange,
+    lateAfterMs: Long = DEFAULT_LATE_MS,
+    available: (Int) -> Boolean,
+  ): RequestPlan? {
     check(!closed)
     for (assembly in assemblies.values) {
       val index = assembly.index
       if (!wanted[index] || verified[index] || !available(index)) continue
       for (slot in assembly.missingBlocks()) {
         val request = assembly.request(slot)
-        if (request !in assignments) return reserve(peer, request)
+        if (request !in assignments) return reserve(peer, request, lateAfterMs)
       }
     }
     return null
   }
 
-  private fun reserve(peer: PeerBlockExchange, request: PeerMessage.Request): RequestPlan {
+  private fun reserve(
+    peer: PeerBlockExchange,
+    request: PeerMessage.Request,
+    lateAfterMs: Long,
+  ): RequestPlan {
     val plan = RequestPlan(peer, request)
-    assignments[request] = Assignment(plan)
+    assignments[request] = Assignment(plan, nowMs() + lateAfterMs)
     return plan
+  }
+
+  /**
+   * A block for [peer] to ask for too, which another peer was asked for first and is late with,
+   * or, in the [endgame], has not delivered yet; only of pieces [available] accepts. At most one
+   * duplicate per block, [MAX_PEER_DUPLICATES] per peer and [MAX_DUPLICATES] in all, and none
+   * while less than a quarter of the transfer budget is free, so duplicates never keep pieces
+   * from starting. Null when there is none.
+   */
+  fun planDuplicate(
+    peer: PeerBlockExchange,
+    endgame: Boolean,
+    available: (Int) -> Boolean,
+  ): RequestPlan? {
+    check(!closed)
+    if (copies.size >= MAX_DUPLICATES || (copiesByPeer[peer] ?: 0) >= MAX_PEER_DUPLICATES ||
+      buffers.capacity - buffers.allocated < buffers.capacity / 4) return null
+    val now = nowMs()
+    for (assembly in assemblies.values) {
+      val index = assembly.index
+      if (!wanted[index] || verified[index] || !available(index)) continue
+      for (slot in assembly.missingBlocks()) {
+        val request = assembly.request(slot)
+        val first = assignments[request] ?: continue
+        // Only a request that went out can be late; a block is never asked of one peer twice.
+        if (first.ticket == null || first.lost || first.plan.peer === peer ||
+          request in copies || !endgame && now < first.dueAt) continue
+        val plan = RequestPlan(peer, request)
+        copies[request] = Assignment(plan, now + DEFAULT_LATE_MS)
+        copiesByPeer[peer] = (copiesByPeer[peer] ?: 0) + 1
+        return plan
+      }
+    }
+    return null
   }
 
   /**
    * Null acknowledges an unsent/unadmitted request. A stale acknowledgement cannot bind a newer
    * plan; false means the issuing peer actor must cancel or close any ticket it already created.
    * The peer actor must enqueue this acknowledgement before forwarding responses for the ticket.
+   * A ticket for a block another peer delivered meanwhile is bound, and queued to cancel.
    */
   fun resolve(plan: RequestPlan, ticket: PeerBlockExchange.Ticket?): Boolean {
     if (closed) return false
-    val assignment = assignments[plan.request] ?: return false
-    if (assignment.plan !== plan || assignment.ticket != null) return false
-    if (ticket == null) assignments.remove(plan.request) else {
+    val assignment = assignmentOf(plan) ?: return false
+    if (assignment.ticket != null) return false
+    if (ticket == null) release(assignment) else {
       require(ticket.request == plan.request && plan.peer.owns(ticket)) { "Wrong request issuer" }
       assignment.ticket = ticket
+      if (assignment.lost) cancels += Cancel(plan.peer, ticket)
     }
+    return true
+  }
+
+  /** The request [plan] made, first or duplicate; null once it ended. */
+  private fun assignmentOf(plan: RequestPlan): Assignment? =
+    assignments[plan.request]?.takeIf { it.plan === plan }
+      ?: copies[plan.request]?.takeIf { it.plan === plan }
+
+  /** [peer]'s request bound to [ticket], first or duplicate; null when stale. */
+  private fun assignmentOf(peer: PeerBlockExchange, ticket: PeerBlockExchange.Ticket) =
+    assignments[ticket.request]?.takeIf { it.plan.peer === peer && it.ticket === ticket }
+      ?: copies[ticket.request]?.takeIf { it.plan.peer === peer && it.ticket === ticket }
+
+  /** Ends [assignment]; when it was the first request for its block, a duplicate takes over. */
+  private fun release(assignment: Assignment) {
+    val request = assignment.plan.request
+    if (copies[request] === assignment) {
+      copies.remove(request)
+      uncount(assignment.plan.peer)
+      return
+    }
+    val copy = copies.remove(request)
+    if (copy == null) {
+      assignments.remove(request)
+    } else {
+      uncount(copy.plan.peer)
+      assignments[request] = copy
+    }
+  }
+
+  private fun uncount(peer: PeerBlockExchange) {
+    val count = (copiesByPeer[peer] ?: return) - 1
+    if (count == 0) copiesByPeer.remove(peer) else copiesByPeer[peer] = count
+  }
+
+  /** The other copy of a delivered block lost: its peer is told to cancel it. */
+  private fun lose(assignment: Assignment) {
+    assignment.lost = true
+    assignment.ticket?.let { cancels += Cancel(assignment.plan.peer, it) }
+  }
+
+  /** Requests whose blocks other peers delivered first, for their peers to cancel. */
+  fun takeCancels(): List<Cancel> {
+    if (cancels.isEmpty()) return emptyList()
+    return cancels.toList().also { cancels.clear() }
+  }
+
+  /**
+   * [peer] canceled the request [ticket] stands for, and will not answer it: it ends. False when
+   * it had already ended.
+   */
+  fun canceled(peer: PeerBlockExchange, ticket: PeerBlockExchange.Ticket): Boolean {
+    if (closed) return false
+    release(assignmentOf(peer, ticket) ?: return false)
+    return true
+  }
+
+  /** Requests out whose peers are late with them; a duplicate does not make one less late. */
+  fun lateCount(): Int {
+    check(!closed)
+    val now = nowMs()
+    return assignments.values.count { !it.lost && it.ticket != null && now >= it.dueAt }
+  }
+
+  /**
+   * Whether the download is in its endgame: every wanted piece left is being fetched (assembled,
+   * committed or with a web seed) or has no source ([sourced] false), and some are being fetched.
+   * Then peers ask for blocks others have outstanding, and may begin pieces web seeds fetch
+   * ([rescue]).
+   */
+  fun endgame(sourced: (Int) -> Boolean): Boolean {
+    check(!closed)
+    if (remaining == 0) return false
+    var fetching = false
+    for (index in verified.indices) {
+      if (!wanted[index] || verified[index]) continue
+      if (isBusy(index)) fetching = true else if (sourced(index)) return false
+    }
+    return fetching
+  }
+
+  /**
+   * Whether a peer may begin [index], which a web seed fetches, in the endgame: a slow mirror is
+   * then no longer the only source of the pieces it holds. Whichever verifies it first stores it.
+   */
+  fun canRescue(index: Int): Boolean {
+    check(!closed)
+    return index in verified.indices && wanted[index] && !verified[index] && index in webSeeds &&
+      index !in assemblies && !commits.containsValue(index) &&
+      assemblies.size + commits.size < maxActive
+  }
+
+  /** Begins [index] for peers although a web seed fetches it; see [canRescue]. */
+  fun rescue(index: Int): Boolean {
+    check(!closed)
+    if (!canRescue(index)) return false
+    assemblies[index] = TorrentV2PieceAssembly.create(layout, index, buffers) ?: return false
+    version++
     return true
   }
 
@@ -346,7 +518,7 @@ internal class TorrentV2PieceScheduler private constructor(
         val request = assembly.request(slot)
         if (request in assignments) continue
         if (attempts++ == 128) return null
-        val plan = reserve(peer, request)
+        val plan = reserve(peer, request, DEFAULT_LATE_MS)
         val ticket = try {
           peer.request(request)
         } catch (error: Throwable) {
@@ -361,34 +533,47 @@ internal class TorrentV2PieceScheduler private constructor(
     return null
   }
 
-  /** Returns false for a stale callback; it still consumes any delivered block buffer. */
+  /**
+   * Returns false for a stale callback; it still consumes any delivered block buffer. The first
+   * copy of a block is stored and the other copy's peer is told to cancel ([takeCancels]); a
+   * second copy is discarded.
+   */
   fun receive(peer: PeerBlockExchange, response: PeerBlockExchange.Response): Boolean {
     val ticket = when (response) {
       is PeerBlockExchange.Response.Block -> response.ticket
       is PeerBlockExchange.Response.Rejected -> response.ticket
-      is PeerBlockExchange.Response.Canceled -> response.ticket
     }
-    val assignment = assignments[ticket.request]
-    if (closed || assignment == null || assignment.plan.peer !== peer || assignment.ticket !== ticket) {
+    val assignment = if (closed) null else assignmentOf(peer, ticket)
+    if (assignment == null) {
       if (response is PeerBlockExchange.Response.Block) response.close()
       return false
     }
-    assignments.remove(ticket.request)
+    release(assignment)
     if (response is PeerBlockExchange.Response.Block) {
+      if (assignment.lost) {
+        response.close()
+        return true
+      }
       val assembly = assemblies[ticket.request.index]
       if (assembly == null) {
         response.close()
         error("Assigned piece has no assembly")
       }
       assembly.accept(response)
+      // Still out with another peer: no longer needed there.
+      assignments[ticket.request]?.let(::lose)
     }
     return true
   }
 
   /** Session actors call this after the peer actor has closed and joined its pipeline/reader. */
   fun detachPeer(peer: PeerBlockExchange) {
-    val abandoned = assignments.filterValues { it.plan.peer === peer }.keys
-    abandoned.forEach(assignments::remove)
+    // Its duplicates go first, so none of them takes over a block of its own.
+    copies.values.filter { it.plan.peer === peer }.forEach(::release)
+    // A block it was asked for first goes to whoever duplicated it, if anyone did.
+    assignments.values.filter { it.plan.peer === peer }.forEach(::release)
+    copiesByPeer.remove(peer)
+    cancels.removeAll { it.peer === peer }
   }
 
   /** Evict unavailable partial pieces, preserving live assignments and completed assemblies. */
@@ -468,6 +653,9 @@ internal class TorrentV2PieceScheduler private constructor(
     assemblies.values.forEach { it.close() }
     assemblies.clear()
     assignments.clear()
+    copies.clear()
+    copiesByPeer.clear()
+    cancels.clear()
     commits.clear()
     busy = ByteArray(0)
     webSeeds.clear()
@@ -477,6 +665,25 @@ internal class TorrentV2PieceScheduler private constructor(
   }
 
   companion object {
+    /** How long a peer whose rate is unknown may take with a block before another may ask too. */
+    const val DEFAULT_LATE_MS = 6_000L
+
+    /** The least and most time a peer may take with its blocks before others may ask too. */
+    const val MIN_LATE_MS = 4_000L
+    const val MAX_LATE_MS = 30_000L
+
+    /** Duplicate requests out at once, in all and per peer. */
+    const val MAX_DUPLICATES = 64
+    const val MAX_PEER_DUPLICATES = 8
+
+    /**
+     * How long a peer may take with what it was asked for: twice the time [pipeline] blocks take
+     * at its [rate] in bytes a second, [MIN_LATE_MS] to [MAX_LATE_MS]; [DEFAULT_LATE_MS] while
+     * the rate is unknown.
+     */
+    fun lateAfterMs(pipeline: Int, rate: Long): Long = if (rate <= 0) DEFAULT_LATE_MS else
+      (2_000.0 * pipeline * PeerWire.BLOCK_SIZE / rate).toLong().coerceIn(MIN_LATE_MS, MAX_LATE_MS)
+
     /** Initial bits must come from current store verification, not unchecked checkpoint hints. */
     fun create(
       layout: TorrentContentLayout,
@@ -485,6 +692,7 @@ internal class TorrentV2PieceScheduler private constructor(
       buffers: TorrentBufferBudget,
       state: TorrentBufferBudget,
       maxActive: Int = 2,
+      nowMs: () -> Long = monotonicClock(),
     ): TorrentV2PieceScheduler? {
       require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
       require(verified.size.toLong() == layout.pieceCount && maxActive in 1..1024)
@@ -502,7 +710,8 @@ internal class TorrentV2PieceScheduler private constructor(
           "Unknown selected file"
         }
         val wanted = wantedPieces(layout, selectedIds, verified.size)
-        return TorrentV2PieceScheduler(layout, wanted, verified.copyOf(), buffers, maxActive, lease)
+        return TorrentV2PieceScheduler(layout, wanted, verified.copyOf(), buffers, maxActive, lease,
+          nowMs)
       } catch (error: Throwable) {
         lease.close()
         throw error

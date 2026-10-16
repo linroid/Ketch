@@ -115,9 +115,12 @@ class TorrentV2PieceAssemblyTest {
     val assembly = assertNotNull(TorrentV2PieceAssembly.create(layout, 0, assemblies))
     try {
       val tail = assembly.request(1)
-      assembly.accept(block(tail, byteArrayOf(1, 2, 3), incoming))
+      assertTrue(assembly.accept(block(tail, byteArrayOf(1, 2, 3), incoming)))
+      // A second copy, as duplicate requests may bring, is ignored and its credit returned.
+      assertFalse(assembly.accept(block(tail, byteArrayOf(7, 7, 7), incoming)))
+      assertEquals(0, incoming.allocated)
+      assertEquals(listOf(0), assembly.missingBlocks())
       for ((request, value) in listOf(
-        tail to byteArrayOf(1, 2, 3),
         PeerMessage.Request(1, 0, 3) to byteArrayOf(1, 2, 3),
         PeerMessage.Request(0, 1, 3) to byteArrayOf(1, 2, 3),
         PeerMessage.Request(0, 0, 16_384) to byteArrayOf(1),

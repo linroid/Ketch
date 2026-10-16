@@ -37,8 +37,11 @@ internal class TorrentV2PieceAssembly private constructor(
     return received.indices.filter { !received[it] }
   }
 
-  /** Always consumes the delivered block's credit, including duplicate and invalid responses. */
-  fun accept(block: PeerBlockExchange.Response.Block) {
+  /**
+   * Always consumes the delivered block's credit, including duplicate and invalid responses.
+   * False for a second copy of a block, which is ignored: duplicate requests may deliver one.
+   */
+  fun accept(block: PeerBlockExchange.Response.Block): Boolean {
     try {
       check(owner.load() === Owner.ACTOR)
       val request = block.ticket.request
@@ -47,10 +50,11 @@ internal class TorrentV2PieceAssembly private constructor(
       val slot = request.begin / PeerWire.BLOCK_SIZE
       require(slot in received.indices && request == request(slot) &&
         block.bytes.size == request.length) { "Invalid assembly block range" }
-      require(!received[slot]) { "Duplicate assembly block" }
+      if (received[slot]) return false
       block.bytes.copyInto(bytes, request.begin)
       received[slot] = true
       count++
+      return true
     } finally {
       block.close()
     }

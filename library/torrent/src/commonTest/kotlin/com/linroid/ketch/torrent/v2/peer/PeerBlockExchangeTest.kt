@@ -106,9 +106,78 @@ class PeerBlockExchangeTest {
     f.receive(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
     val replacement = assertNotNull(f.exchange.request(request))
     assertTrue(f.exchange.cancel(replacement))
-    assertSame(replacement, assertIs<PeerBlockExchange.Response.Canceled>(
-      f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)))).ticket)
+    // Canceled, it is forgotten at once: its late block is ignored.
+    assertEquals(0, f.exchange.pendingCount)
+    assertNull(f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3))))
+    assertFalse(f.connection.closed)
     f.exchange.close()
+    assertEquals(0, f.blocks.allocated)
+  }
+
+  @Test
+  fun cancel_forgetsTheRequestOnceWritten_soItsLateAnswerIsNoViolation() = runTest {
+    val f = Fixture(fast = true)
+    f.ready()
+    val ticket = assertNotNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+    val other = assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+    val sent = f.connection.outgoing.size
+    assertTrue(f.exchange.cancel(ticket))
+    f.connection.outgoing.skip(sent)
+    assertEquals(PeerMessage.Cancel(0, 0, 3), PeerWire.decode(
+      f.connection.outgoing.readByteArray(f.connection.outgoing.readInt().toLong()),
+      pieceCount = 2))
+    // Its credit is back, and nothing for it is pending any more.
+    assertEquals(1, f.exchange.pendingCount)
+    assertEquals(5 * 2 + 256, f.blocks.allocated)
+    assertFalse(f.exchange.cancel(ticket))
+    // The peer had already queued it, then answers our CANCEL with a reject (BEP 6): both are
+    // ignored, and the request still out is served as usual.
+    assertNull(f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3))))
+    assertNull(f.receive(PeerMessage.Reject(0, 0, 3)))
+    assertSame(other, assertIs<PeerBlockExchange.Response.Block>(
+      f.receive(PeerMessage.Piece(1, 0, byteArrayOf(1, 2, 3, 4, 5)))).also { it.close() }.ticket)
+    assertFalse(f.connection.closed)
+    f.exchange.close()
+    assertEquals(0, f.blocks.allocated)
+  }
+
+  @Test
+  fun slowPeer_answeringNow_andThen_keepsItsRequestsUntilSilentForTheTimeout() = runTest {
+    val f = Fixture()
+    f.ready()
+    val first = assertNotNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+    assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+    // Past the timeout of its oldest request, the peer answers it: the other request goes on.
+    f.now = 8
+    assertSame(first, assertIs<PeerBlockExchange.Response.Block>(
+      f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)))).also { it.close() }.ticket)
+    f.now = 15
+    assertFalse(f.exchange.expire())
+    assertEquals(3L, f.exchange.nextDeadlineMs())
+    // Silent for the timeout since its last answer, it is closed.
+    f.now = 18
+    assertTrue(f.exchange.expire())
+    assertTrue(f.connection.closed)
+    assertEquals(0, f.blocks.allocated)
+  }
+
+  @Test
+  fun requestThePeerNeverAnswers_expiresAtItsMaximumAgeWhateverElseItServes() = runTest {
+    val f = Fixture()
+    f.ready()
+    // Piece 1's request is never answered; piece 0's are, one after another.
+    assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
+    val maxAge = 10L * PeerBlockExchange.MAX_AGE_TIMEOUTS
+    while (f.now + 8 < maxAge) {
+      assertNotNull(f.exchange.request(PeerMessage.Request(0, 0, 3)))
+      f.now += 8
+      assertFalse(f.exchange.expire())
+      assertIs<PeerBlockExchange.Response.Block>(
+        f.receive(PeerMessage.Piece(0, 0, byteArrayOf(1, 2, 3)))).close()
+    }
+    f.now = maxAge
+    assertTrue(f.exchange.expire())
+    assertTrue(f.connection.closed)
     assertEquals(0, f.blocks.allocated)
   }
 
@@ -242,8 +311,7 @@ class PeerBlockExchangeTest {
     delivered.close()
     val next = assertNotNull(f.exchange.request(PeerMessage.Request(1, 0, 5)))
     assertTrue(f.exchange.cancel(next))
-    assertIs<PeerBlockExchange.Response.Canceled>(
-      f.receive(PeerMessage.Piece(1, 0, byteArrayOf(1, 2, 3, 4, 5))))
+    assertNull(f.receive(PeerMessage.Piece(1, 0, byteArrayOf(1, 2, 3, 4, 5))))
     f.exchange.close()
     assertEquals(0, f.blocks.allocated)
     assertEquals(0, f.frames.allocated)

@@ -16,6 +16,11 @@ import kotlinx.coroutines.withTimeout
  * state before construction; pending/delivered blocks retain their own buffer reservations.
  * A separate reader hands frames to receive. The actor must schedule expire at nextDeadlineMs.
  *
+ * A peer that serves slowly is kept: its requests expire only once it answered none of them for
+ * [timeoutMs], or one of them has waited [MAX_AGE_TIMEOUTS] times that long, and the scheduler
+ * asks other peers for what it is late with meanwhile. A request we [cancel] is forgotten once
+ * the CANCEL is written, so a late block or reject for it is ignored, never a violation.
+ *
  * Without the Fast extension (BEP 6) a CHOKE silently discards every outstanding request (BEP 3).
  * The actor collects those with [takeDropped] and returns them to the scheduler. With it ([fast])
  * a CHOKE keeps our requests: the peer rejects those it will not serve, and may serve its
@@ -33,7 +38,7 @@ internal class PeerBlockExchange(
   private val transport: PeerHashTransport,
   private val budget: TorrentBufferBudget,
   private val maxPending: Int = 32,
-  private val timeoutMs: Long = 30_000,
+  private val timeoutMs: Long = 60_000,
   private val clock: () -> Long = monotonicClock(),
   private val mode: PeerIdentityHandshake.Mode = PeerIdentityHandshake.Mode.V2,
   /** Both sides set the Fast extension bit (BEP 6). */
@@ -57,13 +62,11 @@ internal class PeerBlockExchange(
       fun close() = lease.close()
     }
     data class Rejected(val ticket: Ticket) : Response
-    data class Canceled(val ticket: Ticket) : Response
   }
   private class Pending(
     val ticket: Ticket,
     val started: Long,
     val lease: TorrentBufferBudget.Lease,
-    var canceled: Boolean = false,
   )
 
   init {
@@ -80,6 +83,8 @@ internal class PeerBlockExchange(
   private var closed = false
   /** When a Fast peer last choked us, on [clock]; null while it unchokes us. */
   private var chokedAt: Long? = null
+  /** When the peer last answered a request of ours, with a block or a reject, on [clock]. */
+  private var answeredAt = Long.MIN_VALUE
   var localInterested: Boolean = false
     private set
   val pendingCount: Int get() = pending.size
@@ -125,8 +130,12 @@ internal class PeerBlockExchange(
 
   private fun remaining(value: Pending): Long {
     val now = clock()
-    val elapsed = now - value.started
-    return if (now < value.started || elapsed < 0) 0 else maxOf(0, timeoutMs - elapsed)
+    // Each answer gives every request out another [timeoutMs]; none waits past its maximum age.
+    val since = maxOf(value.started, answeredAt)
+    val elapsed = now - since
+    val age = now - value.started
+    if (now < since || elapsed < 0 || age < 0) return 0
+    return maxOf(0, minOf(timeoutMs - elapsed, timeoutMs * MAX_AGE_TIMEOUTS - age))
   }
 
   private fun checkLive() {
@@ -178,18 +187,22 @@ internal class PeerBlockExchange(
     return PeerMessage.Request(request.index, request.begin, length)
   }
 
-  /** False means stale ownership or no frame credit; retry a live ticket when credit returns. */
+  /**
+   * Cancels [ticket]'s request and forgets it once the CANCEL is written: no response for it
+   * follows, and a late block or reject for it is ignored. False means stale ownership, as when
+   * it was already answered, or no frame credit, which leaves the request out as it was.
+   */
   suspend fun cancel(ticket: Ticket): Boolean {
     checkLive()
     val value = pending[ticket.wire] ?: return false
     if (value.ticket !== ticket) return false
-    if (value.canceled) return true
     try {
       return write(value) {
         val wire = ticket.wire
         transport.trySend(PeerMessage.Cancel(wire.index, wire.begin, wire.length)) {
-          value.canceled = true
+          pending.remove(wire)
           state.cancel(wire)
+          value.lease.close()
         }
       }
     } catch (error: Throwable) {
@@ -247,6 +260,8 @@ internal class PeerBlockExchange(
         check(!accepted) { "Missing block request ownership" }
         return null
       }
+      // An answer, however slow: the peer still serves us.
+      answeredAt = clock()
       if (message is PeerMessage.Piece && accepted) {
         val ticket = value.ticket
         val length = ticket.request.length
@@ -258,9 +273,10 @@ internal class PeerBlockExchange(
         }
         return Response.Block(ticket, message.bytes.copyOf(length), value.lease)
       }
+      // Pending requests are live ones: the protocol state accepts any answer to them.
+      check(message is PeerMessage.Reject) { "Unaccepted block for a live request" }
       value.lease.close()
-      return if (message is PeerMessage.Reject) Response.Rejected(value.ticket) else
-        Response.Canceled(value.ticket)
+      return Response.Rejected(value.ticket)
     } catch (error: Throwable) {
       close()
       throw error
@@ -281,7 +297,7 @@ internal class PeerBlockExchange(
 
   /** Live requests a choking peer does not allow fast: those it should reject (BEP 6). */
   private fun choked(): List<Pending> = pending.values.filter {
-    !it.canceled && !state.allowsFast(it.ticket.wire.index)
+    !state.allowsFast(it.ticket.wire.index)
   }
 
   /**
@@ -313,7 +329,11 @@ internal class PeerBlockExchange(
   /** Requests the peer discarded by choking us; each must be returned to the scheduler. */
   fun takeDropped(): List<Response.Rejected> = dropped.toList().also { dropped.clear() }
 
-  /** A timed-out request cannot be forgotten on a reusable v2 stream; tear down the connection. */
+  /**
+   * A timed-out request cannot be forgotten on a reusable v2 stream; tear down the connection.
+   * Requests time out once the peer answered none for the response timeout, or the oldest one
+   * waited [MAX_AGE_TIMEOUTS] times that long.
+   */
   fun expire(): Boolean {
     if (closed || pending.values.none { remaining(it) == 0L }) return false
     close()
@@ -329,5 +349,13 @@ internal class PeerBlockExchange(
       pending.clear()
       protocol = null
     }
+  }
+
+  companion object {
+    /**
+     * How many times the response timeout one request may wait at most, however often the peer
+     * answers others: a request it dropped without a word must not hold its block for good.
+     */
+    const val MAX_AGE_TIMEOUTS: Int = 4
   }
 }

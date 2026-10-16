@@ -106,6 +106,15 @@ internal object TorrentV2SessionLoop {
   /** How long web seeds that found no piece wait before looking again, unless state changes. */
   private const val MIRROR_RETRY_MS = 250L
 
+  /**
+   * How often a downloading loop wakes up unprompted: to look for late requests other peers may
+   * duplicate, and whether the endgame began.
+   */
+  private const val TICK_MS = 1_000L
+
+  /** How long a peer that found nothing to duplicate waits before looking again. */
+  private const val DUPLICATE_SCAN_MS = 500L
+
   /** Live changes a swarm loop applies without restarting its pool, dialer or workers. */
   sealed interface Control {
     /** At most [peers] connections; the excess are stopped, least useful first. */
@@ -227,7 +236,9 @@ internal object TorrentV2SessionLoop {
     val diagnostics = swarm?.let { PeerDiagnostics(listener = it.runtime.peerOutcomes) }
     try {
       val pieces = checkNotNull(TorrentV2PieceScheduler.create(layout, selectedIds,
-        store.verifiedPieces(), buffers, state, maxActive)) { "Piece scheduler budget exhausted" }
+        store.verifiedPieces(), buffers, state, maxActive, nowMs)) {
+        "Piece scheduler budget exhausted"
+      }
       scheduler = pieces
       val rarity = checkNotNull(TorrentV2RarityPicker.create<PeerV2Pool.Peer>(
         layout.pieceCount.toInt(), state, maxPeers)) { "Rarity index budget exhausted" }
@@ -268,12 +279,39 @@ internal object TorrentV2SessionLoop {
       // changes, or after a while for buffers freed elsewhere.
       var mirrorVersion = -1L
       var mirrorRetryAt = 0L
+      // Web seeds that stopped.
+      val stoppedMirrors = mutableSetOf<Int>()
       // Every selected piece is verified; a seed keeps serving peers after that.
       var complete = false
       var seeding = false
       val label = "taskId=${store.taskId} (${logHash(layout.infoHash.hex)})"
+      // Every wanted piece left is being fetched or has no source; looked at each tick.
+      var endgame = false
+      // Cancels of requests other peers delivered first, waiting for room in their peer's queue.
+      val cancels = ArrayDeque<TorrentV2PieceScheduler.Cancel>()
 
       fun wakeAdmission() { peers.values.forEach { it.admissionBlocked = false } }
+
+      /** Some connected peer has piece [index], or a web seed that runs serves it. */
+      fun sourced(index: Int): Boolean = rarity.hasAny(index) || mirrors != null &&
+        mirrors.urls.indices.any { it !in stoppedMirrors && mirrors.serves(it, index) }
+
+      /** Tells peers to cancel the requests other peers delivered first. */
+      fun sendCancels() {
+        cancels.addAll(pieces.takeCancels())
+        if (cancels.isEmpty()) return
+        val views = peers.entries.associate { (peer, view) -> peer.blocks to view }
+        val iterator = cancels.iterator()
+        while (iterator.hasNext()) {
+          val cancel = iterator.next()
+          val view = views[cancel.peer]
+          // A peer gone has nothing to cancel; a full queue takes it on a later pass.
+          if (view == null ||
+            view.commands.trySend(PeerV2DownloadActor.Command.Cancel(cancel.ticket)).isSuccess) {
+            iterator.remove()
+          }
+        }
+      }
 
       fun stop(peer: PeerV2Pool.Peer) {
         if (!stopping.add(peer)) return
@@ -286,6 +324,8 @@ internal object TorrentV2SessionLoop {
         // Unwanted pieces go once their last request is answered.
         pieces.evictUnwanted()
         pieces.submitReady(worker)
+        // Before new requests: a cancel makes room in the pipeline of a peer that was late.
+        sendCancels()
         for ((peer, view) in peers) {
           if (view.rateRetryAt <= nowMs()) view.rateRetryAt = 0
           if (view.admissionBlocked || view.rateRetryAt != 0L) continue
@@ -305,17 +345,31 @@ internal object TorrentV2SessionLoop {
             rarity.has(peer, index) && index !in view.refused &&
               (!view.choked || index in view.allowedFast)
           }
-          var plan = pieces.planNext(peer.blocks, eligible)
+          // How long the peer may take with a block before another peer may ask for it too.
+          val lateAfter = TorrentV2PieceScheduler.lateAfterMs(window, view.rate)
+          var plan = pieces.planNext(peer.blocks, lateAfter, eligible)
           if (plan == null) {
             val index = rarity.pick(peer) { pieces.canBegin(it) && eligible(it) }
             if (index != null) {
-              if (pieces.begin(index)) plan = pieces.planNext(peer.blocks, eligible)
+              if (pieces.begin(index)) plan = pieces.planNext(peer.blocks, lateAfter, eligible)
               else {
                 view.admissionBlocked = true
                 // Downloads come first: the upload cache gives its pieces back.
                 uploads?.trim()
               }
             }
+          }
+          if (plan == null && !view.admissionBlocked && nowMs() >= view.duplicateScanAt) {
+            // Nothing new to fetch. In the endgame a piece a web seed fetches, as its mirror may
+            // be slow; then a block another peer is late with, or in the endgame any it has out.
+            if (endgame) {
+              val index = rarity.pick(peer) { pieces.canRescue(it) && eligible(it) }
+              if (index != null && pieces.rescue(index)) {
+                plan = pieces.planNext(peer.blocks, lateAfter, eligible)
+              }
+            }
+            if (plan == null) plan = pieces.planDuplicate(peer.blocks, endgame, eligible)
+            if (plan == null) view.duplicateScanAt = nowMs() + DUPLICATE_SCAN_MS
           }
           if (plan != null) {
             var sent = false
@@ -510,10 +564,18 @@ internal object TorrentV2SessionLoop {
               // What crossed the wire: on a v1 route, the canonical block with its padding.
               view.traffic?.received(block.ticket.wire.length)
               view.receivedSinceRechoke += block.ticket.request.length
+              view.delivered(block.ticket.request.length)
               members[peer]?.attempt?.let { it.payload += block.ticket.request.length }
               uploads?.received(peer, block.ticket.request.length)
             }
             pieces.receive(peer.blocks, value.value)
+            wakeAdmission()
+          }
+          // The peer forgot a request another peer delivered first: no answer for it follows.
+          is PeerV2DownloadActor.Event.Canceled -> if (value.sent) {
+            check(view.inFlight > 0)
+            view.inFlight--
+            pieces.canceled(peer.blocks, value.ticket)
             wakeAdmission()
           }
           is PeerV2DownloadActor.Event.Hash -> {
@@ -736,6 +798,8 @@ internal object TorrentV2SessionLoop {
       onProgress()
       var preference = 0
       val branches = if (swarm == null) 3 else 9
+      // Each tick looks for late requests and the endgame; see TICK_MS.
+      var nextTick = nowMs() + TICK_MS
       var acceptingConnections = connections != null
       // Event driven: an idle swarm logs nothing, so the loop never wakes just to report.
       var nextSummary = nowMs() + SWARM_SUMMARY_INTERVAL_MS
@@ -750,6 +814,7 @@ internal object TorrentV2SessionLoop {
           if (!complete && pieces.completed() && !store.completed()) retarget()
           if (!complete && pieces.completed()) {
             complete = true
+            endgame = false
             // A seed retries nobody; peers it has not tried are still dialed.
             book?.completed()
             if (swarm.onCompleted()) {
@@ -760,6 +825,12 @@ internal object TorrentV2SessionLoop {
           // A seed stops once the upload policy no longer seeds.
           if (seeding && swarm.runtime.uploadPolicy() !=
             TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
+        }
+        if (!complete && nowMs() >= nextTick) {
+          nextTick = nowMs() + TICK_MS
+          endgame = pieces.endgame(::sourced)
+          // Peers look for late requests again on this pass.
+          wakeAdmission()
         }
         pump()
         if (nowMs() >= nextSummary) {
@@ -782,7 +853,7 @@ internal object TorrentV2SessionLoop {
             }.orEmpty()
             "V2 swarm $label: pieces $verified/${layout.pieceCount}, peers=${peers.size}" +
               "$swarmPart unchoked=${peers.values.count { !it.choked }}, pendingCommits=" +
-              "${pieces.pendingCommitCount}$outcomes$webSeedPart"
+              "${pieces.pendingCommitCount}, endgame=$endgame$outcomes$webSeedPart"
           }
         }
         // Every peer tried is gone and nobody is left to dial: an owner waits for discovery to
@@ -853,8 +924,10 @@ internal object TorrentV2SessionLoop {
           val mirrorDelay = if (idleMirrors.isNotEmpty() && !complete) {
             (mirrorRetryAt - nowMs()).coerceAtLeast(1)
           } else null
+          // While downloading: late requests and the endgame (see TICK_MS).
+          val tickDelay = if (!complete) (nextTick - nowMs()).coerceAtLeast(1) else null
           val retryDelay = listOfNotNull(memoryDelay, rateDelay, dialDelay, uploadDelay,
-            exchangeDelay, mirrorDelay).minOrNull()
+            exchangeDelay, mirrorDelay, tickDelay).minOrNull()
           if (retryDelay != null) onTimeout(retryDelay) { Event.Retry }
         }
         preference = (preference + 1) % branches
@@ -879,6 +952,12 @@ internal object TorrentV2SessionLoop {
             is TorrentV2WebSeeds.Event.Stopped -> {
               mirrorsRunning--
               idleMirrors.remove(update.seed)
+              stoppedMirrors += update.seed
+              // A run handed to it as it stopped goes back, so peers may fetch those pieces.
+              for (claim in checkNotNull(mirrors).reclaim(update.seed)) {
+                claim.lease.close()
+                pieces.webSeedDone(claim.index, verified = false)
+              }
             }
             is TorrentV2WebSeeds.Event.Failed -> throw update.cause
           }

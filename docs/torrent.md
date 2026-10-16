@@ -709,6 +709,13 @@ uploads never starve downloads; with less than the default 32 MiB, pieces larger
 buffer are never uploaded. Reading a piece to prove its block hashes counts against the upload
 limits, and such reads take at most half of a limit.
 
+A block a v2 peer is late with (twice its queue's time at its rate, 4 to 30 seconds) is asked of
+another peer, and in the endgame, once every wanted piece left is being fetched or has no source,
+idle peers ask for any outstanding block. A block has at most two requesters (each peer at most 8
+copies, a download 64), and the first copy to arrive cancels the other. In the endgame peers may
+also start a piece a web seed is fetching. A slow peer is closed only after a minute without
+answering anything, and a request it never answers is given up after four.
+
 ### Downloading v1 pieces
 
 - Peers download 16 KiB blocks of the pieces being assembled. A piece opens, rarest first, when a

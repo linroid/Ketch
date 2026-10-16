@@ -78,6 +78,8 @@ class TorrentV2SessionLoopTest {
     private val input = Channel<ByteArray>(Channel.UNLIMITED)
     private val pending = Buffer()
     val requests = mutableListOf<PeerMessage.Request>()
+    /** The requests we canceled. */
+    val cancels = mutableListOf<PeerMessage.Cancel>()
     /** Every request as it is written, for tests that run in real time. */
     val requested = Channel<PeerMessage.Request>(Channel.UNLIMITED)
     @Volatile var closed = false
@@ -114,6 +116,7 @@ class TorrentV2SessionLoopTest {
       val buffer = Buffer().write(bytes)
       val size = buffer.readInt()
       val message = PeerWire.decode(buffer.readByteArray(size.toLong()))
+      if (message is PeerMessage.Cancel) cancels += message
       if (message is PeerMessage.Request) {
         requests += message
         requested.trySend(message)
@@ -490,6 +493,35 @@ class TorrentV2SessionLoopTest {
       } finally { download.cancelAndJoin() }
       assertTrue(f.store.completed())
       assertEquals(2, f.connections.single().requests.size)
+      f.checkReleased()
+    } finally { f.store.cleanup() }
+  }
+
+  @Test
+  fun blockASilentPeerHolds_isFetchedFromAnotherAndCanceledWithTheSilentOne() = runTest {
+    val f = Fixture(setOf("0"))
+    val clock = { testScheduler.currentTime }
+    try {
+      f.store.initialize()
+      PeerV2Pool.run(f.state, maxPeers = 2) { pool ->
+        // One peer takes requests and never answers them; the other serves at once.
+        f.attach(pool, clock) { it.deferResponses = true }
+        f.attach(pool, clock)
+        TorrentV2CommitWorker.run(f.store, dispatcher = StandardTestDispatcher(testScheduler)) {
+          TorrentV2SessionLoop.download(layout, setOf("0"), f.store, pool, it, f.buffers,
+            f.state, maxPeers = 2, nowMs = clock)
+        }
+      }
+      assertTrue(f.store.completed())
+      assertContentEquals(bytes, torrentFileSystem.read(f.output / "a") { readByteArray() })
+      val (silent, serving) = f.connections
+      // The piece is all that is left, so the endgame asks the serving peer for whatever the
+      // silent one holds, and the silent one is told to cancel it: nothing waits for it to time
+      // out, which would have closed it instead.
+      assertTrue(silent.requests.isNotEmpty())
+      assertTrue(serving.requests.containsAll(silent.requests))
+      assertEquals(silent.requests.map { PeerMessage.Cancel(it.index, it.begin, it.length) }
+        .toSet(), silent.cancels.toSet())
       f.checkReleased()
     } finally { f.store.cleanup() }
   }

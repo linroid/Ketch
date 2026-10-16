@@ -37,6 +37,9 @@ internal const val MAX_QUEUED_HASH_ANSWERS = 64
 /** `ut_metadata` answers that may wait for room in one peer's actor queue; more go unanswered. */
 internal const val MAX_QUEUED_METADATA_ANSWERS = 8
 
+/** The least time a peer's download rate is measured over. */
+private const val RATE_WINDOW_MS = 2_000L
+
 /**
  * What the session loop knows about one ready peer. Only the loop reads or writes it. A swarm
  * session charges [PEER_VIEW_BYTES] per view; [close] returns it.
@@ -46,7 +49,7 @@ internal class TorrentV2PeerView(
   /** Null only for peers attached without a negotiated identity (pipeline tests). */
   val info: PeerInfo?,
   private val lease: TorrentBufferBudget.Lease? = null,
-  nowMs: () -> Long = monotonicClock(),
+  private val nowMs: () -> Long = monotonicClock(),
   /** This peer among the task's live connections; closed with the view. */
   val traffic: PeerTraffic? = null,
   /** The swarm's piece length, which sizes [serveCredit]; the largest a piece may be. */
@@ -66,6 +69,32 @@ internal class TorrentV2PeerView(
 
   /** Payload bytes this peer delivered since the last rechoke; ranks peers to drop first. */
   var receivedSinceRechoke = 0L
+
+  /** No sooner than this does the peer look again for blocks others are late with. */
+  var duplicateScanAt = 0L
+
+  // Payload delivered since [rateWindowStart], for [rate].
+  private var rateWindowStart = nowMs()
+  private var rateWindowBytes = 0L
+
+  /**
+   * Payload bytes a second the peer delivered over its last window of at least
+   * [RATE_WINDOW_MS]; zero until one passed. How late its requests may be follows from it.
+   */
+  var rate = 0L
+    private set
+
+  /** The peer delivered [bytes] of payload. */
+  fun delivered(bytes: Int) {
+    val now = nowMs()
+    rateWindowBytes += bytes
+    val elapsed = now - rateWindowStart
+    if (elapsed >= RATE_WINDOW_MS) {
+      rate = rateWindowBytes * 1000 / elapsed
+      rateWindowStart = now
+      rateWindowBytes = 0
+    }
+  }
 
   // Upload
   /** The peer wants payload from us. */
