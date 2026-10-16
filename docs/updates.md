@@ -248,9 +248,10 @@ the signing key and an increasing `-PversionCode`, so installed APKs can upgrade
 [Google Play signing](app-store-listing.md#google-play) for channel changes.
 
 The release key comes from the `ANDROID_KEYSTORE_*` variables, or from the untracked
-`local.properties`, and debug builds are signed with it too, so they install over a release
-build and keep its data. Without it, debug builds use Android's debug key and cannot replace a
-release-signed install:
+`local.properties`, and debug builds are signed with it too. Without `-PversionCode` they take
+version code 2,000,000,000, above any release's run number, so they install over a release build
+and keep its data; a release then installs only after the debug build is uninstalled. Without
+the key, debug builds use Android's debug key and cannot replace a release-signed install:
 
 ```properties
 ketch.signing.storeFile=/absolute/path/to/ketch-release.jks

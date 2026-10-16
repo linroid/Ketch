@@ -112,6 +112,18 @@ android {
   }
 }
 
+// Releases take the workflow's run number as their version code. A debug build signed with the
+// release key gets one above any of them unless -PversionCode names one, so it installs over a
+// release install; a release then needs the debug build uninstalled first.
+if (!providers.gradleProperty("versionCode").isPresent) {
+  androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+      // Below Play's 2,100,000,000 limit, and far above any release's run number.
+      variant.outputs.forEach { it.versionCode.set(2_000_000_000) }
+    }
+  }
+}
+
 // Koog, kotlinx-schema and Ktor's server depend on kotlin-reflect for features the app does not
 // use (reflective tool sets and schemas, loading server modules by name). Its R8 rules keep most
 // of it, so release builds leave it out.
