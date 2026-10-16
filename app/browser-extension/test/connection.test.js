@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { NATIVE_HOST, withEndpoint } from '../src/lib/connection.js';
+import { NATIVE_HOST, pickAppFolder, withEndpoint } from '../src/lib/connection.js';
 import { FailureKind, KetchRequestError } from '../src/lib/ketch-client.js';
 
 const app = { id: 'local', type: 'app', name: 'This computer' };
@@ -179,4 +179,30 @@ test('a copy of the extension the app does not accept says so', async () => {
       saveEndpoint: async () => {},
     },
   }), { kind: FailureKind.APP_NOT_ALLOWED });
+});
+
+describe('pickAppFolder', () => {
+  test('asks the app for a folder, starting where the field points', async () => {
+    const { deps, messages } = fakeApp({ folder: '/Users/me/Movies' });
+    assert.equal(await pickAppFolder('/Users/me', { deps }), '/Users/me/Movies');
+    assert.deepEqual(messages, [{ type: 'pick-folder', initialFolder: '/Users/me' }]);
+  });
+
+  test('a canceled dialog chooses nothing', async () => {
+    const { deps, messages } = fakeApp({ canceled: true });
+    assert.equal(await pickAppFolder('', { deps }), undefined);
+    assert.deepEqual(messages, [{ type: 'pick-folder', initialFolder: undefined }]);
+  });
+
+  test('an app from before folder picking asks to be updated', async () => {
+    const { deps } = fakeApp({ error: 'bad_request', message: 'Unknown request type' });
+    await assert.rejects(pickAppFolder(undefined, { deps }),
+      (error) => error.kind === FailureKind.UNREACHABLE && !/Unknown request/.test(error.message));
+  });
+
+  test('a missing app says so', async () => {
+    const { deps } = fakeApp(new Error('Specified native messaging host not found.'));
+    await assert.rejects(pickAppFolder(undefined, { deps }),
+      { kind: FailureKind.APP_NOT_INSTALLED });
+  });
 });

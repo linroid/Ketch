@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "Приложению Ketch не удалось подключиться"
   },
+  "error_app_pick_unsupported": {
+    "message": "Обновите приложение Ketch, чтобы выбирать папки отсюда"
+  },
   "error_app_invalid_reply": {
     "message": "Приложение Ketch прислало неверный ответ"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "Папка по умолчанию"
+  },
+  "dialog_folder_browse": {
+    "message": "Обзор…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Выбрать папку на этом компьютере"
   },
   "dialog_device_checking": {
     "message": "Проверка…"

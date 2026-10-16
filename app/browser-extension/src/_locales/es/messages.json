@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "La app de Ketch no pudo conectarse"
   },
+  "error_app_pick_unsupported": {
+    "message": "Actualiza la app Ketch para elegir carpetas desde aquí"
+  },
   "error_app_invalid_reply": {
     "message": "La app de Ketch envió una respuesta no válida"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "Carpeta predeterminada"
+  },
+  "dialog_folder_browse": {
+    "message": "Examinar…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Elegir una carpeta de este equipo"
   },
   "dialog_device_checking": {
     "message": "Comprobando…"

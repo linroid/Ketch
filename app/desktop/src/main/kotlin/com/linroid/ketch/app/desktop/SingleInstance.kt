@@ -18,6 +18,8 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.security.MessageDigest
 import java.security.SecureRandom
 import kotlin.concurrent.thread
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Keeps one desktop app per user. Windows and Linux start a new process for every file opened
@@ -51,7 +53,7 @@ internal class SingleInstance private constructor(
     private const val REQUEST = -1
 
     /** How long a [request] waits for its reply; the app may still be starting up. */
-    private const val REPLY_TIMEOUT_MS = 30_000
+    private val REPLY_TIMEOUT = 30.seconds
 
     /**
      * Becomes the running instance and passes arguments forwarded by later launches to
@@ -130,14 +132,18 @@ internal class SingleInstance private constructor(
 
     /**
      * Sends [message] to the running instance and returns its reply, or null when no instance
-     * is running, it did not answer in time, or it had no reply.
+     * is running, it did not answer within [replyTimeout], or it had no reply.
      */
-    fun request(dir: File, message: String): String? {
+    fun request(
+      dir: File,
+      message: String,
+      replyTimeout: Duration = REPLY_TIMEOUT,
+    ): String? {
       val (port, token) = readEndpoint(dir) ?: return null
       return try {
         Socket().use { socket ->
           socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MS)
-          socket.soTimeout = REPLY_TIMEOUT_MS
+          socket.soTimeout = replyTimeout.inWholeMilliseconds.toInt()
           val output = DataOutputStream(socket.getOutputStream().buffered())
           output.writeUTF(token)
           output.writeInt(REQUEST)

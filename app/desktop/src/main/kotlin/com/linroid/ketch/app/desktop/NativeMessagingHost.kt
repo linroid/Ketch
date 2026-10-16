@@ -18,6 +18,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -29,12 +30,15 @@ import kotlin.time.TimeSource
  * exits. The app it starts stays hidden in the menu bar or notification area
  * ([AppCommand.launchDetached]), so a captured download never pops up a window.
  *
- * Requests are `{"type":"connect","launch":true}`. Replies are the app's
- * `{"url":…,"token":…}`, or `{"error":…,"message":…}`.
+ * Requests are `{"type":"connect","launch":true}`, answered with the app's
+ * `{"url":…,"token":…}`, and `{"type":"pick-folder","initialFolder":…}`, which starts the app
+ * like `connect` and has it show the system's folder dialog, answered with `{"folder":…}` or
+ * `{"canceled":true}`. Either fails with `{"error":…,"message":…}`.
  */
 internal class NativeMessagingHost(
   private val requestApp: () -> String?,
   private val launchApp: () -> Unit,
+  private val pickFolder: (initialFolder: String?) -> String? = { null },
   private val startTimeout: Duration = 30.seconds,
   private val pollInterval: Duration = 250.milliseconds,
 ) {
@@ -50,6 +54,7 @@ internal class NativeMessagingHost(
       ?: return errorReply("bad_request", "The request is not a JSON object")
     return when (message["type"]?.jsonPrimitive?.contentOrNull) {
       "connect" -> connect(launch = message["launch"]?.jsonPrimitive?.booleanOrNull ?: true)
+      "pick-folder" -> pickFolder(message["initialFolder"]?.jsonPrimitive?.contentOrNull)
       else -> errorReply("bad_request", "Unknown request type")
     }
   }
@@ -78,6 +83,19 @@ internal class NativeMessagingHost(
     return last ?: errorReply("not_started", "Ketch didn't start in time")
   }
 
+  private fun pickFolder(initialFolder: String?): String {
+    // The app answers only once it runs and has loaded, whatever its address.
+    val connected = connect(launch = true)
+    if (connected.isError()) return connected
+    return pickFolder.invoke(initialFolder?.takeIf { it.isNotBlank() })
+      ?: errorReply("pick_failed", "Ketch couldn't show the folder dialog")
+  }
+
+  private fun String.isError(): Boolean {
+    val reply = runCatching { Json.parseToJsonElement(this) as? JsonObject }.getOrNull()
+    return reply?.get("error") != null
+  }
+
   private fun String.isNotReady(): Boolean {
     val reply = runCatching { Json.parseToJsonElement(this) as? JsonObject }.getOrNull()
     return reply?.get("error")?.jsonPrimitive?.contentOrNull == NOT_READY
@@ -89,6 +107,15 @@ internal class NativeMessagingHost(
 
     /** [SingleInstance] request for [LocalApiServer]'s address and token. */
     const val CONNECT_REQUEST = "browser-extension/connect"
+
+    /**
+     * [SingleInstance] request that has the app show its folder dialog: this, a line break, then
+     * the folder to start in (empty for none). See [pickFolderReply].
+     */
+    const val PICK_FOLDER_REQUEST = "browser-extension/pick-folder"
+
+    /** How long the host waits for the user to choose a folder. */
+    val PICK_FOLDER_TIMEOUT: Duration = 10.minutes
 
     /** Name of the host, as the extension and the host manifests know it. */
     const val NAME = "com.linroid.ketch"
@@ -149,12 +176,35 @@ internal fun runNativeMessagingHost(configDir: File) {
   val host = NativeMessagingHost(
     requestApp = { SingleInstance.request(configDir, NativeMessagingHost.CONNECT_REQUEST) },
     launchApp = { AppCommand.current().launchDetached() },
+    pickFolder = { initialFolder ->
+      SingleInstance.request(
+        configDir,
+        "${NativeMessagingHost.PICK_FOLDER_REQUEST}\n${initialFolder.orEmpty()}",
+        replyTimeout = NativeMessagingHost.PICK_FOLDER_TIMEOUT,
+      )
+    },
   )
   try {
     host.serve(FileInputStream(FileDescriptor.`in`), stdout)
   } catch (e: IOException) {
     System.err.println("Ketch native messaging host: ${e.message}")
   }
+}
+
+/**
+ * Answers a [NativeMessagingHost.PICK_FOLDER_REQUEST] with [pick], which shows the folder dialog
+ * starting in the folder the request names and returns the folder chosen, or null when canceled.
+ */
+internal fun pickFolderReply(request: String, pick: (initialFolder: String?) -> String?): String {
+  val initialFolder = request.substringAfter('\n', "").takeIf { it.isNotBlank() }
+  val folder = try {
+    pick(initialFolder)
+  } catch (e: Exception) {
+    return errorReply("pick_failed", "Couldn't show the folder dialog: ${e.message}")
+  }
+  return buildJsonObject {
+    if (folder == null) put("canceled", true) else put("folder", folder)
+  }.toString()
 }
 
 internal fun errorReply(code: String, message: String): String = buildJsonObject {

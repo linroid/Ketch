@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "Die Ketch-App konnte keine Verbindung herstellen"
   },
+  "error_app_pick_unsupported": {
+    "message": "Aktualisiere die Ketch-App, um hier Ordner auszuwählen"
+  },
   "error_app_invalid_reply": {
     "message": "Die Ketch-App hat eine ungültige Antwort gesendet"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "Standardordner"
+  },
+  "dialog_folder_browse": {
+    "message": "Durchsuchen…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Einen Ordner auf diesem Computer auswählen"
   },
   "dialog_device_checking": {
     "message": "Wird geprüft…"

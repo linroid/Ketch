@@ -133,6 +133,10 @@
     "message": "The Ketch app couldn't connect",
     "description": "Error when the Ketch app on this computer reported a problem without describing it."
   },
+  "error_app_pick_unsupported": {
+    "message": "Update the Ketch app to choose folders from here",
+    "description": "Download review dialog: error when the Ketch app is too old to show its folder dialog for the extension"
+  },
   "error_app_invalid_reply": {
     "message": "The Ketch app sent an invalid reply",
     "description": "Error when the Ketch app on this computer answered with something the extension can't use."
@@ -816,6 +820,14 @@
   "dialog_folder_default": {
     "message": "Default folder",
     "description": "Download review dialog: folder field placeholder when the device has not said which folder it uses"
+  },
+  "dialog_folder_browse": {
+    "message": "Browse…",
+    "description": "Download review dialog: button beside the folder field that opens the folder dialog of the Ketch app on this computer"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Choose a folder on this computer",
+    "description": "Download review dialog: tooltip of the Browse button"
   },
   "dialog_device_checking": {
     "message": "Checking…",

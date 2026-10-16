@@ -29,13 +29,14 @@ globalThis.chrome = {
 const {
   openReview, sendReview, cancelReview, closeReviews, reviewDestination, resourceDestination,
   directReview, canDownloadDirectly, reopenReview, recentFolders, categoryFor, rememberDeviceFolders,
-  knownDeviceFolders,
+  knownDeviceFolders, lastFolder,
 } = await import('../src/lib/review.js');
 
 function reset() {
   for (const key of Object.keys(data)) delete data[key];
   delete local.recentFolders;
   delete local.deviceFolders;
+  delete local.lastFolders;
   browserActions.length = 0;
 }
 async function review(download = { url: 'https://example.com/file', browserDownloadId: 42 }) {
@@ -203,6 +204,19 @@ test('sent folders are remembered per device, most recent first and without repe
   }
   assert.deepEqual(await recentFolders('server'), ['/data/a', '/data/b']);
   assert.deepEqual(await recentFolders('other'), []);
+});
+
+test('the review starts in the folder last sent to each device, Auto included', async () => {
+  reset();
+  assert.equal(await lastFolder('server'), undefined);
+  let id = await review({ url: 'https://example.com/file' });
+  await sendReview(id, 'server', '', ' /data/movies ', async () => ({ taskId: 'accepted' }));
+  assert.equal(await lastFolder('server'), '/data/movies');
+  assert.equal(await lastFolder('other'), undefined);
+  id = await review({ url: 'https://example.com/file' });
+  await sendReview(id, 'server', '', '', async () => ({ taskId: 'accepted' }));
+  assert.equal(await lastFolder('server'), '');
+  assert.deepEqual(await recentFolders('server'), ['/data/movies']);
 });
 
 test('downloading in the browser resumes a captured original', async () => {

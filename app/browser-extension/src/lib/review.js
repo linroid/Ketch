@@ -8,6 +8,7 @@ import { loadSettings } from './settings.js';
 const PREFIX = 'review:';
 const RECENT_FOLDERS_KEY = 'recentFolders';
 const DEVICE_FOLDERS_KEY = 'deviceFolders';
+const LAST_FOLDERS_KEY = 'lastFolders';
 const MAX_RECENT_FOLDERS = 5;
 /** Size of the dialog window; the page fits its height to what it shows. */
 const DIALOG_WIDTH = 460;
@@ -383,10 +384,27 @@ export async function recentFolders(instanceId) {
   }
 }
 
+/**
+ * The folder the last download sent to `instanceId` went to, which the review starts with: empty
+ * when it was left to the device, `undefined` before any.
+ */
+export async function lastFolder(instanceId) {
+  try {
+    const folder = (await ext.storage.local.get(LAST_FOLDERS_KEY))[LAST_FOLDERS_KEY]?.[instanceId];
+    return typeof folder === 'string' ? folder : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function rememberFolder(instanceId, folder) {
   const directory = String(folder ?? '').trim();
-  if (!directory) return;
   try {
+    const last = (await ext.storage.local.get(LAST_FOLDERS_KEY))[LAST_FOLDERS_KEY] ?? {};
+    if (last[instanceId] !== directory) {
+      await ext.storage.local.set({ [LAST_FOLDERS_KEY]: { ...last, [instanceId]: directory } });
+    }
+    if (!directory) return;
     const stored = (await ext.storage.local.get(RECENT_FOLDERS_KEY))[RECENT_FOLDERS_KEY] ?? {};
     const folders = [directory, ...(await recentFolders(instanceId))
       .filter((it) => it !== directory)].slice(0, MAX_RECENT_FOLDERS);

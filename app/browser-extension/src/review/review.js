@@ -1,11 +1,11 @@
-import { withEndpoint } from '../lib/connection.js';
-import { ext } from '../lib/ext.js';
+import { pickAppFolder, withEndpoint } from '../lib/connection.js';
+import { ext, remoteOnly } from '../lib/ext.js';
 import { failureHint, formatBytes, nameFromUrl, withHint } from '../lib/format.js';
 import { localizePage, t } from '../lib/i18n.js';
 import { FailureKind, KetchClient } from '../lib/ketch-client.js';
 import { fileNameFromPath, isTorrentFile, isTorrentUrl } from '../lib/request.js';
 import {
-  canDownloadDirectly, categoryFor, deviceFolders, knownDeviceFolders, readReview,
+  canDownloadDirectly, categoryFor, deviceFolders, knownDeviceFolders, lastFolder, readReview,
   recentFolders, rememberDeviceFolders, reviewDestination,
 } from '../lib/review.js';
 import { loadSettings } from '../lib/settings.js';
@@ -51,13 +51,22 @@ let autoPath;
 let autoFilled;
 /** What each device answered when asked for its status, by instance id. */
 const probes = new Map();
+/**
+ * Whether the folder was chosen in this review; until then it follows the folder last sent to the
+ * selected device.
+ */
+let folderChosen = false;
 
 localizePage();
 $('form').addEventListener('submit', onSend);
 $('cancel').addEventListener('click', onCancel);
 $('direct').addEventListener('click', onDirect);
 $('name').addEventListener('input', () => { validate(); renderFolders(); });
-$('folder').addEventListener('input', () => { renderFolders(); validate(); });
+$('folder').addEventListener('input', () => {
+  folderChosen = true;
+  renderFolders();
+  validate();
+});
 $('folder').addEventListener('focus', fillAutoFolder);
 $('folder').addEventListener('blur', () => {
   // Left as filled in, the folder is still the device's choice.
@@ -66,6 +75,7 @@ $('folder').addEventListener('blur', () => {
   renderFolders();
 });
 $('devices').addEventListener('change', () => renderDevice());
+$('browse').addEventListener('click', onBrowse);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !busy) onCancel();
 });
@@ -195,9 +205,13 @@ async function renderDevice() {
     problem.textContent = withHint(probe.error?.message ?? t('dialog_device_offline'),
       failureHint(probe.error, instance));
   }
-  const folders = await recentFolders(instance.id);
+  const [folders, last] = await Promise.all([recentFolders(instance.id), lastFolder(instance.id)]);
   if (instance.id !== selectedInstance().id) return;
   recent = folders;
+  // Like a browser's Save As, start where the last download to this device went.
+  if (!folderChosen && document.activeElement !== $('folder')) $('folder').value = last ?? '';
+  // Only the Ketch app on this computer can show a folder dialog.
+  $('browse').hidden = remoteOnly || instance.type !== 'app';
   renderFolders();
   const free = status?.system?.usableSpace;
   const size = entry.download.size;
@@ -239,6 +253,7 @@ function renderFolders() {
     button.title = title;
     button.setAttribute('aria-pressed', String(current === value));
     button.addEventListener('click', () => {
+      folderChosen = true;
       $('folder').value = value;
       renderFolders();
       validate();
@@ -367,6 +382,28 @@ async function onSend(event) {
   } catch {
     // If the background disappeared, do not offer a second submission without its state.
     showStatus(t('error_handoff_uncertain'), 'error');
+  }
+}
+
+/** Asks the Ketch app on this computer for a folder, starting where the field points. */
+async function onBrowse() {
+  const instance = selectedInstance();
+  const browse = $('browse');
+  browse.disabled = true;
+  showStatus('');
+  try {
+    const folder = await pickAppFolder(folderValue().trim() || autoPath);
+    if (folder !== undefined && !busy) {
+      folderChosen = true;
+      autoFilled = undefined;
+      $('folder').value = folder;
+      renderFolders();
+      validate();
+    }
+  } catch (error) {
+    showStatus(withHint(error.message, failureHint(error, instance)), 'error');
+  } finally {
+    browse.disabled = busy;
   }
 }
 

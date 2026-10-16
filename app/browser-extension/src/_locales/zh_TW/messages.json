@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "無法連線至 Ketch 應用程式"
   },
+  "error_app_pick_unsupported": {
+    "message": "請更新 Ketch 應用程式，以便在這裡選擇資料夾"
+  },
   "error_app_invalid_reply": {
     "message": "Ketch 應用程式傳回了無效的回應"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "預設資料夾"
+  },
+  "dialog_folder_browse": {
+    "message": "瀏覽…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "選擇這台電腦上的資料夾"
   },
   "dialog_device_checking": {
     "message": "正在檢查…"

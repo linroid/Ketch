@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "L'app Ketch n'a pas pu se connecter"
   },
+  "error_app_pick_unsupported": {
+    "message": "Mettez à jour l'app Ketch pour choisir des dossiers ici"
+  },
   "error_app_invalid_reply": {
     "message": "L'app Ketch a envoyé une réponse non valide"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "Dossier par défaut"
+  },
+  "dialog_folder_browse": {
+    "message": "Parcourir…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Choisir un dossier sur cet ordinateur"
   },
   "dialog_device_checking": {
     "message": "Vérification…"

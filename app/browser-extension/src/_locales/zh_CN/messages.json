@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "无法连接到 Ketch 应用"
   },
+  "error_app_pick_unsupported": {
+    "message": "请更新 Ketch 应用，以便在这里选择文件夹"
+  },
   "error_app_invalid_reply": {
     "message": "Ketch 应用返回了无效的响应"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "默认文件夹"
+  },
+  "dialog_folder_browse": {
+    "message": "浏览…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "选择这台电脑上的文件夹"
   },
   "dialog_device_checking": {
     "message": "正在检查…"

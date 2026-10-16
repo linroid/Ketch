@@ -63,6 +63,7 @@ import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.instance.displayName
 import com.linroid.ketch.app.log.FileLogger
+import com.linroid.ketch.app.platform.AwtFilePicker
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.LocalAppUpdates
@@ -234,7 +235,11 @@ fun main(args: Array<String>) {
       when (request) {
         NativeMessagingHost.CONNECT_REQUEST -> localApiServer.connect()
         CLI_CONNECT_REQUEST -> localApiServer.connect(fromExtension = false)
-        else -> null
+        else -> if (request.startsWith(NativeMessagingHost.PICK_FOLDER_REQUEST + "\n")) {
+          pickFolderReply(request) { initialFolder -> pickFolderInFront(initialFolder) }
+        } else {
+          null
+        }
       }
     },
   ) { forwarded ->
@@ -940,6 +945,18 @@ private suspend fun openFile(files: FileActions, path: String): Boolean = try {
 } catch (e: FileActionException) {
   log.d { "Showing the task, as its file did not open: ${e.describeCauses()}" }
   false
+}
+
+/**
+ * Shows the folder dialog for the browser extension, with Ketch in front first: macOS only shows
+ * the active app's dialogs in front, and Ketch may be in the menu bar alone.
+ */
+private fun pickFolderInFront(initialFolder: String?): String? {
+  if (Desktop.isDesktopSupported()) {
+    val desktop = Desktop.getDesktop()
+    if (desktop.isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) desktop.requestForeground(true)
+  }
+  return runBlocking { AwtFilePicker.pickFolder(initialFolder) }
 }
 
 /** Opens Settings from the macOS Settings and About items; returns what removes the handlers. */

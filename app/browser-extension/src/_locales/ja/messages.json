@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "Ketchアプリへの接続に失敗しました"
   },
+  "error_app_pick_unsupported": {
+    "message": "ここでフォルダを選ぶにはKetchアプリを更新してください"
+  },
   "error_app_invalid_reply": {
     "message": "Ketchアプリから無効な応答が返されました"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "既定のフォルダ"
+  },
+  "dialog_folder_browse": {
+    "message": "参照…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "このコンピュータのフォルダを選択"
   },
   "dialog_device_checking": {
     "message": "確認中…"

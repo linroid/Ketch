@@ -191,4 +191,79 @@ class NativeMessagingHostTest {
 
     assertEquals(reply, readNativeMessage(ByteArrayInputStream(output.toByteArray())))
   }
+
+  @Test
+  fun handle_pickFolder_asksTheRunningAppWithTheInitialFolder() {
+    var asked: String? = "unset"
+    val host = NativeMessagingHost(
+      requestApp = { reply },
+      launchApp = { error("Must not launch a running app") },
+      pickFolder = { initialFolder ->
+        asked = initialFolder
+        """{"folder":"/Users/me/Movies"}"""
+      },
+    )
+
+    val answer = host.handle("""{"type":"pick-folder","initialFolder":"/Users/me"}""")
+
+    assertEquals("""{"folder":"/Users/me/Movies"}""", answer)
+    assertEquals("/Users/me", asked)
+    host.handle("""{"type":"pick-folder","initialFolder":" "}""")
+    assertNull(asked)
+  }
+
+  @Test
+  fun handle_pickFolder_startsTheAppFirst() {
+    var launches = 0
+    var requests = 0
+    val host = NativeMessagingHost(
+      requestApp = { if (++requests >= 2) reply else null },
+      launchApp = { launches++ },
+      pickFolder = { """{"canceled":true}""" },
+      pollInterval = 1.milliseconds,
+    )
+
+    assertEquals("""{"canceled":true}""", host.handle("""{"type":"pick-folder"}"""))
+    assertEquals(1, launches)
+  }
+
+  @Test
+  fun handle_pickFolder_failsWhenTheAppCannotStartOrAnswer() {
+    val unstarted = NativeMessagingHost(
+      requestApp = { null },
+      launchApp = { throw IOException("no such file") },
+      pickFolder = { error("Must not ask an app that isn't running") },
+    )
+    assertEquals(
+      """{"error":"launch_failed","message":"Couldn't start Ketch: no such file"}""",
+      unstarted.handle("""{"type":"pick-folder"}"""),
+    )
+    val silent = NativeMessagingHost(requestApp = { reply }, launchApp = { }, pickFolder = { null })
+    assertEquals(
+      """{"error":"pick_failed","message":"Ketch couldn't show the folder dialog"}""",
+      silent.handle("""{"type":"pick-folder"}"""),
+    )
+  }
+
+  @Test
+  fun pickFolderReply_reportsTheFolderOrACancel() {
+    val request = "${NativeMessagingHost.PICK_FOLDER_REQUEST}\n/Users/me/Downloads"
+    var asked: String? = null
+
+    val chosen = pickFolderReply(request) { initialFolder ->
+      asked = initialFolder
+      "/Users/me/Movies"
+    }
+
+    assertEquals("""{"folder":"/Users/me/Movies"}""", chosen)
+    assertEquals("/Users/me/Downloads", asked)
+    assertEquals(
+      """{"canceled":true}""",
+      pickFolderReply("${NativeMessagingHost.PICK_FOLDER_REQUEST}\n") { null },
+    )
+    assertEquals(
+      """{"error":"pick_failed","message":"Couldn't show the folder dialog: headless"}""",
+      pickFolderReply(request) { throw IllegalStateException("headless") },
+    )
+  }
 }

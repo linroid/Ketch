@@ -31,13 +31,18 @@
 
     <section class="section">
       <label class="section-title" for="folder" data-i18n="dialog_save_in">Save in</label>
-      <div class="folder-field">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.4l2 2h8.6A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5
-                   1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>
-        </svg>
-        <input id="folder" type="text" spellcheck="false" maxlength="4096">
+      <div class="folder-row">
+        <div class="folder-field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.4l2 2h8.6A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5
+                     1.5h-15A1.5 1.5 0 0 1 3 17.5z"/>
+          </svg>
+          <input id="folder" type="text" spellcheck="false" maxlength="4096">
+        </div>
+        <button id="browse" type="button" hidden data-i18n="dialog_folder_browse"
+                title="Choose a folder on this computer"
+                data-i18n-title="dialog_folder_browse_detail">Browse…</button>
       </div>
       <div id="folders" class="chips"></div>
       <p id="torrent-note" class="note" hidden data-i18n="dialog_torrent_layout">Torrents keep

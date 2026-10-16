@@ -1593,10 +1593,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   per-run token, separate from the Settings server, over the app's engine or, while a
   `ketch server` runs the downloads instead, a client of it; the `ketch` CLI asks for the same
   server (`CLI_CONNECT_REQUEST`), which then does not count as an extension connection. The app
-  registers the host with installed browsers on every launch; the Chromium extension id is pinned
-  by the manifest `key`. The browser reads the host's stdout as length-prefixed messages, so
-  nothing else may write there: the launcher sends the JVM's own warnings to stderr (`-Xlog` in
-  `app/desktop/build.gradle.kts`)
+  registers the host with installed browsers on every launch. A `pick-folder` request has the app
+  show `AwtFilePicker`'s folder dialog (`PICK_FOLDER_REQUEST`, `pickFolderReply`) for the
+  download dialog's Browse…, which starts in the folder last sent to each device
+  (`lastFolder`). The Chromium extension id is pinned by the manifest `key`. The browser reads
+  the host's stdout as length-prefixed messages, so nothing else may write there: the launcher
+  sends the JVM's own warnings to stderr (`-Xlog` in `app/desktop/build.gradle.kts`)
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
   them) and falls back to the browser when Ketch fails; context menus per instance; a content
   script sends trusted magnet link clicks

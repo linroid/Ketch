@@ -79,6 +79,33 @@ export async function withEndpoint(instance, action, { launch = true, deps } = {
   return action(endpoint);
 }
 
+/**
+ * Has the Ketch app on this computer show the system's folder dialog, starting the app first if
+ * needed. Waits as long as the user takes to choose.
+ *
+ * @param {string | undefined} initialFolder the folder the dialog starts in
+ * @param {{ deps?: ConnectionDeps }} [options]
+ * @returns {Promise<string | undefined>} the folder chosen; `undefined` when canceled
+ */
+export async function pickAppFolder(initialFolder, { deps } = {}) {
+  const connection = deps ?? browserDeps();
+  let reply;
+  try {
+    reply = await connection.sendNativeMessage(NATIVE_HOST,
+      { type: 'pick-folder', initialFolder: initialFolder || undefined });
+  } catch (error) {
+    throw nativeMessagingError(error);
+  }
+  if (reply?.canceled === true) return undefined;
+  if (typeof reply?.folder === 'string' && reply.folder) return reply.folder;
+  // Apps from before folder picking know only `connect`.
+  if (reply?.error === 'bad_request') {
+    throw new KetchRequestError(FailureKind.UNREACHABLE, t('error_app_pick_unsupported'));
+  }
+  throw new KetchRequestError(FailureKind.UNREACHABLE,
+    reply?.message || t('error_app_connect_failed'));
+}
+
 /** @returns {Promise<Endpoint>} */
 async function connectToApp(deps, launch) {
   let reply;
@@ -88,29 +115,7 @@ async function connectToApp(deps, launch) {
       APP_START_TIMEOUT_MS,
     );
   } catch (error) {
-    if (error?.name === 'TimeoutError') {
-      throw new KetchRequestError(FailureKind.TIMEOUT, t('error_app_start_timeout'), {
-        cause: error,
-      });
-    }
-    // Chromium: "Access to the specified native messaging host is forbidden."
-    if (/forbidden/i.test(String(error?.message))) {
-      throw new KetchRequestError(FailureKind.APP_NOT_ALLOWED, t('error_app_not_allowed'), {
-        cause: error,
-      });
-    }
-    // Chromium: "Specified native messaging host not found."; Firefox: "No such native
-    // application com.linroid.ketch".
-    if (/not found|no such native application/i.test(String(error?.message))) {
-      throw new KetchRequestError(
-        FailureKind.APP_NOT_INSTALLED,
-        t('error_app_not_installed'),
-        { cause: error },
-      );
-    }
-    throw new KetchRequestError(FailureKind.UNREACHABLE, t('error_app_unreachable'), {
-      cause: error,
-    });
+    throw nativeMessagingError(error);
   }
   if (reply?.error === 'not_running') {
     throw new KetchRequestError(FailureKind.APP_NOT_RUNNING, t('error_app_not_running'));
@@ -125,6 +130,33 @@ async function connectToApp(deps, launch) {
     throw new KetchRequestError(FailureKind.UNREACHABLE, t('error_app_invalid_reply'));
   }
   return { url: reply.url, token: reply.token };
+}
+
+/** What a failed native message means for the user. */
+function nativeMessagingError(error) {
+  if (error?.name === 'TimeoutError') {
+    return new KetchRequestError(FailureKind.TIMEOUT, t('error_app_start_timeout'), {
+      cause: error,
+    });
+  }
+  // Chromium: "Access to the specified native messaging host is forbidden."
+  if (/forbidden/i.test(String(error?.message))) {
+    return new KetchRequestError(FailureKind.APP_NOT_ALLOWED, t('error_app_not_allowed'), {
+      cause: error,
+    });
+  }
+  // Chromium: "Specified native messaging host not found."; Firefox: "No such native
+  // application com.linroid.ketch".
+  if (/not found|no such native application/i.test(String(error?.message))) {
+    return new KetchRequestError(
+      FailureKind.APP_NOT_INSTALLED,
+      t('error_app_not_installed'),
+      { cause: error },
+    );
+  }
+  return new KetchRequestError(FailureKind.UNREACHABLE, t('error_app_unreachable'), {
+    cause: error,
+  });
 }
 
 function withTimeout(promise, timeoutMs) {

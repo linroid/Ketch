@@ -190,13 +190,17 @@ window over the browser instead, or a tab in Safari. It shows:
   another one; torrents keep the names and layout inside them;
 - every Ketch instance with whether it can be reached and the free space in its download folder;
   checking never opens the Ketch app, sending does;
-- the folder, on the selected device, with quick options under it:
-  - **Auto** (the default) leaves the folder empty, so the device chooses: its download folder,
-    or the category folder it sorts this file into by type or site (Settings → Downloads in the
-    app), named on the chip as in "Auto · Videos" and shown in the field. Clicking the field fills
-    in that path to edit; left unchanged, it stays Auto;
+- the folder, on the selected device, starting with the one the last download sent to that
+  device used, as a browser's Save As dialog does. For the Ketch app on this computer,
+  **Browse…** opens its system folder dialog (it starts the app if needed; older apps ask to be
+  updated). Quick options sit under it:
+  - **Auto** (the default until you send elsewhere) leaves the folder empty, so the device
+    chooses: its download folder, or the category folder it sorts this file into by type or site
+    (Settings → Downloads in the app), named on the chip as in "Auto · Videos" and shown in the
+    field. Clicking the field fills in that path to edit; left unchanged, it stays Auto;
   - the device's category folders, to pick one yourself;
-  - the last five folders you sent to on that device, kept in the extension's local storage.
+  - the last five folders you sent to on that device, kept in the extension's local storage
+    with the last one.
 
   A device that can't be asked, such as the Ketch app while it is closed, shows the download and
   category folders it reported last, in the dialog or the popup, which the extension keeps in its
@@ -308,6 +312,10 @@ The Ketch app on this computer is reached through
    separate from sharing in Settings → Sharing, which stays off unless you turn it on.
 4. The extension keeps that address and token in memory for the browser session and talks to it
    like any Ketch server. When the app restarts, the extension asks the host again.
+
+The download dialog's **Browse…** sends the host a `pick-folder` request instead: the host gets
+the app running as above, the app shows its system folder dialog in front, and the host replies
+with the folder chosen, or that the dialog was canceled.
 
 Looking at the popup or the settings page never opens Ketch; sending a download, **Open Ketch** in
 the popup and **Test connection** do; sending waits up to 45 seconds for Ketch to start.

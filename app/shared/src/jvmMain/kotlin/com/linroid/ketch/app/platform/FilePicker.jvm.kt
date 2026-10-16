@@ -10,11 +10,13 @@ import ketch.app.shared.generated.resources.device_pick_torrents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
+import java.awt.Component
 import java.awt.Dialog
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.KeyboardFocusManager
 import java.io.File
+import javax.swing.JDialog
 import javax.swing.JFileChooser
 
 @Composable
@@ -23,8 +25,10 @@ actual fun rememberFilePicker(): FilePicker = AwtFilePicker
 /**
  * Native file dialogs, owned by the focused window. A folder is chosen in the native dialog on
  * macOS and in Swing's chooser elsewhere, because AWT cannot choose folders on Windows or Linux.
+ * With no focused window, as when the browser extension asks while Ketch is in the tray, the
+ * chooser stays above other apps' windows.
  */
-internal object AwtFilePicker : FilePicker {
+object AwtFilePicker : FilePicker {
   override val canPickFolder: Boolean = true
 
   override suspend fun pickFolder(initialFolder: String?): String? {
@@ -65,7 +69,10 @@ internal object AwtFilePicker : FilePicker {
   }
 
   private fun chooseFolder(initialFolder: String?, title: String, choose: String): String? {
-    val chooser = JFileChooser(initialFolder)
+    val chooser = object : JFileChooser(initialFolder) {
+      override fun createDialog(parent: Component?): JDialog =
+        super.createDialog(parent).apply { if (parent == null) isAlwaysOnTop = true }
+    }
     chooser.dialogTitle = title
     chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
     chooser.isAcceptAllFileFilterUsed = false

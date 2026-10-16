@@ -275,8 +275,20 @@ legend.section-title {
 }
 
 /* Folder */
+.folder-row {
+  display: flex;
+  gap: 6px;
+}
+
 .folder-field {
   position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-row button {
+  flex: none;
+  white-space: nowrap;
 }
 
 .folder-field svg {

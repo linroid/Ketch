@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "O app Ketch não conseguiu se conectar"
   },
+  "error_app_pick_unsupported": {
+    "message": "Atualize o app Ketch para escolher pastas por aqui"
+  },
   "error_app_invalid_reply": {
     "message": "O app Ketch enviou uma resposta inválida"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "Pasta padrão"
+  },
+  "dialog_folder_browse": {
+    "message": "Procurar…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "Escolher uma pasta neste computador"
   },
   "dialog_device_checking": {
     "message": "Verificando…"

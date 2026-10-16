@@ -102,6 +102,9 @@
   "error_app_connect_failed": {
     "message": "Ketch 앱에 연결하지 못했습니다"
   },
+  "error_app_pick_unsupported": {
+    "message": "여기서 폴더를 선택하려면 Ketch 앱을 업데이트하세요"
+  },
   "error_app_invalid_reply": {
     "message": "Ketch 앱이 잘못된 응답을 보냈습니다"
   },
@@ -623,6 +626,12 @@
   },
   "dialog_folder_default": {
     "message": "기본 폴더"
+  },
+  "dialog_folder_browse": {
+    "message": "찾아보기…"
+  },
+  "dialog_folder_browse_detail": {
+    "message": "이 컴퓨터의 폴더 선택"
   },
   "dialog_device_checking": {
     "message": "확인 중…"
