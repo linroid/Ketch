@@ -102,6 +102,11 @@ internal class TorrentSwarm(
    * uploads never take the frames and pieces downloads need.
    */
   private val uploadBudget: TorrentBufferBudget = budget,
+  /**
+   * What each connected peer's wire frames and availability may hold. The engine keeps it apart
+   * from [budget], so a torrent with many peers still has piece buffers to fetch with.
+   */
+  private val peerBudget: TorrentBufferBudget = budget,
   /** Read live: peers are choked or unchoked within a tick, and a seed stops leaving SEED. */
   private val uploadPolicy: () -> TorrentUploadPolicy = { TorrentUploadPolicy.DISABLED },
   private val downloadPayload: suspend (Int) -> Unit = {},
@@ -208,16 +213,20 @@ internal class TorrentSwarm(
     // Any piece may become wanted, and the first is the longest.
     val largestPiece = if (store.pieceCount == 0) 0 else store.pieceSize(0)
     val peerOverhead = PEER_WIRE_BYTES + store.pieceCount * 4
-    require(budget.capacity >= largestPiece + peerOverhead) {
+    val sharedOverhead = if (peerBudget === budget) peerOverhead else 0
+    require(budget.capacity >= largestPiece + sharedOverhead &&
+      peerBudget.capacity >= peerOverhead) {
       "Torrent buffer limit cannot hold a piece and peer protocol state"
     }
-    // The budget is the engine's: every torrent's peers and pieces, and uploads, share it. A peer
-    // is admitted only while all of it but this swarm's own pieces, which its peers share and
-    // finish, leaves room for one more piece, so peers can never starve piece buffers entirely.
+    // Peers sharing the piece budget, as in tests, are admitted only while all of it but this
+    // swarm's own pieces, which its peers share and finish, leaves room for one more piece, so
+    // peers can never starve piece buffers entirely.
     fun reservePeer(): TorrentBufferBudget.Lease? {
-      val others = budget.allocated - scheduler.heldBytes
-      if (budget.capacity - others - peerOverhead < largestPiece) return null
-      return budget.reserve(peerOverhead)
+      if (peerBudget === budget) {
+        val others = budget.allocated - scheduler.heldBytes
+        if (budget.capacity - others - peerOverhead < largestPiece) return null
+      }
+      return peerBudget.reserve(peerOverhead)
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
     val attempts = linkedMapOf<PeerEndpoint, Int>()

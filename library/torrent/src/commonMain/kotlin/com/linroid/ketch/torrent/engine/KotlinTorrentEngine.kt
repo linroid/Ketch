@@ -240,6 +240,12 @@ internal class KotlinTorrentEngine(
   private val utpEndpoints = AtomicReference(emptyMap<String, UtpEndpoint>())
   private val exchangeBudgets = TorrentExchangeBudgets(config)
   private val budget = exchangeBudgets.transfer
+
+  /**
+   * Each v1 session's part of [budget]. V2 sessions still reserve from it directly: their wire
+   * frames and peer state come from it too, and refusing those drops the peer.
+   */
+  private val v1Shares = TorrentFairShares(budget)
   private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
   private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
   internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
@@ -827,8 +833,9 @@ internal class KotlinTorrentEngine(
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
       val trackerState = TorrentBufferBudget(
         maxOf(1, trackerControlStateWeight().toInt()))
-      val session = KotlinTorrentSession(store, network, budget, scope,
+      val session = KotlinTorrentSession(store, network, v1Shares.share(), scope,
         connections = config.connectionsPerTorrent, uploadBudget = exchangeBudgets.uploads,
+        peerBudget = exchangeBudgets.peers,
         uploadPolicy = { uploadPolicy.load() },
         checkpoint = checkpoint, peerId = peerId,
         discover = { peers, owner -> discover(spec, peers, owner, trackerState) },

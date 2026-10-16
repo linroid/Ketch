@@ -58,6 +58,8 @@ internal class KotlinTorrentSession(
   connections: Int = 20,
   /** The part of [budget] pieces read back for peers may hold, every session's together. */
   private val uploadBudget: TorrentBufferBudget = budget,
+  /** What connected peers' wire frames and availability hold, every session's together. */
+  private val peerBudget: TorrentBufferBudget = budget,
   /** Read live: peers follow a change within a tick, and a seed finishes once it leaves SEED. */
   private val uploadPolicy: () -> TorrentUploadPolicy = { TorrentUploadPolicy.DISABLED },
   private val checkpoint: TorrentCheckpoint? = null,
@@ -430,6 +432,7 @@ internal class KotlinTorrentSession(
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
               connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
+              peerBudget = peerBudget,
               uploadPolicy = uploadPolicy,
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
               listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,

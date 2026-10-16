@@ -72,4 +72,75 @@ class TorrentBufferBudgetTest {
       TorrentConfig(maxExchangeBytes = 32 * 1024 * 1024)
     }
   }
+
+  @Test
+  fun aLoneShareMayUseTheWholeParent() {
+    val parent = TorrentBufferBudget(100)
+    val share = TorrentFairShares(parent, clock = { 0L }).share()
+    val lease = assertNotNull(share.reserve(100))
+    assertEquals(100, parent.allocated)
+    lease.close()
+  }
+
+  @Test
+  fun aShareHeldBackWithinItsPartStopsAnotherGrowingPastItsOwn() {
+    var now = 0L
+    val parent = TorrentBufferBudget(100)
+    val shares = TorrentFairShares(parent, clock = { now })
+    val busy = shares.share()
+    val quiet = shares.share()
+    // Alone, the busy torrent fills the parent.
+    val held = List(10) { assertNotNull(busy.reserve(10)) }
+    // The quiet one finds no room within its part of 50 and is held back.
+    assertNull(quiet.reserve(10))
+    // A buffer the busy torrent gives back goes to the quiet one, not back to the busy one.
+    held[0].close()
+    assertNull(busy.reserve(10))
+    val first = assertNotNull(quiet.reserve(10))
+    held[1].close()
+    held[2].close()
+    assertNull(busy.reserve(10))
+    val second = assertNotNull(quiet.reserve(20))
+    assertEquals(70, busy.allocated)
+    assertEquals(30, quiet.allocated)
+    // Once the quiet one stops asking, the busy one may grow past its part again.
+    second.close()
+    now += 5_000
+    val regrown = assertNotNull(busy.reserve(20))
+    regrown.close()
+    held.drop(3).forEach { it.close() }
+    first.close()
+    assertEquals(0, parent.allocated)
+  }
+
+  @Test
+  fun aShareOverItsPartDoesNotHoldOthersBack() {
+    val parent = TorrentBufferBudget(100)
+    val shares = TorrentFairShares(parent, clock = { 0L })
+    val first = shares.share()
+    val second = shares.share()
+    val a = assertNotNull(first.reserve(60))
+    val b = assertNotNull(second.reserve(40))
+    // Over its part of 50, the first finds no room: that never stops the second.
+    assertNull(first.reserve(10))
+    b.close()
+    val c = assertNotNull(second.reserve(40))
+    a.close()
+    c.close()
+  }
+
+  @Test
+  fun idleSharesLeaveTheSplit() {
+    var now = 0L
+    val parent = TorrentBufferBudget(100)
+    val shares = TorrentFairShares(parent, clock = { now })
+    val first = shares.share()
+    val second = shares.share()
+    val lease = assertNotNull(second.reserve(10))
+    lease.close()
+    // The second holds nothing and was never held back, so the first's part is the whole parent.
+    now += 5_000
+    val whole = assertNotNull(first.reserve(100))
+    whole.close()
+  }
 }
