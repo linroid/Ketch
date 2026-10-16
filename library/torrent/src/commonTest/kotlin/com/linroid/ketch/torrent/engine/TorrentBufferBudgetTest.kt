@@ -114,6 +114,25 @@ class TorrentBufferBudgetTest {
   }
 
   @Test
+  fun aShareWhosePieceExceedsItsPart_stillGetsOnePiece() {
+    val parent = TorrentBufferBudget(100)
+    val shares = TorrentFairShares(parent, clock = { 0L })
+    val small = List(2) { shares.share() }
+    val large = shares.share()
+    // Two torrents of small pieces fill the parent while the third has none.
+    val held = small.flatMap { share -> List(5) { assertNotNull(share.reserve(10)) } }
+    // Its pieces of 40 are larger than its part of 33: it is held back all the same.
+    assertNull(large.reserve(40))
+    // The second gives four buffers back; the first, over its part, may not take them.
+    held.drop(5).take(4).forEach { it.close() }
+    assertNull(small[0].reserve(10))
+    val piece = assertNotNull(large.reserve(40))
+    piece.close()
+    (held.take(5) + held.last()).forEach { it.close() }
+    assertEquals(0, parent.allocated)
+  }
+
+  @Test
   fun aShareOverItsPartDoesNotHoldOthersBack() {
     val parent = TorrentBufferBudget(100)
     val shares = TorrentFairShares(parent, clock = { 0L })

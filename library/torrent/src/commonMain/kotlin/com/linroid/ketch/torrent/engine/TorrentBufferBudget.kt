@@ -82,14 +82,17 @@ internal class TorrentFairShares(
     val now = clock()
     val active = active(share, now)
     val fair = parent.capacity / active.size
-    if (share.allocated + bytes <= fair) return true
+    if (share.allocated + bytes <= maxOf(fair, bytes)) return true
     return active.none { it !== share && it.allocated < fair && isHeldBack(it, now) }
   }
 
-  /** [share] found no room for [bytes]; within its fair part, that holds the others back. */
+  /**
+   * [share] found no room for [bytes]; within its fair part, that holds the others back. A part
+   * smaller than one of its pieces still holds that one piece.
+   */
   internal fun heldBack(share: TorrentBufferBudget, bytes: Int) {
     val now = clock()
-    if (share.allocated + bytes <= parent.capacity / active(share, now).size) {
+    if (share.allocated + bytes <= maxOf(parent.capacity / active(share, now).size, bytes)) {
       share.heldBackAt.store(now)
     }
   }

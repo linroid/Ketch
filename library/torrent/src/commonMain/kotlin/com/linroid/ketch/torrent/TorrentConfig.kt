@@ -61,11 +61,15 @@ data class TorrentConfig(
   val uploadPolicy: TorrentUploadPolicy? = null,
   /** Maximum metainfo bytes accepted from HTTP or peers. */
   val maxMetadataBytes: Int = 4 * 1024 * 1024,
-  /** Maximum simultaneously buffered piece data across the engine. */
+  /**
+   * Maximum simultaneously buffered piece data across the engine. Connected v1 peers' wire frames
+   * and piece availability take as much again beside it, so they never take the piece buffers.
+   */
   val maxBufferedBytes: Int = 32 * 1024 * 1024,
   /**
-   * Combined admission ceiling for buffers, metadata exchange, cache entries, and session state.
-   * This is not a process RSS limit; platform allocations and caller-owned state are separate.
+   * Combined admission ceiling for buffers, metadata exchange, cache entries, and session state;
+   * v1 peers' wire buffers ([maxBufferedBytes] more) are admitted apart from it. This is not a
+   * process RSS limit; platform allocations and caller-owned state are separate.
    */
   val maxExchangeBytes: Int = 128 * 1024 * 1024,
   /** Cache retention ceiling, including conservative file/index and string allowances. */
