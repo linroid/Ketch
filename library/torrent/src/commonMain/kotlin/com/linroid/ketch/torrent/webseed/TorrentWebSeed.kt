@@ -169,6 +169,12 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
    */
   suspend fun unavailable(indices: Set<Int>)
 
+  /**
+   * Whether a wanted piece that is not verified yet is one this seed may still serve, whoever
+   * fetches it now: an empty [claim] may only mean that the buffers are full.
+   */
+  suspend fun servable(): Boolean
+
   /** The seed stopped: dropped, or its transfer ended. Never cancelled. */
   suspend fun stop()
 }
@@ -213,7 +219,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     try {
       while (true) {
         val claimed = pieces.claim()
-        if (claimed.isEmpty() && refused && !served) {
+        if (claimed.isEmpty() && refused && !served && !pieces.servable()) {
           // Every piece it could still be asked for failed: a mirror without the torrent.
           stats.dropped.incrementAndFetch()
           log.i { "Dropped web seed $label of $logLabel: it served none of the pieces asked" }
@@ -546,6 +552,8 @@ internal class SwarmWebSeedPieces(
   override suspend fun unavailable(indices: Set<Int>) {
     scheduler.withdraw(id, indices)
   }
+
+  override suspend fun servable(): Boolean = scheduler.hasWanted(id)
 
   override suspend fun stop() {
     scheduler.remove(id)

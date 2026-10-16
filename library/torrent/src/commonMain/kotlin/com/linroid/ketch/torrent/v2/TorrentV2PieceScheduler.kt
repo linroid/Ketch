@@ -741,21 +741,22 @@ internal class TorrentV2PieceScheduler private constructor(
       }
     }
 
-    /** The pieces of [selectedIds]' files, every file's when it is empty. */
-    private fun wantedPieces(
-      layout: TorrentContentLayout,
-      selectedIds: Set<String>,
-      count: Int,
-    ): BooleanArray {
-      val wanted = BooleanArray(count)
-      for (file in layout.files) {
-        if (selectedIds.isNotEmpty() && file.id !in selectedIds) continue
-        val first = (file.offset / layout.pieceLength).toInt()
-        val pieces = file.length / layout.pieceLength +
-          if (file.length % layout.pieceLength == 0L) 0 else 1
-        wanted.fill(true, first, first + pieces.toInt())
-      }
-      return wanted
-    }
   }
+}
+
+/** The pieces of [selectedIds]' files, every file's when it is empty. */
+internal fun wantedPieces(
+  layout: TorrentContentLayout,
+  selectedIds: Set<String>,
+  count: Int,
+): BooleanArray {
+  val wanted = BooleanArray(count)
+  for (file in layout.files) {
+    if (selectedIds.isNotEmpty() && file.id !in selectedIds) continue
+    val first = (file.offset / layout.pieceLength).toInt()
+    val pieces = file.length / layout.pieceLength +
+      if (file.length % layout.pieceLength == 0L) 0 else 1
+    wanted.fill(true, first, first + pieces.toInt())
+  }
+  return wanted
 }

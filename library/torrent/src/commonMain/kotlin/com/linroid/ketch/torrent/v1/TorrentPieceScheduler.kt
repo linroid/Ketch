@@ -199,6 +199,9 @@ internal class TorrentPieceScheduler(
     searches.remove(peer)
   }
 
+  /** Whether [peer] has a wanted piece that is not verified yet. */
+  suspend fun hasWanted(peer: Int): Boolean = mutex.withLock { (wantedFrom[peer] ?: 0) > 0 }
+
   /** [peer] no longer has [indices]: a web seed that cannot serve them. */
   suspend fun withdraw(peer: Int, indices: Collection<Int>): Unit = mutex.withLock {
     val pieces = availability[peer] ?: return@withLock

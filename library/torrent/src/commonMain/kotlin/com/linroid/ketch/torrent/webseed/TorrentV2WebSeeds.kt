@@ -10,6 +10,7 @@ import com.linroid.ketch.torrent.storage.CommitOutcome
 import com.linroid.ketch.torrent.storage.TorrentStorageException
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.v2.TorrentV2PieceScheduler
+import com.linroid.ketch.torrent.v2.wantedPieces
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -76,6 +77,7 @@ internal class WebSeedV2Layout private constructor(
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2WebSeeds private constructor(
+  private val contentLayout: TorrentContentLayout,
   private val layouts: List<WebSeedV2Layout>,
   val urls: List<String>,
   private val store: TorrentV2PieceStore,
@@ -224,6 +226,12 @@ internal class TorrentV2WebSeeds private constructor(
       }
     }
 
+    override suspend fun servable(): Boolean {
+      val verified = store.verifiedPieces()
+      val wanted = wantedPieces(contentLayout, store.selectedIds(), verified.size)
+      return verified.indices.any { wanted[it] && !verified[it] && serves(seed, it) }
+    }
+
     override suspend fun stop() {
       events.trySend(Event.Stopped(seed))
     }
@@ -252,8 +260,8 @@ internal class TorrentV2WebSeeds private constructor(
         WebSeedV2Layout.of(document, layout, url)?.let { url to it }
       }
       if (seeds.isEmpty()) return null
-      return TorrentV2WebSeeds(seeds.map { it.second }, seeds.map { it.first }, store, http,
-        reporter, logLabel, retryMs, downloadPayload)
+      return TorrentV2WebSeeds(layout, seeds.map { it.second }, seeds.map { it.first }, store,
+        http, reporter, logLabel, retryMs, downloadPayload)
     }
   }
 }
