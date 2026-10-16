@@ -158,6 +158,17 @@ class TorrentWebSeedTest {
   }
 
   @Test
+  fun layout_piecesOfAFile_includeThoseItShares() {
+    val layout = WebSeedLayout(multiFile("http://mirror.test/pub"), "http://mirror.test/pub")
+    val (first, empty, middle, last) = mirrorFiles.keys.toList()
+    // a b.bin is bytes 0..19999, ünï.bin 20000..49999 and c.bin 50000..89999.
+    assertEquals(setOf(0, 1), layout.piecesOf(first))
+    assertEquals(emptySet(), layout.piecesOf(empty))
+    assertEquals(setOf(1, 2, 3), layout.piecesOf(middle))
+    assertEquals(setOf(3, 4, 5), layout.piecesOf(last))
+  }
+
+  @Test
   fun layout_singleFileFolderUrl_appendsTheName() {
     val metadata = singleFile(ByteArray(PIECE + 1), null)
     assertEquals("http://m.test/d/data", WebSeedLayout(metadata, "http://m.test/d/")
@@ -477,19 +488,20 @@ class TorrentWebSeedTest {
   @Test
   fun unservable_onlyLastingAnswersAndCorruptPieces() {
     val pieces = setOf(3, 4)
-    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, KetchError.Http(404))))
-    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, KetchError.Http(416))))
-    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, KetchError.Unsupported())))
+    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, FILE, KetchError.Http(404))))
+    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, FILE, KetchError.Http(416))))
+    assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, FILE, KetchError.Unsupported())))
     assertEquals(setOf(7), unservable(CorruptWebSeedPiece(7)))
     // A busy server, a timeout or a dropped connection may pass.
-    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, KetchError.Http(503))))
-    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, KetchError.Network())))
-    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces,
+    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, FILE, KetchError.Http(503))))
+    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, FILE, KetchError.Network())))
+    assertEquals(emptySet(), unservable(WebSeedRequestFailure(pieces, FILE,
       IOException("Web seed response ended early"))))
   }
 
   private companion object {
     const val PIECE = 16_384
+    const val FILE = "http://mirror.test/pub/my%20set/c.bin"
   }
 }
 

@@ -93,6 +93,17 @@ internal class WebSeedLayout(private val metadata: TorrentMetadata, base: String
     }
     return spans
   }
+
+  /** Every piece holding bytes of the file at [url]. */
+  fun piecesOf(url: String): Set<Int> = buildSet {
+    for (file in urls.indices) {
+      val size = metadata.files[file].size
+      if (urls[file] != url || size == 0L) continue
+      val first = (starts[file] / metadata.pieceLength).toInt()
+      val last = ((starts[file] + size - 1) / metadata.pieceLength).toInt()
+      for (index in first..last) add(index)
+    }
+  }
 }
 
 /** Percent-encodes one path segment as UTF-8, keeping only unreserved characters. */
@@ -168,6 +179,9 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
    * when a mirror has since changed one. Later claims leave them to peers and other seeds.
    */
   suspend fun unavailable(indices: Set<Int>)
+
+  /** Every piece holding bytes of the file at [url]. */
+  fun piecesOf(url: String): Set<Int>
 
   /**
    * Whether a wanted piece that is not verified yet is one this seed may still serve, whoever
@@ -265,7 +279,14 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         stats.failures.incrementAndFetch()
         disconnect()
         val unservable = unservable(failure).let { found ->
-          if (failure is CorruptWebSeedPiece && corrupted.add(failure.index)) emptySet() else found
+          when {
+            failure is CorruptWebSeedPiece && corrupted.add(failure.index) -> emptySet()
+            // A file the seed lacks, or has another version of, is the whole file's to skip:
+            // its pieces past this run would only fail again.
+            failure is WebSeedRequestFailure && found.isNotEmpty() ->
+              found + pieces.piecesOf(failure.url)
+            else -> found
+          }
         }
         if (unservable.isNotEmpty()) {
           refused = true
@@ -282,8 +303,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         if (unservable.isNotEmpty()) {
           // The rest of the torrent may still be fine: go on with it at once.
           log.i {
-            "Web seed $label of $logLabel cannot serve piece(s) " +
-              "${unservable.sorted().joinToString()}: ${failure.describeWithoutUrls()}"
+            "Web seed $label of $logLabel cannot serve ${unservable.size} piece(s) " +
+              "(${unservable.min()}..${unservable.max()}): ${failure.describeWithoutUrls()}"
           }
           continue
         }
@@ -407,7 +428,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
       if (failure is TorrentStorageException || failure is CorruptWebSeedPiece) throw failure
       // The pieces this request still owed, which a lasting error makes unservable.
       throw WebSeedRequestFailure(request.parts.drop(part).mapNotNull { run[it.piece]?.index }
-        .toSet(), failure)
+        .toSet(), request.url, failure)
     }
     if (total != length) throw IOException("Web seed response ended early")
   }
@@ -483,8 +504,12 @@ internal class WebSeedWorker<P : WebSeedPiece>(
 internal class CorruptWebSeedPiece(val index: Int) : IOException("Web seed sent a corrupt piece")
 
 /** A request for [pieces] failed with [cause]. */
-internal class WebSeedRequestFailure(val pieces: Set<Int>, override val cause: Throwable) :
-  IOException(cause.message, cause)
+internal class WebSeedRequestFailure(
+  val pieces: Set<Int>,
+  /** The file the failed request asked for. */
+  val url: String,
+  override val cause: Throwable,
+) : IOException(cause.message, cause)
 
 /**
  * The pieces [failure] shows a web seed cannot serve: a corrupt one, or those of a request its
@@ -552,6 +577,8 @@ internal class SwarmWebSeedPieces(
   override suspend fun unavailable(indices: Set<Int>) {
     scheduler.withdraw(id, indices)
   }
+
+  override fun piecesOf(url: String): Set<Int> = layout.piecesOf(url)
 
   override suspend fun servable(): Boolean = scheduler.hasWanted(id)
 

@@ -39,6 +39,16 @@ internal class WebSeedV2Layout private constructor(
     return WebSeedSpan(url, extent.fileOffset..<extent.fileOffset + extent.length, 0)
   }
 
+  /** Every piece of the file at [url]. */
+  fun piecesOf(url: String): Set<Int> = buildSet {
+    for (file in layout.files) {
+      if (urls[file.id] != url || file.length == 0L) continue
+      val first = (file.offset / layout.pieceLength).toInt()
+      val count = ((file.length - 1) / layout.pieceLength + 1).toInt()
+      for (index in first until first + count) add(index)
+    }
+  }
+
   companion object {
     /** Null when a multi-file torrent has no name to find its files under. */
     fun of(
@@ -225,6 +235,8 @@ internal class TorrentV2WebSeeds private constructor(
         if (pieces.compareAndSet(current, current + indices)) break
       }
     }
+
+    override fun piecesOf(url: String): Set<Int> = layout.piecesOf(url)
 
     override suspend fun servable(): Boolean {
       val verified = store.verifiedPieces()
