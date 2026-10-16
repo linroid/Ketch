@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.magnet
 
 import com.linroid.ketch.torrent.net.PeerEndpoint
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -14,6 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class TorrentMetadataPeersTest {
   private val a = PeerEndpoint("192.0.2.1", 6881)
@@ -177,5 +179,55 @@ class TorrentMetadataPeersTest {
     assertFailsWith<PrivateTorrentMagnetException> {
       fetchFromMetadataPeers<String>("Metadata", peers) { throw PrivateTorrentMagnetException() }
     }
+  }
+
+  @Test
+  fun lookupWithoutProgress_endsAtItsTime() = runTest {
+    assertFailsWith<TimeoutCancellationException> {
+      withTimeoutUnlessProgressing(120.seconds, 30.seconds, MetadataProgress()) {
+        awaitCancellation()
+      }
+    }
+    assertEquals(120_000L, currentTime)
+  }
+
+  @Test
+  fun lookupWhoseExchangeKeepsReceiving_goesOnUntilItFinishes() = runTest {
+    val progress = MetadataProgress()
+    val metadata = withTimeoutUnlessProgressing(120.seconds, 30.seconds, progress) {
+      // A slow peer: a block every 20 s, the last at 300 s.
+      repeat(15) {
+        delay(20_000)
+        progress.advance()
+      }
+      "info"
+    }
+    assertEquals("info", metadata)
+    assertEquals(300_000L, currentTime)
+  }
+
+  @Test
+  fun lookupPastItsTime_endsOnceItsExchangeStops() = runTest {
+    val progress = MetadataProgress()
+    assertFailsWith<TimeoutCancellationException> {
+      withTimeoutUnlessProgressing(120.seconds, 30.seconds, progress) {
+        repeat(7) {
+          delay(20_000)
+          progress.advance()
+        }
+        awaitCancellation()
+      }
+    }
+    // The last block came at 140 s: the window from 150 s ended without one at 180 s.
+    assertEquals(180_000L, currentTime)
+  }
+
+  @Test
+  fun exchangeProgress_isTheLookupsToo() {
+    val lookup = MetadataProgress()
+    val exchange = MetadataProgress(lookup::advance)
+    exchange.advance()
+    exchange.advance()
+    assertEquals(2, lookup.value)
   }
 }

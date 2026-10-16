@@ -22,14 +22,21 @@ import kotlinx.coroutines.withTimeout
 import okio.Buffer
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import kotlin.time.Duration.Companion.milliseconds
 
-/** BEP 9 bounded metadata exchange, with four outstanding blocks and full hash verification. */
 private val log = KetchLogger("TorrentEngine")
 
+/**
+ * BEP 9 bounded metadata exchange, with four outstanding blocks and full hash verification.
+ *
+ * A peer has [timeoutMs] to send the first block, and as long again for each that follows, but
+ * no more than six times it in all: a peer sending a large info dictionary slowly finishes, one
+ * that stops sending is left.
+ */
 internal class TorrentMetadataExchange(
   private val network: TorrentNetwork,
   private val maxBytes: Int = 4 * 1024 * 1024,
-  private val timeoutMs: Long = 30_000,
+  private val timeoutMs: Long = METADATA_IDLE_MS,
   private val budget: TorrentBufferBudget = TorrentBufferBudget(32 * 1024 * 1024),
   /** Ours in the handshake: the engine's, as for every other peer. */
   private val peerId: ByteString = TorrentClient.peerId().toByteString(),
@@ -44,8 +51,10 @@ internal class TorrentMetadataExchange(
     endpoint: PeerEndpoint,
     trackerTiers: List<List<String>> = emptyList(),
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
-  ): TorrentMetadata = fetchContent(TorrentIdentity(v1 = hash), endpoint, trackerTiers, privacy) {
-      _, info, _ ->
+    /** Told of each block received, as the lookup's [MetadataProgress] is. */
+    onProgress: () -> Unit = {},
+  ): TorrentMetadata = fetchContent(TorrentIdentity(v1 = hash), endpoint, trackerTiers, privacy,
+    onProgress) { _, info, _, _ ->
     // A btih magnet may name a hybrid; its v1 view tells resolution the v2 identity to fetch.
     val metadata = unusableUnless {
       TorrentMetadata.fromBencode(metainfoFromInfo(info, trackerTiers), allowHybrid = true)
@@ -61,8 +70,24 @@ internal class TorrentMetadataExchange(
     endpoint: PeerEndpoint,
     trackerTiers: List<List<String>> = emptyList(),
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
-    decode: suspend (TorrentConnection, ByteArray, TorrentBufferBudget) -> T,
-  ): T = withTimeout(timeoutMs) {
+    onProgress: () -> Unit = {},
+    /** Reads what follows the info dictionary, advancing the progress as it arrives. */
+    decode: suspend (TorrentConnection, ByteArray, TorrentBufferBudget, MetadataProgress) -> T,
+  ): T = withTimeout(timeoutMs * 6) {
+    val progress = MetadataProgress(onProgress)
+    withTimeoutUnlessProgressing(timeoutMs.milliseconds, timeoutMs.milliseconds, progress) {
+      exchange(identity, endpoint, trackerTiers, privacy, progress, decode)
+    }
+  }
+
+  private suspend fun <T> exchange(
+    identity: TorrentIdentity,
+    endpoint: PeerEndpoint,
+    trackerTiers: List<List<String>>,
+    privacy: TorrentDiscoveryPrivacy,
+    progress: MetadataProgress,
+    decode: suspend (TorrentConnection, ByteArray, TorrentBufferBudget, MetadataProgress) -> T,
+  ): T {
     require(privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY ||
       trackerTiers.any { it.isNotEmpty() }) {
       "Tracker-only metadata requires supplied trackers"
@@ -132,9 +157,10 @@ internal class TorrentMetadataExchange(
           pending.remove(piece.toInt())
           received[piece.toInt()] = true
           receivedCount++
+          progress.advance()
           if (receivedCount == received.size) {
             require(identity.matchesInfo(output)) { "Metadata hash mismatch" }
-            return@withTimeout decode(connection, output, workspace)
+            return decode(connection, output, workspace, progress)
           }
         }
         val id = extensions.id("ut_metadata")
@@ -145,8 +171,6 @@ internal class TorrentMetadataExchange(
           }
         }
       }
-      @Suppress("UNREACHABLE_CODE")
-      error("Metadata exchange ended")
     } finally {
       connection?.close()
       lease?.close()

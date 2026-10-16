@@ -11,6 +11,7 @@ import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.V2InfoHash
 import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerHandshake
@@ -19,10 +20,12 @@ import com.linroid.ketch.torrent.peer.PeerWire
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -192,6 +195,72 @@ class TorrentMetadataExchangeTest {
     assertEquals(4, extensions.id("ut_pex"))
     assertFailsWith<IllegalArgumentException> {
       extensions.receive(Bencode.encode(mapOf("m" to mapOf("ut_metadata" to 4L))), 1024)
+    }
+  }
+
+  @Test
+  fun exchange_slowPeerThatKeepsSending_finishesPastItsTimeout() = runTest {
+    // Three blocks, 600 ms apart, against a peer timeout of 1 s.
+    val info = paced(blockDelayMs = 600, blocks = 3) { network, hash, endpoint ->
+      TorrentMetadataExchange(network, timeoutMs = 1_000).fetch(hash, endpoint)
+    }
+    assertEquals(3, (info.infoBytes.size + 16_383) / 16_384)
+  }
+
+  @Test
+  fun exchange_peerThatStopsSending_isLeftAfterItsTimeout() = runTest {
+    assertFailsWith<TimeoutCancellationException> {
+      paced(blockDelayMs = 0, blocks = 1) { network, hash, endpoint ->
+        TorrentMetadataExchange(network, timeoutMs = 1_000).fetch(hash, endpoint)
+      }
+    }
+  }
+
+  /**
+   * Fetches 40 KB of metadata from a peer that sends [blocks] of its blocks, each [blockDelayMs]
+   * after the last, and then nothing.
+   */
+  private suspend fun paced(
+    blockDelayMs: Long,
+    blocks: Int,
+    fetch: suspend (TorrentNetwork, InfoHash, PeerEndpoint) -> TorrentMetadata,
+  ): TorrentMetadata = withContext(Dispatchers.Default) {
+    withTimeout(15_000) {
+      coroutineScope {
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+          "name" to "fixture", "length" to 0L, "piece length" to 16_384L,
+          "pieces" to ByteArray(0), "padding" to "x".repeat(40_000)))))
+        val network = createTorrentNetwork()
+        val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+        val server = async {
+          val connection = listener.accept()
+          try {
+            val wire = PeerWire(connection)
+            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
+            wire.read()
+            wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+              "m" to mapOf("ut_metadata" to 7L),
+              "metadata_size" to metadata.infoBytes.size.toLong()))))
+            val requests = (0..2).map {
+              Bencode.parse((wire.read() as PeerMessage.Extended).payload)["piece"]!!
+                .integer!!.toInt()
+            }
+            for (piece in requests.take(blocks)) {
+              delay(blockDelayMs)
+              wire.send(TorrentMetadataExchange.response(1, piece, metadata))
+            }
+            awaitCancellation()
+          } finally {
+            connection.close()
+          }
+        }
+        try {
+          fetch(network, metadata.infoHash, listener.local)
+        } finally {
+          server.cancelAndJoin()
+          network.close()
+        }
+      }
     }
   }
 

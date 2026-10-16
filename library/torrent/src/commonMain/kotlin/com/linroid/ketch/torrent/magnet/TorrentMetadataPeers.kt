@@ -5,6 +5,10 @@ import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -14,8 +18,71 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.withTimeout
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.time.Duration
 
 private val log = KetchLogger("TorrentEngine")
+
+/**
+ * How long a metadata exchange, or a lookup past its time, goes on without receiving any of the
+ * metadata before it gives up.
+ */
+internal const val METADATA_IDLE_MS = 30_000L
+
+/**
+ * Counts the pieces of metadata an exchange receives (info blocks and piece layer hashes), so
+ * [withTimeoutUnlessProgressing] lets an exchange, or the lookup it belongs to, go on while they
+ * arrive. Each count is passed on to [then]: an exchange's to its lookup's.
+ */
+@OptIn(ExperimentalAtomicApi::class)
+internal class MetadataProgress(private val then: (() -> Unit)? = null) {
+  private val count = AtomicLong(0)
+
+  val value: Long get() = count.load()
+
+  fun advance() {
+    count.incrementAndFetch()
+    then?.invoke()
+  }
+}
+
+/**
+ * Runs [block] for [time], and past it while [progress] advances at least once every [idle]: a
+ * peer still sending a large torrent's metadata, however slowly, is not cut off at a fixed time.
+ * Fails with [TimeoutCancellationException], as [withTimeout] does, once it may not go on.
+ */
+internal suspend fun <T> withTimeoutUnlessProgressing(
+  time: Duration,
+  idle: Duration,
+  progress: MetadataProgress,
+  block: suspend CoroutineScope.() -> T,
+): T = coroutineScope { awaitWhileProgressing(async(block = block), time, idle, progress) }
+
+private suspend fun <T> awaitWhileProgressing(
+  work: Deferred<T>,
+  time: Duration,
+  idle: Duration,
+  progress: MetadataProgress,
+): T {
+  var window = time
+  while (true) {
+    val before = progress.value
+    try {
+      return withTimeout(window) { work.await() }
+    } catch (e: TimeoutCancellationException) {
+      // The block's own timeout, not this window's.
+      if (work.isCompleted) return work.await()
+      if (progress.value == before) {
+        work.cancel()
+        throw e
+      }
+      window = idle
+    }
+  }
+}
 
 /** Waits before asking a peer that failed again: the first retry after 5 s, the last after 30. */
 internal val METADATA_RETRY_DELAYS_MS = listOf(5_000L, 15_000L, 30_000L)

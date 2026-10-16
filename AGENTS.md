@@ -705,7 +705,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   again after 5, 15 and 30 s; tasks
   and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
   peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
-  and a preview that takes 2 minutes offers Keep waiting and Add anyway
+  and a preview that takes 2 minutes offers Keep waiting and Add anyway. A peer has
+  `METADATA_IDLE_MS` (30 s) for each part it sends (`MetadataProgress`: an info block or a piece
+  layer response) and six times it in all, and a lookup goes on past its time while one arrives
+  within that (`withTimeoutUnlessProgressing`). V2 lookups ask for piece layers eight requests at
+  a time and keep what each peer sent (`TorrentV2LayerParts`), so peers holding the layers of
+  some files only (qBittorrent leechers) add up; a dual-topic magnet discovers under both hashes
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or
   no verified piece for four pieces' worth of time at its rate (1 to 10 minutes; time waiting on
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no

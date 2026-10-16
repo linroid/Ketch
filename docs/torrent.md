@@ -611,6 +611,12 @@ This section describes the engine's protocol behavior for people who debug swarm
   at most 4,096 peers each, ignoring those found later. Metadata that matches the magnet's hash
   but that Ketch cannot open, such as a torrent with 32 MiB pieces, ends the lookup with that
   reason, as every peer would send the same.
+- **Large metadata** arrives at a peer's pace: a peer has 30 seconds to send each part of it,
+  and three minutes in all, and a round runs past its two minutes while a peer is still sending.
+  A v2 or hybrid magnet also needs each file's piece layer, which peers send as BEP 52 hashes,
+  eight requests at a time. A peer that downloads only some files (as qBittorrent does) has only
+  their layers; those it sends are kept, and the next peer is asked for the rest. A magnet naming
+  both hashes looks for peers under each, as a hybrid's peers may announce only one.
 
 ### Encryption details
 

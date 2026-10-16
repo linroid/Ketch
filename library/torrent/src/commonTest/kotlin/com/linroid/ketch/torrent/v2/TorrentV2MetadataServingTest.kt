@@ -52,6 +52,7 @@ class TorrentV2MetadataServingTest {
    */
   private fun downloading(
     policy: TorrentUploadPolicy,
+    fixture: TorrentV2Fixture = this.fixture,
     body: suspend (KotlinTorrentEngine) -> Unit,
   ) = runTest {
     withContext(Dispatchers.Default) {
@@ -98,6 +99,22 @@ class TorrentV2MetadataServingTest {
         assertEquals(fixture.document.pieceLayers, fetched.pieceLayers)
       } finally { network.close() }
     }
+
+  @Test
+  fun manyFilesPieceLayers_areAskedForSeveralAtATime() {
+    // Forty files of three pieces each: forty hash requests, which take turns on one connection.
+    val many = TorrentV2Fixture.build((10..49).map { "f$it" to 70_000 })
+    downloading(TorrentUploadPolicy.WHILE_DOWNLOADING, many) { engine ->
+      val network = createTorrentNetwork()
+      try {
+        val metainfo = TorrentV2MetadataExchange(network).fetch(many.document.identity,
+          PeerEndpoint("127.0.0.1", engine.listenPort))
+        val fetched = TorrentV2Document.parse(metainfo, expectedIdentity = many.document.identity)
+        assertEquals(40, fetched.pieceLayers.size)
+        assertEquals(many.document.pieceLayers, fetched.pieceLayers)
+      } finally { network.close() }
+    }
+  }
 
   @Test
   fun disabledUploadAdvertisesNoUtMetadata() =
