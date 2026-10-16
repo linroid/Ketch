@@ -25,7 +25,7 @@ internal class PeerExtensions {
   fun id(name: String): Int = ids[name] ?: 0
 
   fun receive(bytes: ByteArray, maxMetadataBytes: Int) {
-    val root = Bencode.parse(bytes, PeerWire.MAX_FRAME_SIZE)
+    val root = Bencode.parse(bytes, PeerWire.MAX_FRAME_SIZE, lenient = true)
     require(root.dictionary != null)
     root["m"]?.let { mapping ->
       val entries = requireNotNull(mapping.dictionary)

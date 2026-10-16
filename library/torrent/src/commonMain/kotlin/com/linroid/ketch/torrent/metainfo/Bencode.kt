@@ -29,8 +29,18 @@ internal object Bencode {
 
   fun decode(data: ByteArray): Any = parse(data).legacyValue()
 
-  fun parse(data: ByteArray, maxBytes: Int = 4 * 1024 * 1024, maxNodes: Int = 100_000): Node {
-    val node = parsePrefix(data, maxBytes, maxNodes)
+  /**
+   * Parses [data], all of it. [lenient] accepts dictionary keys out of order, keeping the first of
+   * a repeated key, as trackers, DHT nodes and peers that other clients talk to send them;
+   * metainfo and our own files keep to canonical bencode.
+   */
+  fun parse(
+    data: ByteArray,
+    maxBytes: Int = 4 * 1024 * 1024,
+    maxNodes: Int = 100_000,
+    lenient: Boolean = false,
+  ): Node {
+    val node = parsePrefix(data, maxBytes, maxNodes, lenient)
     require(node.end == data.size) { "Trailing bencode data" }
     return node
   }
@@ -40,10 +50,11 @@ internal object Bencode {
     data: ByteArray,
     maxBytes: Int = 4 * 1024 * 1024,
     maxNodes: Int = 100_000,
+    lenient: Boolean = false,
   ): Node {
     require(data.size <= maxBytes) { "Bencode exceeds size limit" }
     require(maxNodes in 1..1_000_000)
-    return Parser(data, maxNodes).read(0)
+    return Parser(data, maxNodes, lenient).read(0)
   }
 
   fun encode(value: Any, maxBytes: Int = 4 * 1024 * 1024): ByteArray {
@@ -53,7 +64,11 @@ internal object Bencode {
     return buffer.readByteArray()
   }
 
-  private class Parser(private val data: ByteArray, private val maxNodes: Int) {
+  private class Parser(
+    private val data: ByteArray,
+    private val maxNodes: Int,
+    private val lenient: Boolean,
+  ) {
     private var cursor = 0
     private var nodes = 0
 
@@ -75,9 +90,12 @@ internal object Bencode {
           var previous: ByteString? = null
           while (!consumeEnd()) {
             val key = bytes().toByteString()
-            require(previous == null || previous < key) { "Unsorted or duplicate bencode key" }
-            previous = key
-            items[key] = read(depth + 1)
+            if (!lenient) {
+              require(previous == null || previous < key) { "Unsorted or duplicate bencode key" }
+              previous = key
+            }
+            val value = read(depth + 1)
+            if (key !in items) items[key] = value
           }
           items
         }
@@ -103,7 +121,7 @@ internal object Bencode {
       }
       require(cursor < data.size) { "Unterminated integer" }
       val text = data.decodeToString(start, cursor++)
-      require(text.matches(Regex("0|-?[1-9][0-9]*"))) { "Noncanonical integer" }
+      require(canonicalInteger(text)) { "Noncanonical integer" }
       return text.toLongOrNull() ?: throw IllegalArgumentException("Bencode integer overflow")
     }
 
@@ -169,4 +187,12 @@ internal object Bencode {
     }
     require(out.size <= maxBytes) { "Bencode exceeds size limit" }
   }
+}
+
+/** Whether [text] is `0` or a nonzero integer without leading zeros, as bencode requires. */
+private fun canonicalInteger(text: String): Boolean {
+  if (text == "0") return true
+  val digits = if (text.startsWith('-')) 1 else 0
+  return text.length > digits && text[digits] in '1'..'9' &&
+    (digits + 1 until text.length).all { text[it] in '0'..'9' }
 }

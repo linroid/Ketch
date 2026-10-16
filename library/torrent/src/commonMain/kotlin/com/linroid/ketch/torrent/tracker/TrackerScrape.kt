@@ -22,7 +22,7 @@ internal data class TrackerScrape(val complete: Long, val downloaded: Long, val 
 
     fun parseHttp(bytes: ByteArray, topics: List<TrackerTopic>): Map<TrackerTopic, TrackerScrape> {
       validate(topics)
-      val root = Bencode.parse(bytes, 64 * 1024, 4096)
+      val root = Bencode.parse(bytes, 64 * 1024, 4096, lenient = true)
       require(root["failure reason"] == null && root["failure_reason"] == null) {
         "Tracker rejected scrape"
       }

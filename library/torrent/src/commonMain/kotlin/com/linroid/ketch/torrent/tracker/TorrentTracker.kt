@@ -240,7 +240,7 @@ internal class TorrentTracker(
 
     /** Reads [url]'s answer to an announce; its `failure reason` fails it. */
     fun parseHttp(bytes: ByteArray, url: String): TrackerResponse {
-      val root = Bencode.parse(bytes, 1024 * 1024)
+      val root = Bencode.parse(bytes, 1024 * 1024, lenient = true)
       require(root.dictionary != null) { "Invalid tracker response" }
       root["failure reason"]?.let { reason ->
         throw TrackerFailureException(reason.bytes?.let { trackerMessage(it, url) })

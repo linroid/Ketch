@@ -84,6 +84,16 @@ class TorrentTrackerTest {
   }
 
   @Test
+  fun httpResponseWithKeysOutOfOrderIsRead() {
+    // Some trackers write their dictionary keys in insertion order, which other clients accept.
+    val body = "d8:intervali1800e5:peers6:".encodeToByteArray() +
+      byteArrayOf(127, 0, 0, 1, 0x1a, 0xe1.toByte()) + "8:completei3ee".encodeToByteArray()
+    val response = TorrentTracker.parseHttp(body, "https://tracker/announce")
+    assertEquals(1800L, response.intervalSeconds)
+    assertEquals(listOf(PeerEndpoint("127.0.0.1", 6881)), response.peers)
+  }
+
+  @Test
   fun httpResponseRetainsAnEarlierManualMinimum() {
     val response = TorrentTracker.parseHttp(Bencode.encode(mapOf(
       "interval" to 3600L, "min interval" to 300L, "peers" to ByteArray(0)

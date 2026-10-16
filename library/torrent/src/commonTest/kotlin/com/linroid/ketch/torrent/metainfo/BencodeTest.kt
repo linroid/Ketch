@@ -140,4 +140,25 @@ class BencodeTest {
       Bencode.decode("li42e".encodeToByteArray())
     }
   }
+
+  @Test
+  fun unsortedKeys_failStrictButParseLenientKeepingTheFirstRepeat() {
+    val data = "d1:bi2e1:ai1e1:bi3ee".encodeToByteArray()
+    assertFailsWith<IllegalArgumentException> { Bencode.parse(data) }
+    val node = Bencode.parse(data, lenient = true)
+    assertEquals(1L, node["a"]?.integer)
+    assertEquals(2L, node["b"]?.integer)
+    assertEquals(data.size, node.end)
+  }
+
+  @Test
+  fun integers_stayCanonicalWhenLenient() {
+    for (text in listOf("i01e", "i-0e", "i-e", "ie", "i1-e")) {
+      assertFailsWith<IllegalArgumentException>(text) {
+        Bencode.parse(text.encodeToByteArray(), lenient = true)
+      }
+    }
+    assertEquals(-42L, Bencode.parse("i-42e".encodeToByteArray()).integer)
+    assertEquals(0L, Bencode.parse("i0e".encodeToByteArray()).integer)
+  }
 }

@@ -26,7 +26,7 @@ internal object DhtCodec {
   const val MAX_RECEIVE = 4096
 
   fun parse(bytes: ByteArray): DhtMessage {
-    val root = Bencode.parse(bytes, MAX_RECEIVE)
+    val root = Bencode.parse(bytes, MAX_RECEIVE, lenient = true)
     require(root.dictionary != null)
     val transaction = requireNotNull(root["t"]?.bytes).toByteString()
     require(transaction.size in 1..8)

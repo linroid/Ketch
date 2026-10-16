@@ -70,7 +70,7 @@ internal class PeerExchange(private val nowMs: () -> Long = monotonicClock()) {
     val now = nowMs()
     while (received.isNotEmpty() && now - received.first() >= INTERVAL_MS) received.removeFirst()
     require(received.size < MAX_MESSAGES_PER_WINDOW) { "Peer exchange rate exceeded" }
-    val root = Bencode.parse(bytes, 16 * 1024)
+    val root = Bencode.parse(bytes, 16 * 1024, lenient = true)
     val keys = listOf("added", "added6", "dropped", "dropped6")
     require(root.dictionary != null && keys.any { root[it] != null })
     // Flags pair with their entries by position, so they are matched before anything is dropped.

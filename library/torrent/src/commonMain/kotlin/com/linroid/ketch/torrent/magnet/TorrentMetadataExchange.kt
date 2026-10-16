@@ -108,7 +108,8 @@ internal class TorrentMetadataExchange(
             received = BooleanArray((size + BLOCK_SIZE - 1) / BLOCK_SIZE)
           }
         } else if (message.id == PeerExtensions.METADATA) {
-          val header = Bencode.parsePrefix(message.payload, PeerWire.MAX_FRAME_SIZE)
+          val header = Bencode.parsePrefix(message.payload, PeerWire.MAX_FRAME_SIZE,
+            lenient = true)
           val type = requireNotNull(header["msg_type"]?.integer)
           if (type !in 0..2) continue
           val piece = requireNotNull(header["piece"]?.integer)

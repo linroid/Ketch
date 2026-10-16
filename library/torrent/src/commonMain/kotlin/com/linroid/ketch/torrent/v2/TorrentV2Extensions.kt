@@ -80,7 +80,7 @@ internal class TorrentV2Extensions(
   }
 
   private fun metadata(view: TorrentV2PeerView, payload: ByteArray): TorrentV2Uploader.Verdict {
-    val header = Bencode.parsePrefix(payload, PeerWire.MAX_FRAME_SIZE)
+    val header = Bencode.parsePrefix(payload, PeerWire.MAX_FRAME_SIZE, lenient = true)
     // We never ask for the info dictionary, so only requests (type 0) need an answer.
     if (header["msg_type"]?.integer != 0L) return TorrentV2Uploader.Verdict.KEEP
     val piece = requireNotNull(header["piece"]?.integer)
@@ -140,7 +140,7 @@ internal class TorrentV2Extensions(
     if (remoteId == 0 || message.id != remoteId) return
     if (view.metadataAnswers.size >= MAX_QUEUED_METADATA_ANSWERS) return
     val header = try {
-      Bencode.parsePrefix(message.payload, PeerWire.MAX_FRAME_SIZE)
+      Bencode.parsePrefix(message.payload, PeerWire.MAX_FRAME_SIZE, lenient = true)
     } catch (_: IllegalArgumentException) {
       return
     }

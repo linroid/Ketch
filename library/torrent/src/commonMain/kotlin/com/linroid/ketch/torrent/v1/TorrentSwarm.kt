@@ -1013,7 +1013,7 @@ internal class TorrentSwarm(
         if (trackerRestricted) return
         receiveHolepunch(HolepunchMessage.decode(message.payload) ?: return)
       } else if (message.id == PeerExtensions.METADATA) {
-        val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE)
+        val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE, lenient = true)
         if (header["msg_type"]?.integer == 0L) {
           val index = requireNotNull(header["piece"]?.integer)
           require(index in 0..Int.MAX_VALUE.toLong())
