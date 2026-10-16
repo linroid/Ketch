@@ -22,8 +22,10 @@ import com.linroid.ketch.torrent.lsd.LsdTopic
 import com.linroid.ketch.torrent.lsd.LsdTransport
 import com.linroid.ketch.torrent.lsd.TorrentLocalDiscovery
 import com.linroid.ketch.torrent.magnet.MAX_METADATA_PEERS
+import com.linroid.ketch.torrent.magnet.AnsweringPeers
 import com.linroid.ketch.torrent.magnet.METADATA_IDLE_MS
 import com.linroid.ketch.torrent.magnet.MagnetUri
+import com.linroid.ketch.torrent.magnet.MetadataLookupPeers
 import com.linroid.ketch.torrent.magnet.MetadataProgress
 import com.linroid.ketch.torrent.magnet.MetadataLookupFailure
 import com.linroid.ketch.torrent.magnet.PrivateTorrentMagnetException
@@ -258,6 +260,8 @@ internal class KotlinTorrentEngine(
   internal val allocatedExchangeBytes: Int get() = exchangeBudgets.allocated
   /** What pieces read back for peers hold, every torrent's together; for tests. */
   internal val allocatedUploadBytes: Int get() = exchangeBudgets.uploads.allocated
+  // Peers that sent a found torrent's metadata, which its download dials first.
+  private val lookupPeers = MetadataLookupPeers()
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
     exchangeBudgets.cache)
   private val tracker = TorrentTracker(http, network)
@@ -538,6 +542,9 @@ internal class KotlinTorrentEngine(
     }
   }
 
+  /** The key [lookupPeers] keeps a swarm's peers under: its wire tag. */
+  private fun lookupTag(topic: TrackerTopic): String = topic.wireBytes().toByteString().hex()
+
   /** How long a lookup past its time goes on without receiving any of the metadata. */
   private val lookupIdleTime: Duration
     get() = minOf(METADATA_IDLE_MS.milliseconds, magnetLookupTime)
@@ -575,12 +582,18 @@ internal class KotlinTorrentEngine(
           coroutineScope {
             val peers = Channel<PeerEndpoint>(256)
             val discovery = launch { discoverMagnet(magnet, peers) }
+            val answering = AnsweringPeers()
             try {
               fetchFromMetadataPeers("Metadata for $hash", peers, onPeer = { found = it },
-                onAsked = { asked = it }, skip = ::isOwnAddress) {
+                onAsked = { asked = it }, skip = ::isOwnAddress) { endpoint ->
                 TorrentMetadataExchange(network, config.maxMetadataBytes,
                   budget = exchangeBudgets.metadata, peerId = peerId.toByteString())
-                  .fetch(magnet.infoHash, it, onProgress = progress::advance)
+                  .fetch(magnet.infoHash, endpoint, onProgress = {
+                    progress.advance()
+                    answering.add(endpoint)
+                  })
+              }.also {
+                lookupPeers.keep(lookupTag(TrackerTopic.V1(magnet.infoHash)), answering.all)
               }
             } finally { discovery.cancel(); peers.cancel() }
           }
@@ -667,11 +680,14 @@ internal class KotlinTorrentEngine(
     require(privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY || tiers.isNotEmpty()) {
       "Tracker-only magnets require supplied trackers"
     }
+    val answering = AnsweringPeers()
     suspend fun fetch(endpoint: PeerEndpoint): ByteArray =
       TorrentV2MetadataExchange(network, config.maxMetadataBytes,
         budget = exchangeBudgets.metadata, peerId = peerId.toByteString())
-        .fetch(magnet.identity, endpoint, tiers, privacy, magnet.webSeeds,
-          onProgress = progress::advance, parts = parts)
+        .fetch(magnet.identity, endpoint, tiers, privacy, magnet.webSeeds, onProgress = {
+          progress.advance()
+          answering.add(endpoint)
+        }, parts = parts)
     if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       val asked = HashSet<PeerEndpoint>()
       while (isActive) {
@@ -720,6 +736,7 @@ internal class KotlinTorrentEngine(
       try {
         fetchFromMetadataPeers("V2 metadata for ${topic.logHash()}", peers,
           skip = ::isOwnAddress) { fetch(it) }
+          .also { lookupPeers.keep(lookupTag(topic), answering.all) }
       } finally {
         withContext(NonCancellable) { discovery.forEach { it.cancelAndJoin() }; peers.cancel() }
       }
@@ -1170,6 +1187,12 @@ internal class KotlinTorrentEngine(
           }
         }
       } }
+      // The peers that sent its metadata, in the swarm they answered in.
+      for (topic in topics) launch {
+        lookupPeers.take(lookupTag(topic)).forEach {
+          sink.offer(it, peerTopic(topic), PeerOrigin.EXPLICIT)
+        }
+      }
       if (config.dhtEnabled) launch {
         while (isActive) {
           attempt {
@@ -1273,6 +1296,11 @@ internal class KotlinTorrentEngine(
           attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
         }
       } }
+      // The peers that sent its metadata.
+      launch {
+        lookupPeers.take(lookupTag(TrackerTopic.V1(metadata.infoHash)))
+          .forEach { output.send(it) }
+      }
       if (config.dhtEnabled) launch {
         while (isActive) {
           dhtPeers(metadata.infoHash, announce = true).forEach { output.send(it) }

@@ -710,7 +710,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   layer response) and six times it in all, and a lookup goes on past its time while one arrives
   within that (`withTimeoutUnlessProgressing`). V2 lookups ask for piece layers eight requests at
   a time and keep what each peer sent (`TorrentV2LayerParts`), so peers holding the layers of
-  some files only (qBittorrent leechers) add up; a dual-topic magnet discovers under both hashes
+  some files only (qBittorrent leechers) add up; a dual-topic magnet discovers under both hashes.
+  The peers that sent a found torrent's metadata (`AnsweringPeers`) are kept by wire tag
+  (`MetadataLookupPeers`, 32 torrents of 64 peers) and offered first, once, to its download's
+  discovery (v1, and v2 as `PeerOrigin.EXPLICIT` in the swarm they answered in)
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or
   no verified piece for four pieces' worth of time at its rate (1 to 10 minutes; time waiting on
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no
