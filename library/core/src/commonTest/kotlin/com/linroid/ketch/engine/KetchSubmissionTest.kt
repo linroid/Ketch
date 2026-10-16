@@ -1,14 +1,20 @@
 package com.linroid.ketch.engine
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadSchedule
-import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.task.InMemoryTaskStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -44,6 +50,27 @@ class KetchSubmissionTest {
         assertFailsWith<IllegalArgumentException> { ketch.download(DownloadRequest(url)) }
       }
       assertEquals(0, ketch.tasks.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun download_resolvedByASourceThatOnlyTakesContent_isAccepted() = runTest {
+    val ketch = Ketch(httpEngine = FakeHttpEngine(), additionalSources = listOf(ContentSource()))
+    try {
+      // What resolving uploaded content gave: a link no source handles on its own.
+      val resolved = ResolvedSource(url = "upload:1", sourceType = ContentSource.TYPE,
+        totalBytes = 0, supportsResume = false, suggestedFileName = "upload.bin",
+        maxSegments = 1)
+      ketch.download(DownloadRequest(resolved.url, resolvedSource = resolved))
+      assertFailsWith<IllegalArgumentException> { ketch.download(DownloadRequest(resolved.url)) }
+      // A resolution of a type no source has is refused like a link.
+      assertFailsWith<IllegalArgumentException> {
+        ketch.download(DownloadRequest(resolved.url,
+          resolvedSource = resolved.copy(sourceType = "gone")))
+      }
+      assertEquals(1, ketch.tasks.value.size)
     } finally {
       ketch.close()
     }
@@ -102,6 +129,20 @@ class KetchSubmissionTest {
       }
     } finally {
       next.close()
+    }
+  }
+
+  /** A source that resolves uploaded content only, never a link. */
+  private class ContentSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
+    override val type = TYPE
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Content
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+      error("Not resolved in this test")
+    override suspend fun download(context: DownloadContext, state: Unit?) = context.onProgress(0, 0)
+
+    companion object {
+      const val TYPE = "content"
     }
   }
 }

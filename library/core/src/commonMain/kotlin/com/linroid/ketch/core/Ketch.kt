@@ -236,10 +236,14 @@ class Ketch(
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
-    // Refused now rather than queued to fail when it starts, as from the CLI, REST or MCP.
-    require(sourceResolver.canHandle(request.url)) {
-      "No download source handles this link: ${redactUrl(request.url)}"
-    }
+    // Refused now rather than queued to fail when it starts, as from the CLI, REST or MCP. A
+    // resolved request starts with the source of its type, as a source that only takes content
+    // resolves to a link it need not handle.
+    val resolved = request.resolvedSource
+    require(
+      if (resolved != null) sourceResolver.hasType(resolved.sourceType, resolved.url)
+      else sourceResolver.canHandle(request.url)
+    ) { "No download source handles this link: ${redactUrl(request.url)}" }
     requireProxySupport(request.proxy)
     requireChecksumSupport(request)
     require(
