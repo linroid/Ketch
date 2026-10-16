@@ -94,6 +94,25 @@ class TorrentTrackerTest {
   }
 
   @Test
+  fun httpResponse_readsWhatOtherClientsTolerate() {
+    val peer = byteArrayOf(127, 0, 0, 1, 0x1a, 0xe1.toByte())
+    // A trailing CRLF and peers6 as an empty list, both sent by public trackers.
+    val crlf = "d8:intervali900e5:peers6:".encodeToByteArray() + peer +
+      "6:peers6lee\r\n".encodeToByteArray()
+    val read = TorrentTracker.parseHttp(crlf, "https://tracker/announce")
+    assertEquals(900L, read.intervalSeconds)
+    assertEquals(listOf(PeerEndpoint("127.0.0.1", 6881)), read.peers)
+    // No interval: 30 minutes. Dictionary peers, a malformed one skipped.
+    val listed = TorrentTracker.parseHttp(Bencode.encode(mapOf("peers" to listOf(
+      mapOf("ip" to "10.0.0.2", "port" to 51413L),
+      mapOf("ip" to "10.0.0.3"),
+      mapOf("ip" to "10.0.0.4", "port" to 0L),
+    ))), "https://tracker/announce")
+    assertEquals(1_800L, listed.intervalSeconds)
+    assertEquals(listOf(PeerEndpoint("10.0.0.2", 51413)), listed.peers)
+  }
+
+  @Test
   fun httpResponseRetainsAnEarlierManualMinimum() {
     val response = TorrentTracker.parseHttp(Bencode.encode(mapOf(
       "interval" to 3600L, "min interval" to 300L, "peers" to ByteArray(0)

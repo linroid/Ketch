@@ -238,31 +238,27 @@ internal class TorrentTracker(
       }
     }
 
-    /** Reads [url]'s answer to an announce; its `failure reason` fails it. */
+    /**
+     * Reads [url]'s answer to an announce; its `failure reason` fails it. Read as leniently as
+     * other clients read it: trailing whitespace, a missing `interval` (30 minutes then), peers
+     * in the original dictionary model or as an empty list, and malformed entries among them,
+     * which are skipped.
+     */
     fun parseHttp(bytes: ByteArray, url: String): TrackerResponse {
-      val root = Bencode.parse(bytes, 1024 * 1024, lenient = true)
+      var end = bytes.size
+      while (end > 0 && bytes[end - 1].toInt().toChar() in " \t\r\n") end--
+      val root = Bencode.parse(if (end == bytes.size) bytes else bytes.copyOf(end), 1024 * 1024,
+        lenient = true)
       require(root.dictionary != null) { "Invalid tracker response" }
       root["failure reason"]?.let { reason ->
         throw TrackerFailureException(reason.bytes?.let { trackerMessage(it, url) })
       }
-      val interval = checkedInterval(requireNotNull(root["interval"]?.integer))
+      val interval = checkedInterval(root["interval"]?.integer ?: DEFAULT_INTERVAL_SECONDS)
       val minimum = root["min interval"]?.integer ?: interval
       require(minimum in 1..604_800)
       val peers = mutableListOf<PeerEndpoint>()
-      root["peers"]?.let { node ->
-        if (node.bytes != null) peers += compactPeers(node.bytes!!, false)
-        else {
-          val list = requireNotNull(node.list)
-          require(list.size <= 4096)
-          for (item in list) {
-            val host = requireNotNull(item["ip"]?.text())
-            val port = requireNotNull(item["port"]?.integer)
-            require(port in 1..65535)
-            peers += PeerEndpoint(host, port.toInt())
-          }
-        }
-      }
-      root["peers6"]?.let { peers += compactPeers(requireNotNull(it.bytes), true) }
+      root["peers"]?.let { peers += peerList(it, ipv6 = false) }
+      root["peers6"]?.let { peers += peerList(it, ipv6 = true) }
       val id = root["tracker id"]?.bytes
       require(id == null || id.size <= 1024)
       return TrackerResponse(peers.distinct().take(4096), maxOf(interval, minimum), id,
@@ -272,6 +268,18 @@ internal class TorrentTracker(
 
     fun compactPeers(bytes: ByteArray, ipv6: Boolean): List<PeerEndpoint> =
       compactEntries(bytes, ipv6).filterNotNull().distinct()
+
+    /** A `peers` or `peers6` value: compact, or a list of `{ip, port}` dictionaries. */
+    private fun peerList(node: Bencode.Node, ipv6: Boolean): List<PeerEndpoint> {
+      node.bytes?.let { return compactPeers(it, ipv6) }
+      val list = node.list ?: return emptyList()
+      require(list.size <= 4096)
+      return list.mapNotNull { item ->
+        val host = runCatching { item["ip"]?.text() }.getOrNull()?.takeIf { it.isNotBlank() }
+        val port = item["port"]?.integer?.takeIf { it in 1..65535 }
+        if (host == null || port == null) null else PeerEndpoint(host, port.toInt())
+      }
+    }
 
     /**
      * Every compact entry of [bytes] in order, null where the port is 0, so that values sent
@@ -520,3 +528,6 @@ internal class TrackerTiers(
     }
   }
 }
+
+/** The announce interval of a reply that names none, as libtorrent assumes. */
+private const val DEFAULT_INTERVAL_SECONDS = 1_800L
