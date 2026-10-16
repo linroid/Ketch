@@ -30,8 +30,11 @@ internal fun trackerMessage(raw: ByteArray, trackerUrl: String): String? {
       else -> append(char)
     }
   }
-  var text = withoutUrls(visible)
+  // Secrets go before URLs are cut: a URL ends at characters a passkey may hold, such as a
+  // comma, so cutting first could leave most of a passkey behind, no longer whole to match.
+  var text = visible
   for (secret in urlSecrets(trackerUrl)) text = text.replace(secret, "***", ignoreCase = true)
+  text = withoutUrls(text)
   text = SECRET_LIKE.replace(text) { match ->
     val token = match.value
     if (token.any { it in '0'..'9' } && token.any { it !in '0'..'9' }) "***" else token

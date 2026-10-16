@@ -77,6 +77,14 @@ class TrackerMessageTest {
   }
 
   @Test
+  fun passkeysEndingAUrlEarlyAreMaskedWhole() {
+    // A URL in text ends at a comma, which a passkey may hold; none of it may be left behind.
+    val url = "https://tracker.example/announce?passkey=a,bcdef1234"
+    assertEquals("Refused https://tracker.example:443 (key ***)",
+      trackerMessage("Refused $url (key a,bcdef1234)".encodeToByteArray(), url))
+  }
+
+  @Test
   fun httpWarningIsKept() {
     val response = TorrentTracker.parseHttp(Bencode.encode(mapOf("interval" to 60L,
       "peers" to ByteArray(0), "warning message" to "Update\tyour client, $PASSKEY")),
