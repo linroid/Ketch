@@ -30,8 +30,10 @@ internal class PeerProtocolState(
     private set
   private var availabilitySeen = false
   private val pending = mutableSetOf<PeerMessage.Request>()
-  // Requests we canceled or were answered, and when: a late copy of one is no violation.
+  // Requests we canceled, and when: a late copy of one is no violation.
   private val canceled = linkedMapOf<PeerMessage.Request, Long>()
+  // The last requests the peer answered, whose repeated copy is no violation either.
+  private val answered = linkedSetOf<PeerMessage.Request>()
   /** A copy of the requests the peer has not answered; [pendingCount] and [isPending] copy none. */
   val requests: Set<PeerMessage.Request> get() = pending.toSet()
 
@@ -116,10 +118,12 @@ internal class PeerProtocolState(
         val request = PeerMessage.Request(message.index, message.begin, message.bytes.size)
         if (pending.remove(request)) {
           if (explicitRejects) return canceled.remove(request) == null
-          remember(request)
+          answered.remove(request)
+          answered.add(request)
+          while (answered.size > maxPending * 2) answered.remove(answered.first())
           return true
         }
-        if (!explicitRejects && request in canceled) return false
+        if (!explicitRejects && (request in canceled || request in answered)) return false
         throw IllegalArgumentException("Unsolicited or mismatched peer block")
       }
       is PeerMessage.Reject -> {
@@ -132,7 +136,9 @@ internal class PeerProtocolState(
         if (fast) {
           // True frees a live request; a reject for one we canceled needs nothing.
           if (pending.remove(request)) return true
-          require(request in canceled) { "Unsolicited or mismatched reject" }
+          require(request in canceled || request in answered) {
+            "Unsolicited or mismatched reject"
+          }
           return false
         }
       }

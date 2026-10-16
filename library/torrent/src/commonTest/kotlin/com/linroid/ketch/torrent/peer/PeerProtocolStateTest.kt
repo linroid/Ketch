@@ -42,13 +42,15 @@ class PeerProtocolStateTest {
     }
     // The peer had already queued the canceled block: it is ignored, not a violation.
     assertFalse(state.received(PeerMessage.Piece(0, 0, ByteArray(16))))
-    // A minute on, it is forgotten.
+    // A minute on, once more requests were canceled since than the pipeline holds, it is
+    // forgotten.
     state.requested(canceled)
     state.cancel(canceled)
     now = PeerProtocolState.CANCELED_TTL_MS + 1
-    for (begin in 51..60) {
-      state.requested(PeerMessage.Request(0, begin * 16, 16))
-      state.received(PeerMessage.Piece(0, begin * 16, ByteArray(16)))
+    for (begin in 51..55) {
+      val request = PeerMessage.Request(0, begin * 16, 16)
+      state.requested(request)
+      state.cancel(request)
     }
     assertFailsWith<IllegalArgumentException> {
       state.received(PeerMessage.Piece(0, 0, ByteArray(16)))

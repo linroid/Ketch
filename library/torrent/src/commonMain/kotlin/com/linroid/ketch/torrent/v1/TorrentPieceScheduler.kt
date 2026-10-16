@@ -89,11 +89,9 @@ internal class TorrentPieceScheduler(
   private val searches = mutableMapOf<Int, Search>()
   // When each peer last looked for late blocks.
   private val lateScans = mutableMapOf<Int, Long>()
-  // Wanted pieces no connected peer or seed has, and when and at which [openings] they were
-  // counted ([sourceless]).
+  // Wanted pieces no connected peer or seed has, and when they were counted ([sourceless]).
   private var sourcelessCount = 0
   private var sourcelessAt = Long.MIN_VALUE / 2
-  private var sourcelessOpenings = -1L
 
   /** Verified pieces in the order they verified, each once, for HAVEs ([poll]). */
   private var haveLog = IntArray(16)
@@ -315,9 +313,9 @@ internal class TorrentPieceScheduler(
    */
   private fun sourceless(now: Long): Int {
     if (unopened == 0) return 0
-    if (now - sourcelessAt < SOURCELESS_SCAN_MS && sourcelessOpenings == openings) {
-      return sourcelessCount
-    }
+    // Recounted once a second: peers come and go far less often than pieces open, and a piece
+    // nobody has never opens, so opening one leaves the count as it was.
+    if (now - sourcelessAt < SOURCELESS_SCAN_MS) return sourcelessCount
     var count = 0
     for (index in 0 until pieceCount) {
       if (wanted[index] && !verified[index] && openPieces[index] == null &&
@@ -325,7 +323,6 @@ internal class TorrentPieceScheduler(
     }
     sourcelessCount = count
     sourcelessAt = now
-    sourcelessOpenings = openings
     return count
   }
 
