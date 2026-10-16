@@ -41,17 +41,16 @@ kotlin {
     }
   }
 
-  // Compose Multiplatform 1.11+ references iOS 18 APIs (e.g. UIViewLayoutRegion in
-  // compose-ui-uikit) and dnssd 1.1.0 is built for iOS 15+. Kotlin/Native defaults to
-  // iOS 14.0, which causes link failures and missing back-deployment dylib lookups at
-  // runtime. Override the minimum iOS version to 18.0.
+  // iOS 15.0 is the lowest deployment target Xcode 26+ accepts, and the one the Xcode project
+  // sets. Kotlin/Native defaults to iOS 14.0, below what dnssd is built for. Compose and Skiko
+  // weak-link the newer UIKit classes they use and check for them at runtime.
   targets.withType<KotlinNativeTarget>().configureEach {
     compilations.configureEach {
       compileTaskProvider.configure {
         compilerOptions.freeCompilerArgs.add(
           "-Xoverride-konan-properties=" +
-            "osVersionMin.ios_arm64=18.0;" +
-            "osVersionMin.ios_simulator_arm64=18.0",
+            "osVersionMin.ios_arm64=15.0;" +
+            "osVersionMin.ios_simulator_arm64=15.0",
         )
       }
     }

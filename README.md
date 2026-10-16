@@ -29,7 +29,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web app](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
+[![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Desktop](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
@@ -76,7 +76,7 @@ available on Maven Central. [Start integrating Ketch →](docs/developers.md#qui
 | Windows (x64, ARM64) | `.msi`, or the portable `.zip` that runs without installing, from the [latest release][release] ([about the portable app](docs/updates.md#the-portable-windows-app)) |
 | Linux (x64, ARM64) | `.deb` from the [latest release][release] |
 | Android 8.0+ | `.apk` from the [latest release][release] |
-| iOS 18+ | Build from source with Xcode ([`app/ios`](app/ios/)) |
+| iOS 15+ | Unsigned `.ipa` from the [latest release][release], to sideload with AltStore, SideStore or Sideloadly (they sign it with your Apple ID); or build from source with Xcode ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), to control Ketch running on another device |
 | Browser extension | Chrome, Edge, Brave and other Chromium browsers: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` from the extension's [releases](https://github.com/linroid/Ketch/releases) ([how to install](app/browser-extension/README.md#installing)) |
 | Command line and server | macOS, Linux and Windows: [install script](#run-ketch-on-a-server) or the [latest release][release] |

@@ -29,7 +29,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Aplicación web](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
+[![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Escritorio](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![Licencia](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
@@ -82,7 +82,7 @@ Multiplatform está disponible en Maven Central.
 | Windows (x64, ARM64) | `.msi` o `.zip` portátil sin instalación de la [última versión][release] ([sobre la versión portátil](docs/updates.md#the-portable-windows-app)) |
 | Linux (x64, ARM64) | `.deb` de la [última versión][release] |
 | Android 8.0+ | `.apk` de la [última versión][release] |
-| iOS 18+ | Compila desde el código fuente con Xcode ([`app/ios`](app/ios/)) |
+| iOS 15+ | `.ipa` sin firmar de la [última versión][release], para instalar con AltStore, SideStore o Sideloadly (lo firman con tu Apple ID); o compila desde el código fuente con Xcode ([`app/ios`](app/ios/)) |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/), para controlar Ketch en otro dispositivo |
 | Extensión del navegador | Chrome, Edge, Brave y otros navegadores Chromium: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` de las [versiones de la extensión](https://github.com/linroid/Ketch/releases) ([instalación](app/browser-extension/README.md#installing)) |
 | Línea de comandos y servidor | macOS, Linux y Windows: [script de instalación](#run-ketch-on-a-server) o la [última versión][release] |

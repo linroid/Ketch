@@ -29,7 +29,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![网页应用](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
+[![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![桌面端](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![许可证](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
@@ -80,7 +80,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 | Windows（x64、ARM64） | [最新版本][release]中的 `.msi` 或免安装便携版 `.zip`（[便携版说明](docs/updates.md#the-portable-windows-app)） |
 | Linux（x64、ARM64） | [最新版本][release]中的 `.deb` |
 | Android 8.0+ | [最新版本][release]中的 `.apk` |
-| iOS 18+ | 使用 Xcode 从源码构建（[`app/ios`](app/ios/)） |
+| iOS 15+ | [最新版本][release]中未签名的 `.ipa`，用 AltStore、SideStore 或 Sideloadly 侧载（它们会用你的 Apple ID 签名）；或使用 Xcode 从源码构建（[`app/ios`](app/ios/)） |
 | 网页版 | [linroid.com/Ketch](https://linroid.com/Ketch/)，用于控制其他设备上运行的 Ketch |
 | 浏览器扩展 | Chrome、Edge、Brave 等 Chromium 浏览器：[Chrome 应用商店](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)；Firefox：扩展[发布页](https://github.com/linroid/Ketch/releases)中的 `.zip`（[安装方法](app/browser-extension/README.md#installing)） |
 | 命令行和服务器 | macOS、Linux 和 Windows：[安装脚本](#run-ketch-on-a-server)或[最新版本][release] |

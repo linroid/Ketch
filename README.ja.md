@@ -29,7 +29,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web アプリ](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-18+-000000.svg?logo=apple&logoColor=white)](app/ios/)
+[![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![デスクトップ](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![ライセンス](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Android Weekly](https://androidweekly.net/issues/issue-748/badge)](https://androidweekly.net/issues/issue-748)
@@ -81,7 +81,7 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 | Windows（x64、ARM64） | [最新リリース][release]の `.msi`、またはインストール不要のポータブル版 `.zip`（[ポータブル版について](docs/updates.md#the-portable-windows-app)） |
 | Linux（x64、ARM64） | [最新リリース][release]の `.deb` |
 | Android 8.0+ | [最新リリース][release]の `.apk` |
-| iOS 18+ | Xcode でソースからビルド（[`app/ios`](app/ios/)） |
+| iOS 15+ | [最新リリース][release]の未署名 `.ipa` を AltStore、SideStore、Sideloadly でサイドロード（各ツールがあなたの Apple ID で署名します）。または Xcode でソースからビルド（[`app/ios`](app/ios/)） |
 | Web | [linroid.com/Ketch](https://linroid.com/Ketch/) から別のデバイスで動作する Ketch を操作 |
 | ブラウザ拡張機能 | Chrome、Edge、Brave などの Chromium 系ブラウザ：[Chrome ウェブストア](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)、Firefox：拡張機能の[リリース](https://github.com/linroid/Ketch/releases)の `.zip`（[インストール方法](app/browser-extension/README.md#installing)） |
 | コマンドラインとサーバー | macOS、Linux、Windows：[インストールスクリプト](#run-ketch-on-a-server)または[最新リリース][release] |

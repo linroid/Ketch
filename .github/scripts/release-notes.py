@@ -54,6 +54,7 @@ def download_notes(artifacts, server_url, repository, tag, docker_image, extensi
     ("Windows · portable", desktop("windows", "-portable.zip"), "ZIP · no installation"),
     ("**Linux** · Debian / Ubuntu", desktop("linux", ".deb"), "DEB"),
     ("**Android** · 8.0+", download("Universal", "android-{version}.apk"), "APK"),
+    ("**iPhone / iPad** · iOS 15+", download("Unsigned", "ios-{version}.ipa"), "IPA · sideload"),
   ])
   commands = table([
     ("Platform", "Processor", "Download"),
@@ -114,9 +115,11 @@ Connect it to a running Ketch server to manage your downloads.
 </details>
 
 <details>
-<summary><strong>Build for iPhone or iPad</strong></summary>
+<summary><strong>Installing on iPhone or iPad</strong></summary>
 
-For iOS 18+, [build from source with Xcode]({source_url}/app/ios).
+The IPA is unsigned: install it with a sideloading tool such as AltStore, SideStore or
+Sideloadly, which signs it with your own Apple ID, or
+[build from source with Xcode]({source_url}/app/ios).
 
 </details>
 

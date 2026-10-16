@@ -243,7 +243,7 @@ handed to Android's installer through a private FileProvider with a temporary re
 
 Build the GitHub APK with `:app:android:assembleDirectRelease` and the Play bundle with
 `:app:android:bundlePlayRelease`. The release workflow ships the direct APK under its existing
-asset name. Keep the application ID, the signing key and an increasing `-PversionCode`, so
+asset name, and the Play bundle as `ketch-android-<version>-play.aab`. Keep the application ID, the signing key and an increasing `-PversionCode`, so
 installed APKs can upgrade; a debug-signed build cannot install the release-signed APK as an
 update. See [Google Play signing](app-store-listing.md#google-play) for channel changes.
 

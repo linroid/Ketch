@@ -58,9 +58,10 @@ the iOS app does not offer, and torrents (see [BitTorrent](#bittorrent-on-the-ap
 
 ### Before the first release
 
-- [ ] **Upload an app bundle.** Play takes `.aab` files only, and the release workflow builds
-  the direct APK (`assembleDirectRelease`). Build `:app:android:bundlePlayRelease` with the same
-  version code for Play; this flavor omits the self-updater and install-packages permission.
+- [ ] **Upload an app bundle.** Play takes `.aab` files only. The release workflow attaches
+  `ketch-android-<version>-play.aab` (`:app:android:bundlePlayRelease`) beside the direct APK,
+  with the same version code; this flavor omits the self-updater and install-packages
+  permission.
 - [ ] **Keep one signing key across channels.** Play App Signing re-signs what Play delivers. If
   Play generates its own key, the Play build and the GitHub APK can never update each other.
   Upload the existing release key as the app signing key (Play Console's "Use existing app
