@@ -6,6 +6,10 @@ from pathlib import Path
 from urllib.parse import quote
 
 
+# Opens only for the Google accounts on the internal testing track's tester lists.
+PLAY_INTERNAL_TEST = "https://play.google.com/apps/internaltest/4701361324155150498"
+
+
 def download_notes(artifacts, server_url, repository, tag, docker_image, extension_tag=""):
   version = tag.removeprefix("v")
   release_url = f"{server_url}/{repository}/releases/download/{quote(tag, safe='')}"
@@ -54,6 +58,7 @@ def download_notes(artifacts, server_url, repository, tag, docker_image, extensi
     ("Windows · portable", desktop("windows", "-portable.zip"), "ZIP · no installation"),
     ("**Linux** · Debian / Ubuntu", desktop("linux", ".deb"), "DEB"),
     ("**Android** · 8.0+", download("Universal", "android-{version}.apk"), "APK"),
+    ("Android · Google Play", f"[Internal test]({PLAY_INTERNAL_TEST})", "Invited testers only"),
     ("**iPhone / iPad** · iOS 15+", download("Unsigned", "ios-{version}.ipa"), "IPA · sideload"),
   ])
   commands = table([
