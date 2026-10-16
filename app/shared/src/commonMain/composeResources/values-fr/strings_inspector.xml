@@ -209,4 +209,16 @@
   <string name="inspector_seeding_stop">Arrêter le partage</string>
   <string name="inspector_seeding_start">Partager</string>
   <string name="inspector_seeding_waiting">En attente de partage</string>
+  <plurals name="inspector_stall_missing">
+    <item quantity="one">Aucun pair ni seed web n’a %1$d pièce nécessaire</item>
+    <item quantity="other">Aucun pair ni seed web n’a %1$d pièces nécessaires</item>
+  </plurals>
+  <plurals name="inspector_stall_skip">
+    <item quantity="one">Ignorer le fichier</item>
+    <item quantity="other">Ignorer %1$d fichiers</item>
+  </plurals>
+  <string name="inspector_stall_no_peers">Aucun pair depuis %1$s · recherche en cours</string>
+  <string name="inspector_stall_choked">Pairs connectés, mais aucun ne partage encore</string>
+  <string name="inspector_stall_slow">Les pairs sont lents · demande les mêmes pièces à d’autres</string>
+  <string name="inspector_stall_unknown">Aucune progression depuis %1$s</string>
 </resources>

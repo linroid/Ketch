@@ -209,4 +209,16 @@
   <string name="inspector_seeding_stop">Parar de semear</string>
   <string name="inspector_seeding_start">Semear</string>
   <string name="inspector_seeding_waiting">Aguardando para semear</string>
+  <plurals name="inspector_stall_missing">
+    <item quantity="one">Nenhum par ou semente web tem %1$d parte necessária</item>
+    <item quantity="other">Nenhum par ou semente web tem %1$d partes necessárias</item>
+  </plurals>
+  <plurals name="inspector_stall_skip">
+    <item quantity="one">Ignorar arquivo</item>
+    <item quantity="other">Ignorar %1$d arquivos</item>
+  </plurals>
+  <string name="inspector_stall_no_peers">Sem pares há %1$s · ainda procurando</string>
+  <string name="inspector_stall_choked">Pares conectados, mas nenhum está compartilhando ainda</string>
+  <string name="inspector_stall_slow">Os pares estão lentos · pedindo as mesmas partes a outros</string>
+  <string name="inspector_stall_unknown">Sem progresso há %1$s</string>
 </resources>

@@ -194,4 +194,14 @@
   <string name="inspector_seeding_stop">シードを停止</string>
   <string name="inspector_seeding_start">シード</string>
   <string name="inspector_seeding_waiting">シード待機中</string>
+  <plurals name="inspector_stall_missing">
+    <item quantity="other">必要な%1$d個のピースを持つピアやWebシードがありません</item>
+  </plurals>
+  <plurals name="inspector_stall_skip">
+    <item quantity="other">%1$d個のファイルをスキップ</item>
+  </plurals>
+  <string name="inspector_stall_no_peers">%1$s間ピアなし · 検索を継続中</string>
+  <string name="inspector_stall_choked">ピアに接続済みですが、まだ共有しているピアはありません</string>
+  <string name="inspector_stall_slow">ピアが遅いため · 同じピースを他のピアにも要求中</string>
+  <string name="inspector_stall_unknown">%1$s間進捗なし</string>
 </resources>

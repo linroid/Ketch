@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.i18n.warmStrings
 import com.linroid.ketch.app.input.KeyboardPlatform
@@ -609,9 +610,10 @@ internal fun <T> withSample(
   density: DensityMode = DensityMode.Compact,
   data: SampleData = SampleData.downloads(),
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
+  embedded: (SampleData) -> KetchApi = ::SampleKetchApi,
   block: (SampleEnvironment) -> T,
 ): T = withEnvironment(
-  create = { SampleEnvironment(data, theme, density, aiProviderFactory) },
+  create = { SampleEnvironment(data, theme, density, aiProviderFactory, embedded) },
   block = block,
 )
 

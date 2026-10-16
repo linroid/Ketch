@@ -209,4 +209,16 @@
   <string name="inspector_seeding_stop">Seeden beenden</string>
   <string name="inspector_seeding_start">Seeden</string>
   <string name="inspector_seeding_waiting">Wartet aufs Seeden</string>
+  <plurals name="inspector_stall_missing">
+    <item quantity="one">Kein Peer und kein Webseed hat %1$d benötigtes Stück</item>
+    <item quantity="other">Kein Peer und kein Webseed hat %1$d benötigte Stücke</item>
+  </plurals>
+  <plurals name="inspector_stall_skip">
+    <item quantity="one">Datei überspringen</item>
+    <item quantity="other">%1$d Dateien überspringen</item>
+  </plurals>
+  <string name="inspector_stall_no_peers">Seit %1$s keine Peers · sucht weiter</string>
+  <string name="inspector_stall_choked">Peers verbunden, aber noch teilt keiner</string>
+  <string name="inspector_stall_slow">Peers sind langsam · fragt andere nach denselben Stücken</string>
+  <string name="inspector_stall_unknown">Seit %1$s kein Fortschritt</string>
 </resources>

@@ -194,4 +194,14 @@
   <string name="inspector_seeding_stop">시딩 중지</string>
   <string name="inspector_seeding_start">시드</string>
   <string name="inspector_seeding_waiting">시딩 대기 중</string>
+  <plurals name="inspector_stall_missing">
+    <item quantity="other">필요한 조각 %1$d개를 가진 피어나 웹 시드가 없음</item>
+  </plurals>
+  <plurals name="inspector_stall_skip">
+    <item quantity="other">파일 %1$d개 건너뛰기</item>
+  </plurals>
+  <string name="inspector_stall_no_peers">%1$s째 피어 없음 · 계속 찾는 중</string>
+  <string name="inspector_stall_choked">피어에 연결됐지만 아직 공유하는 피어가 없음</string>
+  <string name="inspector_stall_slow">피어가 느림 · 같은 조각을 다른 피어에게도 요청 중</string>
+  <string name="inspector_stall_unknown">%1$s째 진행 없음</string>
 </resources>

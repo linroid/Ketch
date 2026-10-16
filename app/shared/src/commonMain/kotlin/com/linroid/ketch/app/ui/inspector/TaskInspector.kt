@@ -79,9 +79,9 @@ enum class InspectorPlacement {
  *
  * With two or more rows selected it sums them up and offers their shared Controls. Otherwise it
  * shows the task of [taskKey]: its header with the lane strip, metric and reason lines, the
- * action bar, and the tabs: Overview (problem card, Controls and Details), Connections or Files,
- * and Activity. With neither, it keeps showing what it showed last, while its container goes
- * away.
+ * action bar, and the tabs: Overview (problem card or stall notice, Controls and Details),
+ * Connections or Files, and Activity. With neither, it keeps showing what it showed last, while
+ * its container goes away.
  *
  * @param placement the container this is shown in.
  * @param onClose closes the inspector.
@@ -278,7 +278,10 @@ private fun TaskView(
   }
 }
 
-/** The Overview tab: the problem of a failed download, its Controls and its Details. */
+/**
+ * The Overview tab: the problem of a failed download, or why a torrent makes no progress, its
+ * Controls and its Details.
+ */
 @Composable
 private fun Overview(
   state: AppState,
@@ -292,6 +295,7 @@ private fun Overview(
   if (row.state is DownloadState.Failed && error != null) {
     ProblemCard(row, error, runner, inBar = setOfNotNull(runner.primary(row)))
   }
+  StallNotice(state, row, pending)
   if (row.state.hasControls) InspectorControls(state, listOf(row), runner, pending)
   SeedingControl(state, row, runner, pending)
   TaskDetails(state, row, device, runner, copier)

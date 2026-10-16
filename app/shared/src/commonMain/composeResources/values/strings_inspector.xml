@@ -290,4 +290,22 @@
   <!-- A finished torrent meant to seed that does not share yet, such as while uploads wait for
        Wi-Fi or a free slot. -->
   <string name="inspector_seeding_waiting">Waiting to seed</string>
+
+  <!-- Why a downloading torrent makes no progress. %1$d is how many pieces it needs that no
+       connected peer or web seed has. -->
+  <plurals name="inspector_stall_missing">
+    <item quantity="one">No peer or web seed has %1$d piece it needs</item>
+    <item quantity="other">No peer or web seed has %1$d pieces it needs</item>
+  </plurals>
+  <!-- Leaves out the files those pieces belong to, so the rest can finish. %1$d is how many. -->
+  <plurals name="inspector_stall_skip">
+    <item quantity="one">Skip file</item>
+    <item quantity="other">Skip %1$d files</item>
+  </plurals>
+  <!-- %1$s is how long, such as "2m 30s". -->
+  <string name="inspector_stall_no_peers">No peers for %1$s · still looking</string>
+  <string name="inspector_stall_choked">Peers connected, but none is sharing yet</string>
+  <string name="inspector_stall_slow">Peers are slow · asking others for the same pieces</string>
+  <!-- %1$s is how long, such as "2m 30s". -->
+  <string name="inspector_stall_unknown">No progress for %1$s</string>
 </resources>

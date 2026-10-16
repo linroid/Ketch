@@ -239,4 +239,20 @@
   <string name="inspector_seeding_stop">Остановить раздачу</string>
   <string name="inspector_seeding_start">Раздавать</string>
   <string name="inspector_seeding_waiting">Ожидает раздачи</string>
+  <plurals name="inspector_stall_missing">
+    <item quantity="one">Ни у одного пира или веб-сида нет %1$d нужной части</item>
+    <item quantity="few">Ни у одного пира или веб-сида нет %1$d нужных частей</item>
+    <item quantity="many">Ни у одного пира или веб-сида нет %1$d нужных частей</item>
+    <item quantity="other">Ни у одного пира или веб-сида нет %1$d нужных частей</item>
+  </plurals>
+  <plurals name="inspector_stall_skip">
+    <item quantity="one">Пропустить %1$d файл</item>
+    <item quantity="few">Пропустить %1$d файла</item>
+    <item quantity="many">Пропустить %1$d файлов</item>
+    <item quantity="other">Пропустить %1$d файла</item>
+  </plurals>
+  <string name="inspector_stall_no_peers">Нет пиров уже %1$s · поиск продолжается</string>
+  <string name="inspector_stall_choked">Пиры подключены, но пока никто не раздаёт</string>
+  <string name="inspector_stall_slow">Пиры медленные · запрашивает те же части у других</string>
+  <string name="inspector_stall_unknown">Нет прогресса уже %1$s</string>
 </resources>

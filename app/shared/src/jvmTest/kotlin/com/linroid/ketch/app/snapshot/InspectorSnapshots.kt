@@ -20,9 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.Interest
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.app.i18n.verbatim
@@ -30,6 +33,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DeviceInfo
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.LocalAppState
+import com.linroid.ketch.app.state.PagedController
 import com.linroid.ketch.app.state.RowCapabilities
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchDensity
@@ -46,8 +50,18 @@ import com.linroid.ketch.app.ui.inspector.TaskHeader
 import com.linroid.ketch.app.ui.inspector.TaskInspector
 import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentStallReason
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -72,6 +86,21 @@ class InspectorSnapshots {
     for (theme in SnapshotTheme.entries) {
       for ((file, name) in STATES) {
         inspector("inspector-$file", Tall, theme) { inspect(name) }
+      }
+    }
+  }
+
+  @Test
+  fun inspector_stalledTorrent_saysWhy() {
+    for (theme in SnapshotTheme.entries) {
+      // Before: a torrent that stopped moving said nothing of it.
+      inspector("inspector-torrent-moving", Docked, theme,
+        embedded = { StalledTorrents(it, null) }) { inspect(TORRENT) }
+      inspector("inspector-torrent-stalled", Docked, theme,
+        embedded = { StalledTorrents(it, MISSING) }) { inspect(TORRENT) }
+      inspector("inspector-torrent-no-peers", Docked, theme,
+        embedded = { StalledTorrents(it, MISSING.copy(reason = TorrentStallReason.NO_PEERS)) }) {
+        inspect(TORRENT)
       }
     }
   }
@@ -220,9 +249,10 @@ class InspectorSnapshots {
     placement: InspectorPlacement = InspectorPlacement.Docked,
     width: Dp = if (placement == InspectorPlacement.Overlay) OverlayWidth else DockedWidth,
     interact: suspend SnapshotScene.() -> Unit = {},
+    embedded: (SampleData) -> KetchApi = ::SampleKetchApi,
     setup: Setup.() -> TaskKey?,
   ) {
-    withSample(theme, size.density.toMode()) { env ->
+    withSample(theme, size.density.toMode(), embedded = embedded) { env ->
       val state = env.controller.state
       val key = onUiThread { Setup(state, env.data).setup() }
       snapshot(name, size, theme, interact) {
@@ -271,6 +301,10 @@ class InspectorSnapshots {
     const val FAILED = "model-weights.safetensors"
     const val COMPLETED = "vacation-photos-2026.zip"
     const val QUEUED = "blender-4.2-macos-arm64.dmg"
+
+    /** Two pieces of the torrent no peer has, for three minutes. */
+    val MISSING = TorrentStall(TorrentStallReason.MISSING_PIECES, seconds = 190,
+      missingPieces = 2, peers = 6, unchokingPeers = 4)
 
     /** File name suffixes and the sample task each shows. */
     val STATES = listOf(
@@ -361,3 +395,26 @@ private fun remoteRow() = ListFixtures.row(
   device = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote()),
   now = SampleData.NOW,
 ).copy(segments = listOf(Segment(0, 0, 2_399_999_999, 900_000_000)))
+
+/** [SampleData]'s device with torrent controls, whose every torrent reports [stall]. */
+private class StalledTorrents(
+  data: SampleData,
+  private val stall: TorrentStall?,
+  private val sample: SampleKetchApi = SampleKetchApi(data),
+) : KetchApi by sample {
+  private val controller = PagedController(emptyList(), pageSize = 1)
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    if (key == TorrentController) controller as T else null
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    if (interest is TorrentInterest) {
+      flowOf(TorrentSnapshot(interest.taskId, TorrentRevision("epoch", 1),
+        TorrentActivity.DOWNLOADING, selectionGeneration = 0, selectionComplete = false,
+        stall = stall)) as Flow<T>
+    } else {
+      sample.subscribe(interest, interval)
+    }
+}
