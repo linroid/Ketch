@@ -236,6 +236,10 @@ class Ketch(
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
+    // Refused now rather than queued to fail when it starts, as from the CLI, REST or MCP.
+    require(sourceResolver.canHandle(request.url)) {
+      "No download source handles this link: ${redactUrl(request.url)}"
+    }
     requireProxySupport(request.proxy)
     requireChecksumSupport(request)
     require(

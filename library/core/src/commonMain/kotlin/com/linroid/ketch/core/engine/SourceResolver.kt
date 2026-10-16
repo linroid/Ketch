@@ -56,6 +56,9 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
   /** The first source that downloads [url]. */
   fun resolve(url: String): DownloadSource<*> = resolve(ResolveInput.Url(url))
 
+  /** Whether a source downloads [url]. */
+  fun canHandle(url: String): Boolean = sources.any { it.canHandle(ResolveInput.Url(url)) }
+
   private fun ResolveInput.describe(): String = when (this) {
     is ResolveInput.Url -> "URL: ${redactUrl(url)}"
     is ResolveInput.Content -> "content: fileName=$fileName, size=${bytes.size}"

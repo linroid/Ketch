@@ -29,6 +29,8 @@ interface KetchApi {
   /**
    * Adds a download.
    *
+   * @throws IllegalArgumentException if no download source handles [DownloadRequest.url], or the
+   *   request is otherwise invalid
    * @throws UnsupportedOperationException if [DownloadRequest.proxy] is not [Proxy.System]
    *   and this backend does not list [KetchFeatures.PROXY]
    */

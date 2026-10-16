@@ -36,6 +36,20 @@ class KetchSubmissionTest {
   }
 
   @Test
+  fun download_linkNoSourceHandles_isRefusedUpFront() = runTest {
+    val ketch = Ketch(httpEngine = FakeHttpEngine())
+    try {
+      // A name without a scheme, as a mistyped CLI or REST request sends it.
+      for (url in listOf("wt-big-buck-bunny", "gopher://example.com/file")) {
+        assertFailsWith<IllegalArgumentException> { ketch.download(DownloadRequest(url)) }
+      }
+      assertEquals(0, ketch.tasks.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun download_sameRequestIdAfterSelectionChange_returnsTheTask() = runTest {
     val source = SelectableSource()
     val ketch = Ketch(httpEngine = FakeHttpEngine(), additionalSources = listOf(source))
