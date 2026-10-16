@@ -1547,7 +1547,11 @@ class TorrentDownloadSource(
     deleteFiles: Boolean,
   ) {
     release(context.taskId)
-    if (!deleteFiles || state == null) return
+    if (state == null) return
+    if (!deleteFiles) {
+      forget(context, state)
+      return
+    }
     try {
       if (state.version == 3) {
         cleanupV2(context, state)
@@ -1557,17 +1561,7 @@ class TorrentDownloadSource(
         engine.load()?.removeTorrent(state.infoHash, deleteFiles = true)
       }
       tasks.release(context.taskId)
-      val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }
-        ?.let { TorrentCheckpoint.decode(decodeBase64(it)) }
-      val metadata = checkpoint?.metadata
-        ?: metainfoOf(context.preResolved, state)?.let { TorrentMetadata.fromBencode(it) }
-        ?: return
-      val output = context.outputPath ?: checkpoint?.output ?: state.savePath
-      if (output.isEmpty()) return
-      val store = TorrentPieceStore(metadata, output.toPath(),
-        state.selectedFileIds.map { it.toInt() }.toSet(), context.taskId)
-      checkpoint?.let { store.restore(it) }
-      store.recoverOwnership()
+      val store = v1Store(context, state) ?: return
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }
     } catch (e: CancellationException) { throw e
@@ -1579,7 +1573,58 @@ class TorrentDownloadSource(
     }
   }
 
+  /**
+   * Deletes what a task removed with its files kept had beside them: a v1 task's sidecar folder
+   * (checkpoint, ownership journal, pieces of skipped files) or a v2 task's creation log. Nothing
+   * reads them once the task is gone, and they would stay in the download folder for good.
+   */
+  private suspend fun forget(context: DownloadContext, state: TorrentSourceState) {
+    try {
+      if (state.version == 3) {
+        val store = v2Store(context, state)
+        try { store.forget() } finally { store.close() }
+      } else {
+        v1Store(context, state)?.forget()
+      }
+      stateMutex.withLock { states.remove(context.taskId) }
+    } catch (e: CancellationException) { throw e
+    } catch (e: Exception) {
+      log.w { "Kept the bookkeeping of taskId=${context.taskId}: ${e.describeWithoutUrls()}" }
+    }
+  }
+
+  /** [state]'s v1 store with the files it owns recovered, or null when nothing was saved. */
+  private suspend fun v1Store(
+    context: DownloadContext,
+    state: TorrentSourceState,
+  ): TorrentPieceStore? {
+    val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }
+      ?.let { TorrentCheckpoint.decode(decodeBase64(it)) }
+    val metadata = checkpoint?.metadata
+      ?: metainfoOf(context.preResolved, state)?.let { TorrentMetadata.fromBencode(it) }
+      ?: return null
+    val output = context.outputPath ?: checkpoint?.output ?: state.savePath
+    if (output.isEmpty()) return null
+    val store = TorrentPieceStore(metadata, output.toPath(),
+      state.selectedFileIds.map { it.toInt() }.toSet(), context.taskId)
+    checkpoint?.let { store.restore(it) }
+    store.recoverOwnership()
+    return store
+  }
+
   private suspend fun cleanupV2(context: DownloadContext, state: TorrentSourceState) {
+    val store = v2Store(context, state)
+    try {
+      store.cleanup()
+      stateMutex.withLock { states.remove(context.taskId) }
+    } finally { store.close() }
+  }
+
+  /** [state]'s v2 store with the paths its creation log names recovered; the caller closes it. */
+  private suspend fun v2Store(
+    context: DownloadContext,
+    state: TorrentSourceState,
+  ): TorrentV2PieceStore {
     check(!tasks.isReserved(context.taskId)) { "Join the torrent download before cleanup" }
     val metainfo = requireNotNull(metainfoOf(context.preResolved, state)) { "No saved metainfo" }
     val document = TorrentV2Document.parse(metainfo,
@@ -1604,9 +1649,11 @@ class TorrentDownloadSource(
     try {
       checkpoint?.let { store.restore(it) }
       store.recoverOwnership()
-      store.cleanup()
-      stateMutex.withLock { states.remove(context.taskId) }
-    } finally { store.close() }
+    } catch (e: Throwable) {
+      store.close()
+      throw e
+    }
+    return store
   }
 
   companion object {

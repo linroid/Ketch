@@ -225,6 +225,9 @@ private fun runDownload(args: DownloadArgs.Download) {
 
     val result = task.await()
     monitor.cancel()
+    // The task lives only as long as this process: what a source kept beside its files to resume
+    // it, such as a torrent's sidecar or creation log, would only clutter the folder.
+    task.remove(deleteFiles = false)
 
     result.fold(
       onSuccess = { path -> println("\nDownload completed: $path") },

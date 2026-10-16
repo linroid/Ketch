@@ -214,4 +214,80 @@ class TorrentDownloadSourceCleanupTest {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }
   }
+
+  @Test
+  fun removeKeepingFiles_deletesTheSidecarButNoFile() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        coroutineScope {
+          val seeder = GatedSeeder()
+          seeder.start(this)
+          val root = temporaryRoot()
+          var engine: KotlinTorrentEngine? = null
+          val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false), seeder.http)
+          source.engineFactory = { config ->
+            KotlinTorrentEngine(config, http = TorrentHttp(seeder.http),
+              listenHost = "127.0.0.1").also { engine = it }
+          }
+          val ketch = Ketch(seeder.http, additionalSources = listOf(source))
+          try {
+            ketch.start()
+            seeder.openAll()
+            val task = ketch.download(DownloadRequest(GatedSeeder.URL,
+              destination = Destination((root / "out").toString())))
+            awaitStage("completion", task) { task.await().getOrThrow() }
+            assertTrue(torrentFileSystem.list(root).any { it.name.startsWith(".ketch-") })
+            task.remove(deleteFiles = false)
+            assertTrue(torrentFileSystem.exists(root / "out" / "f0"))
+            assertTrue(torrentFileSystem.exists(root / "out" / "f1"))
+            // Nothing reads the checkpoint or journal once the task is gone.
+            assertEquals(emptyList(),
+              torrentFileSystem.list(root).filter { it.name.startsWith(".ketch-") })
+            source.assertNoLeaks()
+          } finally {
+            ketch.close()
+            engine?.stop()
+            seeder.close()
+            torrentFileSystem.deleteRecursively(root, mustExist = false)
+          }
+          engine?.assertNoLeaks()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun removeKeepingFilesV2_deletesTheCreationLogButNoFile() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5))
+    val root = temporaryRoot()
+    val output = root / "out"
+    try {
+      val store = TorrentV2PieceStore(fixture.document, output, setOf("0", "1"), "task",
+        TorrentBufferBudget(4 * 1024 * 1024), Semaphore(1),
+        creationLogPath = v2CreationLog(output, "task"))
+      val checkpoint = try {
+        store.initialize()
+        fixture.seed(store, 0..1)
+        store.checkpoint()
+      } finally {
+        store.close()
+      }
+      assertTrue(torrentFileSystem.exists(v2CreationLog(output, "task")))
+      val state = TorrentSourceState(fixture.document.info.hash.hex, 40_005,
+        encodeBase64(checkpoint.encode()), setOf("0", "1"), output.toString(),
+        encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+      val context = DownloadContext(taskId = "task", url = "http://fixture/file.torrent",
+        request = DownloadRequest("http://fixture/file.torrent"),
+        fileAccessor = StubFileAccessor, segments = MutableStateFlow(emptyList()),
+        onProgress = { _, _ -> }, throttle = { _ -> }, headers = emptyMap(),
+        outputPath = output.toString())
+      TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+        .cleanup(context, state, deleteFiles = false)
+      assertTrue(torrentFileSystem.exists(output / "a"))
+      assertTrue(torrentFileSystem.exists(output / "b"))
+      assertFalse(torrentFileSystem.exists(v2CreationLog(output, "task")))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
 }

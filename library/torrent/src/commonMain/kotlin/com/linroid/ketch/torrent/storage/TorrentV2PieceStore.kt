@@ -590,6 +590,15 @@ internal class TorrentV2PieceStore(
     }
   }
 
+  /**
+   * Deletes the creation log, the one file this store keeps beside the payload, leaving every
+   * payload file as it is. For a task removed with its files kept.
+   */
+  suspend fun forget() = mutex.withLock {
+    closed = true
+    storageOperation { creationLog?.delete() }
+  }
+
   /** Recovers journal claims for deletion without creating new payload files. */
   suspend fun recoverOwnership() = mutex.withLock {
     check(!closed && !initialized)

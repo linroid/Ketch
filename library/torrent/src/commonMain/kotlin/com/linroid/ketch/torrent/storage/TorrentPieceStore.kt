@@ -631,6 +631,31 @@ internal class TorrentPieceStore(
     }
   }
 
+  /**
+   * Deletes what this store keeps beside the payload, every payload file left as it is: the
+   * sidecar's checkpoint, ownership journal and pieces of skipped files, then the sidecar folder
+   * once empty. For a task removed with its files kept.
+   */
+  suspend fun forget() = mutex.withLock {
+    storageOperation {
+      val files = ownedFiles.toList().filter { it.first.parent == sidecar }
+        .sortedBy { it.first == journalPath }
+      for ((path, identity) in files) {
+        validateRegularPath(path)
+        if (torrentFileIdentity(path) == identity) fileSystem.delete(path, mustExist = false)
+        ownedFiles.remove(path)
+      }
+      val identity = ownedDirectories[sidecar]
+      validateParents(sidecar)
+      val directory = fileSystem.metadataOrNull(sidecar)?.isDirectory == true
+      if (directory && identity != null && torrentFileIdentity(sidecar) == identity &&
+        fileSystem.list(sidecar).isEmpty()) {
+        fileSystem.delete(sidecar)
+        ownedDirectories.remove(sidecar)
+      }
+    }
+  }
+
   suspend fun ownedPaths(): Pair<List<String>, List<String>> = mutex.withLock {
     ownedFiles.keys.map { it.toString() } to ownedDirectories.keys.map { it.toString() }
   }

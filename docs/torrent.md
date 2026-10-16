@@ -747,9 +747,11 @@ and which files the task owns, and a restart rehashes the data rather than trust
 Configure a durable `TaskStore` (such as `SqliteTaskStore`) to keep tasks across restarts.
 
 - File identities and an append-only ownership journal stop cleanup from deleting files that
-  existed before the download or were replaced. A v2 or hybrid task also keeps
-  `.ketch-v2-<task-id>.creation` beside its folder until it is removed, to recover files created
-  before the first checkpoint; keep it with the task. It is published with a hard link, or, on
+  existed before the download or were replaced. A v1 task keeps them, its checkpoint and the
+  pieces of skipped files in a hidden `.ketch-<info-hash>-<task-id>` folder beside its download; a
+  v2 or hybrid task keeps `.ketch-v2-<task-id>.creation` there, to recover files created before
+  the first checkpoint. Keep them with the task: removing the task deletes them, also when it
+  keeps the downloaded files, and so does `ketch <url>` once its download ends. It is published with a hard link, or, on
   file systems without them (FAT, exFAT and some network shares), by claiming its name with an
   empty file and moving the written log over it, so an existing log is never replaced.
 - Payload I/O opens files through their parent folder without following symlinks. Do not let an
