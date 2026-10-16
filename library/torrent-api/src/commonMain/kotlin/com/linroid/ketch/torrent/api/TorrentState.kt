@@ -56,6 +56,8 @@ data class TorrentCounters(
  *   session. It can be `true` while [activity] is not [TorrentActivity.SEEDING], such as while
  *   uploads are paused, and the task seeds once they resume; `null` from backends that do not
  *   report it.
+ * @property stall why the download has made no progress for a while; `null` while it progresses,
+ *   is not downloading, or from backends that do not report it.
  */
 @Serializable
 data class TorrentSnapshot(
@@ -66,6 +68,7 @@ data class TorrentSnapshot(
   val selectionComplete: Boolean,
   val counters: TorrentCounters? = null,
   val seeding: Boolean? = null,
+  val stall: TorrentStall? = null,
 ) {
   init {
     require(taskId.isNotBlank() && taskId.length <= 128)

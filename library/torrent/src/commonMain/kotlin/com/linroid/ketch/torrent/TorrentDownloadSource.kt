@@ -673,7 +673,8 @@ class TorrentDownloadSource(
       else -> TorrentActivity.STOPPED
     }
     val counters = session.payloadCounters()
-    return LiveTorrent(activity, counters.received, counters.uploaded, counters.uploadSpeed)
+    return LiveTorrent(activity, counters.received, counters.uploaded, counters.uploadSpeed,
+      stall = session.stall.value.takeIf { activity == TorrentActivity.DOWNLOADING })
   }
 
   internal suspend fun seedingAvailability(taskId: String): SeedingOutcome? = when {

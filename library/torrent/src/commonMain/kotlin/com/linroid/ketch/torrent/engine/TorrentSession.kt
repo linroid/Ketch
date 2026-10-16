@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent.engine
 
+import com.linroid.ketch.torrent.api.TorrentStall
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -43,6 +45,9 @@ internal interface TorrentSession {
 
   /** Payload received from and sent to peers, and the current upload speed when tracked. */
   suspend fun payloadCounters(): TorrentPayloadCounters
+
+  /** Why the download makes no progress, while it does not; sessions that cannot tell, null. */
+  val stall: StateFlow<TorrentStall?> get() = NO_STALL
 
   /** Sets per-torrent download rate limit (bytes/sec, 0=unlimited). */
   fun setDownloadRateLimit(bytesPerSecond: Long)
@@ -94,3 +99,5 @@ internal enum class TorrentSessionState {
   /** Stopped or errored. */
   STOPPED,
 }
+
+private val NO_STALL: StateFlow<TorrentStall?> = MutableStateFlow(null)

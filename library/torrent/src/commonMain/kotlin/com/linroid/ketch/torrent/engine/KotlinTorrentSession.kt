@@ -6,6 +6,7 @@ import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.monotonicClock
@@ -22,6 +23,11 @@ import com.linroid.ketch.torrent.tracker.TrackerControl
 import com.linroid.ketch.torrent.tracker.TrackerRevisionConflict
 import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.v1.TorrentSwarm
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -42,11 +48,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicLong
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.coroutines.cancellation.CancellationException
 
 /** One task owns this session, its lifecycle job, output, and checkpoint. Network/runtime are borrowed. */
 @OptIn(ExperimentalAtomicApi::class)
@@ -273,6 +274,9 @@ internal class KotlinTorrentSession(
   override val totalBytes: Long get() = store.totalSelectedBytes
   override val downloadedBytes: StateFlow<Long> get() = _downloadedBytes
   override val state: StateFlow<TorrentSessionState> get() = _state
+
+  private val _stall = MutableStateFlow<TorrentStall?>(null)
+  override val stall: StateFlow<TorrentStall?> get() = _stall
   val failure: StateFlow<Throwable?> get() = _failure
   val receivedBytes: Long get() = received.load()
   val uploadedBytes: Long get() = uploaded.load()
@@ -432,7 +436,7 @@ internal class KotlinTorrentSession(
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
               connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
-              peerBudget = peerBudget,
+              peerBudget = peerBudget, stall = _stall, reannounce = { reannounceTrackers() },
               uploadPolicy = uploadPolicy,
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
               listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,
@@ -480,6 +484,7 @@ internal class KotlinTorrentSession(
               log.i { "Torrent $label stopped seeding: upload policy changed" }
             }
           } finally {
+            _stall.value = null
             withContext(NonCancellable) { discovery.cancelAndJoin(); peers.cancel() }
           }
         }

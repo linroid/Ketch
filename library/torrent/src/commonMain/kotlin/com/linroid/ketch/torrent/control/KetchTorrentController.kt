@@ -26,13 +26,15 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentCounters
-import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentPageRequest
+import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentStall
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
@@ -56,7 +58,6 @@ import kotlinx.serialization.json.Json
 import okio.ByteString.Companion.decodeBase64
 import okio.ByteString.Companion.encodeUtf8
 import okio.IOException
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Ketch's [TorrentController] over a [TorrentControlSource]: snapshots, file pages and
@@ -101,6 +102,7 @@ internal class KetchTorrentController(
     val selectionComplete: Boolean,
     val counters: TorrentCounters?,
     val seeding: Boolean,
+    val stall: TorrentStall?,
   ) {
     val control get() = TorrentRevisions.Control(generation, seeding)
   }
@@ -489,6 +491,7 @@ internal class KetchTorrentController(
       counters = content.counters,
       // A session the source has not reported seeding yet still seeds.
       seeding = content.seeding || content.activity == TorrentActivity.SEEDING,
+      stall = content.stall,
     )
   }
 
@@ -505,6 +508,7 @@ internal class KetchTorrentController(
       selectionComplete = state is DownloadState.Completed && counters != null,
       counters = counters,
       seeding = seedingOf(task, control),
+      stall = live?.stall?.takeIf { state is DownloadState.Downloading },
     )
   }
 

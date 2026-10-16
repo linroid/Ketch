@@ -7,6 +7,7 @@ import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentReachability
+import com.linroid.ketch.torrent.api.TorrentStall
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -103,12 +104,14 @@ private val NO_SHARING_RESUMES: StateFlow<Long> = MutableStateFlow(0L)
  * @property uploadedPayloadBytes payload sent to peers by this session, or `null` when not
  *   tracked
  * @property uploadBytesPerSecond the current upload speed, or `null` when not tracked
+ * @property stall why the download makes no progress, while it downloads and does not
  */
 internal class LiveTorrent(
   val activity: TorrentActivity,
   val receivedPayloadBytes: Long?,
   val uploadedPayloadBytes: Long?,
   val uploadBytesPerSecond: Long?,
+  val stall: TorrentStall? = null,
 )
 
 /**

@@ -4,6 +4,8 @@ import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.torrent.RecordingConnections
+import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentStallReason
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -18,15 +20,6 @@ import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import com.linroid.ketch.torrent.v1.TorrentSwarm
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import okio.FileSystem
-import okio.IOException
-import okio.Path
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
@@ -37,6 +30,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import okio.FileSystem
+import okio.IOException
+import okio.Path
 
 class TorrentWebSeedTest {
   private fun hashes(payload: ByteArray, pieceLength: Int): ByteArray =
@@ -423,6 +430,45 @@ class TorrentWebSeedTest {
           }
           // Never asked for the lost file again.
           assertTrue(partial.requests.count { it.first == stale } <= 1)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun lostFile_isReportedAsAStallNamingIt() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        // The only source lost c.bin, as archive.org items lose regenerated files.
+        val lost = "http://mirror.test/pub/my%20set/c.bin"
+        val mirror = MirrorEngine(mirrorFiles, missing = setOf(lost))
+        withStore(multiFile("http://mirror.test/pub")) { store, _ ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>().also { it.close() }
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              while (mirror.requests.none { it.first == lost }) delay(20)
+              delay(500)
+              // Payload stopped 40 s ago: a stall, and why.
+              clock = 40_000
+              delay(500)
+              clock = 80_000
+              val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+              assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
+              assertTrue(reported.missingPieces > 0)
+              assertTrue("3" in reported.missingFileIds)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
         }
       }
     }

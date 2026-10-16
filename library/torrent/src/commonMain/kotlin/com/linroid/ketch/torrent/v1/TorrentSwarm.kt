@@ -5,9 +5,14 @@ import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.describeWithoutUrls
+import com.linroid.ketch.torrent.engine.StallRecovery
+import com.linroid.ketch.torrent.engine.StallSignals
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
+import com.linroid.ketch.torrent.engine.TorrentStallWatchdog
+import com.linroid.ketch.torrent.engine.describe
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.magnet.TorrentMetadataExchange
 import com.linroid.ketch.torrent.metainfo.Bencode
@@ -59,6 +64,9 @@ import com.linroid.ketch.torrent.webseed.SwarmWebSeedPieces
 import com.linroid.ketch.torrent.webseed.WEB_SEED_RETRY_MS
 import com.linroid.ketch.torrent.webseed.WebSeedStats
 import com.linroid.ketch.torrent.webseed.WebSeedWorker
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -70,6 +78,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.onTimeout
@@ -80,9 +89,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
-import kotlin.concurrent.atomics.AtomicLong
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.time.TimeSource
 
 /**
  * Bounded peer workers around verified storage. Each worker owns its wire and request state.
@@ -153,6 +159,10 @@ internal class TorrentSwarm(
    * them ourselves and hand their piece to other peers.
    */
   private val fastRejectGraceMs: Long = FAST_REJECT_GRACE_MS,
+  /** Why the download stalls, published about once a second; null while it progresses. */
+  private val stall: MutableStateFlow<TorrentStall?>? = null,
+  /** Announces to the torrent's trackers now, as a stalled swarm asks to recover. */
+  private val reannounce: suspend () -> Unit = {},
 ) {
   /**
    * What peer exchange may tell others about a connection: where it listens, and its flags.
@@ -180,6 +190,11 @@ internal class TorrentSwarm(
   private val connectedMutex = Mutex()
   // Guarded by connectedMutex. Each worker publishes only its own contact.
   private val connected = mutableMapOf<Int, PexContact>()
+  // Connected peers that unchoke us, guarded like [connected].
+  private val unchoking = mutableSetOf<Int>()
+  // Payload received from peers and web seeds, and time spent waiting on speed limits for it.
+  private val payloadReceived = AtomicLong(0)
+  private val throttledMs = AtomicLong(0)
   private val uploaded = AtomicLong(0)
 
   /** Hole punching (BEP 55) runs for public torrents while uTP is on. */
@@ -248,7 +263,10 @@ internal class TorrentSwarm(
     // Hashes of stored pieces a selection made wanted; each wakes the loop when done.
     val rechecked = Channel<Unit>(Channel.CONFLATED)
     val verifiers = mutableListOf<Job>()
+    // Notices a download that stopped making progress, and says why ([stall]).
+    val watchdog = TorrentStallWatchdog(nowMs)
     suspend fun applySelection() {
+      watchdog.progressed()
       val view = scheduler.retarget { store.selectionView() }
       verifiers.removeAll { it.isCompleted }
       if (view.recheck.isEmpty()) return
@@ -282,18 +300,28 @@ internal class TorrentSwarm(
       SwarmWebSeedPieces(-1 - number, url, store, scheduler,
         onVerified = { progressEvents.trySend(Unit) }).also { it.join() }
     }
-    val webSeeds = webSeedUrls.mapIndexed { number, url ->
+    // Payload from web seeds counts and is throttled as peers' does.
+    val webSeedPayload: suspend (Int) -> Unit = { size ->
+      val at = nowMs()
+      downloadPayload(size)
+      throttledMs.addAndFetch(nowMs() - at)
+      payloadReceived.addAndFetch(size.toLong())
+    }
+    fun launchWebSeed(number: Int): Job {
       val pieces = webSeedPieces[number]
-      val worker = WebSeedWorker(url, pieces, checkNotNull(webSeedHttp), webSeedStats, logLabel,
-        reporter, webSeedRetryMs, downloadPayload = downloadPayload)
-      launch(TorrentDispatchers.engine) {
+      val worker = WebSeedWorker(webSeedUrls[number], pieces, checkNotNull(webSeedHttp),
+        webSeedStats, logLabel, reporter, webSeedRetryMs, downloadPayload = webSeedPayload)
+      return launch(TorrentDispatchers.engine) {
         try {
+          // A seed started again joins with every piece, those it could not serve included.
+          pieces.join()
           worker.run()
         } catch (e: TorrentStorageException) {
           webSeedFailures.trySend(e)
         }
       }
     }
+    val webSeeds = webSeedUrls.indices.mapTo(mutableListOf()) { launchWebSeed(it) }
     if (webSeeds.isNotEmpty()) {
       log.i { "Swarm $logLabel: downloading from ${webSeeds.size} web seed(s) too" }
     }
@@ -329,12 +357,64 @@ internal class TorrentSwarm(
           "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
           "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}; " +
           holepunch.summary() +
-          if (webSeeds.isEmpty()) "" else
-            "; ${webSeedStats.summary(webSeeds.count { it.isActive }, webSeeds.size)}"
+          (if (webSeeds.isEmpty()) "" else
+            "; ${webSeedStats.summary(webSeeds.count { it.isActive }, webSeeds.size)}") +
+          (stall?.value?.let { "; stall: ${it.describe()}" } ?: "")
       }
       discovered = 0
       connectFailures = 0
       corruptPieces = 0
+    }
+    var lastStallCheck = now()
+    // Peers given up on, or waiting to be retried, are dialed again.
+    fun revivePeers() {
+      var revived = 0
+      for (endpoint in attempts.keys.toList()) {
+        if (endpoint in active || endpoint in pending) continue
+        attempts.remove(endpoint)
+        attemptedAt.remove(endpoint)
+        retryAt.remove(endpoint)
+        pending.addLast(endpoint)
+        revived++
+      }
+      if (revived > 0) log.d { "Swarm $logLabel: dialing $revived peer(s) it gave up on again" }
+    }
+    suspend fun checkStall() {
+      val published = stall ?: return
+      val health = scheduler.health(MAX_REPORTED_MISSING_PIECES)
+      val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
+      val running = webSeeds.count { it.isActive }
+      val files = if (health.missing.isEmpty()) emptyList() else {
+        store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
+      }
+      val due = watchdog.check(StallSignals(
+        downloading = !complete, peers = peers, unchokingPeers = unchoked,
+        missingPieces = health.missingCount, missingFileIds = files,
+        lateBlocks = health.lateBlocks, webSeeds = running,
+        droppedWebSeeds = webSeeds.size - running, payloadBytes = payloadReceived.load(),
+        throttledMs = throttledMs.load(), pieceLength = store.metadata.pieceLength,
+      ))
+      val current = watchdog.stall
+      val previous = published.value
+      if (current?.reason != previous?.reason) {
+        if (current == null) log.i { "Swarm $logLabel makes progress again" }
+        else log.i { "Swarm $logLabel stalled: ${current.describe()}" }
+      }
+      published.value = current
+      for (recovery in due) {
+        log.i { "Swarm $logLabel recovers from a stall: ${recovery.name.lowercase()}" }
+        when (recovery) {
+          StallRecovery.REANNOUNCE -> launch {
+            try { reannounce() } catch (e: CancellationException) { throw e } catch (e: Exception) {
+              log.d { "Swarm $logLabel: reannounce failed: ${e.describeWithoutUrls()}" }
+            }
+          }
+          StallRecovery.REVIVE_PEERS -> revivePeers()
+          StallRecovery.RELAUNCH_WEB_SEEDS -> for (number in webSeeds.indices) {
+            if (!webSeeds[number].isActive) webSeeds[number] = launchWebSeed(number)
+          }
+        }
+      }
     }
     fun launchPeer(
       endpoint: PeerEndpoint,
@@ -370,7 +450,10 @@ internal class TorrentSwarm(
         } finally {
           withContext(NonCancellable) {
             scheduler.remove(id)
-            connectedMutex.withLock { connected.remove(id) }
+            connectedMutex.withLock {
+              connected.remove(id)
+              unchoking.remove(id)
+            }
             chokerMutex.withLock { choker.remove(id) }
           }
           connection?.close()
@@ -404,6 +487,10 @@ internal class TorrentSwarm(
         if (now() - lastSummary >= SWARM_SUMMARY_INTERVAL_MS) {
           lastSummary = now()
           logSummary()
+        }
+        if (now() - lastStallCheck >= STALL_CHECK_MS) {
+          lastStallCheck = now()
+          checkStall()
         }
         if (complete && policy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
         val expired = attemptedAt.filter { (endpoint, time) ->
@@ -525,7 +612,10 @@ internal class TorrentSwarm(
             }
           }
           webSeedFailures.onReceive { throw it }
-          progressEvents.onReceive { onProgress(store.progress().sum()) }
+          progressEvents.onReceive {
+            watchdog.progressed()
+            onProgress(store.progress().sum())
+          }
           onTimeout(100) {}
         }
       }
@@ -792,11 +882,17 @@ internal class TorrentSwarm(
         attempt.payload += message.bytes.size
         downloadPayload(message.bytes.size)
         lastBlock += throttling.elapsedNow()
-        lastUsefulPayload += nowMs() - throttledAt
+        val throttled = nowMs() - throttledAt
+        lastUsefulPayload += throttled
+        throttledMs.addAndFetch(throttled)
+        payloadReceived.addAndFetch(message.bytes.size.toLong())
       }
       require(fast || !message.isFastExtension()) { "Fast extension message without BEP 6" }
       val wasChoking = state.choking
       val accepted = state.received(message)
+      if (state.choking != wasChoking) {
+        connectedMutex.withLock { if (state.choking) unchoking.remove(id) else unchoking.add(id) }
+      }
       when (message) {
         // Only the one-time bitfield rebuilds availability; HAVE stays incremental so a
         // peer cannot force a full snapshot and rarity scan per announcement.
@@ -1263,6 +1359,12 @@ private const val MAX_CONNECTS_PER_MINUTE = 8
 private const val REQUEST_QUEUE = 500
 
 /** Block requests we keep outstanding with a v1 peer before its rate is known. */
+/** How often a swarm checks whether it stalled. */
+private const val STALL_CHECK_MS = 1_000L
+
+/** The most missing pieces a stall check looks up the files of. */
+private const val MAX_REPORTED_MISSING_PIECES = 4_096
+
 /** The least and most time a peer may take with blocks before others may ask for them too. */
 private const val MIN_LATE_MS = 4_000L
 private const val MAX_LATE_MS = 30_000L

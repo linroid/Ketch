@@ -549,6 +549,8 @@ internal class SwarmWebSeedPieces(
 
   override suspend fun stop() {
     scheduler.remove(id)
+    // Started again, it joins again.
+    joined = false
   }
 }
 

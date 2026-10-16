@@ -270,6 +270,34 @@ internal class TorrentPieceScheduler(
     Grant(requests, starved)
   }
 
+  /**
+   * What a stalled swarm reports: [missingCount] wanted pieces no connected peer or running web
+   * seed has, the first [missing] of them, and [lateBlocks] requested blocks their peer is late
+   * with.
+   */
+  class Health(val missingCount: Int, val missing: IntArray, val lateBlocks: Int)
+
+  /** The swarm's [Health] now, naming at most [limit] missing pieces. */
+  suspend fun health(limit: Int): Health = mutex.withLock {
+    val now = nowMs()
+    val missing = ArrayList<Int>()
+    var count = 0
+    for (index in 0 until pieceCount) {
+      if (wanted[index] && !verified[index] && seedOwned[index] == 0 && rarity[index] == 0) {
+        count++
+        if (missing.size < limit) missing += index
+      }
+    }
+    var late = 0
+    for (piece in open.values) {
+      if (piece.committing) continue
+      for (block in 0 until piece.blocks) {
+        if (piece.owner[block] >= 0 && now >= piece.dueAt[block]) late++
+      }
+    }
+    Health(count, missing.toIntArray(), late)
+  }
+
   /** Whether [peer] may look for late blocks now: at most every [LATE_SCAN_MS]. */
   private fun lateScanDue(peer: Int, now: Long): Boolean {
     val last = lateScans[peer]

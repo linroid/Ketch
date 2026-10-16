@@ -30,6 +30,19 @@ import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentStallReason
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -44,17 +57,6 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
 
 /**
  * Ketch's torrent controller: revisions that never conflict with progress, the retry ledger in
@@ -629,6 +631,27 @@ class KetchTorrentControllerTest {
       assertEquals(TorrentActivity.STOPPED, stopped.activity)
       // Neither seeding nor meant to.
       assertEquals(false, stopped.seeding)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun snapshot_stalledDownload_saysWhy() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      assertIs<DownloadState.Downloading>(task.state.value)
+      val stall = TorrentStall(TorrentStallReason.MISSING_PIECES, seconds = 90,
+        missingPieces = 1, missingFileIds = listOf("0"), peers = 2, unchokingPeers = 1)
+      source.live[task.taskId] = LiveTorrent(TorrentActivity.DOWNLOADING, 0, 0, null, stall)
+      assertEquals(stall, assertNotNull(ketch.torrents.snapshot(task.taskId)).stall)
+      // Paused, it is not stalled, whatever the session last said.
+      task.pause()
+      runCurrent()
+      assertNull(assertNotNull(ketch.torrents.snapshot(task.taskId)).stall)
     } finally {
       ketch.close()
     }

@@ -154,6 +154,22 @@ internal class TorrentPieceStore(
     return result
   }
 
+  /** The selected files holding bytes of any of [pieces], at most [limit] of them, in order. */
+  fun filesHolding(pieces: IntArray, limit: Int): List<Int> {
+    if (pieces.isEmpty()) return emptyList()
+    val sorted = pieces.sorted()
+    val files = mutableListOf<Int>()
+    for (file in selected.sorted()) {
+      val range = piecesOf(file)
+      if (range.isEmpty()) continue
+      // The first missing piece at or after the file's first one.
+      val at = sorted.binarySearch(range.first).let { if (it >= 0) it else -it - 1 }
+      if (at < sorted.size && sorted[at] <= range.last) files += file
+      if (files.size == limit) break
+    }
+    return files
+  }
+
   /** The pieces holding bytes of [file]; empty for an empty file. */
   private fun piecesOf(file: Int): IntRange {
     if (metadata.files[file].size == 0L) return IntRange.EMPTY
