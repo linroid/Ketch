@@ -72,7 +72,7 @@ class V1ThroughputTest {
     val payload = Random(162).nextBytes(maxOf(bytes, delayedBytes))
     withContext(Dispatchers.IO) {
       // Warms the JIT up on the same paths; not reported.
-      download(payload, 64 * 1024 * 1024, 262_144, 0, seeders)
+      download(payload, minOf(payload.size, 64 * 1024 * 1024), 262_144, 0, seeders)
       report.parentFile.mkdirs()
       if (!report.exists()) {
         report.appendText("| Label | Piece | RTT | Seeders | Payload | MB/s (median, min–max) " +
@@ -152,6 +152,9 @@ class V1ThroughputTest {
       val session = engine.addTask(TorrentTaskSpec("throughput", metadata,
         File(root, "payload").path, emptySet()))
       val gcBefore = gcMs()
+      // The seeders' work is taken over the same interval as the process's, threads that end
+      // before it does included.
+      val seedersBefore = seeds.map { it.usage() }
       val cpuBefore = os.processCpuTime
       val allocatedBefore = threads.totalThreadAllocatedBytes
       val started = TimeSource.Monotonic.markNow()
@@ -162,12 +165,14 @@ class V1ThroughputTest {
         }
       }
       val seconds = started.elapsedNow().inWholeNanoseconds / 1e9
-      @Suppress("DEPRECATION")
-      val seederThreads = seeds.flatMap { it.threads }.map { it.id }.toLongArray()
-      val seederCpu = threads.getThreadCpuTime(seederThreads).filter { it > 0 }.sum()
-      val seederAllocated = threads.getThreadAllocatedBytes(seederThreads).filter { it > 0 }.sum()
-      val cpu = os.processCpuTime - cpuBefore - seederCpu
-      val allocated = threads.totalThreadAllocatedBytes - allocatedBefore - seederAllocated
+      val cpuAfter = os.processCpuTime
+      val allocatedAfter = threads.totalThreadAllocatedBytes
+      val seedersAfter = seeds.map { it.usage() }
+      val seederCpu = seedersAfter.sumOf { it.cpuNanos } - seedersBefore.sumOf { it.cpuNanos }
+      val seederAllocated =
+        seedersAfter.sumOf { it.allocatedBytes } - seedersBefore.sumOf { it.allocatedBytes }
+      val cpu = cpuAfter - cpuBefore - seederCpu
+      val allocated = allocatedAfter - allocatedBefore - seederAllocated
       val complete = finished == TorrentSessionState.FINISHED
       check(finished != TorrentSessionState.STOPPED) {
         "Download stopped: ${session.failure.value?.stackTraceToString()}"

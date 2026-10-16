@@ -7,6 +7,7 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.IOException
+import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -33,9 +34,10 @@ internal class LoopbackSeeder(
   private val sockets = CopyOnWriteArrayList<Socket>()
   private val pieces = (length + pieceLength - 1) / pieceLength
   private val peerId = Random.nextBytes(20)
+  private val threads = ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean
 
-  /** Every thread the seeder ran, for their CPU time and allocation. */
-  val threads: MutableList<Thread> = CopyOnWriteArrayList()
+  /** Every thread the seeder ran, with what each spent once it ended. */
+  private val workers = CopyOnWriteArrayList<Worker>()
   @Volatile private var closed = false
 
   val port: Int get() = server.localPort
@@ -54,10 +56,53 @@ internal class LoopbackSeeder(
     }
   }
 
+  /** A seeder thread; its totals are kept once it ends, when the JVM no longer reports them. */
+  private class Worker {
+    lateinit var thread: Thread
+    @Volatile var cpuNanos = 0L
+    @Volatile var allocatedBytes = 0L
+    @Volatile var done = false
+  }
+
+  /** CPU time and heap allocation, in nanoseconds and bytes. */
+  class Usage(val cpuNanos: Long, val allocatedBytes: Long)
+
+  /** What every thread the seeder ran has spent so far, ended ones included. */
+  fun usage(): Usage {
+    var cpu = 0L
+    var allocated = 0L
+    for (worker in workers) {
+      if (!worker.done) {
+        @Suppress("DEPRECATION")
+        val id = worker.thread.id
+        val liveCpu = threads.getThreadCpuTime(id)
+        val liveAllocated = threads.getThreadAllocatedBytes(id)
+        // -1 once the thread ended, and by then it stored its totals.
+        if (liveCpu >= 0 && liveAllocated >= 0) {
+          cpu += liveCpu
+          allocated += liveAllocated
+          continue
+        }
+      }
+      cpu += worker.cpuNanos
+      allocated += worker.allocatedBytes
+    }
+    return Usage(cpu, allocated)
+  }
+
   private fun spawn(name: String, body: () -> Unit) {
-    val thread = Thread(body, name).apply { isDaemon = true }
-    threads += thread
-    thread.start()
+    val worker = Worker()
+    worker.thread = Thread({
+      try {
+        body()
+      } finally {
+        worker.cpuNanos = threads.currentThreadCpuTime
+        worker.allocatedBytes = threads.currentThreadAllocatedBytes
+        worker.done = true
+      }
+    }, name).apply { isDaemon = true }
+    workers += worker
+    worker.thread.start()
   }
 
   private sealed interface Out {
@@ -176,6 +221,6 @@ internal class LoopbackSeeder(
     closed = true
     server.close()
     sockets.forEach { it.close() }
-    threads.forEach { it.interrupt() }
+    workers.forEach { it.thread.interrupt() }
   }
 }
