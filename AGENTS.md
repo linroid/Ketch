@@ -103,7 +103,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `blocked`, `not-forwarded` or `unknown`, which unknown wire values decode as; the port, the
   NAT layers forwarding it, TCP peers that connected in and whether hole punching runs),
   `TorrentSnapshot` (`seeding`: meant to seed, the saved intent or a live seeding session; `null`
-  from older backends), `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
+  from older backends; `stall`: why a download makes no progress), `TorrentStall`
+  (`TorrentStallReason`: `missing-pieces`, `no-peers`, `choked`, `slow-peers` or `unknown`, which
+  unknown wire values decode as; the missing pieces and their files, the peers), `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
   `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
   `TorrentCommandException`, `TorrentPageRequest`, `TorrentFilePage`, `TorrentFileEntry`,
   `TorrentFileOrder` (wire names, each naming a `FileOrder`)
@@ -168,8 +170,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   internal, in sub-packages by concern:
 - `com.linroid.ketch.torrent.engine` -- `TorrentEngine`, `KotlinTorrentEngine`,
   `TorrentSession`, `KotlinTorrentSession`, session admission and registry, `TorrentActiveSlots`,
-  `TorrentRouteTable`, `TorrentAdvertisedPort`, the buffer and connection budgets and
-  `TorrentRateLimiter`
+  `TorrentRouteTable`, `TorrentAdvertisedPort`, the buffer and connection budgets (each v1
+  session's fair share of the transfer budget, `TorrentFairShares`; v1 peers' wire buffers apart,
+  `TorrentExchangeBudgets.peers`), `TorrentRateLimiter` and `TorrentStallWatchdog` (a stalled
+  download's reason and recoveries)
 - `com.linroid.ketch.torrent.metainfo` -- `Bencode`, `InfoHash`, `TorrentIdentity`
   (`V2InfoHash`), `TorrentMetadata`, `TorrentV2Info`, `TorrentV2Document`, piece layers, the
   hybrid and content layouts and the name rules (`TorrentNames.kt`: `validateTorrentComponent`,
@@ -702,6 +706,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
   peers again) until found or stopped. The apps show such a task as Starting, "Finding peers",
   and a preview that takes 2 minutes offers Keep waiting and Add anyway
+- Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or
+  no verified piece for four pieces' worth of time at its rate (1 to 10 minutes; time waiting on
+  speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no
+  connected peer or web seed has and their files, no peers, all choking, slow peers) the session
+  publishes (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm
+  summary). After a minute it reannounces to trackers (5, 10, up to 30 minutes apart), revives
+  peers it gave up on, and after two minutes relaunches dropped web seeds. The inspector says why
+  (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
+  its queue's time at its rate, 4 to 30 s) is asked of another peer with room, and the endgame
+  starts once every unopened piece is one no source has
 - Verified selected-file storage, ownership journal, restart rehash, live limits, and upload and
   seeding (`[torrent] upload`, while downloading by default in the apps, the CLI and the server;
   the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so)

@@ -132,7 +132,7 @@ Log messages keep the names of Ketch's API types and of exceptions, and the CLI 
 | A resume restarts from zero | `ETag mismatch`, `Last-Modified mismatch` or `Local file integrity check failed` |
 | A task stays queued | `[DownloadQueue]` lines showing the concurrency and per-host limits |
 | A magnet never resolves | `Fetching metadata for magnet` repeating, tracker announce failures and DHT contacts; at debug, `Metadata for magnet ... not found within` after each 2-minute round |
-| A torrent stays at 0% | The [swarm summary](#torrent-swarm-summaries): `discovered=0` points at trackers or DHT (`lsd=0` while a device on the LAN shares it: local discovery is off or multicast is blocked), `connected=0` at reachability, `corrupt>0` at bad peers, `webSeedFailures` at mirrors |
+| A torrent stays at 0% or 99% | The [swarm summary](#torrent-swarm-summaries), which ends with `stall:` and why once it stops making progress: `discovered=0` points at trackers or DHT (`lsd=0` while a device on the LAN shares it: local discovery is off or multicast is blocked), `connected=0` at reachability, `corrupt>0` at bad peers, `webSeedFailures` at mirrors |
 | A remote instance is offline | `[RemoteKetch] Connection to ... failed (attempt n)` or `rejected the API token` |
 
 Task-scoped messages include `taskId=`, so you can follow one download with `grep`.
@@ -208,6 +208,12 @@ supporting uTP or preferring encryption, and how many of those failed.
 A v1 swarm that runs out of peers logs this at info. A v2 or hybrid swarm, which keeps waiting for
 discovery, logs it at info each time every peer it tried is gone and none is left to dial, at most
 once per 30 seconds.
+
+A swarm that [stopped making progress](torrent.md#when-a-download-stops-making-progress) ends the
+line with `stall:` and why (`missing-pieces`, `no-peers`, `choked`, `slow-peers` or `unknown`), for
+how long, the missing pieces and the files they belong to, and the peers connected and unchoking
+it. Each change of reason logs one line at info (`stalled: …`, `makes progress again`), as does each
+recovery it tries (`reannounce`, `revive_peers`, `relaunch_web_seeds`).
 
 ## Log format
 

@@ -669,14 +669,18 @@ reachable peer. A magnet's metadata still comes from peers.
   torrent's URL names the folder holding the torrent's folder; each file is fetched from the URL,
   the torrent name and the file's path, percent-encoded.
 - Each seed fetches runs of whole pieces no one else is fetching, up to 16 pieces or 4 MiB, with
-  one range request per file a run spans, and no more than its share of the free pieces. Later
-  pieces of a run only use buffers that leave half the buffer limit free.
+  one range request per file a run spans, and no more than its share of the free pieces. Once the
+  first request of a run is answered, the others go out four at a time. Later pieces of a run only
+  use buffers that leave half the buffer limit free.
 - Each piece is checked as it arrives, like a peer's: SHA-1 for v1, the piece layer for v2 and
   hybrid. BEP 47 padding files are never requested.
 - In the endgame a seed may fetch one piece a peer is fetching; the first verified copy wins.
-- A failed request or corrupt piece keeps the pieces stored before it, gives back the rest and
-  backs the seed off (2 seconds, doubling to a minute). Five failures in a row drop it until the
-  task runs again.
+- A failed request or corrupt piece keeps the pieces stored before it and gives back the rest. A
+  file the seed answers with 404, 410, 416 or another range than asked, and a piece it sends
+  corrupt twice, it no longer fetches: the seed goes on with the rest of the torrent, as when a
+  mirror has since changed one file. Other failures back it off (2 seconds, doubling to a minute).
+  Five failed runs in a row without a verified piece drop it, as does having nothing left it can
+  serve before it served anything; a download that stalls starts dropped seeds again.
 - Requests go through the source's HTTP engine with the system's proxy settings, count against the
   download limits, fail after 30 seconds without data, and show among the task's live connections
   as `HTTP`.
@@ -719,10 +723,36 @@ limits, and such reads take at most half of a limit.
   another piece needs it, and after a minute in any case.
 - A piece that fails its hash check is fetched again. When several peers had sent it, one peer
   fetches it alone next, so a peer that keeps sending bad data is found and disconnected.
-- Once every wanted piece is being fetched, a peer with nothing else to do also asks for blocks
-  another peer owes, and the first copy to arrive cancels the other.
+- A block a peer has not delivered within twice the time its queue takes at its rate (4 to 30
+  seconds) is late: a peer with room asks for it too, so a slow peer never holds the download up.
+  Once every wanted piece left is being fetched or is one no connected peer or web seed has, a peer
+  with nothing else to do asks for any block another peer owes. A block has at most two
+  requesters, and the first copy to arrive cancels the other.
 - Ketch tells a peer it is interested only while the peer has a piece Ketch still wants. Once Ketch
   has every piece, it closes connections to peers that have every piece too.
+
+### When a download stops making progress
+
+Each download checks itself every second. It has stalled once no payload arrived for 30 seconds,
+or no piece verified for four pieces' worth of time at its rate (between one and ten minutes);
+time spent waiting on a speed limit never counts. It then says why, in the most telling order:
+
+- **Missing pieces**: wanted pieces that no connected peer or web seed has, and the files they
+  belong to. The download waits for a peer that has them; skipping those files lets the rest
+  finish. A torrent whose files changed at its only web seed stops here.
+- **No peers**: no peer is connected and no web seed is fetching.
+- **Choked**: peers are connected, but none of them lets Ketch download yet.
+- **Slow peers**: peers are late with what was asked of them, which other peers are then asked
+  for too.
+
+Once a stall has lasted a minute, the download announces to its trackers again (then after 5, 10
+and up to 30 minutes), dials again the peers it gave up on, and after two minutes starts its
+dropped web seeds again. The apps' inspector shows the reason under a downloading torrent, with
+Skip file when pieces are missing. `TorrentSnapshot.stall` carries it (`TorrentStall`: the reason,
+how long, the missing pieces and their files, and the peers), as do REST snapshots, the event
+stream and `RemoteKetch`; an unknown reason decodes as `unknown`. The swarm summary in the
+[logs](logging.md#torrent-swarm-summaries) ends with `stall: …`, and each change of reason logs at
+info.
 
 ### Fast extension
 
