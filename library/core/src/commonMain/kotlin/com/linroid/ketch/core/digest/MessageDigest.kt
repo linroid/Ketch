@@ -3,7 +3,8 @@ package com.linroid.ketch.core.digest
 import com.linroid.ketch.api.ChecksumAlgorithm
 
 /**
- * An incremental hash function, written in pure Kotlin so it runs on every target the engine
+ * An incremental hash function. [newDigest] gives the platform's implementation where it has one;
+ * [Md5], [Sha1], [Sha256] and [Sha512] are pure Kotlin and run on every target the engine
  * supports. Instances are confined to one owner and cannot be updated after [digest].
  */
 interface MessageDigest {
@@ -23,13 +24,23 @@ interface MessageDigest {
   fun digest(): ByteArray
 }
 
-/** A new, empty [MessageDigest] of this algorithm. */
-fun ChecksumAlgorithm.newDigest(): MessageDigest = when (this) {
+/**
+ * A new, empty [MessageDigest] of this algorithm: the platform's (`java.security.MessageDigest` on
+ * the JVM and Android, CommonCrypto on iOS), which is several times faster, else the pure Kotlin
+ * one.
+ */
+fun ChecksumAlgorithm.newDigest(): MessageDigest = platformDigest(this) ?: pureDigest()
+
+/** The pure Kotlin [MessageDigest] of this algorithm, which every target has. */
+internal fun ChecksumAlgorithm.pureDigest(): MessageDigest = when (this) {
   ChecksumAlgorithm.MD5 -> Md5()
   ChecksumAlgorithm.SHA_1 -> Sha1()
   ChecksumAlgorithm.SHA_256 -> Sha256()
   ChecksumAlgorithm.SHA_512 -> Sha512()
 }
+
+/** The platform's implementation of [algorithm], or null where it has none. */
+internal expect fun platformDigest(algorithm: ChecksumAlgorithm): MessageDigest?
 
 /** Checks [offset] and [count] against [data] as every [MessageDigest.update] does. */
 internal fun checkRange(data: ByteArray, offset: Int, count: Int) {

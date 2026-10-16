@@ -7,7 +7,7 @@ package com.linroid.ketch.torrent.crypto
  */
 internal class TorrentMerkleRoot(private val fileLength: Long) {
   private val frontier = TorrentMerkleFrontier()
-  private var blockHash = Sha256()
+  private var blockHash = newSha256()
   private var blockBytes = 0
   private var received = 0L
   private var finished = false
@@ -32,7 +32,7 @@ internal class TorrentMerkleRoot(private val fileLength: Long) {
       remaining -= size
       if (blockBytes == BLOCK_BYTES) {
         frontier.append(blockHash.digest())
-        blockHash = Sha256()
+        blockHash = newSha256()
         blockBytes = 0
       }
     }

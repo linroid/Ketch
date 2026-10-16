@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent.metainfo
 
-import com.linroid.ketch.torrent.crypto.Sha256
+import com.linroid.ketch.torrent.crypto.newSha256
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import okio.ByteString.Companion.toByteString
 import kotlin.test.Test
@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class TorrentPieceLayersTest {
   private val hashes = listOf(sha256Digest(ByteArray(16_384)), sha256Digest(byteArrayOf(1)))
-  private val root = Sha256().update(hashes[0]).update(hashes[1]).digest().toByteString()
+  private val root = newSha256().update(hashes[0]).update(hashes[1]).digest().toByteString()
   private val layer = (hashes[0] + hashes[1]).toByteString()
   private val info = TorrentV2Info.parse(Bencode.encode(mapOf(
     "meta version" to 2L, "piece length" to 16_384L,

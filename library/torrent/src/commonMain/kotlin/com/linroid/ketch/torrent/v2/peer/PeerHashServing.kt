@@ -1,7 +1,7 @@
 package com.linroid.ketch.torrent.v2.peer
 
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.torrent.crypto.Sha256
+import com.linroid.ketch.torrent.crypto.newSha256
 import com.linroid.ketch.torrent.crypto.TorrentMerkleRoot
 import com.linroid.ketch.torrent.crypto.merkleZeroHash
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -267,7 +267,7 @@ internal class TorrentV2HashServer(
   }
 
   private fun pairs(row: List<ByteArray>, level: Int): List<ByteArray> =
-    row.chunked(2) { Sha256().update(it[0]).update(it.getOrNull(1) ?: merkleZeroHash(level))
+    row.chunked(2) { newSha256().update(it[0]).update(it.getOrNull(1) ?: merkleZeroHash(level))
       .digest() }
 
   /** The file's cached levels from [from] to its root, built and admitted on first use. */
@@ -374,7 +374,7 @@ internal class TorrentV2HashServer(
         var row = (0 until leaves).map { offset ->
           val start = offset * TorrentMerkleRoot.BLOCK_BYTES
           if (firstBlock + offset >= bounds.blocks || start >= bytes.size) merkleZeroHash(0)
-          else Sha256().update(bytes, start,
+          else newSha256().update(bytes, start,
             minOf(TorrentMerkleRoot.BLOCK_BYTES, bytes.size - start)).digest()
         }
         buildList {

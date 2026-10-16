@@ -113,6 +113,36 @@ KETCH_TORRENT_BENCHMARK=1 ./gradlew :library:torrent:jvmTest --tests '*TorrentBe
 The method, settings and reporting rules are in
 [the benchmark notes](../../test-fixtures/torrent/BENCHMARK.md).
 
+### v1 download throughput
+
+`V1ThroughputTest` measures how fast one engine downloads a v1 torrent, and the CPU it spends,
+without an external client. A `KotlinTorrentEngine` with the default buffer limits downloads from
+`LoopbackSeeder`s in the same JVM: memory-backed seeds on plain threads that answer each request
+after an optional delay, which the engine sees as the round trip. Uploads, DHT, uTP, encryption,
+local discovery and port mapping are off, so only the download path is measured, and the seeders'
+own threads are subtracted from the CPU time and allocation. One warm-up download runs first.
+
+```sh
+KETCH_TORRENT_THROUGHPUT=1 KETCH_THROUGHPUT_LABEL="$(git rev-parse --short HEAD)" \
+  ./gradlew :library:torrent:jvmTest --tests '*V1ThroughputTest'
+```
+
+| Variable | Meaning |
+| --- | --- |
+| `KETCH_TORRENT_THROUGHPUT` | `1` includes the test; otherwise it is left out |
+| `KETCH_THROUGHPUT_PIECES` | Piece lengths in bytes (default 16 KiB, 256 KiB, 4 MiB and 16 MiB) |
+| `KETCH_THROUGHPUT_RTT_MS` | Emulated round trips (default `0,50`) |
+| `KETCH_THROUGHPUT_SEEDERS` | Seeders, each with every piece (default 4) |
+| `KETCH_THROUGHPUT_BYTES` | Payload without a round trip (default 256 MiB) |
+| `KETCH_THROUGHPUT_DELAYED_BYTES` | Payload with one (default 64 MiB) |
+| `KETCH_THROUGHPUT_RUNS` | Runs per row (default 3) |
+| `KETCH_THROUGHPUT_LABEL` | The report's first column |
+| `KETCH_THROUGHPUT_REPORT` | Markdown table appended to (default `build/reports/torrent-throughput.md`) |
+
+Each row reports the median rate with its range, the CPU seconds and bytes allocated per GiB
+downloaded, and GC time. CPU time includes the JIT and garbage collector. Loopback has no
+bandwidth limit, so rows without a round trip show what the engine's own work allows.
+
 ### Session state memory
 
 `TorrentSessionMemoryTest` checks that session admission (`TorrentConfig.maxSessionStateBytes`)

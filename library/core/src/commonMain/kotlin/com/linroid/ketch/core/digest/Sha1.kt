@@ -1,5 +1,7 @@
 package com.linroid.ketch.core.digest
 
+import com.linroid.ketch.api.ChecksumAlgorithm
+
 /**
  * Incremental SHA-1 (FIPS 180-4), used for BitTorrent v1 identity and piece integrity and for
  * [com.linroid.ketch.api.ChecksumAlgorithm.SHA_1] checksums. Instances are confined to one owner
@@ -86,4 +88,5 @@ class Sha1 : MessageDigest {
 }
 
 /** Returns the 20-byte SHA-1 digest of [data]. */
-fun sha1Digest(data: ByteArray): ByteArray = Sha1().update(data).digest()
+fun sha1Digest(data: ByteArray): ByteArray =
+  ChecksumAlgorithm.SHA_1.newDigest().update(data).digest()

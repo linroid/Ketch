@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent.mse
 
-import com.linroid.ketch.torrent.crypto.Sha1
+import com.linroid.ketch.torrent.crypto.newSha1
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentConnection
 import kotlinx.coroutines.async
@@ -135,7 +135,7 @@ class MseHandshakeTest {
       val keys = MseKeyPair()
       link.a.write(keys.publicKey)
       val secret = keys.agree(link.a.readExactly(96))
-      fun hash(label: String, vararg parts: ByteArray) = Sha1().update(label.encodeToByteArray())
+      fun hash(label: String, vararg parts: ByteArray) = newSha1().update(label.encodeToByteArray())
         .also { digest -> parts.forEach { digest.update(it) } }.digest()
       val encrypt = Rc4(hash("keyA", secret, skey), 1024)
       val req2 = hash("req2", skey)

@@ -97,11 +97,13 @@ tasks.withType<Test>().configureEach {
   // Required evidence must describe this execution, not restored/cached XML from an earlier run.
   val benchmark = providers.environmentVariable("KETCH_TORRENT_BENCHMARK").orNull == "1"
   val measuring = providers.environmentVariable("KETCH_TORRENT_MEMORY").orNull == "1"
+  val throughput = providers.environmentVariable("KETCH_TORRENT_THROUGHPUT").orNull == "1"
   val publicSwarm = providers.gradleProperty("publicTorrentTests").orNull == "true"
   inputs.property("publicTorrentTests", publicSwarm)
   val surveying = !providers.environmentVariable("KETCH_TORRENT_SURVEY").orNull.isNullOrBlank()
-  outputs.upToDateWhen { !conformance && !benchmark && !measuring && !publicSwarm && !surveying }
-  outputs.cacheIf { !conformance && !benchmark && !measuring && !publicSwarm && !surveying }
+  val opted = conformance || benchmark || measuring || publicSwarm || surveying || throughput
+  outputs.upToDateWhen { !opted }
+  outputs.cacheIf { !opted }
   if (!publicSwarm) filter.excludeTestsMatching("*PublicSwarmTest")
   if (!surveying) filter.excludeTestsMatching("*PeerSurveyTest")
   if (!conformance && providers.environmentVariable("TRANSMISSION_DAEMON").orNull.isNullOrBlank()) {
@@ -111,11 +113,16 @@ tasks.withType<Test>().configureEach {
     filter.excludeTestsMatching("*TorrentBenchmarkTest")
   }
   if (!measuring) filter.excludeTestsMatching("*TorrentSessionMemoryTest")
+  // The throughput payload is held in memory beside the engine's buffers.
+  if (throughput) maxHeapSize = "2g" else filter.excludeTestsMatching("*V1ThroughputTest")
   for (name in listOf("TRANSMISSION_DAEMON", "KETCH_TORRENT_BENCHMARK",
     "KETCH_NATIVE_CLI", "KETCH_JVM_CLI", "KETCH_BENCHMARK_BYTES", "KETCH_BENCHMARK_RUNS",
     "KETCH_BENCHMARK_REVISION", "KETCH_BENCHMARK_REPORT", "KETCH_TORRENT_MEMORY",
     "KETCH_TORRENT_MEMORY_REPORT", "KETCH_TORRENT_SURVEY", "KETCH_TORRENT_SURVEY_MINUTES",
-    "KETCH_TORRENT_SURVEY_LOG", "KETCH_TORRENT_SURVEY_ENCRYPTION")) {
+    "KETCH_TORRENT_SURVEY_LOG", "KETCH_TORRENT_SURVEY_ENCRYPTION", "KETCH_TORRENT_THROUGHPUT",
+    "KETCH_THROUGHPUT_PIECES", "KETCH_THROUGHPUT_RTT_MS", "KETCH_THROUGHPUT_SEEDERS",
+    "KETCH_THROUGHPUT_BYTES", "KETCH_THROUGHPUT_DELAYED_BYTES", "KETCH_THROUGHPUT_RUNS",
+    "KETCH_THROUGHPUT_LABEL", "KETCH_THROUGHPUT_REPORT")) {
     val value = providers.environmentVariable(name).orElse("")
     inputs.property(name, value)
     environment(name, value.get())

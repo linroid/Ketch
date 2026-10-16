@@ -29,11 +29,11 @@ internal fun verifyTorrentMerkleBlock(
     val siblingStart = ((blockIndex shr level) xor 1L) shl level
     if (siblingStart >= blockCount && !sibling.contentEquals(zero)) return false
     hash = if (((blockIndex shr level) and 1L) == 0L) {
-      Sha256().update(hash).update(sibling).digest()
+      newSha256().update(hash).update(sibling).digest()
     } else {
-      Sha256().update(sibling).update(hash).digest()
+      newSha256().update(sibling).update(hash).digest()
     }
-    zero = Sha256().update(zero).update(zero).digest()
+    zero = newSha256().update(zero).update(zero).digest()
   }
   return hash.contentEquals(expectedRoot)
 }

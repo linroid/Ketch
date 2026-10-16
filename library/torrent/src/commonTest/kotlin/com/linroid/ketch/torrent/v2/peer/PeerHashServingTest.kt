@@ -1,7 +1,7 @@
 package com.linroid.ketch.torrent.v2.peer
 
 import com.linroid.ketch.torrent.TorrentV2Fixture
-import com.linroid.ketch.torrent.crypto.Sha256
+import com.linroid.ketch.torrent.crypto.newSha256
 import com.linroid.ketch.torrent.crypto.merkleZeroHash
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
@@ -164,7 +164,7 @@ class PeerHashServingTest {
     assertEquals(expected(0, selector), hashes)
     assertTrue(verifies(0, selector, hashes))
     // A zero subtree is the hash of two zero subtrees one level down.
-    assertContentEquals(Sha256().update(merkleZeroHash(4)).update(merkleZeroHash(4)).digest(),
+    assertContentEquals(newSha256().update(merkleZeroHash(4)).update(merkleZeroHash(4)).digest(),
       merkleZeroHash(5))
     server.close()
   }

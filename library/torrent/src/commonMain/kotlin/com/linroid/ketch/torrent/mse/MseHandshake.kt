@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent.mse
 
-import com.linroid.ketch.torrent.crypto.Sha1
+import com.linroid.ketch.torrent.crypto.newSha1
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.net.PrefixedConnection
 import com.linroid.ketch.torrent.net.TorrentConnection
@@ -179,7 +179,7 @@ internal object MseHandshake {
   }
 
   internal fun hash(label: String, vararg parts: ByteArray): ByteArray {
-    val digest = Sha1().update(label.encodeToByteArray())
+    val digest = newSha1().update(label.encodeToByteArray())
     parts.forEach { digest.update(it) }
     return digest.digest()
   }

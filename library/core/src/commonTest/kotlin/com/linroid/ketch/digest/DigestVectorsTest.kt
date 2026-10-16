@@ -2,14 +2,26 @@ package com.linroid.ketch.digest
 
 import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.core.digest.Md5
+import com.linroid.ketch.core.digest.MessageDigest
 import com.linroid.ketch.core.digest.Sha512
 import com.linroid.ketch.core.digest.newDigest
+import com.linroid.ketch.core.digest.pureDigest
+import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** Known answers from RFC 1321 (MD5) and FIPS 180 (SHA-1, SHA-512), for whole and split input. */
+/**
+ * Known answers from RFC 1321 (MD5) and FIPS 180 (SHA-1, SHA-512), for whole and split input, from
+ * both the digests [newDigest] gives (the platform's where it has them) and the pure Kotlin ones.
+ */
 class DigestVectorsTest {
+  private val factories = listOf<Pair<String, (ChecksumAlgorithm) -> MessageDigest>>(
+    "platform" to { it.newDigest() },
+    "pure" to { it.pureDigest() },
+  )
+
   @Test
   fun md5_rfc1321Vectors() {
     check(
@@ -63,16 +75,39 @@ class DigestVectorsTest {
         "de0ff244877ea60a4cb0432ce577c31beb009c5c2c49aa2e4eadb217ad8cc09b",
     )
     val block = ByteArray(1000) { 'a'.code.toByte() }
-    for ((algorithm, hex) in expected) {
-      val digest = algorithm.newDigest()
-      repeat(1000) { digest.update(block) }
-      assertEquals(hex, digest.digest().hex(), algorithm.label)
+    for ((name, factory) in factories) {
+      for ((algorithm, hex) in expected) {
+        val digest = factory(algorithm)
+        repeat(1000) { digest.update(block) }
+        assertEquals(hex, digest.digest().hex(), "$name ${algorithm.label}")
+      }
+    }
+  }
+
+  @Test
+  fun platformDigests_matchPureKotlinOnRandomSplits() {
+    val random = Random(162)
+    for (algorithm in ChecksumAlgorithm.entries) {
+      repeat(20) {
+        val data = random.nextBytes(random.nextInt(0, 3000))
+        val platform = algorithm.newDigest()
+        val pure = algorithm.pureDigest()
+        var offset = 0
+        while (offset < data.size) {
+          val count = random.nextInt(0, data.size - offset + 1)
+          platform.update(data, offset, count)
+          pure.update(data, offset, count)
+          offset += count
+        }
+        assertContentEquals(pure.digest(), platform.digest(), "${algorithm.label} of ${data.size}")
+      }
     }
   }
 
   @Test
   fun finishedOrInvalidRange_throws() {
-    for (digest in listOf(Md5(), Sha512())) {
+    val digests = listOf(Md5(), Sha512()) + ChecksumAlgorithm.entries.map { it.newDigest() }
+    for (digest in digests) {
       assertFailsWith<IllegalArgumentException> { digest.update(ByteArray(4), 3, 2) }
       digest.digest()
       assertFailsWith<IllegalStateException> { digest.digest() }
@@ -82,14 +117,16 @@ class DigestVectorsTest {
 
   /** Checks every vector whole and split at every byte, across the padding boundaries. */
   private fun check(algorithm: ChecksumAlgorithm, vararg vectors: Pair<String, String>) {
-    for ((input, expected) in vectors) {
-      val bytes = input.encodeToByteArray()
-      assertEquals(expected, algorithm.newDigest().update(bytes).digest().hex(), input)
-      for (split in 0..bytes.size) {
-        val digest = algorithm.newDigest()
-          .update(bytes, 0, split)
-          .update(bytes, split, bytes.size - split)
-        assertEquals(expected, digest.digest().hex(), "$input split at $split")
+    for ((name, factory) in factories) {
+      for ((input, expected) in vectors) {
+        val bytes = input.encodeToByteArray()
+        assertEquals(expected, factory(algorithm).update(bytes).digest().hex(), "$name $input")
+        for (split in 0..bytes.size) {
+          val digest = factory(algorithm)
+            .update(bytes, 0, split)
+            .update(bytes, split, bytes.size - split)
+          assertEquals(expected, digest.digest().hex(), "$name $input split at $split")
+        }
       }
     }
   }

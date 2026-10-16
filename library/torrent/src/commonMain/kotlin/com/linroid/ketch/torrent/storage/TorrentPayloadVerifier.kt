@@ -1,7 +1,7 @@
 package com.linroid.ketch.torrent.storage
 
-import com.linroid.ketch.torrent.crypto.Sha1
-import com.linroid.ketch.torrent.crypto.Sha256
+import com.linroid.ketch.torrent.crypto.newSha1
+import com.linroid.ketch.torrent.crypto.newSha256
 import com.linroid.ketch.torrent.crypto.TorrentMerkleRoot
 import com.linroid.ketch.torrent.crypto.merkleZeroHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
@@ -49,7 +49,7 @@ internal class TorrentPayloadVerifier(private val document: TorrentV2Document) {
     private val expectedV1: ByteArray?,
   ) {
     private val merkle = TorrentMerkleRoot(payloadLength)
-    private val sha1 = expectedV1?.let { Sha1() }
+    private val sha1 = expectedV1?.let { newSha1() }
     private var received = 0L
     private var finished = false
 
@@ -77,7 +77,7 @@ internal class TorrentPayloadVerifier(private val document: TorrentV2Document) {
       // A short last piece is padded with zero subtrees up to a whole piece's height.
       val targetBlocks = (treeLength - 1) / TorrentMerkleRoot.BLOCK_BYTES + 1
       while (blocks < targetBlocks) {
-        hash = Sha256().update(hash).update(merkleZeroHash(level)).digest()
+        hash = newSha256().update(hash).update(merkleZeroHash(level)).digest()
         level++
         blocks *= 2
       }

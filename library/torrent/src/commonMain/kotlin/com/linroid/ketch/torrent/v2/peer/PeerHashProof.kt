@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent.v2.peer
 
-import com.linroid.ketch.torrent.crypto.Sha256
+import com.linroid.ketch.torrent.crypto.newSha256
 import com.linroid.ketch.torrent.crypto.TorrentMerkleFrontier
 import com.linroid.ketch.torrent.crypto.TorrentMerkleRoot
 import okio.ByteString
@@ -26,7 +26,7 @@ internal fun verifyPeerHashes(
   val uncles = requested.hashCount - requested.length
 
   fun parent(left: ByteArray, right: ByteArray): ByteArray =
-    Sha256().update(left).update(right).digest()
+    newSha256().update(left).update(right).digest()
   fun hash(index: Int): ByteArray = response.hashes.substring(index * 32, (index + 1) * 32)
     .toByteArray()
 

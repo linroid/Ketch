@@ -1,5 +1,7 @@
 package com.linroid.ketch.core.digest
 
+import com.linroid.ketch.api.ChecksumAlgorithm
+
 /**
  * Incremental SHA-256 for BitTorrent v2 identity and Merkle integrity and for
  * [com.linroid.ketch.api.ChecksumAlgorithm.SHA_256] checksums.
@@ -125,4 +127,5 @@ class Sha256 : MessageDigest {
 }
 
 /** Returns the 32-byte SHA-256 digest of [data] without retaining the input. */
-fun sha256Digest(data: ByteArray): ByteArray = Sha256().update(data).digest()
+fun sha256Digest(data: ByteArray): ByteArray =
+  ChecksumAlgorithm.SHA_256.newDigest().update(data).digest()

@@ -2,7 +2,7 @@ package com.linroid.ketch.torrent.storage
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.torrent.TorrentDispatchers
-import com.linroid.ketch.torrent.crypto.Sha1
+import com.linroid.ketch.torrent.crypto.newSha1
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -385,7 +385,7 @@ internal class TorrentPieceStore(
 
   private fun sidecarMatches(index: Int, path: Path, chunk: ByteArray): Boolean = try {
     val size = pieceSize(index)
-    val digest = Sha1()
+    val digest = newSha1()
     fileSystem.openReadOnly(path).use { handle ->
       var done = 0
       while (done < size) {
@@ -865,7 +865,7 @@ internal class TorrentPieceStore(
     chunk: ByteArray,
     inPlace: (Int) -> Boolean = materialized::contains,
   ): Boolean {
-    val digest = Sha1()
+    val digest = newSha1()
     var hashed = 0
     forEachStoredSpan(index, inPlace) { handle, offset, targetOffset, count ->
       check(targetOffset == hashed) { "Piece spans are not contiguous" }

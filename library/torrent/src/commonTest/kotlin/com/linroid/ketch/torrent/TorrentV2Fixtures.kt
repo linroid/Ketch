@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent
 
-import com.linroid.ketch.torrent.crypto.Sha256
+import com.linroid.ketch.torrent.crypto.newSha256
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -143,7 +143,7 @@ internal class TorrentV2Fixture(
       }
       val levels = mutableListOf(row)
       while (row.size > 1) {
-        row = row.chunked(2).map { Sha256().update(it[0]).update(it[1]).digest() }
+        row = row.chunked(2).map { newSha256().update(it[0]).update(it[1]).digest() }
         levels += row
       }
       return levels

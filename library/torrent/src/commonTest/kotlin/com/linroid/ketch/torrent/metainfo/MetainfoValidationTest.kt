@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent.metainfo
 
-import com.linroid.ketch.torrent.crypto.Sha1
+import com.linroid.ketch.torrent.crypto.newSha1
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.magnet.MagnetUri
 import okio.ByteString.Companion.toByteString
@@ -21,10 +21,10 @@ class MetainfoValidationTest {
     for (split in 0..input.size) {
       assertEquals(
         "84983e441c3bd26ebaae4aa1f95129e5e54670f1",
-        hex(Sha1().update(input, 0, split).update(input, split).digest())
+        hex(newSha1().update(input, 0, split).update(input, split).digest())
       )
     }
-    val hash = Sha1()
+    val hash = newSha1()
     repeat(1000) { hash.update(ByteArray(1000) { 'a'.code.toByte() }) }
     assertEquals("34aa973cd4c4daa4f61eeb2bdbad27316534016f", hex(hash.digest()))
   }

@@ -130,9 +130,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
   `sanitizeFileName()`, `OutputPathReservations`, `partialPathFor()` and
   `movePartialToFinal()` (`PartialFiles.kt`), `DestinationPathPolicy`, `PathRejectedException`
-- `com.linroid.ketch.core.digest` -- `MessageDigest`, `Md5`, `Sha1`, `Sha256`, `Sha512`,
-  `ChecksumAlgorithm.newDigest()`: pure Kotlin hashes on every engine target, shared by checksum
-  verification and `library:torrent`
+- `com.linroid.ketch.core.digest` -- `MessageDigest`, `Md5`, `Sha1`, `Sha256`, `Sha512` (pure
+  Kotlin, on every engine target) and `ChecksumAlgorithm.newDigest()`, which gives the platform's
+  digest where there is one (`platformDigest`, expect/actual: `java.security.MessageDigest` on the
+  JVM and Android, CommonCrypto on iOS except MD5) and the pure Kotlin one elsewhere; shared by
+  checksum verification and `library:torrent`
 - `com.linroid.ketch.core.task` -- `RealDownloadTask`, `TaskHandle`, `TaskController`,
   `TaskStore`, `InMemoryTaskStore`, `TaskRecord`, `TaskState`, `TaskControl` (selection
   generation, sharing intent and the command retry ledger; SQLite `control_json`, `5.sqm`),
@@ -174,7 +176,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent.magnet` -- `MagnetUri` and BEP 9 metadata lookup
   (`TorrentMetadataExchange`, `TorrentV2MetadataExchange`, `TorrentMetadataPeers`,
   `TorrentMetadataCache`)
-- `com.linroid.ketch.torrent.crypto` -- `Sha1` and `Sha256` (aliases of core's `digest` ones,
+- `com.linroid.ketch.torrent.crypto` -- `newSha1()` and `newSha256()` (core's `newDigest()`,
   `Digests`), the BEP 52 Merkle tree (`TorrentMerkleRoot`, `TorrentMerkleProof`,
   `TorrentMerkleFrontier`, `merkleZeroHash()`) and `torrentRandomBytes()`
 - `com.linroid.ketch.torrent.net` -- `TorrentNetwork`, `TorrentConnection` and `PeerEndpoint`
@@ -365,7 +367,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   completed task reports only the request's checksum (published ones are not saved). Applies to
   sources Ketch writes one file for (HTTP, FTP, HLS, DASH); `download` refuses it for sources
   that manage their own files. Listed as `KetchFeatures.CHECKSUM` (`download.checksum`). Hashes
-  are core's pure Kotlin `digest` package, which `library:torrent` uses too; `updater` verifies
+  come from core's `digest` package (the platform's where it has them), which `library:torrent`
+  uses too; `updater` verifies
   release assets through `DownloadRequest.checksum`
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
   execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
