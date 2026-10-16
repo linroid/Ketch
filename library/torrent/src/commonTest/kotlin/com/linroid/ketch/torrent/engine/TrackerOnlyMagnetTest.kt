@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.engine
 
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentEncryption
@@ -114,15 +115,20 @@ class TrackerOnlyMagnetTest {
         val connection = listener.accept()
         try {
           val wire = PeerWire(connection)
-          wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
-          val hello = wire.read() as PeerMessage.Extended
-          assertEquals(null, Bencode.parse(hello.payload)["m"]?.get("ut_pex"))
+          val ours = wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true,
+            false))
+          val hello = Bencode.parse((wire.read() as PeerMessage.Extended).payload)
+          assertEquals(null, hello["m"]?.get("ut_pex"))
+          // The lookup names our client and tells the peer where it is seen (BEP 10).
+          assertEquals(TorrentClient.name, hello["v"]?.text())
+          assertContentEquals(byteArrayOf(127, 0, 0, 1), hello["yourip"]?.bytes)
           wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
             "m" to mapOf("ut_metadata" to 7L), "metadata_size" to metadata.infoBytes.size.toLong()
           ))))
           val request = wire.read() as PeerMessage.Extended
           assertEquals(7, request.id)
           wire.send(TorrentMetadataExchange.response(1, 0, metadata))
+          ours.peerId
         } finally { connection.close() }
       }
       try {
@@ -134,7 +140,14 @@ class TrackerOnlyMagnetTest {
           TorrentDiscoveryPrivacy.TRACKER_ONLY))
         assertTrue(resolved.isPrivate)
         assertContentEquals(metadata.infoBytes, resolved.infoBytes)
-        server.await()
+        // Trackers and metadata peers see the engine's one peer ID, which names Ketch (BEP 20).
+        val peerId = server.await()
+        assertTrue(peerId.decodeToString().startsWith(TorrentClient.peerIdPrefix))
+        val query = "&peer_id=" + peerId.joinToString("") {
+          "%" + (it.toInt() and 255).toString(16).padStart(2, '0')
+        } + "&"
+        val announces = requests.value.filter { "/announce?" in it }
+        assertTrue(announces.isNotEmpty() && announces.all { query in it })
         val expected = if (firstResult == "bad-peer") {
           listOf(PeerEndpoint("127.0.0.2", 9), listener.local)
         } else listOf(listener.local)

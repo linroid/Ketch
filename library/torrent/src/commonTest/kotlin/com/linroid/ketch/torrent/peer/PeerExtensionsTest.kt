@@ -1,8 +1,11 @@
 package com.linroid.ketch.torrent.peer
 
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.net.PeerEndpoint
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -31,6 +34,28 @@ class PeerExtensionsTest {
     assertNull(unbound["p"])
     assertNull(unbound["m"]?.get("ut_pex"))
     assertEquals(16L, unbound["reqq"]?.integer)
+  }
+
+  @Test
+  fun namesTheClientAndWhereThePeerIsSeen() {
+    fun handshake(host: String) = parse(PeerExtensions.handshake(utMetadata = false,
+      metadataSize = null, pex = false, listenPort = 6881, requestQueue = 16,
+      remote = PeerEndpoint(host, 51413)))
+    val ipv4 = handshake("203.0.113.7")
+    assertEquals(TorrentClient.name, ipv4["v"]?.text())
+    assertContentEquals(byteArrayOf(203.toByte(), 0, 113, 7), ipv4["yourip"]?.bytes)
+    // An IPv4-mapped peer is told its IPv4 address; an IPv6 one its 16 bytes.
+    assertContentEquals(byteArrayOf(203.toByte(), 0, 113, 7),
+      handshake("::ffff:203.0.113.7")["yourip"]?.bytes)
+    assertContentEquals(ByteArray(15) { if (it == 0) 0x20 else 0 } + byteArrayOf(1),
+      handshake("2000::1")["yourip"]?.bytes)
+    assertNull(handshake("peer.example")["yourip"])
+    // Metadata lookups name the client too, and say nothing of an unknown address.
+    val lookup = parse(PeerExtensions.handshake())
+    assertEquals(TorrentClient.name, lookup["v"]?.text())
+    assertNull(lookup["yourip"])
+    assertContentEquals(byteArrayOf(127, 0, 0, 1),
+      parse(PeerExtensions.handshake(remote = PeerEndpoint("127.0.0.1", 1)))["yourip"]?.bytes)
   }
 
   @Test

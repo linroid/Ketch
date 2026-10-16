@@ -362,6 +362,27 @@ SDK users can also resolve a torrent as **tracker-only**: it uses only the track
 when the torrent is public (see [discovery privacy](#choosing-discovery-privacy)). Trackers hear
 that a download completed only once every file is selected and complete.
 
+### How Ketch identifies itself
+
+Private trackers usually accept only the clients they list, which they recognize by the peer ID
+and the `User-Agent` of announces. Ketch names itself the same way everywhere:
+
+- **Peer ID** (BEP 20): `-KE`, four version characters and twelve random letters and digits, such
+  as `-KE0910-` for 0.9.1. The version characters are the major, minor and patch numbers (`A` for
+  10, and so on), then `0` for a release or `Z` for a pre-release or development build. `KT`, the
+  obvious code, is KTorrent's. One engine uses one peer ID for every tracker, peer and magnet
+  lookup until it stops.
+- **Extension handshake** (BEP 10): `v` is `Ketch 0.9.1`, and `yourip` tells the peer the address
+  Ketch sees it at.
+- **Tracker requests**: `User-Agent: Ketch/0.9.1`, whatever HTTP engine the source was given.
+
+A tracker that does not list Ketch refuses its announces. What the tracker says (`failure reason`,
+or a UDP tracker's error) is logged as a warning the first time and kept in the torrent's tracker
+status, and so is a `warning message`. Both are cleaned first: control characters are removed, the
+text is cut to 200 characters, URLs are reduced to `scheme://host:port`, and parts of the announce
+URL that could be a passkey, or any other long run of letters and digits, become `***`. Ask the
+tracker's staff to allow Ketch if it is refused.
+
 ## Platform support and limits
 
 - Torrents download on Android 8.0+ (API 26), JVM 11+ (desktop, CLI, server) and iOS (arm64 and
@@ -543,8 +564,9 @@ returns a controller that works over `/api/torrents` with servers listing `torre
 ### Logging
 
 Torrent logs reduce tracker URLs to `scheme://host:port` and magnets to their hash and name, and
-never log tracker passkeys. Avoid turning on URL logging in your own HTTP engine for private
-trackers. At debug level, each running torrent logs a summary every 30 seconds; see
+never log tracker passkeys. A tracker's reason for refusing an announce is logged at warn, cleaned
+as [above](#how-ketch-identifies-itself). Avoid turning on URL logging in your own HTTP engine for
+private trackers. At debug level, each running torrent logs a summary every 30 seconds; see
 [troubleshooting](logging.md#troubleshooting) for reading it when a torrent stalls.
 
 ## How it works

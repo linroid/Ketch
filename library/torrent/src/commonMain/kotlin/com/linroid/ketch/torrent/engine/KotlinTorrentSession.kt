@@ -2,10 +2,10 @@ package com.linroid.ketch.torrent.engine
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ConnectionReporter
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentUploadPolicy
-import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.monotonicClock
@@ -61,7 +61,7 @@ internal class KotlinTorrentSession(
   /** Read live: peers follow a change within a tick, and a seed finishes once it leaves SEED. */
   private val uploadPolicy: () -> TorrentUploadPolicy = { TorrentUploadPolicy.DISABLED },
   private val checkpoint: TorrentCheckpoint? = null,
-  private val peerId: ByteArray = torrentRandomBytes(20),
+  private val peerId: ByteArray = TorrentClient.peerId(),
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
   private val downloadThrottle: suspend (Int) -> Unit = {},
   /** The engine's upload bucket, shared by every torrent and applied before this one's. */

@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.engine
 
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.crypto.sha1Digest
@@ -117,6 +118,8 @@ class KotlinTorrentEngineRoutingTest {
             connection.write(header.copyOfRange(7, 68))
             val reply = PeerWire.decodeHandshake(connection.readExactly(68), metadata.infoHash)
             assertFalse(reply.peerId.contentEquals(local))
+            // The swarm answers with the engine's peer ID, which names Ketch (BEP 20).
+            assertTrue(reply.peerId.decodeToString().startsWith(TorrentClient.peerIdPrefix))
           } finally { connection.close() }
         } finally {
           remote.close()

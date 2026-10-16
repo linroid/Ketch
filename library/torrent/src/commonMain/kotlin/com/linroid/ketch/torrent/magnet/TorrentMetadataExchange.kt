@@ -1,8 +1,8 @@
 package com.linroid.ketch.torrent.magnet
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
-import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
@@ -30,6 +30,8 @@ internal class TorrentMetadataExchange(
   private val maxBytes: Int = 4 * 1024 * 1024,
   private val timeoutMs: Long = 30_000,
   private val budget: TorrentBufferBudget = TorrentBufferBudget(32 * 1024 * 1024),
+  /** Ours in the handshake: the engine's, as for every other peer. */
+  private val peerId: ByteString = TorrentClient.peerId().toByteString(),
 ) {
   init {
     require(maxBytes in 1..4 * 1024 * 1024 && timeoutMs > 0)
@@ -72,7 +74,7 @@ internal class TorrentMetadataExchange(
       connection = network.connectPeer(endpoint, identity.wireTag(mode))
       val workspace = TorrentBufferBudget(256 * 1024)
       val handshake = PeerIdentityHandshake(identity, extensions = true).initiate(connection,
-        mode, torrentRandomBytes(20).toByteString(), workspace)
+        mode, peerId, workspace)
       val wire = PeerWire(connection)
       require(handshake.extensions) {
         "Peer does not support metadata exchange"
@@ -84,7 +86,7 @@ internal class TorrentMetadataExchange(
         lease = budget.reserve(maxBytes * 4 + 256 * 1024)
         if (lease == null) delay(10)
       }
-      wire.send(PeerExtensions.handshake())
+      wire.send(PeerExtensions.handshake(remote = connection.remote))
       val extensions = PeerExtensions()
       var data: ByteArray? = null
       var received = BooleanArray(0)

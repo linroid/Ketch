@@ -1,6 +1,6 @@
 package com.linroid.ketch.torrent.v1
 
-import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.peer.PeerHandshake
@@ -35,7 +35,7 @@ internal class TorrentPeerDownloader(
     val connection = network.connect(endpoint)
     try {
       val wire = PeerWire(connection, metadata, idleTimeoutMs = 30_000)
-      val peerId = torrentRandomBytes(20)
+      val peerId = TorrentClient.peerId()
       val handshake = wire.handshake(PeerHandshake(metadata.infoHash, peerId, false, false))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
       val state = PeerProtocolState(store.pieceCount, maxPending = 1)

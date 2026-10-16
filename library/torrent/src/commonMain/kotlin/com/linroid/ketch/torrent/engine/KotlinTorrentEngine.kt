@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.engine
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.torrent.MAX_V2_PEERS
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentDispatchers
@@ -248,7 +249,8 @@ internal class KotlinTorrentEngine(
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
     exchangeBudgets.cache)
   private val tracker = TorrentTracker(http, network)
-  private val peerId = torrentRandomBytes(20)
+  // One peer ID for every peer, tracker and metadata lookup (BEP 20), as private trackers check.
+  private val peerId = TorrentClient.peerId()
   private val mutex = Mutex()
   private val dhtMutex = Mutex()
 
@@ -559,7 +561,8 @@ internal class KotlinTorrentEngine(
               fetchFromMetadataPeers("Metadata for $hash", peers, onPeer = { found = it },
                 onAsked = { asked = it }, skip = ::isOwnAddress) {
                 TorrentMetadataExchange(network, config.maxMetadataBytes,
-                  budget = exchangeBudgets.metadata).fetch(magnet.infoHash, it)
+                  budget = exchangeBudgets.metadata, peerId = peerId.toByteString())
+                  .fetch(magnet.infoHash, it)
               }
             } finally { discovery.cancel(); peers.cancel() }
           }
@@ -631,8 +634,8 @@ internal class KotlinTorrentEngine(
     }
     suspend fun fetch(endpoint: PeerEndpoint): ByteArray =
       TorrentV2MetadataExchange(network, config.maxMetadataBytes,
-        budget = exchangeBudgets.metadata).fetch(magnet.identity, endpoint, tiers, privacy,
-          magnet.webSeeds)
+        budget = exchangeBudgets.metadata, peerId = peerId.toByteString())
+        .fetch(magnet.identity, endpoint, tiers, privacy, magnet.webSeeds)
     if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       var attempts = 0
       while (isActive) {
@@ -698,7 +701,8 @@ internal class KotlinTorrentEngine(
             check(++attempts <= MAX_METADATA_PEERS) { "Metadata peer limit exceeded" }
             try {
               return TorrentMetadataExchange(network, config.maxMetadataBytes,
-                budget = exchangeBudgets.metadata).fetch(magnet.infoHash, endpoint, trackerTiers,
+                budget = exchangeBudgets.metadata, peerId = peerId.toByteString())
+                .fetch(magnet.infoHash, endpoint, trackerTiers,
                   TorrentDiscoveryPrivacy.TRACKER_ONLY)
             } catch (error: CancellationException) {
               if (!currentCoroutineContext().isActive) throw error

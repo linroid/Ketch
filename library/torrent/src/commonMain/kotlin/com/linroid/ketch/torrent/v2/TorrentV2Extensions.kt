@@ -51,6 +51,7 @@ internal class TorrentV2Extensions(
       pex = pex,
       listenPort = runtime.listenPortFor(info.link.remote),
       requestQueue = MAX_QUEUED_UPLOADS,
+      remote = info.link.remote,
     )
     return view.commands.trySend(PeerV2DownloadActor.Command.Send(handshake)).isSuccess
   }

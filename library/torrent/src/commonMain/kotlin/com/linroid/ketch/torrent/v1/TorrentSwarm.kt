@@ -2,9 +2,9 @@ package com.linroid.ketch.torrent.v1
 
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ConnectionReporter
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.TorrentUploadPolicy
-import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
@@ -95,7 +95,7 @@ internal class TorrentSwarm(
   private val store: TorrentPieceStore,
   private val network: TorrentNetwork,
   private val budget: TorrentBufferBudget,
-  private val peerId: ByteArray = torrentRandomBytes(20),
+  private val peerId: ByteArray = TorrentClient.peerId(),
   private val connections: () -> Int = { 20 },
   /**
    * The part of [budget] pieces read back for peers may hold, every session's together, so
@@ -713,7 +713,7 @@ internal class TorrentSwarm(
           utMetadata = servesMetadata(store.metadata.isPrivate, uploadPolicy()),
           metadataSize = store.metadata.infoBytes.size, pex = !trackerRestricted,
           listenPort = listenPortFor(connection.remote), requestQueue = REQUEST_QUEUE,
-          holepunch = holepunchOn(),
+          holepunch = holepunchOn(), remote = connection.remote,
         ))
       }
       advertised = store.verifiedPieces()

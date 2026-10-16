@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.magnet
 
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
@@ -17,6 +18,7 @@ import com.linroid.ketch.torrent.v2.peer.PeerHashSelector
 import com.linroid.ketch.torrent.v2.peer.PeerHashTransport
 import okio.Buffer
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 
 /** BEP 9 bounded metadata exchange, with four outstanding blocks and full hash verification. */
 internal class TorrentV2MetadataExchange(
@@ -24,6 +26,8 @@ internal class TorrentV2MetadataExchange(
   private val maxBytes: Int = 4 * 1024 * 1024,
   private val timeoutMs: Long = 30_000,
   private val budget: TorrentBufferBudget = TorrentBufferBudget(32 * 1024 * 1024),
+  /** Ours in the handshake: the engine's, as for every other peer. */
+  private val peerId: ByteString = TorrentClient.peerId().toByteString(),
 ) {
   init {
     require(maxBytes in 1..4 * 1024 * 1024 && timeoutMs > 0)
@@ -37,7 +41,7 @@ internal class TorrentV2MetadataExchange(
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
     /** A magnet's web seeds (`ws`), kept in the metainfo as its `url-list`. */
     webSeeds: List<String> = emptyList(),
-  ): ByteArray = TorrentMetadataExchange(network, maxBytes, timeoutMs, budget)
+  ): ByteArray = TorrentMetadataExchange(network, maxBytes, timeoutMs, budget, peerId)
     .fetchContent(identity, endpoint, trackerTiers, privacy) { connection, raw, workspace ->
       val info = TorrentV2Info.parse(raw, expectedIdentity = identity)
       if (info.privateTorrent && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {

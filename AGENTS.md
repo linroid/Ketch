@@ -162,8 +162,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `DownloadSource<TorrentSourceState>`; the state is opaque outside the module), `TorrentConfig`,
   `TorrentEncryption`, `TorrentUploadPolicy`, `TorrentDiscoveryPrivacy`, `TorrentMulticastLock`
   and `TrackerListState`; internal `TorrentSourceMetainfo` and the helpers every package uses
-  (`TorrentLog`, `monotonicClock()`, `TorrentDispatchers`). Everything else is internal, in
-  sub-packages by concern:
+  (`TorrentLog`, `monotonicClock()`, `TorrentDispatchers`, `TorrentClient`). Everything else is
+  internal, in sub-packages by concern:
 - `com.linroid.ketch.torrent.engine` -- `TorrentEngine`, `KotlinTorrentEngine`,
   `TorrentSession`, `KotlinTorrentSession`, session admission and registry, `TorrentActiveSlots`,
   `TorrentRouteTable`, `TorrentAdvertisedPort`, the buffer and connection budgets and
@@ -186,7 +186,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentPortMapper`), `.dht` (`DhtNode`, `DhtRpc`, `DhtRoutingTable`), `.tracker`
   (`TorrentTracker`, `TrackerDiscovery`, `TrackerList`, `PrivateTrackerGroup`) and `.lsd`
   (BEP 14: `TorrentLocalDiscovery`, with `LsdAnnounce`, `LsdTopic` and the `LsdTransport` that
-  `openLsdMulticast()` opens)
+  `openLsdMulticast()` opens); `.tracker` also has `TrackerMessage` (`trackerMessage()`,
+  `TrackerFailureException`)
 - `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
   `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
   (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`,
@@ -606,6 +607,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
+- Client identity, which private trackers check (`TorrentClient`): one BEP 20 peer ID per engine,
+  `-KE` plus four version characters from `KetchApi.VERSION` (`KT` is KTorrent's) and twelve
+  random letters and digits, used by the v1 swarm, v2 and hybrid connections, magnet metadata
+  peers and trackers; BEP 10 `v` (`Ketch <version>`) and `yourip` in every extension handshake;
+  `User-Agent: Ketch/<version>` on tracker announces and scrapes. A tracker's `failure reason`
+  (HTTP) or error (UDP) becomes `TrackerFailureException.reason` and `TrackerStatus.failureReason`,
+  its `warning message` `TrackerStatus.warning`, both through `trackerMessage()`: control and
+  formatting characters removed, URLs reduced to `trackerLabel`, possible passkeys from the
+  announce URL and other long letter-and-digit runs masked, at most 200 characters. Each is logged
+  at warn when it changes
 - DHT bootstrap routers are asked whatever address their names resolve to, reserved ranges such
   as 198.18.0.0/15 included; such a router only introduces nodes and never joins the routing
   table, while addresses learned from the network stay filtered. Peers of public torrents (v1,

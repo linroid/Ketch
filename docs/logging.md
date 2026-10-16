@@ -242,6 +242,7 @@ A magnet download (dates omitted, task IDs shortened):
 [INFO] [TorrentEngine] Fetching metadata for magnet 0123456789ab: privacy=PUBLIC, trackers=3, peers=0, timeout=2m
 [DEBUG] [TorrentTracker] Announce STARTED for 0123456789ab to udp://tracker.example:6969: peers=50, interval=1800s
 [DEBUG] [TorrentTracker] Announce STARTED for 0123456789ab to https://tracker2.example:443 failed (1 in a row): timed out
+[WARN] [TorrentTracker] Tracker https://tracker3.example:443 refused announce STARTED for 0123456789ab: Unregistered torrent
 [DEBUG] [TorrentEngine] IPv4 DHT bootstrap from 4 router(s) and 60 saved node(s): 112 contact(s)
 [INFO] [TorrentEngine] Fetched metadata for magnet 0123456789ab in 4.2s
 [INFO] [TorrentSource] Resolved torrent from magnet: 0123456789ab "ubuntu.iso", v1, files=1, totalBytes=6114656256
@@ -285,6 +286,9 @@ Logs are meant to be shared in bug reports, so Ketch keeps credentials out of th
   `Cookie`, `Set-Cookie` and `Authorization` response headers are logged as `***`.
 - **Tracker URLs** are reduced to `scheme://host:port`, including in error messages, because paths
   and queries carry private tracker passkeys.
+- **Tracker messages**, such as why a tracker refused an announce, lose their control characters
+  and are cut to 200 characters. URLs in them are reduced the same way, and the parts of the
+  announce URL that could be a passkey, or any other long run of letters and digits, become `***`.
 - **Proxies** are logged by their address (`Sending GET for ... through socks5://127.0.0.1:1080`),
   without credentials, and `Proxy.Manual` prints its password as `***`, as in `Config updated`.
 - **Torrent peer addresses** appear only in verbose per-peer lines and a few warnings about a peer's
