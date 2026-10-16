@@ -16,6 +16,7 @@ import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.IOException
 import okio.Path
+import okio.Path.Companion.toPath
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -98,6 +99,100 @@ class TorrentPieceStoreTest {
       assertEquals(1, slots.availablePermits)
       next.initialize()
       assertTrue(next.isInitialized())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  /** Pieces of 4: `abc` and a BEP 47 pad of 1 fill piece 0, `defg` is piece 1. */
+  private val padded = "abc".encodeToByteArray() + ByteArray(1) + "defg".encodeToByteArray()
+  private val paddedMetadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+    "name" to "pack", "piece length" to 4L,
+    "pieces" to (sha1Digest(padded.copyOfRange(0, 4)) + sha1Digest(padded.copyOfRange(4, 8))),
+    "files" to listOf(
+      mapOf("length" to 3L, "path" to listOf("a")),
+      mapOf("attr" to "p", "length" to 1L, "path" to listOf(".pad", "1")),
+      mapOf("length" to 4L, "path" to listOf("b"))
+    )
+  ))))
+
+  private fun temporaryRoot(): Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+    "ketch-piece-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+
+  @Test
+  fun padding_neverWrittenAndReadAsZeros() = runTest {
+    val root = temporaryRoot()
+    val store = TorrentPieceStore(paddedMetadata, root / "pack", emptySet(), "test")
+    try {
+      store.initialize()
+      assertEquals(setOf(0, 2), store.selectedIndices)
+      assertTrue(store.selectsAllFiles())
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, padded.copyOfRange(0, 4)))
+      assertEquals(CommitOutcome.VERIFIED, store.commit(1, padded.copyOfRange(4, 8)))
+      assertTrue(store.completed())
+      store.finish()
+      assertEquals(listOf("a", "b"),
+        torrentFileSystem.list(root / "pack").map { it.name }.sorted())
+      // Stored in place with its zeros: no sidecar holds the piece.
+      assertFalse(torrentFileSystem.exists(
+        root / ".ketch-${paddedMetadata.infoHash.hex}-test" / "0.piece"))
+      assertContentEquals(padded.copyOfRange(0, 4), store.read(0))
+      assertContentEquals(booleanArrayOf(true, true), store.recheck())
+      assertContentEquals(longArrayOf(3, 0, 4), store.progress())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun padding_selectedAndCreatedByAnOlderBuild_isLeftAloneAndCleanedUp() = runTest {
+    val root = temporaryRoot()
+    val first = TorrentPieceStore(paddedMetadata, root / "pack", emptySet(), "test")
+    try {
+      // Older builds listed the pad as a file: they selected and created it.
+      val pad = first.outputPath.toPath() / ".pad" / "1"
+      torrentFileSystem.createDirectories(checkNotNull(pad.parent))
+      torrentFileSystem.write(pad) { write(ByteArray(1)) }
+      val checkpoint = TorrentCheckpoint("test", paddedMetadata, first.outputPath, setOf(0, 1, 2),
+        BooleanArray(2), listOf(TorrentOwnedPath(pad.toString(), torrentFileIdentity(pad)!!)),
+        emptyList())
+      val store = TorrentPieceStore(paddedMetadata, root / "pack", setOf(0, 1, 2), "test")
+      store.restore(checkpoint)
+      store.initialize()
+      assertEquals(setOf(0, 2), store.selectedIndices)
+      store.commit(0, padded.copyOfRange(0, 4))
+      store.commit(1, padded.copyOfRange(4, 8))
+      assertTrue(store.completed())
+      store.cleanup()
+      assertFalse(torrentFileSystem.exists(pad))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun unsafeNames_storedUnderCleanedNames() = runTest {
+    val payload = "abcdefgh".encodeToByteArray()
+    val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "pack", "piece length" to 4L,
+      "pieces" to (sha1Digest(payload.copyOfRange(0, 4)) + sha1Digest(payload.copyOfRange(4, 8))),
+      "files" to listOf(
+        mapOf("length" to 4L, "path" to listOf("Who?.flac")),
+        mapOf("length" to 4L, "path" to listOf("Vol.", "b:c"))
+      )
+    ))))
+    val root = temporaryRoot()
+    val store = TorrentPieceStore(metadata, root / "pack", emptySet(), "test")
+    try {
+      store.initialize()
+      store.commit(0, payload.copyOfRange(0, 4))
+      store.commit(1, payload.copyOfRange(4, 8))
+      store.finish()
+      val output = store.outputPath.toPath()
+      assertContentEquals(payload.copyOfRange(0, 4),
+        torrentFileSystem.read(output / "Who_.flac") { readByteArray() })
+      assertContentEquals(payload.copyOfRange(4, 8),
+        torrentFileSystem.read(output / "Vol" / "b_c") { readByteArray() })
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }

@@ -33,16 +33,18 @@ internal class WebSeedSpan(val url: String, val range: LongRange, val offset: In
  * Maps pieces onto the files of one web seed (BEP 19). A single-file torrent's URL names the
  * file, or, ending in `/`, the folder holding it under the torrent's name. A multi-file torrent's
  * URL names the folder holding the torrent's own folder: each file is at the URL, the torrent
- * name and the file's path, every segment percent-encoded.
+ * name and the file's path as the metainfo lists them, every segment percent-encoded. BEP 47
+ * padding files are never requested: their spans are left out, as the zeros they hold.
  */
 internal class WebSeedLayout(private val metadata: TorrentMetadata, base: String) {
-  private val urls: List<String> = if (!metadata.isMultiFile) {
+  private val urls: List<String?> = if (!metadata.isMultiFile) {
     listOf(if (base.endsWith('/')) base + encodeWebSeedSegment(metadata.name) else base)
   } else {
     val folder = if (base.endsWith('/')) base else "$base/"
     // A multi-file path starts with the torrent name.
     metadata.files.map { file ->
-      folder + file.path.split('/').joinToString("/", transform = ::encodeWebSeedSegment)
+      if (file.padding) null
+      else folder + file.rawPath.joinToString("/", transform = ::encodeWebSeedSegment)
     }
   }
 
@@ -55,7 +57,10 @@ internal class WebSeedLayout(private val metadata: TorrentMetadata, base: String
     }
   }
 
-  /** The requests that fetch piece [index] of [size] bytes, in the order of its bytes. */
+  /**
+   * The requests that fetch piece [index] of [size] bytes, in the order of its bytes; the bytes
+   * of padding files they skip are zeros.
+   */
   fun spans(index: Int, size: Int): List<WebSeedSpan> {
     val start = index * metadata.pieceLength
     val end = start + size
@@ -73,9 +78,9 @@ internal class WebSeedLayout(private val metadata: TorrentMetadata, base: String
       val fileEnd = fileStart + metadata.files[file].size
       val from = maxOf(start, fileStart)
       val to = minOf(end, fileEnd)
-      if (to > from) {
-        spans += WebSeedSpan(urls[file], (from - fileStart)..<(to - fileStart),
-          (from - start).toInt())
+      val url = urls[file]
+      if (to > from && url != null) {
+        spans += WebSeedSpan(url, (from - fileStart)..<(to - fileStart), (from - start).toInt())
       }
       file++
     }
@@ -116,7 +121,10 @@ internal class WebSeedStats {
       "webSeedPayload=${payload.load()}, webSeedFailures=${failures.load()}"
 }
 
-/** A piece one web seed fetches into [bytes], which it owns until it releases the piece. */
+/**
+ * A piece one web seed fetches into [bytes], which it owns until it releases the piece. They
+ * start as zeros, which stand for the bytes no span asks for.
+ */
 internal interface WebSeedPiece {
   val index: Int
   val bytes: ByteArray
@@ -268,8 +276,12 @@ internal class WebSeedWorker<P : WebSeedPiece>(
    */
   private suspend fun fetch(run: MutableList<P?>) {
     val handle = connection ?: open().also { connection = it }
-    val missing = IntArray(run.size) { run[it]?.bytes?.size ?: 0 }
-    for (request in requests(run)) {
+    val requests = requests(run)
+    // The bytes each piece still waits for: padding is never asked for.
+    val missing = IntArray(run.size)
+    for (request in requests) for (part in request.parts) missing[part.piece] += part.length
+    for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece)
+    for (request in requests) {
       val length = request.last - request.first + 1
       var received = 0L
       var part = 0

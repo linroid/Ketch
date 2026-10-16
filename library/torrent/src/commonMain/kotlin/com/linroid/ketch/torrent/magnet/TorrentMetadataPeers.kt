@@ -20,7 +20,7 @@ private val log = KetchLogger("TorrentEngine")
 /** Waits before asking a peer that failed again: the first retry after 5 s, the last after 30. */
 internal val METADATA_RETRY_DELAYS_MS = listOf(5_000L, 15_000L, 30_000L)
 
-/** Distinct peers one metadata lookup asks at most. */
+/** Distinct peers one metadata lookup asks at most; it ignores the peers found after them. */
 internal const val MAX_METADATA_PEERS = 4096
 
 /**
@@ -37,10 +37,11 @@ internal const val METADATA_PARALLEL_PEERS = 16
  * Each peer is asked as soon as it is found and a slot is free. One that fails is asked again
  * after each of [retryDelaysMs], behind any peers found meanwhile, so a swarm of one or two
  * peers that are briefly busy or unreachable still resolves; a peer found again while it waits
- * is not queued twice. [onPeer] gets the number of distinct peers found so far, [onAsked] the
- * number asked so far. A peer [skip] matches when its turn comes is dropped, retries included,
- * as what it rules out may be learned after the peer was found. A
- * [PrivateTorrentMagnetException] ends the lookup.
+ * is not queued twice. Once [MAX_METADATA_PEERS] are found, further peers are ignored while the
+ * lookup goes on with those. [onPeer] gets the number of distinct peers found so far, [onAsked]
+ * the number asked so far. A peer [skip] matches when its turn comes is dropped, retries
+ * included, as what it rules out may be learned after the peer was found. A
+ * [MetadataLookupFailure], which every peer would cause alike, ends the lookup.
  *
  * @param label names the lookup in logs, such as "Metadata for 45b3e332a3b9".
  */
@@ -60,9 +61,15 @@ internal suspend fun <T> fetchFromMetadataPeers(
   val slots = Semaphore(parallelism)
   launch {
     val seen = mutableSetOf<PeerEndpoint>()
+    var full = false
     for (endpoint in discovered) {
-      if (!seen.add(endpoint)) continue
-      check(seen.size <= MAX_METADATA_PEERS) { "Metadata peer limit exceeded" }
+      if (endpoint in seen) continue
+      if (seen.size == MAX_METADATA_PEERS) {
+        if (!full) log.d { "$label: $MAX_METADATA_PEERS peers found, ignoring further peers" }
+        full = true
+        continue
+      }
+      seen += endpoint
       onPeer(seen.size)
       log.v { "$label: found peer $endpoint (${seen.size} so far)" }
       ready.send(endpoint to 0)
@@ -84,7 +91,7 @@ internal suspend fun <T> fetchFromMetadataPeers(
     try {
       log.v { "$label: asking $endpoint (attempt $asked)" }
       if (found.complete(fetch(endpoint))) log.d { "$label received from $endpoint" }
-    } catch (e: PrivateTorrentMagnetException) {
+    } catch (e: MetadataLookupFailure) {
       found.completeExceptionally(e)
     } catch (e: CancellationException) {
       // The exchange's own timeout; when the lookup is cancelled, this rethrows.

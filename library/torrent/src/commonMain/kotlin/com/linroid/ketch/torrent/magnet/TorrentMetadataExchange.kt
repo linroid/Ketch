@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerWire
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import okio.Buffer
@@ -44,8 +45,9 @@ internal class TorrentMetadataExchange(
   ): TorrentMetadata = fetchContent(TorrentIdentity(v1 = hash), endpoint, trackerTiers, privacy) {
       _, info, _ ->
     // A btih magnet may name a hybrid; its v1 view tells resolution the v2 identity to fetch.
-    val metadata = TorrentMetadata.fromBencode(metainfoFromInfo(info, trackerTiers),
-      allowHybrid = true)
+    val metadata = unusableUnless {
+      TorrentMetadata.fromBencode(metainfoFromInfo(info, trackerTiers), allowHybrid = true)
+    }
     if (metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       throw PrivateTorrentMagnetException()
     }
@@ -193,5 +195,30 @@ internal fun metainfoFromInfo(
   return output.writeByte('e'.code).readByteArray()
 }
 
+/**
+ * A failure of a metadata lookup that every peer would cause alike, as the metadata they send
+ * matches the magnet's hash: it ends the lookup instead of asking another peer.
+ */
+internal abstract class MetadataLookupFailure(message: String, cause: Throwable? = null) :
+  IllegalArgumentException(message, cause)
+
 internal class PrivateTorrentMagnetException :
-  IllegalArgumentException("Private torrents require tracker-only discovery or a metainfo input")
+  MetadataLookupFailure("Private torrents require tracker-only discovery or a metainfo input")
+
+/** Metadata that matches the magnet's hash but that Ketch cannot open, for [cause]. */
+internal class UnusableTorrentMetadataException(cause: Throwable) :
+  MetadataLookupFailure("The magnet's torrent cannot be opened: ${cause.message}", cause)
+
+/**
+ * Runs [parse] over metadata that matched its hash, so that any failure but a
+ * [MetadataLookupFailure] is an [UnusableTorrentMetadataException].
+ */
+internal inline fun <T> unusableUnless(parse: () -> T): T = try {
+  parse()
+} catch (e: MetadataLookupFailure) {
+  throw e
+} catch (e: CancellationException) {
+  throw e
+} catch (e: Exception) {
+  throw UnusableTorrentMetadataException(e)
+}

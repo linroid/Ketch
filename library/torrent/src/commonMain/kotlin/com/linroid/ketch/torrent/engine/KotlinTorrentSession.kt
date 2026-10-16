@@ -304,8 +304,9 @@ internal class KotlinTorrentSession(
   }
 
   override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    val files = store.metadata.files
     val indices = fileIds.mapTo(LinkedHashSet()) { id ->
-      requireNotNull(id.toIntOrNull()?.takeIf { it in store.metadata.files.indices }) {
+      requireNotNull(id.toIntOrNull()?.takeIf { files.getOrNull(it)?.padding == false }) {
         "Unknown file id"
       }
     }
@@ -344,7 +345,7 @@ internal class KotlinTorrentSession(
       withContext(NonCancellable) { pending.cancelAndJoin() }
     }
     log.i {
-      "Torrent $label selection: files=${indices.size}/${store.metadata.files.size}, " +
+      "Torrent $label selection: files=${indices.size}/${store.metadata.contentFiles.size}, " +
         "wanted=${store.totalSelectedBytes}"
     }
     val swarm = when (applied) {

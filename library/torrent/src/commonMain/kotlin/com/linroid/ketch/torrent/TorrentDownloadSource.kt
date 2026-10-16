@@ -965,7 +965,7 @@ class TorrentDownloadSource(
         }
         lookups++
         log.i {
-          "No metadata for magnet ${logHash(MagnetUri.parse(url).infoHash.hex)} after " +
+          "No metadata for magnet ${logHash(MagnetUri.parse(url).logTopic)} after " +
             "$lookups lookup(s); looking again"
         }
         delay(MAGNET_LOOKUP_PAUSE_MS)
@@ -1002,8 +1002,10 @@ class TorrentDownloadSource(
     metadata: TorrentMetadata,
     privacy: TorrentDiscoveryPrivacy,
   ): ResolvedSource = ResolvedSource(
-    url = url, sourceType = TYPE, totalBytes = metadata.totalBytes, supportsResume = true,
-    suggestedFileName = metadata.name, maxSegments = metadata.files.size,
+    // Padding shapes the pieces but is never downloaded to disk.
+    url = url, sourceType = TYPE, totalBytes = metadata.contentFiles.sumOf { it.size },
+    supportsResume = true,
+    suggestedFileName = metadata.name, maxSegments = metadata.contentFiles.size,
     metadata = buildMap {
       put(META_INFO_HASH, metadata.infoHash.hex)
       put(META_NAME, metadata.name)
@@ -1012,7 +1014,7 @@ class TorrentDownloadSource(
       put(META_PRIVACY, privacy.name)
       metadata.comment?.let { put(META_COMMENT, it) }
     },
-    files = metadata.files.map { SourceFile(it.index.toString(), it.path, it.size,
+    files = metadata.contentFiles.map { SourceFile(it.index.toString(), it.path, it.size,
       metadata = mapOf("path" to it.path)) },
     selectionMode = FileSelectionMode.MULTIPLE,
   )
@@ -1101,7 +1103,7 @@ class TorrentDownloadSource(
       previous?.metainfo.orEmpty(), version = 2, privacy = privacy)
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
-        "files=${selected.size}/${metadata.files.size}, totalBytes=$total, output=$output, " +
+        "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
         "resume=${previous != null}"
     }
     runSession(context, hash, table, state, initial.revision) {
@@ -1163,7 +1165,9 @@ class TorrentDownloadSource(
     requested: Set<String>,
     previous: TorrentSourceState?,
   ): Set<String> {
-    val ids = requested.ifEmpty { previous?.selectedFileIds.orEmpty() }.ifEmpty { table.ids }
+    // Selections of older builds may name padding files, which tables no longer list.
+    val ids = requested.ifEmpty { previous?.selectedFileIds.orEmpty() }
+      .filterNotTo(LinkedHashSet()) { it in table.padding }.ifEmpty { table.ids }
     require(ids.all { table[it] != null }) { "Invalid file selection" }
     return table.ordered(ids)
   }

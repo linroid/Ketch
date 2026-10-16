@@ -169,8 +169,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentRouteTable`, `TorrentAdvertisedPort`, the buffer and connection budgets and
   `TorrentRateLimiter`
 - `com.linroid.ketch.torrent.metainfo` -- `Bencode`, `InfoHash`, `TorrentIdentity`
-  (`V2InfoHash`), `TorrentMetadata`, `TorrentV2Info`, `TorrentV2Document`, piece layers and the
-  hybrid and content layouts
+  (`V2InfoHash`), `TorrentMetadata`, `TorrentV2Info`, `TorrentV2Document`, piece layers, the
+  hybrid and content layouts and the name rules (`TorrentNames.kt`: `validateTorrentComponent`,
+  `isDiskComponent`, `validateDiskComponent`, `diskComponent`)
 - `com.linroid.ketch.torrent.magnet` -- `MagnetUri` and BEP 9 metadata lookup
   (`TorrentMetadataExchange`, `TorrentV2MetadataExchange`, `TorrentMetadataPeers`,
   `TorrentMetadataCache`)
@@ -606,6 +607,31 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
   browser control through RemoteKetch
 - HTTP(S)/local metainfo, SDK bytes, btih magnets, tracker tiers, DHT and peer exchange
+- Names: a v1 name fails only for traversal (`validateTorrentComponent`: empty, `.`, `..`, `/`,
+  `\` or control characters). `diskComponent` keeps a name `isDiskComponent` accepts (the rules
+  every name had to pass before, so saved tasks keep their files) and passes any other through
+  core's `sanitizeFileName()`, so `TorrentFile.path` is where a file is stored and listed and
+  `rawPath` the names web seeds are asked by; collisions are checked, ignoring case, on stored
+  paths. Storage checks the names it creates or reads with `validateDiskComponent`. V2 and
+  hybrid names keep `TorrentOutputMapping`'s `%xx` escaping, unchanged for saved tasks
+- BEP 47 padding in v1 and hybrid torrents (`attr` `p`, or outside hybrids a name starting
+  `_____padding_file_`) stays in `TorrentMetadata.files`, as it shapes the pieces, marked
+  `TorrentFile.padding`, but never in `contentFiles`, file tables or selections (ones older
+  builds saved drop it), never in the v1 store, which hashes and serves it as zeros, and never
+  in web seed requests. Resolved sizes and admission count content files only
+- Limits cap instead of failing: a torrent or magnet keeps its first 128 trackers
+  (`MAX_TRACKERS`), a metadata lookup ignores peers past `MAX_METADATA_PEERS` (4096), the v1
+  parser takes 10,000 content files at any depth (1,000,000 bencode values), and v2 resolution
+  and tracker-only lookups skip trackers Ketch cannot announce to, such as `wss://`
+  (`TrackerConfiguration.usable`; `prepare` stays strict for edits)
+- Metadata that matches a magnet's hash but does not parse ends the lookup with
+  `UnusableTorrentMetadataException`, a `MetadataLookupFailure` like
+  `PrivateTorrentMagnetException`, which `resolve` reports as `KetchError.SourceError`; v2
+  layers fetched from a peer stay that peer's failures
+- `torrentPublishCatalogObject` (catalog objects and the v2 creation log) never replaces a file:
+  it links where the file system has hard links (`torrentLinkFile`), else claims the name with
+  an exclusive create and moves the written file over it. An empty file at the name is an
+  interrupted publication, which readers take as missing and the next publication takes over
 - DHT bootstrap routers are asked whatever address their names resolve to, reserved ranges such
   as 198.18.0.0/15 included; such a router only introduces nodes and never joins the routing
   table, while addresses learned from the network stay filtered. Peers of public torrents (v1,

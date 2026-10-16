@@ -1,10 +1,107 @@
 package com.linroid.ketch.torrent.metainfo
 
+import com.linroid.ketch.torrent.crypto.sha1Digest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class TorrentMetadataTest {
+  /** A multi-file torrent named [name] of empty files at [paths]. */
+  private fun files(paths: List<List<String>>, name: String = "root"): Map<String, Any> = mapOf(
+    "name" to name, "piece length" to 1L, "pieces" to ByteArray(0),
+    "files" to paths.map { mapOf("path" to it, "length" to 0L) }
+  )
+
+  private fun parse(info: Map<String, Any>, root: Map<String, Any> = emptyMap()) =
+    TorrentMetadata.fromBencode(Bencode.encode(root + ("info" to info)))
+
+  @Test
+  fun fromBencode_unsafeNames_storedUnderCleanedNames() {
+    val info = files(listOf(listOf("Who Are You?.flac"), listOf("Vol.", "a.txt"),
+      listOf("aux.c")), name = "Show: Part 2")
+
+    val metadata = parse(info)
+
+    assertEquals("Show: Part 2", metadata.name)
+    assertEquals(listOf("Show_ Part 2/Who Are You_.flac", "Show_ Part 2/Vol/a.txt",
+      "Show_ Part 2/_aux.c"), metadata.files.map { it.path })
+    // Web seeds ask for the names the torrent lists.
+    assertEquals(listOf("Show: Part 2", "Vol.", "a.txt"), metadata.files[1].rawPath)
+    // The identity is the raw info dictionary's.
+    assertEquals(InfoHash.fromBytes(sha1Digest(Bencode.encode(info))), metadata.infoHash)
+  }
+
+  @Test
+  fun fromBencode_singleFileUnsafeName_storedUnderCleanedName() {
+    val metadata = parse(mapOf("name" to "Why?.iso", "piece length" to 1L, "length" to 0L,
+      "pieces" to ByteArray(0)))
+
+    assertEquals("Why_.iso", metadata.files.single().path)
+    assertEquals(listOf("Why?.iso"), metadata.files.single().rawPath)
+  }
+
+  @Test
+  fun fromBencode_traversalNames_rejected() {
+    for (path in listOf(listOf(".."), listOf("."), listOf(""), listOf("a/b"), listOf("a\\b"),
+      listOf("dir", "x\u0001y"))) {
+      assertFailsWith<IllegalArgumentException>(path.toString()) { parse(files(listOf(path))) }
+    }
+    assertFailsWith<IllegalArgumentException> { parse(files(listOf(listOf("a")), name = "..")) }
+  }
+
+  @Test
+  fun fromBencode_namesEqualOnceCleaned_rejected() {
+    val error = assertFailsWith<IllegalArgumentException> {
+      parse(files(listOf(listOf("a?b"), listOf("A_b"))))
+    }
+    assertEquals("Colliding torrent paths", error.message)
+  }
+
+  @Test
+  fun fromBencode_v1Padding_keptOutOfTheContentFiles() {
+    // libtorrent names each pad `.pad/<length>`, so pads of one length share a path; BitComet's
+    // carry no attribute.
+    val pad = mapOf("attr" to "p", "length" to 1L, "path" to listOf(".pad", "1"))
+    val info = mapOf("name" to "root", "piece length" to 4L, "pieces" to ByteArray(80),
+      "files" to listOf(
+        mapOf("length" to 3L, "path" to listOf("a")), pad,
+        mapOf("length" to 3L, "path" to listOf("b")), pad,
+        mapOf("length" to 2L, "path" to listOf("_____padding_file_0_upgrade to BitComet")),
+        mapOf("length" to 2L, "path" to listOf("c")),
+        mapOf("attr" to "p", "length" to 1L)
+      ))
+
+    val metadata = parse(info)
+
+    assertEquals(listOf(0, 2, 5), metadata.contentFiles.map { it.index })
+    assertEquals(listOf(false, true, false, true, true, false, true),
+      metadata.files.map { it.padding })
+    // Padding shapes the pieces: it counts in the torrent's size.
+    assertEquals(13L, metadata.totalBytes)
+    assertEquals("root/.pad/1", metadata.files.last().path)
+  }
+
+  @Test
+  fun fromBencode_moreThan128Trackers_keepsTheFirst() {
+    val tiers = (0 until 3).map { tier -> (0 until 50).map { "udp://t$tier-$it.test:1" } }
+
+    val metadata = parse(files(listOf(listOf("a"))), mapOf("announce-list" to tiers))
+
+    assertEquals(128, metadata.trackers.size)
+    assertEquals(listOf(50, 50, 28), metadata.trackerTiers.map { it.size })
+    assertEquals("udp://t0-0.test:1", metadata.trackers.first())
+  }
+
+  @Test
+  fun fromBencode_deepTreeWithinTheFileLimit_parses() {
+    // 8,000 files ten folders deep take more than 100,000 bencode values.
+    val paths = (0 until 8_000).map { index ->
+      (0 until 9).map { "d$it" } + "f$index"
+    }
+
+    assertEquals(8_000, parse(files(paths)).files.size)
+  }
+
   @Test
   fun rejectsCanonicallyEquivalentPaths() {
     val info = mapOf(
@@ -22,9 +119,9 @@ class TorrentMetadataTest {
 
   @Test
   fun boundsPathComponentsByEncodedBytes() {
-    TorrentMetadata.validatePathComponent("界".repeat(85))
+    validateDiskComponent("界".repeat(85))
     assertFailsWith<IllegalArgumentException> {
-      TorrentMetadata.validatePathComponent("界".repeat(86))
+      validateDiskComponent("界".repeat(86))
     }
   }
 

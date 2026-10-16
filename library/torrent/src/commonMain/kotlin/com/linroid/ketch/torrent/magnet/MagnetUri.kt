@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.magnet
 
 import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.metainfo.MAX_TRACKERS
 import com.linroid.ketch.torrent.metainfo.MAX_WEB_SEEDS
 import com.linroid.ketch.torrent.metainfo.TorrentIdentity
 import com.linroid.ketch.torrent.metainfo.V2InfoHash
@@ -32,11 +33,17 @@ internal data class MagnetUri(
     explicitPeers: List<String> = emptyList(),
   ) : this(TorrentIdentity(v1 = infoHash), displayName, trackers, explicitPeers)
 
-  /** Transitional v1 runtime guard: never silently discard a supplied v2 exact topic. */
+  /**
+   * The v1 hash of a btih-only magnet, which v1 lookups run by. It refuses a magnet with a v2
+   * topic, so a v2 exact topic is never silently discarded; [logTopic] names any magnet.
+   */
   val infoHash: InfoHash get() {
     require(identity.v2 == null) { "V2 metadata and wire integration is not yet available" }
     return requireNotNull(identity.v1)
   }
+
+  /** The hash that names this magnet in logs: its v2 one when it has one, else its v1 one. */
+  val logTopic: String get() = identity.v2?.hex ?: requireNotNull(identity.v1).hex
 
   /** Reconstructs the magnet URI string. */
   fun toUri(): String = buildString {
@@ -107,7 +114,6 @@ internal data class MagnetUri(
         }
       }
 
-      require(trackers.size <= 128 && peers.size <= 128) { "Too many magnet endpoints" }
       require(infoHash != null || v2Hash != null) {
         "Magnet URI missing a supported torrent exact topic"
       }
@@ -115,11 +121,15 @@ internal data class MagnetUri(
       return MagnetUri(
         identity = TorrentIdentity(infoHash, v2Hash),
         displayName = displayName,
-        trackers = trackers.distinct(),
-        explicitPeers = peers.distinct(),
+        // Only the first trackers and peers are kept; a long list never refuses the magnet.
+        trackers = trackers.distinct().take(MAX_TRACKERS),
+        explicitPeers = peers.distinct().take(MAX_EXPLICIT_PEERS),
         webSeeds = webSeeds.distinct().take(MAX_WEB_SEEDS),
       )
     }
+
+    /** The most `x.pe` peers a magnet keeps. */
+    private const val MAX_EXPLICIT_PEERS = 128
 
     private fun parseInfoHash(hash: String): InfoHash {
       return when (hash.length) {

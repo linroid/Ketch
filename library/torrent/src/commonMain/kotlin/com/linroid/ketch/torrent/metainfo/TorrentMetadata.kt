@@ -39,27 +39,43 @@ internal data class TorrentMetadata(
    * A single file within a torrent.
    *
    * @property index zero-based file index
-   * @property path relative path within the torrent directory
+   * @property path where the file is stored: the torrent name, then its path, each name as
+   *   [diskComponent] cleans it
    * @property size file size in bytes
+   * @property rawPath the torrent name and the file's path as the metainfo lists them, which web
+   *   seeds are asked by
+   * @property padding a BEP 47 padding file: zeros that pieces hash, never listed, selected or
+   *   stored
    */
   data class TorrentFile(
     val index: Int,
     val path: String,
     val size: Long,
+    val rawPath: List<String> = path.split('/'),
+    val padding: Boolean = false,
   )
+
+  /** The files a task lists and selects: every file but the padding. */
+  val contentFiles: List<TorrentFile> get() = files.filterNot { it.padding }
 
   companion object {
     /**
-     * Parses v1 metainfo. With [allowHybrid], a hybrid's info dictionary parses as its v1 view
-     * (BEP 47 padding files included, marked [isHybrid]); only magnet resolution needs that, to
-     * learn the v2 identity it then downloads by. v1 sessions never run a hybrid view.
+     * Parses v1 metainfo. With [allowHybrid], a hybrid's info dictionary parses as its v1 view,
+     * marked [isHybrid]; only magnet resolution needs that, to learn the v2 identity it then
+     * downloads by. v1 sessions never run a hybrid view.
+     *
+     * Names only fail for traversal ([validateTorrentComponent]); each file's [TorrentFile.path]
+     * holds the names it is stored under ([diskComponent]), and two files whose stored paths are
+     * equal ignoring case refuse the torrent. BEP 47 padding files stay in [files], as they shape
+     * the pieces, marked [TorrentFile.padding].
      */
     fun fromBencode(
       data: ByteArray,
       maxBytes: Int = 4 * 1024 * 1024,
       allowHybrid: Boolean = false,
     ): TorrentMetadata {
-      val root = Bencode.parse(data, maxBytes)
+      // Every value is a node: a file costs about one per path component, plus five.
+      val root = Bencode.parse(data, maxBytes, maxNodes = 1_000_000)
       requireNotNull(root.dictionary) { "Torrent root must be a dictionary" }
       val info = requireNotNull(root["info"]) { "Missing info dictionary" }
       requireNotNull(info.dictionary) { "Info must be a dictionary" }
@@ -69,36 +85,42 @@ internal data class TorrentMetadata(
         "BitTorrent v2/hybrid is not supported"
       }
       val name = requireNotNull(info["name"]?.text()) { "Missing name" }
-      validatePathComponent(name)
+      validateTorrentComponent(name)
+      val folder = diskComponent(name)
       val pieceLength = requireNotNull(info["piece length"]?.integer) { "Missing piece length" }
       require(pieceLength in 1..16L * 1024 * 1024) { "Unsupported piece length" }
       val fileNodes = info["files"]
       require(fileNodes == null || info["length"] == null) { "Conflicting file layouts" }
-      val padding = mutableSetOf<Int>()
       val files = if (fileNodes != null) {
         val list = requireNotNull(fileNodes.list) { "Invalid file list" }
-        require(list.isNotEmpty() && list.size <= 10_000) { "Invalid file count" }
+        // Padding may follow every file, so the list may hold twice as many entries.
+        require(list.isNotEmpty() && list.size <= MAX_FILES * 2) { "Invalid file count" }
         list.mapIndexed { index, file ->
           require(file["attr"]?.text()?.contains('l') != true) { "Symlink files unsupported" }
           val size = requireNotNull(file["length"]?.integer) { "Missing file length" }
           require(size >= 0) { "Negative file length" }
-          // BEP 47 padding may share or omit its path; it is never written to disk.
-          if (hybrid && file["attr"]?.text()?.contains('p') == true) {
-            padding += index
-            return@mapIndexed TorrentFile(index, "$name/.pad/$size", size)
+          if (isPadding(file, hybrid)) {
+            // BEP 47 padding may share or omit its path; it is never written to disk.
+            val names = paddingPath(file)
+            return@mapIndexed TorrentFile(index,
+              (listOf(folder) + (names?.map(::diskComponent) ?: listOf(".pad", "$size")))
+                .joinToString("/"), size, listOf(name) + names.orEmpty(), padding = true)
           }
           val parts = requireNotNull(file["path"]?.list) { "Missing file path" }
           require(parts.isNotEmpty() && parts.size <= 64) { "Invalid path depth" }
           val names = parts.map { requireNotNull(it.text()) { "Invalid path component" } }
-          names.forEach(::validatePathComponent)
-          TorrentFile(index, (listOf(name) + names).joinToString("/"), size)
+          names.forEach(::validateTorrentComponent)
+          TorrentFile(index, (listOf(folder) + names.map(::diskComponent)).joinToString("/"),
+            size, listOf(name) + names)
         }
       } else {
         val size = requireNotNull(info["length"]?.integer) { "Missing file length" }
         require(size >= 0) { "Negative file length" }
-        listOf(TorrentFile(0, name, size))
+        listOf(TorrentFile(0, folder, size, listOf(name)))
       }
-      val stored = files.filter { it.index !in padding }
+      val stored = files.filterNot { it.padding }
+      require(stored.size in 1..MAX_FILES) { "Invalid file count" }
+      // Checked on the names files are stored under, which cleaning may have made equal.
       val paths = stored.map { canonicalTorrentName(it.path).lowercase() }.toSet()
       require(paths.size == stored.size) { "Colliding torrent paths" }
       for (path in paths) {
@@ -118,14 +140,19 @@ internal data class TorrentMetadata(
       require(pieces.size % 20 == 0 && count == pieces.size.toLong() / 20) {
         "Piece hash count does not match file layout"
       }
-      val tiers = root["announce-list"]?.let { node ->
+      val listed = root["announce-list"]?.let { node ->
         requireNotNull(node.list) { "Invalid tracker tiers" }.map { tier ->
           requireNotNull(tier.list) { "Invalid tracker tier" }.map { tracker ->
             requireNotNull(tracker.text()) { "Invalid tracker URL" }
           }.distinct()
         }.filter { it.isNotEmpty() }
       } ?: root["announce"]?.text()?.let { listOf(listOf(it)) }.orEmpty()
-      require(tiers.sumOf { it.size } <= 128) { "Too many trackers" }
+      // Trackers lie outside the info dictionary: the first ones are kept, never the torrent
+      // refused.
+      var kept = 0
+      val tiers = listed.map { tier ->
+        tier.take(MAX_TRACKERS - kept).also { kept += it.size }
+      }.filter { it.isNotEmpty() }
       val privateFlag = info["private"]?.integer
       require(info["private"] == null || privateFlag == 0L || privateFlag == 1L) {
         "Invalid private flag"
@@ -151,19 +178,36 @@ internal data class TorrentMetadata(
       )
     }
 
-    internal fun validatePathComponent(value: String) {
-      require(value.isNotEmpty() && value != "." && value != "..") { "Unsafe torrent path" }
-      require(value.encodeToByteArray().size <= 255 && value.none { it < ' ' || it in "/\\:*?\"<>|" }) {
-        "Unsafe torrent path component"
-      }
-      require(!value.endsWith('.') && !value.endsWith(' ')) { "Unsafe trailing path character" }
-      val stem = value.substringBefore('.').uppercase()
-      require(stem !in setOf("CON", "PRN", "AUX", "NUL") &&
-        !(stem.length == 4 && (stem.startsWith("COM") || stem.startsWith("LPT")) &&
-          stem.last() in '1'..'9')) { "Reserved torrent path" }
+    /**
+     * Whether [file] is BEP 47 padding: its `attr` holds `p`, or, outside hybrids, whose creators
+     * always mark it so, its name starts as BitComet's unmarked padding files' names do.
+     */
+    private fun isPadding(file: Bencode.Node, hybrid: Boolean): Boolean {
+      val attr = file["attr"]?.let { runCatching { it.text() }.getOrNull() }
+      if (attr?.contains('p') == true) return true
+      if (hybrid) return false
+      val last = file["path"]?.list?.lastOrNull()?.bytes ?: return false
+      return last.size >= BITCOMET_PADDING.size &&
+        last.copyOfRange(0, BITCOMET_PADDING.size).contentEquals(BITCOMET_PADDING)
     }
+
+    /** A padding file's own path, when it names a usable one; null to name it by its size. */
+    private fun paddingPath(file: Bencode.Node): List<String>? = try {
+      val parts = file["path"]?.list?.takeIf { it.size in 1..64 }
+      parts?.map { requireNotNull(it.text()).also(::validateTorrentComponent) }
+    } catch (_: Exception) {
+      null
+    }
+
+    private val BITCOMET_PADDING = "_____padding_file_".encodeToByteArray()
   }
 }
+
+/** The most content files a v1 torrent lists, besides its padding files. */
+internal const val MAX_FILES = 10_000
+
+/** The most trackers a torrent or magnet keeps; later ones are left out. */
+internal const val MAX_TRACKERS = 128
 
 /** The most web seeds a torrent keeps; further `url-list` entries are ignored. */
 internal const val MAX_WEB_SEEDS = 16

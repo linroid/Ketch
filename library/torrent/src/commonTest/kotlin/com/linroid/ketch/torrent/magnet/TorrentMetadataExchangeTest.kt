@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.magnet
 
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentV2Fixture
+import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentExchangeBudgets
@@ -25,6 +26,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import okio.ByteString.Companion.toByteString
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -44,6 +46,48 @@ class TorrentMetadataExchangeTest {
 
   @Test
   fun exchange_privateMetainfoRequiresExplicitInput() = runTest { exchange("private") }
+
+  @Test
+  fun exchange_infoMatchingItsHashThatDoesNotParse_isUnusable() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        coroutineScope {
+          // Pieces of 32 MiB, which Ketch does not take: every peer would send the same.
+          val info = Bencode.encode(mapOf("name" to "fixture", "length" to 0L,
+            "piece length" to 32L * 1024 * 1024, "pieces" to ByteArray(0)))
+          val hash = InfoHash.fromBytes(sha1Digest(info))
+          val network = createTorrentNetwork()
+          val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val budgets = TorrentExchangeBudgets(TorrentConfig())
+          val server = async {
+            val connection = listener.accept()
+            try {
+              val wire = PeerWire(connection)
+              wire.handshake(PeerHandshake(hash, torrentRandomBytes(20), true, false))
+              assertEquals(0, (wire.read() as PeerMessage.Extended).id)
+              wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+                "m" to mapOf("ut_metadata" to 7L), "metadata_size" to info.size.toLong()))))
+              val request = wire.read() as PeerMessage.Extended
+              val piece = Bencode.parse(request.payload)["piece"]!!.integer!!.toInt()
+              wire.send(TorrentMetadataExchange.response(1, piece, info.toByteString()))
+            } finally { connection.close() }
+          }
+          try {
+            val error = assertFailsWith<UnusableTorrentMetadataException> {
+              TorrentMetadataExchange(network, budget = budgets.metadata)
+                .fetch(hash, listener.local)
+            }
+            assertEquals("Unsupported piece length", error.cause?.message)
+            server.await()
+          } finally {
+            server.cancelAndJoin()
+            network.close()
+          }
+          assertEquals(0, budgets.allocated)
+        }
+      }
+    }
+  }
 
   @Test
   fun handshake_reservesNoMetadataBufferAndCancelPreservesTransferReservation() = runTest {

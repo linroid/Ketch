@@ -58,7 +58,17 @@ run [`ketch server`](#seeding-and-uploading).
 - A v1 torrent with one file saves to the destination as a file; a v1 torrent with several files
   saves into the destination as a folder.
 - A v2 or hybrid torrent always saves into a folder, even with a single file.
-- File names come from the torrent, cleaned of characters and paths that are not safe on disk.
+- File names come from the torrent. In a v1 torrent, a name that is not safe on every system is
+  cleaned as Ketch cleans other download names: `<>:"|?*` become `_`, trailing dots and spaces
+  go, a Windows device name such as `aux.c` gets a leading `_`, and a name over 255 bytes is cut,
+  keeping its extension, so "Who?.flac" is saved, and listed, as "Who_.flac". Names that are safe
+  everywhere stay as they are. A v2 or hybrid torrent escapes such a name's bytes as `%xx`
+  instead.
+- Only names that would leave the folder refuse a torrent: empty names, `.`, `..`, and names with
+  `/`, `\` or control characters. So do two files whose cleaned paths differ only by case.
+- BEP 47 padding files, which align files to pieces in v1 and hybrid torrents (`.pad/<length>`
+  entries, or the `_____padding_file_…` ones of older creators), are never listed, chosen or
+  written.
 
 Progress counts verified bytes of the files you chose. The network speed also counts bytes that
 are received but not kept, such as retries and the parts of pieces that overlap a skipped file.
@@ -371,8 +381,9 @@ that a download completed only once every file is selected and complete.
 - Local peer discovery does not run on iOS.
 - Downloads go to ordinary folders. When the default directory is an Android `content://` folder,
   torrents save to the platform's default directory instead. iOS saves inside the app sandbox.
-- Limits: `.torrent` files up to 4 MiB, 10,000 files per torrent and 16 MiB pieces. Many peers or
-  large pieces use more memory.
+- Limits: `.torrent` files up to 4 MiB, 10,000 files per torrent (padding files aside) and
+  16 MiB pieces. Many peers or large pieces use more memory. A torrent or magnet keeps its first
+  128 trackers.
 - Ketch does not create torrents and has no ratio management.
 
 ## For developers
@@ -402,8 +413,8 @@ task.await().getOrThrow()
 ketch.close()
 ```
 
-An empty `selectedFileIds` downloads every file. File IDs keep their index in the metainfo, so a
-hybrid torrent's IDs may have gaps where padding files are left out.
+An empty `selectedFileIds` downloads every file. File IDs keep their index in the metainfo, so the
+IDs of a torrent with padding files, such as a hybrid, have gaps where the padding is left out.
 
 `KetchApi.resolve` waits until a magnet's metadata is found or the caller cancels it; bound it with
 `withTimeout` if you need to. Up to 16 magnet lookups run at once; more wait for one to finish.
@@ -555,6 +566,7 @@ This section describes the engine's protocol behavior for people who debug swarm
 
 - **Trackers**: HTTP(S) and UDP trackers, with tiers, IPv4 and IPv6, lifecycle events and
   failover. Extra trackers are announced alongside the torrent's own rather than as a later tier.
+  Trackers of other schemes, such as WebTorrent's `wss://`, are skipped.
 - **DHT**: public torrents look up peers in the DHT. With a `stateDirectory`, routing candidates
   are saved, so a restart reaches known nodes even where the bootstrap names do not resolve. Peers
   of public torrents exchange DHT ports (BEP 5 `PORT`), and Ketch pings the nodes they name, so the
@@ -568,9 +580,12 @@ This section describes the engine's protocol behavior for people who debug swarm
   its peers, asks the peer that told it about an unreachable one to introduce it, and dials at
   once when introduced. This works through NATs that keep one external port per local port,
   which most home routers do; it needs uTP on. V2 and hybrid torrents do not punch yet.
-- **Magnet metadata** (BEP 9) is asked of up to four peers at once. A peer only takes the shared
+- **Magnet metadata** (BEP 9) is asked of up to sixteen peers at once. A peer only takes the shared
   metadata buffer once it answers, and a failed one is asked again after 5, 15 and 30 seconds.
-  Lookups run in two-minute rounds, each asking again the peers the last one gave up on.
+  Lookups run in two-minute rounds, each asking again the peers the last one gave up on, and ask
+  at most 4,096 peers each, ignoring those found later. Metadata that matches the magnet's hash
+  but that Ketch cannot open, such as a torrent with 32 MiB pieces, ends the lookup with that
+  reason, as every peer would send the same.
 
 ### Encryption details
 
@@ -690,7 +705,9 @@ Configure a durable `TaskStore` (such as `SqliteTaskStore`) to keep tasks across
 - File identities and an append-only ownership journal stop cleanup from deleting files that
   existed before the download or were replaced. A v2 or hybrid task also keeps
   `.ketch-v2-<task-id>.creation` beside its folder until it is removed, to recover files created
-  before the first checkpoint; keep it with the task.
+  before the first checkpoint; keep it with the task. It is published with a hard link, or, on
+  file systems without them (FAT, exFAT and some network shares), by claiming its name with an
+  empty file and moving the written log over it, so an existing log is never replaced.
 - Payload I/O opens files through their parent folder without following symlinks. Do not let an
   untrusted process change the destination during cleanup: checking a file and deleting it are not
   one atomic operation. A crash between creating a file and recording it may leave a file no task

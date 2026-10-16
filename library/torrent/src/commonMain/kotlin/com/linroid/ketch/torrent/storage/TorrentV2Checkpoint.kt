@@ -4,9 +4,9 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentIdentity
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.V2InfoHash
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import okio.Path.Companion.toPath
@@ -101,7 +101,7 @@ internal class TorrentV2Checkpoint private constructor(
     require(entries.size == owned.size && entries[emptyList()]?.directory == true)
     for (entry in owned) {
       require(entry.components.size <= 64 && entry.identity.length in 1..512)
-      entry.components.forEach(TorrentMetadata::validatePathComponent)
+      entry.components.forEach(::validateDiskComponent)
       if (entry.components.isNotEmpty()) {
         require(entries[entry.components.dropLast(1)]?.directory == true) { "Missing owned parent" }
       }

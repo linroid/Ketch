@@ -12,6 +12,27 @@ class MagnetUriTest {
     "aabbccddee11223344556677889900aabbccddee"
 
   @Test
+  fun parse_moreThan128Trackers_keepsTheFirst() {
+    val uri = "magnet:?xt=urn:btih:$sampleHash" +
+      (0 until 150).joinToString("") { "&tr=udp%3A%2F%2Ft$it.test%3A1" }
+
+    val parsed = MagnetUri.parse(uri)
+
+    assertEquals(128, parsed.trackers.size)
+    assertEquals("udp://t0.test:1", parsed.trackers.first())
+  }
+
+  @Test
+  fun logTopic_magnetWithAV2Topic_isItsV2Hash() {
+    val v2 = "ab".repeat(32)
+    for (uri in listOf("magnet:?xt=urn:btmh:1220$v2",
+      "magnet:?xt=urn:btih:$sampleHash&xt=urn:btmh:1220$v2")) {
+      assertEquals(v2, MagnetUri.parse(uri).logTopic)
+    }
+    assertEquals(sampleHash, MagnetUri.parse("magnet:?xt=urn:btih:$sampleHash").logTopic)
+  }
+
+  @Test
   fun parse_minimalMagnet() {
     val uri = "magnet:?xt=urn:btih:$sampleHash"
     val parsed = MagnetUri.parse(uri)

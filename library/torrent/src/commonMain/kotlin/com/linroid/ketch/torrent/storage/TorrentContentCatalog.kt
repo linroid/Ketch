@@ -5,8 +5,8 @@ import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentIdentity
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -22,14 +22,16 @@ internal class TorrentContentCatalog(
   private val directory: Path,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val slots: Semaphore = Semaphore(1),
-  private val publish: (Path, Path) -> Boolean = ::torrentPublishCatalogObject,
+  private val publish: (Path, Path) -> Boolean = { source, target ->
+    torrentPublishCatalogObject(source, target, fileSystem)
+  },
 ) {
   private val mutex = Mutex()
   private var rootIdentity: String? = null
 
   init {
     require(directory.isAbsolute && directory.parent != null)
-    TorrentMetadata.validatePathComponent(directory.name)
+    validateDiskComponent(directory.name)
   }
 
   suspend fun get(identity: TorrentIdentity): TorrentV2Document? = mutex.withLock {
@@ -99,6 +101,8 @@ internal class TorrentContentCatalog(
   private fun read(path: Path, identity: TorrentIdentity): TorrentV2Document? {
     val metadata = fileSystem.metadataOrNull(path) ?: return null
     require(metadata.isRegularFile && metadata.symlinkTarget == null) { "Unsafe catalog object" }
+    // A publication a crash interrupted, which the next one takes over.
+    if (metadata.size == 0L) return null
     val size = requireNotNull(metadata.size)
     require(size in 1..MAX_BYTES.toLong()) { "Catalog object exceeds byte limit" }
     val bytes = fileSystem.read(path) {
@@ -130,5 +134,47 @@ internal class TorrentContentCatalog(
   }
 }
 
-/** Atomically adds a name for the complete file; false means the destination already exists. */
-internal expect fun torrentPublishCatalogObject(source: Path, target: Path): Boolean
+/**
+ * Atomically adds a name for the complete file [source]; false means [target] already exists.
+ * It links [source] where the file system has hard links. Where it has none (FAT, exFAT and some
+ * network shares), it claims [target] with an exclusive create, then moves [source] over it, so
+ * it never replaces a file either way. A crash between the two leaves an empty file at [target]:
+ * readers take it as not published, and the next publication moves over it.
+ */
+internal fun torrentPublishCatalogObject(
+  source: Path,
+  target: Path,
+  fileSystem: FileSystem = torrentFileSystem,
+  link: (source: Path, target: Path) -> Boolean = ::torrentLinkFile,
+): Boolean {
+  val refused = try {
+    if (link(source, target)) return true
+    null
+  } catch (e: IOException) {
+    e
+  }
+  if (refused == null) {
+    if (!isUnpublished(fileSystem, target)) return false
+  } else {
+    try {
+      fileSystem.openReadWrite(target, mustCreate = true).close()
+    } catch (e: IOException) {
+      if (fileSystem.metadataOrNull(target) == null) throw e.apply { addSuppressed(refused) }
+      if (!isUnpublished(fileSystem, target)) return false
+    }
+  }
+  fileSystem.atomicMove(source, target)
+  return true
+}
+
+/** Whether [path] is an empty regular file: a name a publication claimed and never filled. */
+internal fun isUnpublished(fileSystem: FileSystem, path: Path): Boolean {
+  val metadata = fileSystem.metadataOrNull(path) ?: return false
+  return metadata.isRegularFile && metadata.symlinkTarget == null && metadata.size == 0L
+}
+
+/**
+ * Links [target] to the complete file [source]; false when [target] exists. Throws when the
+ * file system refuses hard links or for any other failure.
+ */
+internal expect fun torrentLinkFile(source: Path, target: Path): Boolean

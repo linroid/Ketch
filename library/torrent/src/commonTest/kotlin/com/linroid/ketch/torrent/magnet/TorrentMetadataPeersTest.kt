@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TorrentMetadataPeersTest {
   private val a = PeerEndpoint("192.0.2.1", 6881)
@@ -139,6 +140,35 @@ class TorrentMetadataPeersTest {
       }
     }
     assertEquals(4, most)
+  }
+
+  @Test
+  fun unusableMetadata_endsTheLookup() = runTest {
+    val peers = Channel<PeerEndpoint>(Channel.UNLIMITED).apply { trySend(a); trySend(b) }
+    var asked = 0
+    assertFailsWith<UnusableTorrentMetadataException> {
+      fetchFromMetadataPeers<String>("Metadata", peers) {
+        asked++
+        throw UnusableTorrentMetadataException(IllegalArgumentException("Invalid file count"))
+      }
+    }
+    // Every peer sends the same metadata, so none is asked again.
+    assertTrue(asked <= 2)
+  }
+
+  @Test
+  fun morePeersThanTheCap_lookupGoesOnWithTheFirst() = runTest {
+    val peers = Channel<PeerEndpoint>(Channel.UNLIMITED)
+    repeat(MAX_METADATA_PEERS + 100) {
+      peers.trySend(PeerEndpoint("10.0.${it / 256}.${it % 256}", 6881))
+    }
+    peers.close()
+    var found = 0
+    val result = fetchFromMetadataPeers("Metadata", peers, onPeer = { found = it }) { endpoint ->
+      if (endpoint == PeerEndpoint("10.0.0.100", 6881)) "info" else throw IOException("busy")
+    }
+    assertEquals("info", result)
+    assertEquals(MAX_METADATA_PEERS, found)
   }
 
   @Test

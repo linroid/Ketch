@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.tracker
 
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
+import com.linroid.ketch.torrent.metainfo.MAX_TRACKERS
 import io.ktor.http.Url
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -71,19 +72,34 @@ internal class TrackerConfiguration private constructor(val tiers: List<List<Str
       val snapshot = tiers.map { tier ->
         tier.map { url ->
           require(url.length in 1..8192) { "Invalid tracker URL length" }
-          val valid = try {
-            val scheme = url.substringBefore("://", "").lowercase()
-            val parsed = Url(url)
-            scheme in setOf("http", "https", "udp") &&
-              parsed.host.isNotEmpty() && parsed.port in 1..65535 &&
-              (scheme != "udp" || (parsed.user == null && parsed.password == null))
-          } catch (_: Exception) { false }
-          require(valid) { "Invalid tracker URL" }
+          require(announceable(url)) { "Invalid tracker URL" }
           url
         }.distinct()
       }.filter { it.isNotEmpty() }
       return TrackerConfiguration(snapshot)
     }
+
+    /**
+     * The trackers of [tiers], a torrent's or a magnet's own list, that Ketch can announce to:
+     * others, such as `wss://` ones, are left out rather than refusing the torrent, and so are
+     * those past the first [MAX_TRACKERS].
+     */
+    fun usable(tiers: List<List<String>>): TrackerConfiguration {
+      var kept = 0
+      return prepare(tiers.map { tier ->
+        tier.filter { it.length in 1..8192 && announceable(it) }.distinct()
+          .take(MAX_TRACKERS - kept).also { kept += it.size }
+      }.filter { it.isNotEmpty() })
+    }
+
+    /** Whether [url] is an http, https or udp tracker with a host and port. */
+    private fun announceable(url: String): Boolean = try {
+      val scheme = url.substringBefore("://", "").lowercase()
+      val parsed = Url(url)
+      scheme in setOf("http", "https", "udp") &&
+        parsed.host.isNotEmpty() && parsed.port in 1..65535 &&
+        (scheme != "udp" || (parsed.user == null && parsed.password == null))
+    } catch (_: Exception) { false }
   }
 }
 

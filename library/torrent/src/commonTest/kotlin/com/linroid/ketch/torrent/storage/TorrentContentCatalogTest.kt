@@ -20,6 +20,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TorrentContentCatalogTest {
   private val info = mapOf("meta version" to 2L, "piece length" to 16_384L,
@@ -103,6 +104,63 @@ class TorrentContentCatalogTest {
           "piece layers" to mapOf(hash to ByteArray(64)))))
       }
       assertFailsWith<IllegalArgumentException> { reopened.get(doc.identity) }
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  /** Refuses hard links, as FAT, exFAT and some network shares do. */
+  private val noLinks: (Path, Path) -> Boolean = { _, _ ->
+    throw IOException("Operation not supported")
+  }
+
+  @Test
+  fun publish_withoutHardLinks_claimsTheNameThenMovesNeverReplacing() {
+    val root = directory()
+    torrentFileSystem.createDirectory(root)
+    try {
+      val source = root / "source.tmp"
+      val target = root / "target"
+      torrentFileSystem.write(source) { writeUtf8("complete") }
+      assertTrue(torrentPublishCatalogObject(source, target, link = noLinks))
+      assertEquals("complete", torrentFileSystem.read(target) { readUtf8() })
+      assertFalse(torrentFileSystem.exists(source))
+      torrentFileSystem.write(source) { writeUtf8("other") }
+      assertFalse(torrentPublishCatalogObject(source, target, link = noLinks))
+      assertEquals("complete", torrentFileSystem.read(target) { readUtf8() })
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun publish_emptyNameAnInterruptedPublicationLeft_isTakenOver() {
+    for (link in listOf(noLinks, ::torrentLinkFile)) {
+      val root = directory()
+      torrentFileSystem.createDirectory(root)
+      try {
+        val source = root / "source.tmp"
+        val target = root / "target"
+        torrentFileSystem.write(target) {}
+        torrentFileSystem.write(source) { writeUtf8("complete") }
+        assertTrue(torrentPublishCatalogObject(source, target, link = link))
+        assertEquals("complete", torrentFileSystem.read(target) { readUtf8() })
+      } finally {
+        torrentFileSystem.deleteRecursively(root, mustExist = false)
+      }
+    }
+  }
+
+  @Test
+  fun catalogWithoutHardLinks_storesAndReadsDocuments() = runTest {
+    val root = directory()
+    val catalog = TorrentContentCatalog(root, publish = { source, target ->
+      torrentPublishCatalogObject(source, target, link = noLinks)
+    })
+    try {
+      assertEquals(document().identity, catalog.put(document()))
+      assertNotNull(TorrentContentCatalog(root).get(document().identity))
+      assertEquals(1, torrentFileSystem.list(root).size)
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }

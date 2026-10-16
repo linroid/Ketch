@@ -3,13 +3,23 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
 import kotlin.test.Test
@@ -135,6 +145,38 @@ class TorrentDownloadSourceResolveTest {
   }
 
   @Test
+  fun resolve_v2MagnetNotFoundWhileInfoIsLogged_looksAgain() = runTest {
+    withContext(Dispatchers.Default) {
+      val lines = Channel<String>(Channel.UNLIMITED)
+      KetchLogger.setLogger(object : Logger {
+        override fun v(message: String) = Unit
+        override fun d(message: String) = Unit
+        override fun i(message: String) { lines.trySend(message) }
+        override fun w(message: String, throwable: Throwable?) = Unit
+        override fun e(message: String, throwable: Throwable?) = Unit
+        override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
+      })
+      // No DHT, LAN discovery or trackers: each lookup finds nothing and times out.
+      val real = TorrentDownloadSource(TorrentConfig(dhtEnabled = false, portMapping = false,
+        localDiscovery = false)).apply { magnetLookupTime = 200.milliseconds }
+      val resolving = async { real.resolve("magnet:?xt=urn:btmh:1220${"ab".repeat(32)}") }
+      try {
+        withTimeout(20_000) {
+          var lookups = 0
+          while (lookups < 2) {
+            if ("No metadata for magnet ${"ab".repeat(6)}" in lines.receive()) lookups++
+          }
+        }
+        assertTrue(resolving.isActive)
+      } finally {
+        KetchLogger.setLogger(Logger.None)
+        resolving.cancelAndJoin()
+        real.close()
+      }
+    }
+  }
+
+  @Test
   fun resolve_magnetWithOtherNetworkError_fails() = runTest {
     fakeEngine.fetchMetadataError = KetchError.Network(IOException("port in use"))
     assertFailsWith<KetchError.Network> {
@@ -196,6 +238,40 @@ class TorrentDownloadSourceResolveTest {
     assertEquals(hash, resolved.metadata["infoHash"])
     assertNotNull(resolved.metadata["metainfo"])
     assertFalse(fakeEngine.started)
+  }
+
+  @Test
+  fun resolveContent_v2MetainfoWithAWebSocketTracker_resolves() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("a.bin" to 40_000), hybrid = true)
+    val tiers = listOf(listOf("wss://tracker.test/announce"), listOf("udp://t.test:1"))
+    // `announce-list` sorts before `info`, the fixture's first key.
+    val content = "d13:announce-list".encodeToByteArray() + Bencode.encode(tiers) +
+      fixture.metainfo.copyOfRange(1, fixture.metainfo.size)
+
+    val resolved = source.resolve(ResolveInput.Content(content, "pack.torrent"))
+
+    assertEquals(fixture.document.info.hash.hex, resolved.metadata["infoHash"])
+    assertEquals(listOf(listOf("udp://t.test:1")), sourceTrackerTiers(content, 4 * 1024 * 1024))
+  }
+
+  @Test
+  fun resolveContent_unsafeNamesAndPadding_listsTheStoredFiles() = runTest {
+    val content = Bencode.encode(mapOf("info" to mapOf(
+      "name" to "Show: Part 2", "piece length" to 4L, "pieces" to ByteArray(40),
+      "files" to listOf(
+        mapOf("length" to 3L, "path" to listOf("Who?.flac")),
+        mapOf("attr" to "p", "length" to 1L, "path" to listOf(".pad", "1")),
+        mapOf("length" to 4L, "path" to listOf("b"))
+      )
+    )))
+
+    val resolved = source.resolve(ResolveInput.Content(content, "show.torrent"))
+
+    assertEquals(listOf("0", "2"), resolved.files.map { it.id })
+    assertEquals(listOf("Show_ Part 2/Who_.flac", "Show_ Part 2/b"),
+      resolved.files.map { it.name })
+    // The padding is never downloaded.
+    assertEquals(7L, resolved.totalBytes)
   }
 
   @Test

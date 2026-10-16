@@ -67,11 +67,20 @@ class MetainfoValidationTest {
     for (changes in listOf(
       mapOf("length" to -1L), mapOf("pieces" to ByteArray(0)),
       mapOf("piece length" to 0L), mapOf("meta version" to 2L),
-      mapOf("name" to "../escape"), mapOf("name" to "CON"), mapOf("name" to "file.")
+      mapOf("name" to "../escape"), mapOf("name" to "..")
     )) {
       assertFailsWith<IllegalArgumentException> {
         TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to (info() + changes))))
       }
+    }
+  }
+
+  @Test
+  fun metainfo_namesUnsafeOnSomeSystems_storedUnderCleanedNames() {
+    for ((name, stored) in listOf("CON" to "_CON", "file." to "file")) {
+      val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to
+        (info() + mapOf("name" to name)))))
+      assertEquals(stored, metadata.files.single().path)
     }
   }
 

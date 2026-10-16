@@ -10,6 +10,30 @@ import kotlin.test.assertTrue
 
 class TrackerConfigurationTest {
   @Test
+  fun usable_trackersKetchCannotAnnounceTo_leftOut() {
+    val usable = TrackerConfiguration.usable(listOf(
+      listOf("wss://tracker.test/announce", "udp://a.test:1"),
+      listOf("ws://b.test/announce"),
+      listOf("http://c.test/announce", "udp://user:secret@d.test:1", "http://c.test/announce")
+    ))
+
+    assertEquals(listOf(listOf("udp://a.test:1"), listOf("http://c.test/announce")),
+      usable.tiers)
+    assertFailsWith<IllegalArgumentException> {
+      TrackerConfiguration.prepare(listOf(listOf("wss://tracker.test/announce")))
+    }
+  }
+
+  @Test
+  fun usable_moreThan128Trackers_keepsTheFirst() {
+    val tiers = (0 until 300).map { listOf("udp://t$it.test:1") }
+
+    val usable = TrackerConfiguration.usable(tiers)
+
+    assertEquals(tiers.take(128), usable.tiers)
+  }
+
+  @Test
   fun admissionSnapshotsInputAndReturnsCreditOnlyFromTheCurrentOwner() {
     val budget = TorrentBufferBudget(100_000)
     val tier = mutableListOf("https://tracker/announce?key=secret")

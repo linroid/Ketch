@@ -1,9 +1,9 @@
 package com.linroid.ketch.torrent.storage
 
 import com.linroid.ketch.torrent.metainfo.Bencode
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.canonicalTorrentName
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
@@ -42,9 +42,12 @@ class TorrentOutputMappingTest {
     assertEquals("音楽.flac", byRaw["音楽.flac".encodeUtf8()])
     assertEquals("%2e%2e", byRaw["..".encodeUtf8()])
     assertEquals("%c0%af", byRaw[names.last()])
+    // Saved v2 tasks find their files by these names, which v1's cleaning never changes.
+    assertEquals("%43%3a%64%72%69%76%65", byRaw["C:drive".encodeUtf8()])
+    assertEquals("%74%72%61%69%6c%69%6e%67%2e", byRaw["trailing.".encodeUtf8()])
     for (file in mapped.files) {
       assertEquals(1, file.components.size)
-      TorrentMetadata.validatePathComponent(file.components.single())
+      validateDiskComponent(file.components.single())
     }
     assertEquals(names.size, mapped.files.map { it.components }.toSet().size)
   }

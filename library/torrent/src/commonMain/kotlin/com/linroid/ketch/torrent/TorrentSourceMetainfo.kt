@@ -8,6 +8,7 @@ import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.metainfo.isDiskComponent
 import com.linroid.ketch.torrent.storage.TorrentOutputMapping
 import com.linroid.ketch.torrent.tracker.TrackerConfiguration
 import kotlinx.coroutines.sync.Mutex
@@ -30,9 +31,7 @@ internal fun resolveV2Metainfo(
   sourceTrackerTiers(bytes, config.maxMetadataBytes)
   val mapping = TorrentOutputMapping.from(document)
   val hash = document.info.hash.hex
-  val name = document.info.displayName?.utf8()?.takeIf { value ->
-    try { TorrentMetadata.validatePathComponent(value); true } catch (_: Exception) { false }
-  } ?: hash
+  val name = document.info.displayName?.utf8()?.takeIf(::isDiskComponent) ?: hash
   return ResolvedSource(
     url = url ?: "torrent:$hash", sourceType = TorrentDownloadSource.TYPE,
     totalBytes = document.info.totalBytes, supportsResume = true, suggestedFileName = name,
@@ -58,7 +57,7 @@ internal fun sourceTrackerTiers(bytes: ByteArray, maxBytes: Int): List<List<Stri
       }
     }
   } ?: envelope["announce"]?.text()?.let { listOf(listOf(it)) }.orEmpty()
-  return TrackerConfiguration.prepare(tiers).tiers
+  return TrackerConfiguration.usable(tiers).tiers
 }
 
 /** Stable task-bound journal lives beside the payload, including without a configured state dir. */
@@ -82,6 +81,8 @@ internal class TorrentFileTable(
   /** Whether the task runs as v2 (pure v2 or hybrid). */
   val v2: Boolean,
   val files: List<TorrentFileRow>,
+  /** IDs of a v1 torrent's padding files, which selections saved by older builds may name. */
+  val padding: Set<String> = emptySet(),
 ) {
   val ids: Set<String> = files.mapTo(LinkedHashSet()) { it.id }
   private val byId = files.associateBy { it.id }
@@ -114,9 +115,9 @@ internal class TorrentFileTable(
           resolved.files.map { TorrentFileRow(it.id, it.name, it.size, it.name.split('/')) })
       }
       val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
-      return TorrentFileTable(metadata.infoHash.hex, v2 = false, metadata.files.map {
+      return TorrentFileTable(metadata.infoHash.hex, v2 = false, metadata.contentFiles.map {
         TorrentFileRow(it.index.toString(), it.path, it.size, it.path.split('/'))
-      })
+      }, metadata.files.filter { it.padding }.mapTo(HashSet()) { it.index.toString() })
     }
   }
 }

@@ -9,6 +9,7 @@ import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import com.linroid.ketch.torrent.tracker.TrackerConfiguration
 import com.linroid.ketch.torrent.tracker.TrackerConfigurationSnapshot
 import com.linroid.ketch.torrent.tracker.TrackerRevisionConflict
@@ -72,8 +73,16 @@ internal class TorrentPieceStore(
   private val log = KetchLogger("TorrentSession")
   private val mutex = Mutex()
   private val output = absolute(output)
+  // BEP 47 padding: zeros that pieces hash, never selected, written or read from disk.
+  private val padding = BooleanArray(metadata.files.size) { metadata.files[it].padding }
+  private val contentFiles: Set<Int> = metadata.files.indices.filterNotTo(LinkedHashSet()) {
+    padding[it]
+  }
   // Replaced whole, never mutated, so readers outside the mutex see a consistent selection.
-  @Volatile private var selected: Set<Int> = selected.ifEmpty { metadata.files.indices }.toSet()
+  // Tasks of older builds listed padding files, which their selections may still name.
+  @Volatile private var selected: Set<Int> = selected
+    .filterNotTo(LinkedHashSet()) { padding.getOrElse(it) { false } }
+    .ifEmpty { contentFiles }
   private val offsets = LongArray(metadata.files.size)
   private val verified = BooleanArray(metadata.pieceHashes.size / 20)
   @Volatile private var wanted = BooleanArray(verified.size)
@@ -88,7 +97,8 @@ internal class TorrentPieceStore(
   private val ownedFiles = linkedMapOf<Path, String>()
   private val ownedDirectories = linkedMapOf<Path, String>()
   private val sidecar: Path
-  // Every file of the torrent: ownership never depends on the selection.
+  // Every file of the torrent: ownership never depends on the selection. Padding files count,
+  // as older builds created them.
   private val allowedOutputFiles by lazy { metadata.files.indices.map(::filePath).toSet() }
   private val allowedDirectories by lazy {
     buildSet {
@@ -115,7 +125,7 @@ internal class TorrentPieceStore(
   val totalSelectedBytes: Long get() = selected.sumOf { metadata.files[it].size }
 
   /** Whether every file is selected; trackers only hear `completed` for a whole torrent. */
-  fun selectsAllFiles(): Boolean = selected.size == metadata.files.size
+  fun selectsAllFiles(): Boolean = selected.size == contentFiles.size
 
   init {
     require(this.selected.all { it in metadata.files.indices }) { "Invalid selected file index" }
@@ -189,7 +199,7 @@ internal class TorrentPieceStore(
       }
       // Files of an earlier selection stay in place while this task still owns them.
       materialized += selected
-      for (file in metadata.files.indices) {
+      for (file in contentFiles) {
         if (ownedFiles.containsKey(filePath(file))) materialized += file
       }
       initialized = true
@@ -218,7 +228,8 @@ internal class TorrentPieceStore(
         // A deselected file the user deleted is never created again for a neighbor's piece.
         overlappingFiles(index).forEach(::dropIfVanished)
         spans = overlappingFiles(index).filter { it in materialized }
-        val inPlace = spans.sumOf { overlap(start, end, it) }
+        val inPlace = overlappingFiles(index).filter { it in materialized || padding[it] }
+          .sumOf { overlap(start, end, it) }
         if (inPlace < bytes.size) {
           ensureDirectory(sidecar)
           val path = sidecar / "$index.piece"
@@ -269,7 +280,7 @@ internal class TorrentPieceStore(
 
   private fun revocable(index: Int): Boolean {
     val selection = selected
-    return !wanted[index] || overlappingFiles(index).any { it !in selection }
+    return !wanted[index] || overlappingFiles(index).any { it !in selection && !padding[it] }
   }
 
   private fun revokeLocked(index: Int) {
@@ -438,7 +449,7 @@ internal class TorrentPieceStore(
    * listed for [verifyExisting]. Before [initialize] it only replaces the selection.
    */
   suspend fun changeSelection(newSelected: Set<Int>): SelectionView = mutex.withLock {
-    require(newSelected.isNotEmpty() && newSelected.all { it in metadata.files.indices }) {
+    require(newSelected.isNotEmpty() && newSelected.all { it in contentFiles }) {
       "Invalid selected file index"
     }
     val next = newSelected.toSet()
@@ -515,7 +526,7 @@ internal class TorrentPieceStore(
     val start = index * metadata.pieceLength
     val end = start + pieceSize(index)
     return overlappingFiles(index).all { file ->
-      overlap(start, end, file) == 0L || if (file in materialized) {
+      overlap(start, end, file) == 0L || padding[file] || if (file in materialized) {
         fileSystem.exists(filePath(file))
       } else ownedSidecar(sidecar / "$index.piece")
     }
@@ -577,7 +588,7 @@ internal class TorrentPieceStore(
       val start = index * metadata.pieceLength
       val end = start + pieceSize(index)
       val inPlace = overlappingFiles(index).all { file ->
-        overlap(start, end, file) == 0L ||
+        overlap(start, end, file) == 0L || padding[file] ||
           file in materialized && fileSystem.exists(filePath(file))
       }
       if (!inPlace) continue
@@ -851,7 +862,8 @@ internal class TorrentPieceStore(
   private fun readPiece(index: Int): ByteArray {
     val bytes = ByteArray(pieceSize(index))
     forEachStoredSpan(index) { handle, offset, targetOffset, count ->
-      readFully(handle, offset, bytes, targetOffset, count)
+      // Padding spans stay zero.
+      if (handle != null) readFully(handle, offset, bytes, targetOffset, count)
     }
     return bytes
   }
@@ -872,7 +884,8 @@ internal class TorrentPieceStore(
       var done = 0
       while (done < count) {
         val size = minOf(chunk.size, count - done)
-        readFully(handle, offset + done, chunk, 0, size)
+        if (handle != null) readFully(handle, offset + done, chunk, 0, size)
+        else chunk.fill(0, 0, size)
         digest.update(chunk, 0, size)
         done += size
       }
@@ -882,10 +895,11 @@ internal class TorrentPieceStore(
       digest.digest().contentEquals(metadata.pieceHashes.copyOfRange(index * 20, index * 20 + 20))
   }
 
+  /** Visits the stored spans of piece [index] in order; a padding span has no handle. */
   private inline fun forEachStoredSpan(
     index: Int,
     inPlace: (Int) -> Boolean = materialized::contains,
-    visit: (handle: FileHandle, offset: Long, targetOffset: Int, count: Int) -> Unit,
+    visit: (handle: FileHandle?, offset: Long, targetOffset: Int, count: Int) -> Unit,
   ) {
     val start = index * metadata.pieceLength
     val end = start + pieceSize(index)
@@ -894,6 +908,10 @@ internal class TorrentPieceStore(
       if (count == 0) continue
       val overlapStart = maxOf(start, offsets[file])
       val targetOffset = (overlapStart - start).toInt()
+      if (padding[file]) {
+        visit(null, 0, targetOffset, count)
+        continue
+      }
       val stored = inPlace(file)
       val path = if (stored) filePath(file) else sidecar / "$index.piece"
       val offset = if (stored) overlapStart - offsets[file] else targetOffset.toLong()
@@ -933,7 +951,7 @@ internal class TorrentPieceStore(
   private fun filePath(index: Int): Path = if (metadata.isMultiFile) {
     val relative = metadata.files[index].path.substringAfter('/', "")
     require(relative.isNotEmpty())
-    relative.split('/').forEach(TorrentMetadata::validatePathComponent)
+    relative.split('/').forEach(::validateDiskComponent)
     output / relative
   } else output
 

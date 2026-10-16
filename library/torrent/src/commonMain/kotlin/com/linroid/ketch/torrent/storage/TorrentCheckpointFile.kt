@@ -3,8 +3,8 @@ package com.linroid.ketch.torrent.storage
 import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.metainfo.InfoHash
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
@@ -34,7 +34,7 @@ internal class TorrentCheckpointFile(
 
   init {
     require(path.isAbsolute && path.parent != null)
-    TorrentMetadata.validatePathComponent(path.name)
+    validateDiskComponent(path.name)
     require(taskId.length in 1..128 && taskId.all { it.isLetterOrDigit() || it == '-' })
   }
 

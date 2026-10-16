@@ -14,7 +14,9 @@ internal fun admitSession(
   config: TorrentConfig,
   budget: TorrentBufferBudget,
 ): TorrentBufferBudget.Lease {
-  require(spec.metadata.files.size <= config.maxFilesPerTorrent) { "Torrent file limit exceeded" }
+  require(spec.metadata.contentFiles.size <= config.maxFilesPerTorrent) {
+    "Torrent file limit exceeded"
+  }
   require(spec.metadata.pieceHashes.size / 20 <= config.maxPiecesPerTorrent) {
     "Torrent piece limit exceeded"
   }

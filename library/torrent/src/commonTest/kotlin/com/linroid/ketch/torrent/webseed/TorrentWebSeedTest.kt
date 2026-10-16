@@ -204,6 +204,44 @@ class TorrentWebSeedTest {
   }
 
   @Test
+  fun multiFile_paddingNeverRequestedAndFilesAskedByTheirTorrentNames() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        // BEP 47 padding after "a.bin" starts "Who?.bin" at piece 2.
+        val a = ByteArray(20_000) { (it * 7 + 1).toByte() }
+        val b = ByteArray(10_000) { (it * 13 + 5).toByte() }
+        val pad = 2 * PIECE - a.size
+        val payload = a + ByteArray(pad) + b
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+          "info" to mapOf("name" to "set", "piece length" to PIECE.toLong(),
+            "pieces" to hashes(payload, PIECE),
+            "files" to listOf(
+              mapOf("length" to a.size.toLong(), "path" to listOf("a.bin")),
+              mapOf("attr" to "p", "length" to pad.toLong(), "path" to listOf(".pad", "$pad")),
+              mapOf("length" to b.size.toLong(), "path" to listOf("Who?.bin"))
+            )),
+          "url-list" to "http://mirror.test/pub/"
+        )))
+        val mirror = MirrorEngine(mapOf(
+          "http://mirror.test/pub/set/a.bin" to a,
+          "http://mirror.test/pub/set/Who%3F.bin" to b
+        ))
+        withStore(metadata) { store, output ->
+          runSwarm(store, mirror)
+          assertTrue(store.completed())
+          assertContentEquals(a, torrentFileSystem.read(output / "a.bin") { readByteArray() })
+          assertContentEquals(b, torrentFileSystem.read(output / "Who_.bin") { readByteArray() })
+          assertFalse(torrentFileSystem.exists(output / ".pad"))
+          assertEquals(listOf(
+            "http://mirror.test/pub/set/a.bin" to 0L..19_999L,
+            "http://mirror.test/pub/set/Who%3F.bin" to 0L..9_999L
+          ), mirror.requests)
+        }
+      }
+    }
+  }
+
+  @Test
   fun singleFile_sixteenPieces_fetchesTheRunInOneRequest() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {

@@ -7,8 +7,8 @@ import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentIdentity
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import com.linroid.ketch.torrent.peer.pieceBitfield
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -83,7 +83,7 @@ internal class TorrentV2PieceStore(
   init {
     require(taskId.length in 1..128 && taskId.all { it.isLetterOrDigit() || it == '-' })
     require(output.isAbsolute && output.parent != null)
-    TorrentMetadata.validatePathComponent(output.name)
+    validateDiskComponent(output.name)
     require(selected.all { it in filesById }) { "Unknown selected file" }
     // The runtime session must admit metadata/layout state before constructing this adapter.
     require(verifier.layout.pieceCount <= 1_000_000) { "Piece index exceeds desktop profile" }
@@ -647,7 +647,7 @@ internal class TorrentV2PieceStore(
     val requested = creationLogPath ?: return
     if (creationLog == null) {
       require(requested.isAbsolute && requested.parent != null)
-      TorrentMetadata.validatePathComponent(requested.name)
+      validateDiskComponent(requested.name)
       val path = fileSystem.canonicalize(checkNotNull(requested.parent)) / requested.name
       require(path.segments.take(destination.segments.size) != destination.segments) {
         "Creation log must be outside payload storage"

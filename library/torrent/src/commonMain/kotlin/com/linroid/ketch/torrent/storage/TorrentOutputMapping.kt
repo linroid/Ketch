@@ -1,9 +1,9 @@
 package com.linroid.ketch.torrent.storage
 
 import com.linroid.ketch.torrent.crypto.sha256Digest
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.canonicalTorrentName
+import com.linroid.ketch.torrent.metainfo.isDiskComponent
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 import okio.ByteString.Companion.toByteString
@@ -60,12 +60,7 @@ internal class TorrentOutputMapping private constructor(val files: List<File>) {
       if (raw.size > 240) return "~" + digest(raw)
       val text = raw.utf8()
       val valid = text.encodeUtf8() == raw && text.none { it == '%' || it == '~' } &&
-        !reservedDevice(text) && try {
-          TorrentMetadata.validatePathComponent(text)
-          true
-        } catch (_: IllegalArgumentException) {
-          false
-        }
+        !reservedDevice(text) && isDiskComponent(text)
       if (valid) return text
       if (raw.size > 80) return "~" + digest(raw)
       return buildString {

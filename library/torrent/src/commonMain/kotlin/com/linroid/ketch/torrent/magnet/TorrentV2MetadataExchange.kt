@@ -39,21 +39,33 @@ internal class TorrentV2MetadataExchange(
     webSeeds: List<String> = emptyList(),
   ): ByteArray = TorrentMetadataExchange(network, maxBytes, timeoutMs, budget)
     .fetchContent(identity, endpoint, trackerTiers, privacy) { connection, raw, workspace ->
-      val info = TorrentV2Info.parse(raw, expectedIdentity = identity)
+      // The info matched its hash, so whatever fails to parse in it fails for every peer.
+      val info = unusableUnless {
+        TorrentV2Info.parse(raw, expectedIdentity = identity).also { info ->
+          val hashes = info.files.filter { it.length > info.pieceLength }
+            .sumOf { (it.length - 1) / info.pieceLength + 1 }
+          require(hashes * 32 <= maxBytes - raw.size) { "Piece layers exceed metainfo limit" }
+        }
+      }
       if (info.privateTorrent && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
         throw PrivateTorrentMagnetException()
       }
+      // Fetched from this peer, so its failures are the peer's.
       val layers = fetchLayers(connection, info, workspace)
-      val envelope = Bencode.encode(mapOf("announce-list" to trackerTiers))
-      val suffix = Bencode.encode(buildMap {
-        put("piece layers", layers)
-        if (webSeeds.isNotEmpty()) put("url-list", webSeeds)
-      })
-      val metainfo = Buffer().write(envelope, 0, envelope.size - 1)
-        .writeUtf8("4:info").write(raw).write(suffix, 1, suffix.size - 1).readByteArray()
-      require(metainfo.size <= maxBytes) { "Resolved metainfo exceeds limit" }
-      TorrentV2Document.parse(metainfo, maxDocumentBytes = maxBytes, expectedIdentity = identity)
-      metainfo
+      unusableUnless {
+        val envelope = Bencode.encode(mapOf("announce-list" to trackerTiers))
+        val suffix = Bencode.encode(buildMap {
+          put("piece layers", layers)
+          if (webSeeds.isNotEmpty()) put("url-list", webSeeds)
+        })
+        val metainfo = Buffer().write(envelope, 0, envelope.size - 1)
+          .writeUtf8("4:info").write(raw).write(suffix, 1, suffix.size - 1).readByteArray()
+        require(metainfo.size <= maxBytes) { "Resolved metainfo exceeds limit" }
+        // Layers were checked against their roots as they arrived.
+        TorrentV2Document.parse(metainfo, maxDocumentBytes = maxBytes,
+          expectedIdentity = identity)
+        metainfo
+      }
     }
 
   private suspend fun fetchLayers(

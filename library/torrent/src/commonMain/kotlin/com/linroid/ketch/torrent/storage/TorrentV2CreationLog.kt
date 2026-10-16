@@ -4,7 +4,7 @@ import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
-import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.metainfo.validateDiskComponent
 import okio.Buffer
 import okio.FileSystem
 import okio.Path
@@ -18,6 +18,10 @@ import okio.use
 internal class TorrentV2CreationLog(
   private val path: Path,
   private val fileSystem: FileSystem,
+  /** Publishes a new log; [torrentPublishCatalogObject] links it, or moves it where it cannot. */
+  private val publish: (source: Path, target: Path) -> Boolean = { source, target ->
+    torrentPublishCatalogObject(source, target, fileSystem)
+  },
 ) {
   /** What [open] read: the records, and which of the accepted bindings the log has. */
   class Opened(val records: List<TorrentV2Checkpoint.Owned>, val matched: Int)
@@ -38,7 +42,8 @@ internal class TorrentV2CreationLog(
     val parent = checkNotNull(path.parent)
     val metadata = fileSystem.metadata(parent)
     require(metadata.isDirectory && metadata.symlinkTarget == null)
-    if (!fileSystem.exists(path)) {
+    // An empty log is one a crash left before it was published, which publishing takes over.
+    if (!fileSystem.exists(path) || isUnpublished(fileSystem, path)) {
       val temp = parent / (".creation-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
       var created: String? = null
       try {
@@ -48,7 +53,7 @@ internal class TorrentV2CreationLog(
           handle.write(0, bytes, 0, bytes.size)
           handle.flush()
         }
-        torrentPublishCatalogObject(temp, path)
+        publish(temp, path)
       } finally {
         if (created != null && torrentFileIdentity(temp) == created) {
           fileSystem.delete(temp, mustExist = false)
@@ -154,7 +159,7 @@ internal class TorrentV2CreationLog(
   private fun validate(record: TorrentV2Checkpoint.Owned) {
     require(records.size < 220_000 && record.components.size <= 64)
     require(record.identity.length in 1..512 && record.components !in indices)
-    record.components.forEach(TorrentMetadata::validatePathComponent)
+    record.components.forEach(::validateDiskComponent)
     if (record.components.isEmpty()) require(records.isEmpty() && record.directory) else {
       val parent = requireNotNull(indices[record.components.dropLast(1)])
       require(records[parent].directory)
