@@ -3,9 +3,14 @@ package com.linroid.ketch.torrent.v2
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.describeWithoutUrls
+import com.linroid.ketch.torrent.engine.StallRecovery
+import com.linroid.ketch.torrent.engine.StallSignals
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
+import com.linroid.ketch.torrent.engine.TorrentStallWatchdog
+import com.linroid.ketch.torrent.engine.describe
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
@@ -38,6 +43,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import okio.ByteString
@@ -97,6 +103,15 @@ internal class TorrentV2Swarm(
    * except in the endgame, and keeps the transfer going while one runs.
    */
   val webSeeds: TorrentV2WebSeeds? = null,
+  /**
+   * Why the download stalls, published about once a second while it downloads; null while it
+   * makes progress. Without it the loop does not look for stalls.
+   */
+  val stall: MutableStateFlow<TorrentStall?>? = null,
+  /** Asks the torrent's trackers for peers now, as a stalled download recovers; never waits. */
+  val reannounce: () -> Unit = {},
+  /** Time this transfer's web seeds spent waiting on speed limits so far, which is no stall. */
+  val webSeedThrottledMs: () -> Long = { 0 },
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
@@ -108,12 +123,15 @@ internal object TorrentV2SessionLoop {
 
   /**
    * How often a downloading loop wakes up unprompted: to look for late requests other peers may
-   * duplicate, and whether the endgame began.
+   * duplicate, whether the endgame began, and whether it stalled.
    */
   private const val TICK_MS = 1_000L
 
   /** How long a peer that found nothing to duplicate waits before looking again. */
   private const val DUPLICATE_SCAN_MS = 500L
+
+  /** The most missing pieces a stall check looks up the files of. */
+  private const val MAX_REPORTED_MISSING_PIECES = 4_096
 
   /** Live changes a swarm loop applies without restarting its pool, dialer or workers. */
   sealed interface Control {
@@ -279,7 +297,7 @@ internal object TorrentV2SessionLoop {
       // changes, or after a while for buffers freed elsewhere.
       var mirrorVersion = -1L
       var mirrorRetryAt = 0L
-      // Web seeds that stopped.
+      // Web seeds that stopped, which a stalled download may start again.
       val stoppedMirrors = mutableSetOf<Int>()
       // Every selected piece is verified; a seed keeps serving peers after that.
       var complete = false
@@ -289,6 +307,11 @@ internal object TorrentV2SessionLoop {
       var endgame = false
       // Cancels of requests other peers delivered first, waiting for room in their peer's queue.
       val cancels = ArrayDeque<TorrentV2PieceScheduler.Cancel>()
+      // Notices a download that stopped making progress, says why and recovers ([checkStall]).
+      val watchdog = swarm?.stall?.let { TorrentStallWatchdog(nowMs) }
+      val payloadAtStart = store.receivedBytes()
+      // Time requests waited on speed limits, which is never a stall.
+      var throttledMs = 0L
 
       fun wakeAdmission() { peers.values.forEach { it.admissionBlocked = false } }
 
@@ -382,6 +405,7 @@ internal object TorrentV2SessionLoop {
             if (delay > 0) {
               check(pieces.resolve(request, null))
               view.rateRetryAt = nowMs() + delay
+              throttledMs += delay
             } else if (sent) {
               view.inFlight++
             } else {
@@ -782,6 +806,8 @@ internal object TorrentV2SessionLoop {
           Control.PolicyChanged -> Unit
           is Control.Select -> {
             retarget()
+            // Pieces it waited for may be gone, others wanted: the stall clock starts over.
+            watchdog?.progressed()
             if (complete && !pieces.completed()) {
               // Download again; the next completion runs onCompleted once more.
               complete = false
@@ -795,10 +821,62 @@ internal object TorrentV2SessionLoop {
         }
       }
 
+      /**
+       * Checks whether the download stalled, publishes why and runs the recoveries due, as a v1
+       * swarm does. Only a swarm that publishes stalls looks for them.
+       */
+      fun checkStall() {
+        val published = swarm?.stall ?: return
+        val stallWatchdog = watchdog ?: return
+        val downloading = !complete && !seeding
+        // With nothing connected no piece is missing from what is: it waits for peers.
+        val missing = if (downloading && peers.size + mirrorsRunning > 0) {
+          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::sourced)
+        } else null
+        val due = stallWatchdog.check(StallSignals(
+          downloading = downloading,
+          peers = peers.size,
+          unchokingPeers = peers.values.count { !it.choked },
+          missingPieces = missing?.count ?: 0,
+          missingFileIds = missing?.fileIds.orEmpty(),
+          lateBlocks = if (downloading) pieces.lateCount() else 0,
+          webSeeds = mirrorsRunning,
+          droppedWebSeeds = stoppedMirrors.size,
+          payloadBytes = store.receivedBytes() - payloadAtStart,
+          throttledMs = throttledMs + swarm.webSeedThrottledMs(),
+          pieceLength = layout.pieceLength,
+        ))
+        val current = stallWatchdog.stall
+        if (current?.reason != published.value?.reason) {
+          if (current == null) log.i { "V2 swarm $label makes progress again" }
+          else log.i { "V2 swarm $label stalled: ${current.describe()}" }
+        }
+        published.value = current
+        for (recovery in due) {
+          log.i { "V2 swarm $label recovers from a stall: ${recovery.name.lowercase()}" }
+          when (recovery) {
+            StallRecovery.REANNOUNCE -> swarm.reannounce()
+            StallRecovery.REVIVE_PEERS -> {
+              val revived = book?.revive() ?: 0
+              if (revived > 0) {
+                log.d { "V2 swarm $label: dialing $revived peer(s) it gave up on again" }
+              }
+            }
+            StallRecovery.RELAUNCH_WEB_SEEDS -> if (mirrors != null) {
+              for (seed in stoppedMirrors.toList()) {
+                if (!mirrors.relaunch(seed)) continue
+                stoppedMirrors -= seed
+                mirrorsRunning++
+              }
+            }
+          }
+        }
+      }
+
       onProgress()
       var preference = 0
       val branches = if (swarm == null) 3 else 9
-      // Each tick looks for late requests and the endgame; see TICK_MS.
+      // Each tick looks for late requests, the endgame and a stall; see TICK_MS.
       var nextTick = nowMs() + TICK_MS
       var acceptingConnections = connections != null
       // Event driven: an idle swarm logs nothing, so the loop never wakes just to report.
@@ -815,6 +893,9 @@ internal object TorrentV2SessionLoop {
           if (!complete && pieces.completed()) {
             complete = true
             endgame = false
+            // A finished download is no stalled one.
+            swarm.stall?.value = null
+            watchdog?.progressed()
             // A seed retries nobody; peers it has not tried are still dialed.
             book?.completed()
             if (swarm.onCompleted()) {
@@ -829,6 +910,7 @@ internal object TorrentV2SessionLoop {
         if (!complete && nowMs() >= nextTick) {
           nextTick = nowMs() + TICK_MS
           endgame = pieces.endgame(::sourced)
+          checkStall()
           // Peers look for late requests again on this pass.
           wakeAdmission()
         }
@@ -851,9 +933,10 @@ internal object TorrentV2SessionLoop {
             val webSeedPart = mirrors?.let {
               "; ${it.stats.summary(mirrorsRunning, it.urls.size)}"
             }.orEmpty()
+            val stallPart = swarm?.stall?.value?.let { "; stall: ${it.describe()}" }.orEmpty()
             "V2 swarm $label: pieces $verified/${layout.pieceCount}, peers=${peers.size}" +
               "$swarmPart unchoked=${peers.values.count { !it.choked }}, pendingCommits=" +
-              "${pieces.pendingCommitCount}, endgame=$endgame$outcomes$webSeedPart"
+              "${pieces.pendingCommitCount}, endgame=$endgame$outcomes$webSeedPart$stallPart"
           }
         }
         // Every peer tried is gone and nobody is left to dial: an owner waits for discovery to
@@ -924,7 +1007,7 @@ internal object TorrentV2SessionLoop {
           val mirrorDelay = if (idleMirrors.isNotEmpty() && !complete) {
             (mirrorRetryAt - nowMs()).coerceAtLeast(1)
           } else null
-          // While downloading: late requests and the endgame (see TICK_MS).
+          // While downloading: late requests, the endgame and stalls (see TICK_MS).
           val tickDelay = if (!complete) (nextTick - nowMs()).coerceAtLeast(1) else null
           val retryDelay = listOfNotNull(memoryDelay, rateDelay, dialDelay, uploadDelay,
             exchangeDelay, mirrorDelay, tickDelay).minOrNull()
@@ -945,7 +1028,10 @@ internal object TorrentV2SessionLoop {
                 view.needed--
               }
               // Peers hear we have it, as for a piece they sent.
-              if (gained) uploads?.committed(index)
+              if (gained) {
+                uploads?.committed(index)
+                watchdog?.progressed()
+              }
               onProgress()
               wakeAdmission()
             }
@@ -1031,6 +1117,7 @@ internal object TorrentV2SessionLoop {
                 view.needed--
               }
               uploads?.committed(index)
+              watchdog?.progressed()
             }
             onProgress()
             wakeAdmission()

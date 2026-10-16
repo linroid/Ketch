@@ -507,6 +507,29 @@ internal class TorrentV2PieceScheduler private constructor(
     return true
   }
 
+  /**
+   * Wanted pieces left that no source has ([sourced] false), not counting those being committed:
+   * how many, and the files holding the first [limit] of them, in piece order, at most
+   * [maxFiles] of those.
+   */
+  fun missing(limit: Int, maxFiles: Int, sourced: (Int) -> Boolean): Missing {
+    check(!closed)
+    val committing = commits.values.toHashSet()
+    var count = 0
+    val files = linkedSetOf<String>()
+    for (index in verified.indices) {
+      if (!wanted[index] || verified[index] || index in committing || sourced(index) ||
+        assemblies[index]?.complete == true) continue
+      if (count++ < limit && files.size < maxFiles) {
+        layout.v2Piece(index.toLong()).fileId?.let(files::add)
+      }
+    }
+    return Missing(count, files.toList())
+  }
+
+  /** What [missing] found: [count] pieces, held by [fileIds]. */
+  class Missing internal constructor(val count: Int, val fileIds: List<String>)
+
   /** Synchronous adapter for an owner of both scheduler and peer; session actors use plan/resolve. */
   suspend fun requestNext(peer: PeerBlockExchange): PeerBlockExchange.Ticket? {
     check(!closed)

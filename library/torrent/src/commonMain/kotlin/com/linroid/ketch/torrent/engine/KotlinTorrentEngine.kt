@@ -1061,9 +1061,12 @@ internal class KotlinTorrentEngine(
       TrackerDiscovery(document, layout, peerId, advertisedPort::current,
         TrackerTiers(urls, ::announceToTracker), onChanged,
         announceCompletion = store::selectsAll, topic = topic)
-    suspend fun poll(discovery: TrackerDiscovery, stopped: Boolean = false): TrackerResponse? =
-      discovery.poll(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes(),
-        stopped = stopped)
+    suspend fun poll(
+      discovery: TrackerDiscovery,
+      stopped: Boolean = false,
+      manual: Boolean = false,
+    ): TrackerResponse? = discovery.poll(store.verifiedPieces(), sink.receivedBytes(),
+      sink.uploadedBytes(), stopped = stopped, manual = manual)
     suspend fun publish(topic: TrackerTopic, peers: List<PeerEndpoint>) {
       // Admit the hosts first: a restricted owner accepts only peers its trackers name.
       sink.trackerPeers(topic, peers)
@@ -1092,9 +1095,17 @@ internal class KotlinTorrentEngine(
       }
     } else if (tiers.isNotEmpty()) for (topic in topics) launch {
       val discovery = discovery(topic, tiers, sink::reset)
+      var reannounced = sink.reannounceRequests()
       try {
         while (isActive) {
-          attempt { poll(discovery)?.let { publish(topic, it.peers.distinct()) } }
+          // A stalled transfer asks for peers now, sooner than the trackers said (as soon as
+          // their minimum interval allows), as a v1 session's tracker control does.
+          val requests = sink.reannounceRequests()
+          val manual = requests != reannounced
+          reannounced = requests
+          attempt {
+            poll(discovery, manual = manual)?.let { publish(topic, it.peers.distinct()) }
+          }
           delay(1000)
         }
       } finally {

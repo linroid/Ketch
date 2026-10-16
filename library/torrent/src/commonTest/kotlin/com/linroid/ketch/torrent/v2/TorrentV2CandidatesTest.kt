@@ -248,4 +248,29 @@ class TorrentV2CandidatesTest {
     book.pushBack(second)
     assertEquals(0x01, book.next()?.pexFlags)
   }
+
+  @Test
+  fun revive_dialsEndpointsGivenUpOnAgainButNeverBannedOnes() {
+    val book = book()
+    for (endpoint in listOf(a, b, c)) book.offer(endpoint, PeerTopic.V2, PeerOrigin.TRACKER)
+    val targets = generateSequence { book.next() }.associateBy { it.endpoint }
+    // a is given up on after its last retry, b backs off, c broke the protocol.
+    var target = targets.getValue(a)
+    for (wait in TorrentV2Candidates.RETRY_DELAYS_MS) {
+      book.failed(target, IOException("Connection refused"))
+      now += wait
+      target = assertNotNull(book.next())
+    }
+    book.failed(target, IOException("Connection refused"))
+    book.failed(targets.getValue(b), IOException("Connection refused"))
+    book.failed(targets.getValue(c), IllegalArgumentException("Bad handshake"))
+    assertNull(book.next())
+    assertEquals(2, book.revive())
+    // Both are dialed at once.
+    val revived = generateSequence { book.next() }.associateBy { it.endpoint }
+    assertEquals(setOf(a, b), revived.keys)
+    // Their attempts start over: a fails once more and backs off its first five seconds.
+    book.failed(revived.getValue(a), IOException("Connection refused"))
+    assertEquals(5_000, book.nextDueMs())
+  }
 }

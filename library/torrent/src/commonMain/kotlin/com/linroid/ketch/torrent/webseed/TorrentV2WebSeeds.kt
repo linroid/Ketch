@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
@@ -9,6 +10,7 @@ import com.linroid.ketch.torrent.storage.CommitOutcome
 import com.linroid.ketch.torrent.storage.TorrentStorageException
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.v2.TorrentV2PieceScheduler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -69,7 +71,8 @@ internal class WebSeedV2Layout private constructor(
  * loop hands out: a seed tells the loop it is idle through [updates], the loop claims a run of
  * pieces from its scheduler ([TorrentV2PieceScheduler.claimWebSeedRun]) and [assign]s it, and the
  * seed reports each piece [Event.Done] once the store verified and wrote it, or gave it back. The
- * store verifies a mirror's piece against the piece layers as it does a peer's.
+ * store verifies a mirror's piece against the piece layers as it does a peer's. A seed that
+ * stopped can be started again ([relaunch]).
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2WebSeeds private constructor(
@@ -98,6 +101,9 @@ internal class TorrentV2WebSeeds private constructor(
 
   // The pieces each seed cannot serve, which its workers report and the loop reads.
   private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
+
+  // Seeds started again after they stopped, which [run] launches.
+  private val relaunches = Channel<Int>(Channel.UNLIMITED)
 
   /** What the seeds tell the session loop. */
   val updates: ReceiveChannel<Event> get() = events
@@ -130,24 +136,39 @@ internal class TorrentV2WebSeeds private constructor(
   fun reclaim(seed: Int): List<TorrentV2PieceScheduler.WebSeedClaim> =
     assignments[seed].tryReceive().getOrNull().orEmpty()
 
-  /** Runs every seed until they are all dropped or the transfer cancels them. */
+  /**
+   * Starts [seed], which [Event.Stopped], again, as a stalled transfer asks: it may be asked for
+   * every piece again, those it could not serve included, as its mirror may have them by now.
+   * False once the seeds closed.
+   */
+  fun relaunch(seed: Int): Boolean {
+    unservable[seed].store(emptySet())
+    return relaunches.trySend(seed).isSuccess
+  }
+
+  /** Runs every seed, and those [relaunch] starts again, until the transfer cancels them. */
   suspend fun run(): Unit = coroutineScope {
     log.i { "Transfer $logLabel: downloading from ${urls.size} web seed(s) too" }
-    for ((seed, url) in urls.withIndex()) {
-      launch {
-        try {
-          WebSeedWorker(url, Pieces(seed), http, stats, logLabel, reporter, retryMs,
-            downloadPayload = downloadPayload).run()
-        } catch (e: TorrentStorageException) {
-          events.trySend(Event.Failed(e))
-        }
-      }
+    for (seed in urls.indices) launchSeed(seed)
+    for (seed in relaunches) {
+      log.i { "Transfer $logLabel: starting web seed ${redactUrl(urls[seed])} again" }
+      launchSeed(seed)
     }
   }
 
-  /** Once [run] returned: pieces still assigned go back to the budget. */
+  private fun CoroutineScope.launchSeed(seed: Int) = launch {
+    try {
+      WebSeedWorker(urls[seed], Pieces(seed), http, stats, logLabel, reporter, retryMs,
+        downloadPayload = downloadPayload).run()
+    } catch (e: TorrentStorageException) {
+      events.trySend(Event.Failed(e))
+    }
+  }
+
+  /** Once [run] was cancelled: pieces still assigned go back to the budget. */
   fun close() {
     events.close()
+    relaunches.close()
     assignments.forEach { it.cancel() }
   }
 

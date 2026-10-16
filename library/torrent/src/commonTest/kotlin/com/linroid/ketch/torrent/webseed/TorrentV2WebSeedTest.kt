@@ -1,9 +1,12 @@
 package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.ConnectionDirection
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.torrent.RecordingConnections
 import com.linroid.ketch.torrent.TorrentV2Fixture
+import com.linroid.ketch.torrent.api.TorrentStallReason
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -12,15 +15,20 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.monotonicClock
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import com.linroid.ketch.torrent.v2.TorrentV2DiscoverySink
 import com.linroid.ketch.torrent.v2.TorrentV2DownloadSession
 import com.linroid.ketch.torrent.v2.TorrentV2Runtime
 import com.linroid.ketch.torrent.v2.TorrentV2SessionOptions
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
@@ -29,12 +37,14 @@ import kotlinx.coroutines.withTimeout
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -282,6 +292,136 @@ class TorrentV2WebSeedTest {
       assertFiles(fixture, run.output, listOf(1))
       assertEquals(setOf("http://mirror.test/pub/pack/c.bin"),
         mirror.requests.map { it.first }.toSet())
+    }
+  }
+
+  /** A download [stalling] runs: its session, the sink its discovery got, and its clock. */
+  private class Stalling(
+    val session: TorrentV2DownloadSession,
+    val sink: TorrentV2DiscoverySink,
+    private val skipped: AtomicLong,
+  ) {
+    /** Moves the session's clock [ms] on, as if that long passed without a byte. */
+    fun skip(ms: Long) {
+      skipped.addAndFetch(ms)
+    }
+  }
+
+  /**
+   * Downloads [fixture] from the web seed [engine] serves, without any peer, its discovery open
+   * and its clock one the test moves on; [body] watches it before it is closed.
+   */
+  private suspend fun stalling(
+    fixture: TorrentV2Fixture,
+    engine: HttpEngine,
+    body: suspend (Stalling) -> Unit,
+  ) = withContext(Dispatchers.Default) {
+    withTimeout(15_000) {
+      val output = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+        "ketch-v2-stall-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+      val buffers = TorrentBufferBudget(4 * 1024 * 1024)
+      val state = TorrentBufferBudget(4 * 1024 * 1024)
+      val network = createTorrentNetwork()
+      val store = TorrentV2PieceStore(fixture.document, output, emptySet(), "stall", buffers,
+        Semaphore(4))
+      val clock = monotonicClock()
+      val skipped = AtomicLong(0)
+      val sinks = CompletableDeferred<TorrentV2DiscoverySink>()
+      try {
+        val session = TorrentV2DownloadSession.open(this, fixture.document, fixture.layout,
+          emptySet(), store,
+          TorrentV2Runtime(network, ByteArray(20) { 1 }.toByteString(), buffers, state,
+            webSeedHttp = TorrentHttp(engine)),
+          TorrentV2SessionOptions(maxPeers = 4, webSeedRetryMs = 5,
+            nowMs = { clock() + skipped.load() },
+            discovery = { sink ->
+              sinks.complete(sink)
+              awaitCancellation()
+            }))
+        try {
+          session.restore(null)
+          session.resume()
+          body(Stalling(session, sinks.await(), skipped))
+        } finally {
+          withContext(NonCancellable) { session.close() }
+        }
+        assertEquals(0, buffers.allocated)
+      } finally {
+        withContext(NonCancellable) {
+          network.close()
+          torrentFileSystem.deleteRecursively(output, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun lostFile_isReportedAsAStallNamingIt() = runTest {
+    val fixture = TorrentV2Fixture.build(files, webSeeds = listOf("http://mirror.test/pub/"))
+    // The only source lost c.bin, as mirrors lose files they regenerate.
+    val mirror = MirrorEngine(mirrorFiles(fixture),
+      missing = setOf("http://mirror.test/pub/pack/c.bin"))
+    val lost = fixture.layout.files.single { it.v2Index == 1 }.id
+    stalling(fixture, mirror) { run ->
+      // Every other file arrives.
+      val others = (files[0].second + files[2].second).toLong()
+      run.session.downloadedBytes.first { it == others }
+      // A check a second sees it arrive.
+      delay(1_500)
+      assertNull(run.session.stall.value)
+      // Nothing more for 40 s: a stall, which names the file the download waits for.
+      run.skip(40_000)
+      val stall = assertNotNull(run.session.stall.first { it != null })
+      assertEquals(TorrentStallReason.MISSING_PIECES, stall.reason)
+      // c.bin's 70,000 bytes are three pieces.
+      assertEquals(3, stall.missingPieces)
+      assertEquals(listOf(lost), stall.missingFileIds)
+      assertEquals(0, stall.peers)
+      // Paused, the download is not stalled any more.
+      run.session.pause()
+      assertNull(run.session.stall.value)
+    }
+  }
+
+  @Test
+  fun droppedSeed_isStartedAgainOnceTheStallLastsTwoMinutes() = runTest {
+    val fixture = TorrentV2Fixture.build(files, webSeeds = listOf("http://mirror.test/pub/"))
+    val mirror = MirrorEngine(mirrorFiles(fixture))
+    // The mirror is down at first, so the seed is dropped, and back later.
+    val online = AtomicBoolean(false)
+    val requests = AtomicLong(0)
+    val flaky = object : HttpEngine {
+      override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+        error("unused")
+
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        requests.addAndFetch(1)
+        if (!online.load()) throw KetchError.Http(404)
+        mirror.download(url, range, headers, onData)
+      }
+
+      override fun close() = Unit
+    }
+    stalling(fixture, flaky) { run ->
+      // Every file is asked for and missing: the seed goes, and nothing else is there.
+      while (requests.load() < files.size) delay(10)
+      delay(1_500)
+      run.skip(40_000)
+      assertEquals(TorrentStallReason.NO_PEERS,
+        run.session.stall.first { it?.reason == TorrentStallReason.NO_PEERS }?.reason)
+      assertEquals(0L, run.sink.reannounceRequests())
+      // Two minutes on, it is started again and finds the mirror back; the trackers are asked
+      // for peers again too.
+      online.store(true)
+      run.skip(90_000)
+      run.session.downloadedBytes.first { it == files.sumOf { file -> file.second }.toLong() }
+      assertTrue(run.sink.reannounceRequests() > 0)
+      assertTrue(mirror.requests.isNotEmpty())
     }
   }
 }

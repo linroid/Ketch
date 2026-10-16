@@ -222,6 +222,22 @@ internal class TorrentV2Candidates(
     }
   }
 
+  /**
+   * Dials again every endpoint given up on or backing off, at once and with its attempts
+   * counted from zero, as a stalled session asks; banned endpoints are not among them. Returns
+   * how many.
+   */
+  fun revive(): Int {
+    val revived = entries.values.filter {
+      it.status == Status.EXHAUSTED || it.status == Status.WAITING
+    }
+    for (entry in revived) {
+      entry.attempts = 0
+      enqueue(entry)
+    }
+    return revived.size
+  }
+
   /** Never dials [endpoint] again, until it leaves the bounded list. */
   fun ban(endpoint: PeerEndpoint) {
     remember(bannedEndpoints, endpoint)

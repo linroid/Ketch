@@ -864,6 +864,27 @@ class TorrentV2PieceSchedulerTest {
   }
 
   @Test
+  fun missing_countsWantedPiecesNoSourceHasAndNamesTheirFiles() {
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      booleanArrayOf(false, false), buffers, state))
+    try {
+      val none = scheduler.missing(limit = 10, maxFiles = 32) { true }
+      assertEquals(0, none.count)
+      assertTrue(none.fileIds.isEmpty())
+      // Nobody has b's piece.
+      val missing = scheduler.missing(limit = 10, maxFiles = 32) { it == 0 }
+      assertEquals(1, missing.count)
+      assertEquals(listOf("1"), missing.fileIds)
+      // Counted whatever the limit, which bounds only the files looked up.
+      val bounded = scheduler.missing(limit = 0, maxFiles = 32) { false }
+      assertEquals(2, bounded.count)
+      assertTrue(bounded.fileIds.isEmpty())
+    } finally { scheduler.close() }
+  }
+
+  @Test
   fun lateAfter_isTwiceThePipelinesTimeAtThePeersRate() {
     assertEquals(TorrentV2PieceScheduler.DEFAULT_LATE_MS,
       TorrentV2PieceScheduler.lateAfterMs(pipeline = 32, rate = 0))
