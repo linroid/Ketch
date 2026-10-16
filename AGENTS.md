@@ -623,7 +623,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`MAX_TRACKERS`), a metadata lookup ignores peers past `MAX_METADATA_PEERS` (4096), the v1
   parser takes 10,000 content files at any depth (1,000,000 bencode values), and v2 resolution
   and tracker-only lookups skip trackers Ketch cannot announce to, such as `wss://`
-  (`TrackerConfiguration.usable`; `prepare` stays strict for edits)
+  (`TrackerConfiguration.usable`; `prepare` stays strict for edits). New metainfo inputs that
+  are private or resolved tracker-only, with no tracker left and no web seed, are refused
+  (`requireDiscoverable`); a saved task's metainfo is read without that check
+  (`resolveV2Metainfo(checkDiscovery = false)`)
 - Metadata that matches a magnet's hash but does not parse ends the lookup with
   `UnusableTorrentMetadataException`, a `MetadataLookupFailure` like
   `PrivateTorrentMagnetException`, which `resolve` reports as `KetchError.SourceError`; v2

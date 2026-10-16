@@ -372,6 +372,9 @@ SDK users can also resolve a torrent as **tracker-only**: it uses only the track
 when the torrent is public (see [discovery privacy](#choosing-discovery-privacy)). Trackers hear
 that a download completed only once every file is selected and complete.
 
+A private or tracker-only `.torrent` with no `http`, `https` or `udp` tracker and no web seed
+could never find a peer, so Ketch refuses to open it rather than wait forever.
+
 ## Platform support and limits
 
 - Torrents download on Android 8.0+ (API 26), JVM 11+ (desktop, CLI, server) and iOS (arm64 and

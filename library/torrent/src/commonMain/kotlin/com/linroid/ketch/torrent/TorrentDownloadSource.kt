@@ -543,7 +543,17 @@ class TorrentDownloadSource(
     check(!closed.load()) { "Torrent source is closed" }
     resolveV2Metainfo(null, bytes, config, privacy)?.let { return it }
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
-    return resolved("torrent:${metadata.infoHash.hex}", metadata, privacy)
+    return resolvedMetainfo("torrent:${metadata.infoHash.hex}", metadata, privacy)
+  }
+
+  /** [resolved] for v1 metainfo a caller supplied, refusing one that could never find a peer. */
+  private fun resolvedMetainfo(
+    url: String,
+    metadata: TorrentMetadata,
+    privacy: TorrentDiscoveryPrivacy,
+  ): ResolvedSource {
+    requireDiscoverable(metadata.isPrivate, metadata.trackerTiers, metadata.webSeeds, privacy)
+    return resolved(url, metadata, privacy)
   }
 
   /**
@@ -939,7 +949,8 @@ class TorrentDownloadSource(
         }
       }
       (resolveV2Metainfo(url, bytes, config, privacy)
-        ?: resolved(url, TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes), privacy))
+        ?: resolvedMetainfo(url, TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes),
+          privacy))
         .logged(if (url.startsWith("http", true)) "HTTP metainfo" else "metainfo file")
     }
   }
@@ -1080,7 +1091,8 @@ class TorrentDownloadSource(
   ) {
     val hash = requireNotNull(resolved.metadata[META_INFO_HASH])
     val bytes = decodeBase64(requireNotNull(resolved.metadata[ResolvedSource.METAINFO_KEY]))
-    val v2 = resolveV2Metainfo(resolved.url, bytes, config, resolvedPrivacy(resolved))
+    val v2 = resolveV2Metainfo(resolved.url, bytes, config, resolvedPrivacy(resolved),
+      checkDiscovery = false)
     if (v2 != null) {
       require(v2.metadata[META_INFO_HASH] == hash) { "Resolved torrent hash mismatch" }
       executeV2(context, v2, previous)

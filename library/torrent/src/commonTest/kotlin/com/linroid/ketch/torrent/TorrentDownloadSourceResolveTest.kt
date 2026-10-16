@@ -244,14 +244,51 @@ class TorrentDownloadSourceResolveTest {
   fun resolveContent_v2MetainfoWithAWebSocketTracker_resolves() = runTest {
     val fixture = TorrentV2Fixture.build(listOf("a.bin" to 40_000), hybrid = true)
     val tiers = listOf(listOf("wss://tracker.test/announce"), listOf("udp://t.test:1"))
-    // `announce-list` sorts before `info`, the fixture's first key.
-    val content = "d13:announce-list".encodeToByteArray() + Bencode.encode(tiers) +
-      fixture.metainfo.copyOfRange(1, fixture.metainfo.size)
+    val content = withTrackers(fixture.metainfo, tiers)
 
     val resolved = source.resolve(ResolveInput.Content(content, "pack.torrent"))
 
     assertEquals(fixture.document.info.hash.hex, resolved.metadata["infoHash"])
     assertEquals(listOf(listOf("udp://t.test:1")), sourceTrackerTiers(content, 4 * 1024 * 1024))
+  }
+
+  /** [metainfo] with an `announce-list` of [tiers] first, which sorts before `info`. */
+  private fun withTrackers(metainfo: ByteArray, tiers: List<List<String>>): ByteArray =
+    "d13:announce-list".encodeToByteArray() + Bencode.encode(tiers) +
+      metainfo.copyOfRange(1, metainfo.size)
+
+  @Test
+  fun resolveContent_privateTorrentWithoutAUsableTracker_refused() = runTest {
+    val v2 = TorrentV2Fixture.build(listOf("a.bin" to 40_000), privateTorrent = true).metainfo
+    val v1 = Bencode.encode(mapOf("info" to mapOf("name" to "a.bin", "length" to 1L,
+      "piece length" to 16_384L, "pieces" to ByteArray(20), "private" to 1L)))
+    val webSocket = listOf(listOf("wss://tracker.test/announce"))
+    for (metainfo in listOf(v2, v1)) {
+      // Its peers come only from trackers, and Ketch cannot announce to a WebSocket one.
+      val content = withTrackers(metainfo, webSocket)
+      val error = assertFailsWith<KetchError.SourceError> {
+        source.resolve(ResolveInput.Content(content, "private.torrent"))
+      }
+      assertTrue("no http, https or udp tracker" in error.cause?.message.orEmpty())
+      // A saved task's metainfo still reads.
+      TorrentFileTable.parse(content, TorrentConfig())
+      source.resolve(ResolveInput.Content(
+        withTrackers(metainfo, webSocket + listOf(listOf("udp://t.test:1"))), "private.torrent"))
+    }
+  }
+
+  @Test
+  fun resolveMetainfo_trackerOnlyWithoutAUsableTracker_refused() {
+    val metainfo = withTrackers(TorrentV2Fixture.build(listOf("a.bin" to 40_000)).metainfo,
+      listOf(listOf("wss://tracker.test/announce")))
+    assertFailsWith<IllegalArgumentException> {
+      source.resolveMetainfo(metainfo, TorrentDiscoveryPrivacy.TRACKER_ONLY)
+    }
+    source.resolveMetainfo(metainfo, TorrentDiscoveryPrivacy.PUBLIC)
+    // A web seed finds the content without peers.
+    val seeded = TorrentV2Fixture.build(listOf("a.bin" to 40_000),
+      webSeeds = listOf("https://mirror.test/")).metainfo
+    source.resolveMetainfo(seeded, TorrentDiscoveryPrivacy.TRACKER_ONLY)
   }
 
   @Test

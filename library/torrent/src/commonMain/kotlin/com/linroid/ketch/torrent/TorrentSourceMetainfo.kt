@@ -16,19 +16,27 @@ import kotlinx.coroutines.sync.withLock
 import okio.ByteString.Companion.toByteString
 import okio.Path
 
-/** Validates the format before dispatch so hybrid content never falls back to v1 parsing. */
+/**
+ * Validates the format before dispatch so hybrid content never falls back to v1 parsing. With
+ * [checkDiscovery], for new inputs, it refuses a torrent that could never find a peer
+ * ([requireDiscoverable]); a saved task's metainfo is read whatever it holds.
+ */
 internal fun resolveV2Metainfo(
   url: String?,
   bytes: ByteArray,
   config: TorrentConfig,
   privacy: TorrentDiscoveryPrivacy,
+  checkDiscovery: Boolean = true,
 ): ResolvedSource? {
   val envelope = Bencode.parse(bytes, config.maxMetadataBytes)
   val version = envelope["info"]?.get("meta version") ?: return null
   require(version.integer == 2L) { "Unsupported torrent metainfo version" }
   val document = TorrentV2Document.parse(bytes, maxDocumentBytes = config.maxMetadataBytes,
     maxFiles = config.maxFilesPerTorrent)
-  sourceTrackerTiers(bytes, config.maxMetadataBytes)
+  val tiers = sourceTrackerTiers(bytes, config.maxMetadataBytes)
+  if (checkDiscovery) {
+    requireDiscoverable(document.info.privateTorrent, tiers, document.webSeeds, privacy)
+  }
   val mapping = TorrentOutputMapping.from(document)
   val hash = document.info.hash.hex
   val name = document.info.displayName?.utf8()?.takeIf(::isDiskComponent) ?: hash
@@ -58,6 +66,26 @@ internal fun sourceTrackerTiers(bytes: ByteArray, maxBytes: Int): List<List<Stri
     }
   } ?: envelope["announce"]?.text()?.let { listOf(listOf(it)) }.orEmpty()
   return TrackerConfiguration.usable(tiers).tiers
+}
+
+/**
+ * Refuses a torrent that could never find a peer: one that finds peers only through its
+ * trackers, as a private torrent or one resolved [TorrentDiscoveryPrivacy.TRACKER_ONLY] does,
+ * yet has no tracker Ketch can announce to (unsupported ones, such as `wss://`, are left out)
+ * and no web seed.
+ */
+internal fun requireDiscoverable(
+  privateTorrent: Boolean,
+  trackerTiers: List<List<String>>,
+  webSeeds: List<String>,
+  privacy: TorrentDiscoveryPrivacy,
+) {
+  val trackersOnly = privateTorrent || privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY
+  if (!trackersOnly || webSeeds.isNotEmpty()) return
+  require(TrackerConfiguration.usable(trackerTiers).tiers.isNotEmpty()) {
+    "Private and tracker-only torrents find peers only through their trackers, and this one " +
+      "has no http, https or udp tracker or web seed"
+  }
 }
 
 /** Stable task-bound journal lives beside the payload, including without a configured state dir. */
@@ -110,7 +138,8 @@ internal class TorrentFileTable(
   companion object {
     /** Parses [bytes] as v2 or hybrid metainfo first, then as v1. */
     fun parse(bytes: ByteArray, config: TorrentConfig): TorrentFileTable {
-      resolveV2Metainfo(null, bytes, config, config.discoveryPrivacy)?.let { resolved ->
+      resolveV2Metainfo(null, bytes, config, config.discoveryPrivacy,
+        checkDiscovery = false)?.let { resolved ->
         return TorrentFileTable(requireNotNull(resolved.metadata["infoHash"]), v2 = true,
           resolved.files.map { TorrentFileRow(it.id, it.name, it.size, it.name.split('/')) })
       }
