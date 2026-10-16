@@ -80,7 +80,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
-import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
@@ -212,13 +211,13 @@ internal class TorrentSwarm(
     require(budget.capacity >= largestPiece + peerOverhead) {
       "Torrent buffer limit cannot hold a piece and peer protocol state"
     }
-    // What this swarm's peers hold of the budget for their wires.
-    val peersOverhead = AtomicInt(0)
-    // Peers never take the room one piece needs, so they cannot starve piece buffers entirely;
-    // pieces being assembled, which every peer shares, never keep a peer out.
+    // The budget is the engine's: every torrent's peers and pieces, and uploads, share it. A peer
+    // is admitted only while all of it but this swarm's own pieces, which its peers share and
+    // finish, leaves room for one more piece, so peers can never starve piece buffers entirely.
     fun reservePeer(): TorrentBufferBudget.Lease? {
-      if (peersOverhead.load() + peerOverhead + largestPiece > budget.capacity) return null
-      return budget.reserve(peerOverhead)?.also { peersOverhead.fetchAndAdd(peerOverhead) }
+      val others = budget.allocated - scheduler.heldBytes
+      if (budget.capacity - others - peerOverhead < largestPiece) return null
+      return budget.reserve(peerOverhead)
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
     val attempts = linkedMapOf<PeerEndpoint, Int>()
@@ -367,7 +366,6 @@ internal class TorrentSwarm(
           }
           connection?.close()
           overhead.close()
-          peersOverhead.fetchAndAdd(-overhead.bytes)
           results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags,
             redundant))
         }

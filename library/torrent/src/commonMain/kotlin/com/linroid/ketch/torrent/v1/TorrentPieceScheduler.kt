@@ -69,6 +69,13 @@ internal class TorrentPieceScheduler(
   // A web seed's run of whole pieces.
   private val claims = mutableMapOf<Int, MutableList<Claim>>()
 
+  /**
+   * Bytes of [budget] this scheduler's pieces hold, open ones and web seeds' claims: buffers its
+   * peers finish and give back, read without the lock to admit peers.
+   */
+  @Volatile var heldBytes: Int = 0
+    private set
+
   /** Wanted, unverified pieces nobody fetches: neither open nor claimed by a web seed. */
   private var unopened = 0
   /** Wanted, unverified pieces. */
@@ -382,6 +389,7 @@ internal class TorrentPieceScheduler(
   private fun seedClaim(peer: Int, index: Int): Claim? {
     val lease = budget.reserve(pieceSize(index)) ?: return null
     val claim = try { Claim(index, lease) } catch (e: Throwable) { lease.close(); throw e }
+    heldBytes += lease.bytes
     track(index) {
       seedOwned[index]++
       seedOwners.getOrPut(index) { mutableSetOf() }.add(peer)
@@ -574,6 +582,7 @@ internal class TorrentPieceScheduler(
     while (lease == null && evictIdle(now, STALE_PIECE_MS)) lease = budget.reserve(size)
     if (lease == null) return null
     val piece = try { OpenPiece(index, lease, now) } catch (e: Throwable) { lease.close(); throw e }
+    heldBytes += lease.bytes
     track(index) {
       open[index] = piece
       openPieces[index] = piece
@@ -675,6 +684,7 @@ internal class TorrentPieceScheduler(
     }
     withFree.remove(piece)
     piece.lease.close()
+    heldBytes -= piece.lease.bytes
     openings++
   }
 
@@ -686,6 +696,7 @@ internal class TorrentPieceScheduler(
       }
     }
     claim.lease.close()
+    heldBytes -= claim.lease.bytes
     openings++
   }
 

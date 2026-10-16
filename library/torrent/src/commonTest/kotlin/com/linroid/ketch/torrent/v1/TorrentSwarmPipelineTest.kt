@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.FileSystem
 import okio.IOException
 import okio.Path
@@ -258,6 +259,36 @@ class TorrentSwarmPipelineTest {
     } finally {
       swarm.cancelAndJoin()
       first.cancelAndJoin()
+      fixture.close()
+    }
+  }
+
+  @Test
+  fun peerWaitsWhileOtherTorrentsLeaveNoRoomForAPiece() = pipelineTest {
+    val fixture = Fixture(pieces = 2, pieceLength = 8 * block)
+    val peers = Channel<PeerEndpoint>(1)
+    val connected = CompletableDeferred<Unit>()
+    val server = seed(fixture, peers) { wire ->
+      connected.complete(Unit)
+      wire.send(unchoke)
+      wire.serve(fixture)
+    }
+    peers.close()
+    // The engine's budget, shared with another torrent whose peers hold all but less than a
+    // piece once this one's wire is charged: dialing would leave neither a piece to fetch.
+    val overhead = 2 * PeerWire.MAX_FRAME_SIZE + fixture.pieces * 4
+    val budget = TorrentBufferBudget(fixture.pieceLength + 2 * overhead)
+    val other = checkNotNull(budget.reserve(overhead + 1))
+    val swarm = launch { TorrentSwarm(fixture.store, fixture.network, budget).run(peers) }
+    try {
+      assertEquals(null, withTimeoutOrNull(500) { connected.await() })
+      other.close()
+      swarm.join()
+      assertContentEquals(fixture.payload, fixture.output())
+      assertEquals(0, budget.allocated)
+    } finally {
+      swarm.cancelAndJoin()
+      server.cancelAndJoin()
       fixture.close()
     }
   }

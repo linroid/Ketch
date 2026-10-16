@@ -854,8 +854,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   append-only log with a cursor per peer) and its interest: workers start not interested and send
   INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A
   swarm holding every piece closes connections to peers holding every piece and never redials
-  them. A peer is admitted while the swarm's wire overhead leaves room for one piece, and is not
-  dropped for lack of useful payload while it waits for a piece buffer. `V1ThroughputTest`
+  them. A peer is admitted while everything the engine-wide budget holds but the swarm's own pieces
+  (`heldBytes`) leaves room for one more piece, and is not dropped for lack of useful payload while
+  it waits for a piece buffer. `V1ThroughputTest`
   measures throughput and CPU (see [verification](docs/development/torrent-verification.md))
 - Fast extension (BEP 6) on every peer connection: v1 (`TorrentSwarm`'s `PeerWorker`), v2 and
   hybrid ones, a hybrid's v1-swarm peers included (below). The handshake sets reserved byte 7 bit
