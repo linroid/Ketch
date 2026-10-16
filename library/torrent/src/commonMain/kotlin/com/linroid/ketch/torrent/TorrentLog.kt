@@ -19,8 +19,11 @@ internal fun trackerLabel(url: String): String = try {
  * [describeCauses] with every embedded URL reduced to its [trackerLabel]. HTTP client errors
  * quote the request URL, which for trackers includes the passkey.
  */
-internal fun Throwable.describeWithoutUrls(): String =
-  EMBEDDED_URL.replace(describeCauses()) { trackerLabel(it.value) }
+internal fun Throwable.describeWithoutUrls(): String = withoutUrls(describeCauses())
+
+/** [text] with every embedded URL reduced to its [trackerLabel]. */
+internal fun withoutUrls(text: String): String =
+  EMBEDDED_URL.replace(text) { trackerLabel(it.value) }
 
 /** Info-hash prefix that keeps log lines short but still greppable. */
 internal fun logHash(hex: String): String = hex.take(12)

@@ -204,9 +204,10 @@ private class ShotScope(
   /** Shows [StoreData.MAPS] in the inspector on its Connections tab. */
   suspend fun showConnections() {
     feedLanes()
-    state.inspect(environment.phoneKey(StoreData.MAPS_ID))
+    // As the connections grid's Show task does; clicking the text "Connections" would find the
+    // Connections page in the navigation first.
+    state.showConnections(environment.phoneKey(StoreData.MAPS_ID), segments = true)
     scene.settle()
-    scene.clickOnText(CONNECTIONS)
   }
 
   /** Shows the Devices page after a few seconds of every device's speed. */
@@ -867,8 +868,6 @@ private val ADD_LINKS = StoreData.LinkSizes.keys.joinToString("\n")
 
 /** The Discover result picked in its screenshot. */
 private const val STORE_DISCOVER_PICK = "https://maps.example.org/offline/alps-topo-2026.zip"
-
-private const val CONNECTIONS = "Connections"
 
 /** Where the half-open inspector sheet is dragged by, and held at, as fractions of the screen. */
 private const val SHEET_GRIP_X = 0.77f

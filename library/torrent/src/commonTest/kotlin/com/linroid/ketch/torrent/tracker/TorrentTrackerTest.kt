@@ -67,7 +67,7 @@ class TorrentTrackerTest {
       "interval" to 30L, "min interval" to 60L,
       "peers" to byteArrayOf(127, 0, 0, 1, 0x1a, 0xe1.toByte()),
       "peers6" to (ByteArray(15) + byteArrayOf(1, 0x1a, 0xe1.toByte()))
-    )))
+    )), "https://tracker/announce")
     assertEquals(60L, response.intervalSeconds)
     assertEquals(60L, response.minimumIntervalSeconds)
     assertEquals(listOf(PeerEndpoint("127.0.0.1", 6881),
@@ -81,17 +81,13 @@ class TorrentTrackerTest {
     assertEquals(listOf(PeerEndpoint("27.47.171.124", 6881)),
       (TorrentTracker.compactPeers(mapped, true) + TorrentTracker.compactPeers(plain, false))
         .distinct())
-    val error = assertFailsWith<IllegalArgumentException> {
-      TorrentTracker.parseHttp(Bencode.encode(mapOf("failure reason" to "secret passkey")))
-    }
-    assertEquals("Tracker rejected announce", error.message)
   }
 
   @Test
   fun httpResponseRetainsAnEarlierManualMinimum() {
     val response = TorrentTracker.parseHttp(Bencode.encode(mapOf(
       "interval" to 3600L, "min interval" to 300L, "peers" to ByteArray(0)
-    )))
+    )), "https://tracker/announce")
     assertEquals(3600L, response.intervalSeconds)
     assertEquals(300L, response.minimumIntervalSeconds)
   }

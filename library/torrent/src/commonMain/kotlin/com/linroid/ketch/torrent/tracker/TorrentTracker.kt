@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.tracker
 
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.torrent.TorrentClient
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.logHash
@@ -65,9 +66,14 @@ internal data class TrackerResponse(
   val trackerId: ByteArray? = null,
   val source: String? = null,
   val minimumIntervalSeconds: Long? = null,
+  /** The tracker's `warning message`, as [trackerMessage] left it. */
+  val warning: String? = null,
 )
 
-/** BEP 3/15/41 tracker exchange. Error messages deliberately exclude URLs and tracker text. */
+/**
+ * BEP 3/15/41 tracker exchange. Error messages exclude URLs; what a tracker says about a refusal
+ * or in a warning is kept only as [trackerMessage] cleans it.
+ */
 internal class TorrentTracker(
   private val http: TorrentHttp,
   private val network: TorrentNetwork,
@@ -91,8 +97,9 @@ internal class TorrentTracker(
     require(url.length <= 8192)
     val parsed = Url(url)
     return when (parsed.protocol.name.lowercase()) {
-      "http", "https" -> parseHttp(http.fetch(httpUrl(url, request, trackerId), 1024 * 1024))
-      "udp" -> udp(parsed, request)
+      "http", "https" -> parseHttp(http.fetch(httpUrl(url, request, trackerId), 1024 * 1024,
+        headers = TRACKER_HEADERS), url)
+      "udp" -> udp(parsed, url, request)
       else -> error("Unsupported tracker protocol")
     }
   }
@@ -116,17 +123,18 @@ internal class TorrentTracker(
         }.buildString()
         val separator = if ('?' in base) "&" else "?"
         val query = topics.joinToString("&") { "info_hash=" + binaryQuery(it.wireBytes()) }
-        TrackerScrape.parseHttp(http.fetch(base + separator + query, 64 * 1024), topics)
+        TrackerScrape.parseHttp(http.fetch(base + separator + query, 64 * 1024,
+          headers = TRACKER_HEADERS), topics)
       }
-      "udp" -> udpExchange(parsed, 2, 8 + topics.size * 12, { packet ->
+      "udp" -> udpExchange(parsed, url, 2, 8 + topics.size * 12, { packet ->
         topics.forEach { packet.write(it.wireBytes()) }
       }) { bytes -> TrackerScrape.parseUdp(bytes.bytes, topics) }
       else -> error("Unsupported tracker protocol")
     }
   }
 
-  private suspend fun udp(url: Url, request: TrackerAnnounce): TrackerResponse =
-    udpExchange(url, 1, 20, { packet ->
+  private suspend fun udp(url: Url, trackerUrl: String, request: TrackerAnnounce): TrackerResponse =
+    udpExchange(url, trackerUrl, 1, 20, { packet ->
       packet.write(request.topic.wireBytes()).write(request.peerId)
         .writeLong(request.downloaded).writeLong(request.left).writeLong(request.uploaded)
         .writeInt(request.event.code).writeInt(0).writeInt(request.key).writeInt(200)
@@ -152,6 +160,7 @@ internal class TorrentTracker(
 
   private suspend fun <T> udpExchange(
     url: Url,
+    trackerUrl: String,
     action: Int,
     minimum: Int,
     encode: (Buffer) -> Unit,
@@ -167,13 +176,13 @@ internal class TorrentTracker(
           val connectId = randomInt()
           val connect = Buffer().writeLong(0x41727101980L).writeInt(0).writeInt(connectId)
           socket.send(remote, connect.readByteArray())
-          val connected = response(socket, remote, connectId, 0, 16)
+          val connected = response(socket, remote, trackerUrl, connectId, 0, 16)
           val cookie = Buffer().write(connected, 8, 8).readLong()
           val transaction = randomInt()
           val packet = Buffer().writeLong(cookie).writeInt(action).writeInt(transaction)
           encode(packet)
           socket.send(remote, packet.readByteArray())
-          val reply = response(socket, remote, transaction, action, minimum)
+          val reply = response(socket, remote, trackerUrl, transaction, action, minimum)
           decode(UdpReply(reply, ':' in remote.host))
         }
         if (result != null) return result
@@ -187,6 +196,7 @@ internal class TorrentTracker(
   private suspend fun response(
     socket: TorrentDatagramSocket,
     remote: PeerEndpoint,
+    trackerUrl: String,
     transaction: Int,
     action: Int,
     minimum: Int,
@@ -198,7 +208,11 @@ internal class TorrentTracker(
       val header = Buffer().write(reply.bytes, 0, 8)
       val receivedAction = header.readInt()
       if (header.readInt() != transaction) continue
-      require(receivedAction != 3) { "Tracker rejected request" }
+      // BEP 15 errors carry the tracker's message after the header.
+      if (receivedAction == 3) {
+        val message = reply.bytes.copyOfRange(8, reply.bytes.size)
+        throw TrackerFailureException(trackerMessage(message, trackerUrl))
+      }
       if (receivedAction != action || reply.bytes.size < minimum) continue
       return reply.bytes
     }
@@ -224,10 +238,12 @@ internal class TorrentTracker(
       }
     }
 
-    fun parseHttp(bytes: ByteArray): TrackerResponse {
+    /** Reads [url]'s answer to an announce; its `failure reason` fails it. */
+    fun parseHttp(bytes: ByteArray, url: String): TrackerResponse {
       val root = Bencode.parse(bytes, 1024 * 1024)
-      require(root.dictionary != null && root["failure reason"] == null) {
-        "Tracker rejected announce"
+      require(root.dictionary != null) { "Invalid tracker response" }
+      root["failure reason"]?.let { reason ->
+        throw TrackerFailureException(reason.bytes?.let { trackerMessage(it, url) })
       }
       val interval = checkedInterval(requireNotNull(root["interval"]?.integer))
       val minimum = root["min interval"]?.integer ?: interval
@@ -250,7 +266,8 @@ internal class TorrentTracker(
       val id = root["tracker id"]?.bytes
       require(id == null || id.size <= 1024)
       return TrackerResponse(peers.distinct().take(4096), maxOf(interval, minimum), id,
-        minimumIntervalSeconds = minimum)
+        minimumIntervalSeconds = minimum,
+        warning = root["warning message"]?.bytes?.let { trackerMessage(it, url) })
     }
 
     fun compactPeers(bytes: ByteArray, ipv6: Boolean): List<PeerEndpoint> =
@@ -278,6 +295,9 @@ internal class TorrentTracker(
     }
 
     private fun randomInt(): Int = Buffer().write(torrentRandomBytes(4)).readInt()
+
+    // Trackers that check the peer ID often check this too, whatever engine sends it.
+    private val TRACKER_HEADERS = mapOf("User-Agent" to TorrentClient.userAgent)
 
     private fun binaryQuery(bytes: ByteArray): String = bytes.joinToString("") {
       "%" + (it.toInt() and 255).toString(16).padStart(2, '0')
@@ -356,10 +376,10 @@ internal class TrackerTiers(
     statusListener(this.status())
   }
 
-  private fun failed(url: String, outcome: TrackerStatus.Outcome) {
+  private fun failed(url: String, outcome: TrackerStatus.Outcome, reason: String? = null) {
     val previous = statuses.getValue(url)
     updateStatus(url, previous.copy(outcome = outcome, failures = previous.failures + 1,
-      consecutiveFailures = previous.consecutiveFailures + 1))
+      consecutiveFailures = previous.consecutiveFailures + 1, failureReason = reason))
   }
 
   fun preferCurrentTracker(beforeSwitch: suspend () -> Unit = {}) {
@@ -444,7 +464,13 @@ internal class TrackerTiers(
         lastPeerCount = result.peers.size,
         lastIntervalSeconds = result.intervalSeconds,
         lastMinimumIntervalSeconds = result.minimumIntervalSeconds,
+        failureReason = null,
+        warning = result.warning,
       ))
+      if (result.warning != null && result.warning != previous.warning) {
+        log.w { "Tracker ${trackerLabel(url)} warns about ${request.topic.logHash()}: " +
+          result.warning }
+      }
       log.d {
         "Announce ${request.event} for ${request.topic.logHash()} to ${trackerLabel(url)}: " +
           "peers=${result.peers.size}, interval=${result.intervalSeconds}s"
@@ -461,6 +487,18 @@ internal class TrackerTiers(
     } catch (e: CancellationException) {
       if (request.event == TrackerEvent.STARTED) unconfirmedStart = url
       throw e
+    } catch (e: TrackerFailureException) {
+      currentCoroutineContext().ensureActive()
+      failed(url, TrackerStatus.Outcome.FAILED, e.reason)
+      // Said once at warn: trackers repeat a refusal on every retry until something changes.
+      if (e.reason != null && e.reason != previous.failureReason) {
+        log.w {
+          "Tracker ${trackerLabel(url)} refused announce ${request.event} for " +
+            "${request.topic.logHash()}: ${e.reason}"
+        }
+      } else {
+        announceFailed(url, request, e.describeWithoutUrls())
+      }
     } catch (e: Exception) {
       currentCoroutineContext().ensureActive()
       failed(url, TrackerStatus.Outcome.FAILED)
