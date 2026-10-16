@@ -124,8 +124,8 @@ class TorrentSwarmPexEndpointTest {
 
   private suspend fun PeerWire.handshake() {
     handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
-    // What the swarm sends first: its extension handshake, bitfield and interest.
-    while (read() != PeerMessage.Control(PeerMessage.Signal.INTERESTED)) { }
+    // What the swarm sends first: its extension handshake, then its bitfield.
+    while (read() !is PeerMessage.Bitfield) { }
   }
 
   private fun extensionHandshake(values: Map<String, Any>) =

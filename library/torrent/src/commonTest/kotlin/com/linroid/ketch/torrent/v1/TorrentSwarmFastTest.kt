@@ -342,12 +342,8 @@ class TorrentSwarmFastTest {
     val done = CompletableDeferred<Unit>()
     val server = peer(fixture, peers) { wire, _ ->
       assertEquals(PeerMessage.HaveAll, wire.read())
-      val offered = mutableListOf<Int>()
-      while (true) {
-        val message = wire.read()
-        if (message == PeerMessage.Control(PeerMessage.Signal.INTERESTED)) break
-        offered += assertIs<PeerMessage.AllowedFast>(message).index
-      }
+      // A seed is never interested, so the allowed-fast offer is all it sends.
+      val offered = List(allowed.size) { assertIs<PeerMessage.AllowedFast>(wire.read()).index }
       assertEquals(allowed, offered)
       // Not interested, so choked: an allowed-fast piece is served, any other rejected.
       val fastBlock = PeerMessage.Request(allowed.first(), 0, 16_384)

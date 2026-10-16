@@ -163,6 +163,8 @@ internal class TorrentSwarm(
     val listen: PeerEndpoint?,
     val attempt: PeerAttempt,
     val flags: Int,
+    /** Closed because both sides were seeds. */
+    val redundant: Boolean = false,
   )
 
   private val log = KetchLogger("TorrentSwarm")
@@ -339,9 +341,13 @@ internal class TorrentSwarm(
       active[endpoint] = launch(TorrentDispatchers.engine, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
         var listen: PeerEndpoint? = if (incoming) null else endpoint
+        var redundant = false
         try {
           peer(id, endpoint, flags, attempt, scheduler, progressEvents, pexEvents, holepunch,
-            punches, connection) { listen = it }
+            punches, connection) { known, seeds ->
+            listen = known
+            redundant = seeds
+          }
         } catch (e: TimeoutCancellationException) {
           // A connect, handshake or idle deadline of this peer, not the swarm stopping it.
           failure = e
@@ -357,7 +363,8 @@ internal class TorrentSwarm(
           }
           connection?.close()
           overhead.close()
-          results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags))
+          results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags,
+            redundant))
         }
       }
     }
@@ -477,9 +484,11 @@ internal class TorrentSwarm(
               }
             }
             if (result.incoming) {
-              // Never redial a source port: a public torrent dials where the peer listens.
+              // Never redial a source port: a public torrent dials where the peer listens, unless
+              // both of us were seeds.
               val listen = result.listen
-              if (listen != null && !trackerRestricted && listen !in active &&
+              if (listen != null && !trackerRestricted && !result.redundant &&
+                listen !in active &&
                 listen !in attempts && listen !in pending &&
                 attempts.size + pending.size < MAX_CANDIDATES) {
                 pending.addLast(listen)
@@ -529,7 +538,10 @@ internal class TorrentSwarm(
     }
   }
 
-  /** Runs one peer; [onListen] learns where it listens once known, also when it fails. */
+  /**
+   * Runs one peer; [onEnd] learns where it listens once known, also when it fails, and whether
+   * it was closed because both sides were seeds.
+   */
   private suspend fun peer(
     id: Int,
     endpoint: PeerEndpoint,
@@ -541,7 +553,7 @@ internal class TorrentSwarm(
     holepunch: SwarmHolepunch,
     punches: SendChannel<PeerEndpoint>,
     accepted: TorrentConnection?,
-    onListen: (PeerEndpoint?) -> Unit,
+    onEnd: (listen: PeerEndpoint?, redundant: Boolean) -> Unit,
   ) {
     val connection = accepted ?: network.connectPeer(endpoint, store.metadata.infoHash.toBytes())
     attempt.stage = PeerStage.HANDSHAKING
@@ -550,7 +562,7 @@ internal class TorrentSwarm(
     try {
       val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
         scheduler, progressEvents, pexEvents, holepunch, punches)
-      try { worker.run() } finally { onListen(worker.listen) }
+      try { worker.run() } finally { onEnd(worker.listen, worker.redundant) }
     } finally {
       connection.close()
     }
@@ -620,6 +632,11 @@ internal class TorrentSwarm(
     private var uploadSlot = false
     /** The peer's interest as the choker last heard it. */
     private var reportedInterest = false
+    /** Whether we told the peer we are interested (BEP 3); a connection starts without. */
+    private var interesting = false
+    /** Both sides have every piece: nothing will ever flow, so the worker ends. */
+    var redundant = false
+      private set
     private var metadataServed = 0
     private var metadataWindow = TimeSource.Monotonic.markNow()
     private var advertised = BooleanArray(0)
@@ -660,7 +677,7 @@ internal class TorrentSwarm(
         lastBlock = TimeSource.Monotonic.markNow()
         lastWrite = TimeSource.Monotonic.markNow()
         try {
-          while (isActive) {
+          while (isActive && !redundant) {
             val message = select<PeerMessage?> {
               messages.onReceive { it }
               onTimeout(idleMs()) { null }
@@ -724,7 +741,6 @@ internal class TorrentSwarm(
       })
       if (dhtPort > 0 && handshake.dht) wire.send(PeerMessage.Port(dhtPort))
       if (fast && uploadingFast()) offerAllowedFast()
-      wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
     }
 
     /**
@@ -1127,12 +1143,25 @@ internal class TorrentSwarm(
       if (!completed && nowMs() - lastUsefulPayload >= 90_000) {
         throw IOException("Peer made no useful download progress")
       }
+      if (completed && scheduler.bothSeeds(id)) {
+        log.v { "Peer $endpoint of $logLabel is a seed, as we are: closing" }
+        redundant = true
+        return
+      }
+      // Interested only while the peer has a piece we still want (BEP 3): one we would never
+      // request from keeps its unchoke slots for peers that download.
+      val wanted = scheduler.wantsFrom(id)
+      if (wanted != interesting) {
+        interesting = wanted
+        wire.send(PeerMessage.Control(
+          if (wanted) PeerMessage.Signal.INTERESTED else PeerMessage.Signal.NOT_INTERESTED))
+      }
       expireChokedRequests()
       if (state.requests.isNotEmpty() && lastBlock.elapsedNow().inWholeSeconds >= 20) {
         error("Peer block deadline exceeded")
       }
       // Choked, a Fast peer still serves its allowed-fast pieces (BEP 6).
-      if (claim == null && (!state.choking || state.allowsAnyFast)) {
+      if (claim == null && interesting && (!state.choking || state.allowsAnyFast)) {
         claim = scheduler.claim(id, eligible = { index ->
           index !in refused && (!state.choking || state.allowsFast(index))
         })

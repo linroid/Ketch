@@ -11,6 +11,7 @@ import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.peer.PeerHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,8 @@ class TorrentSwarmDhtPortTest {
               val wire = PeerWire(connection, metadata)
               val theirs = wire.handshake(
                 PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, dht = true))
+              // Having the piece makes the swarm interested, which ends its opening messages.
+              wire.send(PeerMessage.Bitfield(pieceBitfield(booleanArrayOf(true))))
               val ports = mutableListOf<Int>()
               while (true) {
                 val message = wire.read()

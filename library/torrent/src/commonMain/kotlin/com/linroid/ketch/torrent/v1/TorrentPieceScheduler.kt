@@ -25,7 +25,12 @@ internal class TorrentPieceScheduler(
   @Volatile var wantVersion: Long = 0
     private set
   private val availability = mutableMapOf<Int, BooleanArray>()
+  /** Per peer: the wanted, unverified pieces it has, which our interest in it follows. */
+  private val wantedFrom = mutableMapOf<Int, Int>()
+  /** Per peer: the pieces it has. */
+  private val held = mutableMapOf<Int, Int>()
   private var version = 0L
+  private var verifiedCount = verified.count { it }
   private val rarity = IntArray(wanted.size)
   private val owners = mutableMapOf<Int, MutableSet<Int>>()
   // A peer's single claim, or the run a web seed fetches.
@@ -40,10 +45,18 @@ internal class TorrentPieceScheduler(
   suspend fun availability(peer: Int, pieces: BooleanArray) = mutex.withLock {
     require(pieces.size == wanted.size)
     val previous = availability.put(peer, pieces.copyOf())
+    var count = 0
+    var wantedCount = 0
     for (index in pieces.indices) {
       if (previous?.get(index) == true) rarity[index]--
-      if (pieces[index]) rarity[index]++
+      if (pieces[index]) {
+        rarity[index]++
+        count++
+        if (wanted[index] && !verified[index]) wantedCount++
+      }
     }
+    held[peer] = count
+    wantedFrom[peer] = wantedCount
   }
 
   /**
@@ -57,7 +70,23 @@ internal class TorrentPieceScheduler(
     if (!pieces[index]) {
       pieces[index] = true
       rarity[index]++
+      held[peer] = (held[peer] ?: 0) + 1
+      if (wanted[index] && !verified[index]) wantedFrom[peer] = (wantedFrom[peer] ?: 0) + 1
     }
+  }
+
+  /**
+   * Whether [peer] has a piece we want and have not verified, so we tell it we are interested
+   * (BEP 3): a peer we would never request from keeps its unchoke slots for others.
+   */
+  suspend fun wantsFrom(peer: Int): Boolean = mutex.withLock { (wantedFrom[peer] ?: 0) > 0 }
+
+  /**
+   * Whether [peer] and we both have every piece of the torrent, so neither will ever want
+   * anything of the other, whatever the selection becomes.
+   */
+  suspend fun bothSeeds(peer: Int): Boolean = mutex.withLock {
+    held[peer] == wanted.size && verifiedCount == wanted.size
   }
 
   /**
@@ -145,18 +174,38 @@ internal class TorrentPieceScheduler(
     val gained = view.verified.indices.any { view.verified[it] && !verified[it] }
     wanted = view.wanted.copyOf()
     verified = view.verified.copyOf()
+    verifiedCount = verified.count { it }
     if (gained) version++
     wantVersion++
+    for ((peer, pieces) in availability) {
+      wantedFrom[peer] = pieces.indices.count { pieces[it] && wanted[it] && !verified[it] }
+    }
     view
   }
 
   /** Forgets a piece the store could no longer read; it downloads again if still wanted. */
-  suspend fun revoke(index: Int) = mutex.withLock { verified[index] = false }
+  suspend fun revoke(index: Int) = mutex.withLock {
+    if (verified[index]) {
+      verified[index] = false
+      verifiedCount--
+      countWanted(index, 1)
+    }
+  }
 
   suspend fun verified(index: Int) = mutex.withLock {
     if (!verified[index]) {
       verified[index] = true
+      verifiedCount++
       version++
+      countWanted(index, -1)
+    }
+  }
+
+  /** Adds [change] to the wanted count of every peer that has piece [index], if it is wanted. */
+  private fun countWanted(index: Int, change: Int) {
+    if (!wanted[index]) return
+    for ((peer, pieces) in availability) {
+      if (pieces[index]) wantedFrom[peer] = (wantedFrom[peer] ?: 0) + change
     }
   }
 
@@ -178,6 +227,8 @@ internal class TorrentPieceScheduler(
   suspend fun remove(peer: Int) = mutex.withLock {
     releaseLocked(peer)
     availability.remove(peer)?.forEachIndexed { index, present -> if (present) rarity[index]-- }
+    wantedFrom.remove(peer)
+    held.remove(peer)
   }
 
   private fun releaseLocked(peer: Int) {
