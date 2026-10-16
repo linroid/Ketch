@@ -393,7 +393,8 @@ async function onBrowse() {
   showStatus('');
   try {
     const folder = await pickAppFolder(folderValue().trim() || autoPath);
-    if (folder !== undefined && !busy) {
+    // A folder on this computer means nothing to a device chosen while the dialog was open.
+    if (folder !== undefined && !busy && selectedInstance().id === instance.id) {
       folderChosen = true;
       autoFilled = undefined;
       $('folder').value = folder;
