@@ -54,7 +54,7 @@ class HttpDispatcherTest {
 
   @Test
   fun cio_runsFewTasksAtOnce(): Unit = runBlocking {
-    // A burst of CIO's short tasks takes at most its slice, not a thread each up to OkHttp's 64.
+    // A burst of CIO's short tasks takes at most its slice, not a thread each up to OkHttp's 256.
     val slice = cioDispatcher()
     val running = AtomicInteger()
     val most = AtomicInteger()

@@ -22,7 +22,9 @@ private val httpThreads: CoroutineDispatcher by lazy {
 
 /**
  * OkHttp's: it reads each response body here, blocking a thread for as long as it streams, so
- * as many run at once as responses stream, at most [OKHTTP_THREADS], as `Dispatchers.IO` allowed.
+ * as many run at once as responses stream, at most [OKHTTP_THREADS]. Every HTTPS request on the
+ * JVM goes through OkHttp, so that is enough for several downloads of 32 segments each, whose
+ * bodies would otherwise wait for a thread until their transfer watchdog failed them.
  */
 internal val httpDispatcher: CoroutineDispatcher by lazy {
   httpThreads.limitedParallelism(OKHTTP_THREADS)
@@ -37,5 +39,5 @@ internal val httpDispatcher: CoroutineDispatcher by lazy {
  */
 internal fun cioDispatcher(): CoroutineDispatcher = httpThreads.limitedParallelism(CIO_THREADS)
 
-private const val OKHTTP_THREADS = 64
+private const val OKHTTP_THREADS = 256
 private const val CIO_THREADS = 8
