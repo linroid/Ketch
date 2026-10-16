@@ -15,7 +15,7 @@ internal class PeerProtocolState(
   val fast: Boolean = false,
 ) {
   init {
-    require(pieceCount in 0..1_000_000 && maxPending in 1..256)
+    require(pieceCount in 0..1_000_000 && maxPending in 1..MAX_PENDING)
     require(!(fast && explicitRejects)) { "Fast mode forgets canceled requests" }
   }
 
@@ -27,7 +27,14 @@ internal class PeerProtocolState(
   private var availabilitySeen = false
   private val pending = mutableSetOf<PeerMessage.Request>()
   private val canceled = linkedSetOf<PeerMessage.Request>()
+  /** A copy of the requests the peer has not answered; [pendingCount] and [isPending] copy none. */
   val requests: Set<PeerMessage.Request> get() = pending.toSet()
+
+  /** How many requests the peer has not answered. */
+  val pendingCount: Int get() = pending.size
+
+  /** Whether the peer has not answered [request] yet. */
+  fun isPending(request: PeerMessage.Request): Boolean = request in pending
   /** Pieces the peer serves while it chokes us, at most [MAX_ALLOWED_FAST] of them. */
   private val allowedFast = linkedSetOf<Int>()
 
@@ -141,5 +148,8 @@ internal class PeerProtocolState(
   companion object {
     /** Allowed-fast pieces a peer may name (BEP 6 suggests 10). */
     const val MAX_ALLOWED_FAST: Int = 32
+
+    /** The deepest pipeline a connection may keep. */
+    const val MAX_PENDING: Int = 2048
   }
 }

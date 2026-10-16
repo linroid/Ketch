@@ -78,7 +78,8 @@ internal class TorrentPieceStore(
   private val verified = BooleanArray(metadata.pieceHashes.size / 20)
   @Volatile private var wanted = BooleanArray(verified.size)
   private val fileProgress = LongArray(metadata.files.size)
-  private var remaining = 0
+  // Written under the mutex, read without it by [completedNow].
+  @Volatile private var remaining = 0
   // Under the mutex: files stored in place. It only grows, except for a deselected file that
   // disappeared from disk.
   private val materialized = mutableSetOf<Int>()
@@ -98,7 +99,7 @@ internal class TorrentPieceStore(
       }
     }
   }
-  private var initialized = false
+  @Volatile private var initialized = false
   private var journalReady = false
   private var ownershipLoaded = false
   private val pendingOwnership = mutableListOf<Pair<Boolean, TorrentOwnedPath>>()
@@ -540,6 +541,12 @@ internal class TorrentPieceStore(
   suspend fun isInitialized(): Boolean = mutex.withLock { initialized }
 
   suspend fun completed(): Boolean = mutex.withLock { initialized && remaining == 0 }
+
+  /**
+   * [completed] without the lock, which commits hold across disk I/O, for checks a peer makes on
+   * every message; it may miss a change made at this moment.
+   */
+  fun completedNow(): Boolean = initialized && remaining == 0
 
   suspend fun finish() {
     check(finishIfComplete()) { "Selected torrent files are incomplete" }

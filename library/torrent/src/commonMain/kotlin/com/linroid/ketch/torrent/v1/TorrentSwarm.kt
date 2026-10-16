@@ -80,6 +80,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
@@ -204,17 +205,20 @@ internal class TorrentSwarm(
       return@supervisorScope
     }
     val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
-      store.verifiedPieces(), store::pieceSize, budget)
+      store.verifiedPieces(), store::pieceSize, budget, nowMs)
     // Any piece may become wanted, and the first is the longest.
     val largestPiece = if (store.pieceCount == 0) 0 else store.pieceSize(0)
     val peerOverhead = PEER_WIRE_BYTES + store.pieceCount * 4
     require(budget.capacity >= largestPiece + peerOverhead) {
       "Torrent buffer limit cannot hold a piece and peer protocol state"
     }
-    // Leave room for one claim so connected peers can never starve piece buffers entirely.
+    // What this swarm's peers hold of the budget for their wires.
+    val peersOverhead = AtomicInt(0)
+    // Peers never take the room one piece needs, so they cannot starve piece buffers entirely;
+    // pieces being assembled, which every peer shares, never keep a peer out.
     fun reservePeer(): TorrentBufferBudget.Lease? {
-      if (budget.capacity - budget.allocated - peerOverhead < largestPiece) return null
-      return budget.reserve(peerOverhead)
+      if (peersOverhead.load() + peerOverhead + largestPiece > budget.capacity) return null
+      return budget.reserve(peerOverhead)?.also { peersOverhead.fetchAndAdd(peerOverhead) }
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
     val attempts = linkedMapOf<PeerEndpoint, Int>()
@@ -363,6 +367,7 @@ internal class TorrentSwarm(
           }
           connection?.close()
           overhead.close()
+          peersOverhead.fetchAndAdd(-overhead.bytes)
           results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags,
             redundant))
         }
@@ -524,6 +529,7 @@ internal class TorrentSwarm(
       active.values.forEach { it.join() }
       webSeeds.forEach { it.join() }
       verifiers.forEach { it.join() }
+      withContext(NonCancellable) { scheduler.close() }
       // Peers still connected when the swarm stops count as connected too.
       while (true) {
         val result = results.tryReceive().getOrNull() ?: break
@@ -602,7 +608,7 @@ internal class TorrentSwarm(
     private val serveCredit =
       PeerServeCredit(PeerServeCredit.capacityFor(store.metadata.pieceLength), nowMs)
     /** Requests of the peer we unchoked, oldest first; at most what we advertise (`reqq`). */
-    private val uploads = ArrayDeque<PeerMessage.Request>()
+    private val uploads = LinkedHashSet<PeerMessage.Request>()
     /** When the upload buckets admit the next block, if they held the last one back. */
     private var uploadRetryAt = 0L
     private val wire = PeerWire(connection, store.metadata)
@@ -622,10 +628,18 @@ internal class TorrentSwarm(
     private var fast = false
     /** Pieces this peer may download while we choke it (BEP 6), offered only while we upload. */
     private var allowedFast: Set<Int> = emptySet()
-    /** Pieces the peer rejected though it has them; claimed elsewhere until it unchokes us anew. */
+    /** Pieces the peer rejected though it has them; fetched elsewhere until it unchokes us anew. */
     private val refused = mutableSetOf<Int>()
-    /** Rejects of the current claim's blocks; enough of them hand the piece to other peers. */
-    private var claimRejects = 0
+    /** Rejects of each piece's blocks while unchoked; as many as the piece has refuse it. */
+    private val rejects = mutableMapOf<Int, Int>()
+    /** Requests to keep outstanding: about [QUEUE_TIME_MS] of the peer's rate ([measureRate]). */
+    private var depth = INITIAL_PIPELINE
+    /** Until the first rate sample, each block received adds a request: the depth doubles a trip. */
+    private var slowStart = true
+    /** Payload since [rateSince], and the peer's smoothed rate in bytes a second. */
+    private var rateBytes = 0L
+    private var rateSince = nowMs()
+    private var rate = 0.0
     /** When the peer last choked us, on [nowMs]. */
     private var chokedAt = 0L
     /** We unchoked the peer: the choker gave it a slot and we told it so. */
@@ -640,11 +654,8 @@ internal class TorrentSwarm(
     private var metadataServed = 0
     private var metadataWindow = TimeSource.Monotonic.markNow()
     private var advertised = BooleanArray(0)
-    private var version = -1L
-    private var claim: TorrentPieceScheduler.Claim? = null
-    private var received = BooleanArray(0)
-    private var requested = BooleanArray(0)
-    private var receivedBytes = 0
+    /** How far this peer has heard of the pieces we verified (the scheduler's log). */
+    private var haveCursor = 0
     /** When the peer last sent a wanted block, on [nowMs]; a selection change restarts it. */
     private var lastUsefulPayload = nowMs()
     private var seenWantVersion = scheduler.wantVersion
@@ -693,9 +704,9 @@ internal class TorrentSwarm(
             reader.cancelAndJoin()
             runCatching {
               withTimeoutOrNull(200) {
-                for (request in state.requests) {
-                  wire.send(PeerMessage.Cancel(request.index, request.begin, request.length))
-                }
+                wire.sendAll(state.requests.map {
+                  PeerMessage.Cancel(it.index, it.begin, it.length)
+                })
               }
             }
             messages.cancel()
@@ -717,7 +728,7 @@ internal class TorrentSwarm(
         dht = dhtPort > 0, fast = true))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
       fast = handshake.fast
-      state = PeerProtocolState(store.pieceCount, maxPending = PIPELINE, fast = fast)
+      state = PeerProtocolState(store.pieceCount, maxPending = MAX_PIPELINE, fast = fast)
       attempt.stage = PeerStage.CONNECTED
       traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true)
       chokerMutex.withLock { choker.add(id) }
@@ -733,6 +744,8 @@ internal class TorrentSwarm(
           holepunch = holepunchOn(),
         ))
       }
+      // Taken before the bitfield, so no piece verified meanwhile goes unannounced.
+      haveCursor = scheduler.haveCursor()
       advertised = store.verifiedPieces()
       wire.send(when {
         fast && advertised.none { it } -> PeerMessage.HaveNone
@@ -755,8 +768,7 @@ internal class TorrentSwarm(
     }
 
     /** Whether we serve allowed-fast pieces now: only while the policy uploads at all. */
-    private suspend fun uploadingFast(): Boolean =
-      uploadAllowed(uploadPolicy(), store.completed())
+    private fun uploadingFast(): Boolean = uploadAllowed(uploadPolicy(), store.completedNow())
 
     /** Publishes this connection's contact; others read nothing else of this worker. */
     private suspend fun publishContact() {
@@ -787,16 +799,19 @@ internal class TorrentSwarm(
         is PeerMessage.Control -> when (message.signal) {
           PeerMessage.Signal.CHOKE -> if (fast) {
             // Our requests stand until the peer rejects them; the block deadline restarts. A
-            // repeated CHOKE keeps both clocks, or a peer repeating it would hold the piece.
+            // repeated CHOKE keeps both clocks, or a peer repeating it would hold the blocks.
             if (!wasChoking) {
               chokedAt = nowMs()
               lastBlock = TimeSource.Monotonic.markNow()
             }
           } else {
-            scheduler.release(id)
-            claim = null
+            // Our requests are void (BEP 3); the blocks already received stay with their pieces.
+            scheduler.releasePeer(id)
           }
-          PeerMessage.Signal.UNCHOKE -> refused.clear()
+          PeerMessage.Signal.UNCHOKE -> {
+            refused.clear()
+            rejects.clear()
+          }
           // A peer that wants nothing more has no requests left (BEP 3).
           PeerMessage.Signal.NOT_INTERESTED -> rejectUploads()
           else -> Unit
@@ -828,7 +843,7 @@ internal class TorrentSwarm(
       val serves = uploads.size < REQUEST_QUEUE && scheduler.isVerified(message.index) &&
         (uploadSlot && state.interested ||
           fast && message.index in allowedFast && uploadingFast())
-      if (serves) uploads.addLast(message)
+      if (serves) uploads.add(message)
       else if (fast) wire.send(reject(message))
     }
 
@@ -844,59 +859,74 @@ internal class TorrentSwarm(
       PeerMessage.Reject(request.index, request.begin, request.length)
 
     /**
-     * The peer will not send a block we asked for, which is no fault of its own. Choked, its
-     * piece goes back to the scheduler at once for other peers; unchoked, the block is asked for
-     * again, until the piece has had as many rejects as blocks and is left to other peers.
+     * The peer will not send a block we asked for, which is no fault of its own: the block is
+     * free for any peer at once. Choked, that is all; unchoked, the peer may ask it again, until
+     * it has rejected as many blocks of the piece as it has and the piece is left to others.
      */
     private suspend fun rejected(message: PeerMessage.Reject) {
-      val current = checkNotNull(claim)
-      check(message.index == current.index && message.begin % PeerWire.BLOCK_SIZE == 0)
-      requested[message.begin / PeerWire.BLOCK_SIZE] = false
-      if (state.choking && !state.allowsFast(current.index)) {
-        dropClaim(cancel = false)
-      } else if (++claimRejects >= requested.size) {
-        log.v { "Peer $endpoint of $logLabel keeps rejecting piece ${current.index}" }
-        refused += current.index
-        dropClaim(cancel = true)
+      scheduler.release(id, listOf(PeerMessage.Request(message.index, message.begin,
+        message.length)))
+      if (state.choking && !state.allowsFast(message.index)) return
+      val count = (rejects[message.index] ?: 0) + 1
+      val blocks = (store.pieceSize(message.index) + PeerWire.BLOCK_SIZE - 1) / PeerWire.BLOCK_SIZE
+      if (count < blocks) {
+        rejects[message.index] = count
+        return
       }
+      log.v { "Peer $endpoint of $logLabel keeps rejecting piece ${message.index}" }
+      rejects.remove(message.index)
+      refused += message.index
     }
 
-    /** Forgets our requests, canceling them on the wire when [cancel], and frees the claim. */
-    private suspend fun dropClaim(cancel: Boolean) {
-      for (request in state.requests) {
-        state.cancel(request)
-        if (cancel) wire.send(PeerMessage.Cancel(request.index, request.begin, request.length))
-      }
-      scheduler.release(id)
-      claim = null
-      claimRejects = 0
+    /** Cancels [requests] on the wire, handing their blocks back when [release]. */
+    private suspend fun cancel(requests: List<PeerMessage.Request>, release: Boolean) {
+      for (request in requests) state.cancel(request)
+      wire.sendAll(requests.map { PeerMessage.Cancel(it.index, it.begin, it.length) })
+      if (release) scheduler.release(id, requests)
     }
 
     private suspend fun receiveBlock(message: PeerMessage.Piece) {
-      val current = checkNotNull(claim)
-      check(message.index == current.index && message.begin % PeerWire.BLOCK_SIZE == 0)
-      val block = message.begin / PeerWire.BLOCK_SIZE
-      check(!received[block])
-      message.bytes.copyInto(current.bytes, message.begin)
-      received[block] = true
-      receivedBytes += message.bytes.size
       lastBlock = TimeSource.Monotonic.markNow()
-      lastUsefulPayload = nowMs()
-      if (receivedBytes == current.bytes.size) {
-        when (storage { store.commit(current.index, current.bytes) }) {
-          CommitOutcome.VERIFIED -> {
-            scheduler.verified(current.index)
-            progressEvents.trySend(Unit)
-          }
-          // The selection dropped the piece while it arrived: the peer did nothing wrong.
-          CommitOutcome.NOT_WANTED -> Unit
-          CommitOutcome.CORRUPT -> {
-            log.w { "Piece ${current.index} of $logLabel from $endpoint failed its hash check" }
-            throw CorruptPieceException()
-          }
+      rateBytes += message.bytes.size
+      when (val arrival = scheduler.received(id, message.index, message.begin, message.bytes)) {
+        // Another copy came first, or the piece is done: the peer did nothing wrong.
+        TorrentPieceScheduler.Arrival.Unneeded -> Unit
+        TorrentPieceScheduler.Arrival.Kept -> useful()
+        is TorrentPieceScheduler.Arrival.Complete -> {
+          useful()
+          commit(arrival)
         }
-        scheduler.release(id)
-        claim = null
+      }
+    }
+
+    private fun useful() {
+      lastUsefulPayload = nowMs()
+      if (slowStart && depth < MAX_PIPELINE) depth++
+    }
+
+    /**
+     * Stores a piece this peer delivered the last block of. Only a piece it sent alone that fails
+     * its hash check is its fault; one several peers sent is fetched again from one of them.
+     */
+    private suspend fun commit(piece: TorrentPieceScheduler.Arrival.Complete) {
+      val outcome = try {
+        storage { store.commit(piece.index, piece.bytes) }
+      } catch (e: Throwable) {
+        // Not stored: the piece's blocks are fetched again.
+        withContext(NonCancellable) { scheduler.finish(id, piece.index, null) }
+        throw e
+      }
+      val alone = scheduler.finish(id, piece.index, outcome)
+      when (outcome) {
+        CommitOutcome.VERIFIED -> progressEvents.trySend(Unit)
+        // The selection dropped the piece while it arrived: the peer did nothing wrong.
+        CommitOutcome.NOT_WANTED -> Unit
+        CommitOutcome.CORRUPT -> if (alone) {
+          log.w { "Piece ${piece.index} of $logLabel from $endpoint failed its hash check" }
+          throw CorruptPieceException()
+        } else {
+          log.w { "Piece ${piece.index} of $logLabel failed its hash check; one peer fetches it" }
+        }
       }
     }
 
@@ -1070,11 +1100,52 @@ internal class TorrentSwarm(
      * holding it against the peer. Allowed-fast requests keep the block deadline.
      */
     private suspend fun expireChokedRequests() {
-      val current = claim ?: return
-      if (!fast || !state.choking || state.allowsFast(current.index) ||
-        state.requests.isEmpty() || nowMs() - chokedAt < fastRejectGraceMs) return
-      log.v { "Peer $endpoint of $logLabel choked without rejecting piece ${current.index}" }
-      dropClaim(cancel = true)
+      if (!fast || !state.choking || state.pendingCount == 0 ||
+        nowMs() - chokedAt < fastRejectGraceMs) return
+      val expired = state.requests.filter { !state.allowsFast(it.index) }
+      if (expired.isEmpty()) return
+      log.v { "Peer $endpoint of $logLabel choked without rejecting ${expired.size} request(s)" }
+      cancel(expired, release = true)
+    }
+
+    /**
+     * Updates the peer's rate every [RATE_WINDOW_MS], and [depth] to [QUEUE_TIME_MS] of it: deep
+     * enough to cover a fast peer's round trip, shallow for a slow one, whose blocks others fetch.
+     */
+    private fun measureRate() {
+      val now = nowMs()
+      val elapsed = now - rateSince
+      if (elapsed < RATE_WINDOW_MS) return
+      if (rateBytes > 0 || state.pendingCount > 0) {
+        val sample = rateBytes * 1000.0 / elapsed
+        rate = if (rate == 0.0) sample else (rate + sample) / 2
+        depth = (rate * QUEUE_TIME_MS / 1000 / PeerWire.BLOCK_SIZE).toInt()
+          .coerceIn(MIN_PIPELINE, MAX_PIPELINE)
+        slowStart = false
+      }
+      rateBytes = 0
+      rateSince = now
+    }
+
+    /** Tops our requests up to [depth], at most what the peer queues (BEP 10 `reqq`). */
+    private suspend fun requestBlocks() {
+      measureRate()
+      val limit = minOf(depth, extensions.requestQueue ?: DEFAULT_PEER_QUEUE)
+      val pending = state.pendingCount
+      val need = limit - pending
+      // Asked for in batches, each one scheduler call and one write.
+      if (need <= 0 || pending > 0 && need < minOf(REFILL_BLOCKS, (limit + 7) / 8)) return
+      // Asked of every piece a search looks at: no boxed lookup while nothing is refused.
+      val grant = scheduler.request(id, need) { index ->
+        (refused.isEmpty() || index !in refused) && (!state.choking || state.allowsFast(index))
+      }
+      // Waiting for a piece buffer is our doing, not the peer's.
+      if (grant.starved) lastUsefulPayload = nowMs()
+      if (grant.requests.isEmpty()) return
+      if (pending == 0) lastBlock = TimeSource.Monotonic.markNow()
+      for (request in grant.requests) state.requested(request)
+      wire.sendAll(grant.requests)
+      lastWrite = TimeSource.Monotonic.markNow()
     }
 
     /** Runs after every message and idle tick: upload slot, PEX, HAVEs, deadlines, requests. */
@@ -1115,82 +1186,48 @@ internal class TorrentSwarm(
           exchange.commit(it)
         }
       }
-      scheduler.snapshot(version)?.let { (nextVersion, pieces) ->
-        version = nextVersion
-        for (index in pieces.indices) {
-          if (pieces[index] && !advertised[index]) {
-            wire.send(PeerMessage.Have(index))
-            advertised[index] = true
-          }
-        }
+      val poll = scheduler.poll(id, haveCursor)
+      haveCursor = poll.haveCursor
+      poll.haves?.let { verified ->
+        val haves = verified.filter { !advertised[it] }
+        for (index in haves) advertised[index] = true
+        wire.sendAll(haves.map { PeerMessage.Have(it) })
       }
+      // Blocks another copy delivered, or of pieces done or no longer wanted.
+      val obsolete = poll.cancels.filter { state.isPending(it) }
+      if (obsolete.isNotEmpty()) cancel(obsolete, release = false)
       val wantVersion = scheduler.wantVersion
-      val retargeted = wantVersion != seenWantVersion
-      if (retargeted) {
+      if (wantVersion != seenWantVersion) {
         seenWantVersion = wantVersion
         // The selection changed: a seed that downloads again judges its peers from now on.
         lastUsefulPayload = nowMs()
       }
-      val current = claim
-      if (current != null && (scheduler.isVerified(current.index) ||
-          retargeted && !scheduler.isWanted(current.index))) {
-        dropClaim(cancel = true)
-      }
-      val completed = store.completed()
+      val completed = store.completedNow()
       // The selection grew while seeding: a peer has 90 s from now, not from its last block.
       if (sawComplete && !completed) lastUsefulPayload = nowMs()
       sawComplete = completed
       if (!completed && nowMs() - lastUsefulPayload >= 90_000) {
         throw IOException("Peer made no useful download progress")
       }
-      if (completed && scheduler.bothSeeds(id)) {
+      if (completed && poll.bothSeeds) {
         log.v { "Peer $endpoint of $logLabel is a seed, as we are: closing" }
         redundant = true
         return
       }
       // Interested only while the peer has a piece we still want (BEP 3): one we would never
       // request from keeps its unchoke slots for peers that download.
-      val wanted = scheduler.wantsFrom(id)
+      val wanted = poll.wanted
       if (wanted != interesting) {
         interesting = wanted
         wire.send(PeerMessage.Control(
           if (wanted) PeerMessage.Signal.INTERESTED else PeerMessage.Signal.NOT_INTERESTED))
       }
       expireChokedRequests()
-      if (state.requests.isNotEmpty() && lastBlock.elapsedNow().inWholeSeconds >= 20) {
+      if (state.pendingCount > 0 && lastBlock.elapsedNow().inWholeSeconds >= 20) {
         error("Peer block deadline exceeded")
       }
       // Choked, a Fast peer still serves its allowed-fast pieces (BEP 6).
-      if (claim == null && interesting && (!state.choking || state.allowsAnyFast)) {
-        claim = scheduler.claim(id, eligible = { index ->
-          index !in refused && (!state.choking || state.allowsFast(index))
-        })
-        claim?.let {
-          received = BooleanArray((it.bytes.size + PeerWire.BLOCK_SIZE - 1) /
-            PeerWire.BLOCK_SIZE)
-          requested = BooleanArray(received.size)
-          receivedBytes = 0
-          claimRejects = 0
-          lastBlock = TimeSource.Monotonic.markNow()
-        }
-      }
-      claim?.let { assigned ->
-        if (state.canRequest(assigned.index)) {
-          // No more than the peer queues (BEP 10 `reqq`), which it would otherwise reject.
-          val pipeline = minOf(PIPELINE, extensions.requestQueue ?: PIPELINE)
-          for (block in requested.indices) {
-            if (state.requests.size >= pipeline) break
-            if (requested[block]) continue
-            val begin = block * PeerWire.BLOCK_SIZE
-            val request = PeerMessage.Request(assigned.index, begin,
-              minOf(PeerWire.BLOCK_SIZE, assigned.bytes.size - begin))
-            state.requested(request)
-            wire.send(request)
-            requested[block] = true
-            lastWrite = TimeSource.Monotonic.markNow()
-          }
-        }
-      }
+      if (interesting && (!state.choking || state.allowsAnyFast)) requestBlocks()
       if (lastWrite.elapsedNow().inWholeSeconds >= 30) {
         wire.send(PeerMessage.KeepAlive)
         lastWrite = TimeSource.Monotonic.markNow()
@@ -1201,7 +1238,7 @@ internal class TorrentSwarm(
   }
 }
 
-/** One maximal frame plus its decode copy; piece buffers are charged separately per claim. */
+/** One maximal frame plus its decode copy; piece buffers are charged when pieces open. */
 private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
 
 /** Endpoints a swarm keeps to dial, known and queued together. */
@@ -1210,11 +1247,29 @@ private const val MAX_CANDIDATES = 4096
 /** CONNECTs (BEP 55) one peer may send a minute; each names a host we dial. */
 private const val MAX_CONNECTS_PER_MINUTE = 8
 
-/** Requests a v1 peer may queue with us (BEP 10 `reqq`). */
-private const val REQUEST_QUEUE = 16
+/** Requests a v1 peer may queue with us (BEP 10 `reqq`); each is a few bytes until served. */
+private const val REQUEST_QUEUE = 500
 
-/** Block requests we keep outstanding with one v1 peer. */
-private const val PIPELINE = 16
+/** Block requests we keep outstanding with a v1 peer before its rate is known. */
+private const val INITIAL_PIPELINE = 16
+
+/** The fewest block requests we keep outstanding with a peer that serves any. */
+private const val MIN_PIPELINE = 4
+
+/** The most block requests we keep outstanding with one v1 peer. */
+private const val MAX_PIPELINE = 500
+
+/** What a peer that names no `reqq` queues: the default BEP 10 documents. */
+private const val DEFAULT_PEER_QUEUE = 250
+
+/** How long a peer's outstanding requests last at its rate: enough to ride out a slow trip. */
+private const val QUEUE_TIME_MS = 3_000L
+
+/** How often a peer's rate is sampled; the first sample sets the depth for its round trip. */
+private const val RATE_WINDOW_MS = 500L
+
+/** The most blocks a fast peer's queue may lack before it is topped up. */
+private const val REFILL_BLOCKS = 16
 
 /** The longest a peer worker waits for a message before its next pass. */
 private const val IDLE_MS = 100L

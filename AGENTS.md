@@ -836,15 +836,36 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   refunds it all). Every hash answer waits for the upload limits (`canAnswer`, else it is
   rejected) and pays its bytes to them (`chargeAnswer`). The credit bounds this work even when the upload
   limits, unlimited by default, do not
+- v1 downloads (`TorrentPieceScheduler`, `TorrentSwarm`'s `PeerWorker`): peers request 16 KiB
+  blocks of *open* pieces, one buffer per piece being assembled, reserved whole from the transfer
+  budget when it opens (rarest first, once the open pieces a peer has hold no free block) and
+  shared by every peer that has it, so `maxBufferedBytes` bounds pieces in assembly rather than
+  peers transferring. A worker keeps `QUEUE_TIME_MS` (3 s) of its peer's measured rate
+  outstanding (4 to `MAX_PIPELINE` 500, within the peer's `reqq`, 250 when it names none; until
+  the first sample it starts at `INITIAL_PIPELINE` 16 and adds one per block received), across piece ends, asked for in batches (`request`,
+  `PeerWire.sendAll`); we advertise `reqq` 500. Choke, reject, cancel and disconnect free only the
+  blocks still owed; a partial piece nobody fetches from gives its buffer up after 10 s when
+  another piece needs it, after 60 s anyway and at once when no connected peer has it, and `close`
+  frees the rest when the swarm stops. The peer that delivers the last block commits the piece
+  (`Arrival.Complete`, then `finish`): a failed hash check blames it only when it sent every block,
+  else one peer fetches the piece alone next. Once every wanted piece is open, idle peers also ask
+  for blocks one other peer owes. Each pass, `poll` hands a worker the requests to cancel (the
+  other copy arrived, or the piece is done or unwanted), newly verified pieces for HAVEs (an
+  append-only log with a cursor per peer) and its interest: workers start not interested and send
+  INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A
+  swarm holding every piece closes connections to peers holding every piece and never redials
+  them. A peer is admitted while the swarm's wire overhead leaves room for one piece, and is not
+  dropped for lack of useful payload while it waits for a piece buffer. `V1ThroughputTest`
+  measures throughput and CPU (see [verification](docs/development/torrent-verification.md))
 - Fast extension (BEP 6) on every peer connection: v1 (`TorrentSwarm`'s `PeerWorker`), v2 and
   hybrid ones, a hybrid's v1-swarm peers included (below). The handshake sets reserved byte 7 bit
   0x04 (`PeerHandshake.fast`), and with both bits set `PeerProtocolState(fast = true)` takes
   Have All / Have None in place of a bitfield (we send them when we hold every piece or none),
   Suggest Piece (ignored), Allowed Fast (at most 32, requested while choked through
-  `TorrentPieceScheduler.claim`'s `eligible`) and Reject Request. A CHOKE keeps our requests
+  `TorrentPieceScheduler.request`'s `eligible`) and Reject Request. A CHOKE keeps our requests
   until the peer rejects them; requests left unanswered for `FAST_REJECT_GRACE_MS` (5 s) are
-  canceled. A reject while choked hands the piece back to the scheduler at once; unchoked, the
-  block is asked for again until the piece has had as many rejects as blocks, then other peers
+  canceled. A rejected block is free for any peer at once; unchoked, the peer may ask for it
+  again until it has rejected as many blocks of the piece as the piece has, then other peers
   fetch it (`refused` until the peer unchokes us anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
   full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
   (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.

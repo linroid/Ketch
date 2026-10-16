@@ -460,7 +460,7 @@ and `ketch server` pass `WHILE_DOWNLOADING` unless `[torrent] upload` (or, for `
 | `maxActiveTorrents` | `5` | Torrents the engine runs at once, seeding included (1-64). |
 | `connectionsPerTorrent` | `100` | Peer limit of a task that sets no connections (1-512). |
 | `maxConnections` | `200` | Connections across all torrents, metadata and incoming peers included. |
-| `maxBufferedBytes` | 32 MiB | Piece data buffered across the engine. |
+| `maxBufferedBytes` | 32 MiB | Piece buffers across the engine: pieces being downloaded, shared by their peers, and pieces read for uploads. |
 | `maxMetadataBytes` | 4 MiB | Largest metainfo accepted. |
 | `maxFilesPerTorrent`, `maxPiecesPerTorrent` | 10,000, 250,000 | Size limits checked before a torrent is loaded. |
 
@@ -665,13 +665,32 @@ uploads never starve downloads; with less than the default 32 MiB, pieces larger
 buffer are never uploaded. Reading a piece to prove its block hashes counts against the upload
 limits, and such reads take at most half of a limit.
 
+### Downloading v1 pieces
+
+- Peers download 16 KiB blocks of the pieces being assembled. A piece opens, rarest first, when a
+  peer has nothing left to fetch in the open ones, and every peer that has it shares its buffer, so
+  `maxBufferedBytes` limits the pieces being assembled, not how many peers transfer at once.
+- Each peer is kept about 3 seconds of its own rate in outstanding requests, between 4 and 500,
+  within the request queue it announces (BEP 10 `reqq`, 250 when it names none). Until its rate is
+  known, a peer starts at 16 and gets one more request for each block it delivers. Requests run on
+  across piece ends. Ketch announces a queue of 500.
+- A peer that chokes, rejects or disconnects gives back the blocks it still owes; the blocks it sent
+  stay with their piece. A partial piece nobody fetches gives its buffer up after 10 seconds when
+  another piece needs it, and after a minute in any case.
+- A piece that fails its hash check is fetched again. When several peers had sent it, one peer
+  fetches it alone next, so a peer that keeps sending bad data is found and disconnected.
+- Once every wanted piece is being fetched, a peer with nothing else to do also asks for blocks
+  another peer owes, and the first copy to arrive cancels the other.
+- Ketch tells a peer it is interested only while the peer has a piece Ketch still wants. Once Ketch
+  has every piece, it closes connections to peers that have every piece too.
+
 ### Fast extension
 
 Every connection, v1, v2 and hybrid, negotiates the Fast extension (BEP 6): Have All and Have None,
 rejected rather than dropped requests, a choke that leaves requests to be rejected (those still
 unanswered after 5 seconds are canceled), and allowed-fast pieces requested and served while
 choked. While it uploads, Ketch offers IPv4 peers BEP 6's set of 10 allowed-fast pieces. A rejected
-piece goes to other peers without counting against the peer. A torrent at its peer limit closes
+block goes to other peers without counting against the peer. A torrent at its peer limit closes
 peers that dial it before answering their handshake.
 
 ### Partial selections

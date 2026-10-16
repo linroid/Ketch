@@ -65,6 +65,15 @@ internal class PeerWire(
     connection.write(encode(message, metadata, pieceCount))
   }
 
+  /** Sends [messages] in one write, as a batch of requests is. */
+  suspend fun sendAll(messages: List<PeerMessage>) {
+    if (messages.isEmpty()) return
+    val buffer = Buffer()
+    for (message in messages) buffer.write(encode(message, metadata, pieceCount))
+    val bytes = buffer.readByteArray()
+    withTimeout(idleTimeoutMs) { connection.write(bytes) }
+  }
+
   companion object {
     const val BLOCK_SIZE: Int = 16 * 1024
     const val MAX_FRAME_SIZE: Int = 64 * 1024
