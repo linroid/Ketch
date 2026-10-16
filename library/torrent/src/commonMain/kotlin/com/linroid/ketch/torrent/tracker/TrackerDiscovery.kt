@@ -162,9 +162,13 @@ internal class TrackerDiscovery private constructor(
     retryDelayMs = 15_000L
     val now = nowMs()
     nextAnnounce = now + result.intervalSeconds * 1000
-    // Without an advertised minimum (UDP), conservatively use the regular interval.
-    nextManualAnnounce = now + maxOf(60L,
-      result.minimumIntervalSeconds ?: result.intervalSeconds) * 1000
+    // Without an advertised minimum (UDP), five minutes, or the regular interval when shorter:
+    // a stalled download's reannounces, minutes apart, would otherwise never reach the tracker.
+    nextManualAnnounce = now + maxOf(60L, result.minimumIntervalSeconds
+      ?: minOf(result.intervalSeconds, MANUAL_ANNOUNCE_SECONDS)) * 1000
     return result
   }
 }
+
+/** The least time between a manual announce and the one before, unless the tracker says more. */
+private const val MANUAL_ANNOUNCE_SECONDS = 300L

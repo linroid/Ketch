@@ -229,6 +229,27 @@ class TrackerDiscoveryTest {
   }
 
   @Test
+  fun manualReannounceWithoutATrackerMinimum_waitsFiveMinutesNotTheInterval() = runTest {
+    // UDP trackers name no minimum; their interval is often half an hour.
+    val requests = mutableListOf<TrackerAnnounce>()
+    var now = 0L
+    val tiers = TrackerTiers(listOf(listOf("a"))) { _, request, _ ->
+      requests += request
+      TrackerResponse(emptyList(), 1800)
+    }
+    val document = v2Document()
+    val discovery = TrackerDiscovery(document, TorrentContentLayout.from(document.info),
+      ByteArray(20), { 6881 }, tiers, nowMs = { now })
+    val bits = booleanArrayOf(false, false)
+    discovery.poll(bits, 0, 0)
+    now = 300_000 - 1
+    assertNull(discovery.poll(bits, 0, 0, manual = true))
+    now++
+    assertNotNull(discovery.poll(bits, 0, 0, manual = true))
+    assertEquals(2, requests.size)
+  }
+
+  @Test
   fun shortAutomaticIntervalsDoNotDisableTheManualRateLimit() = runTest {
     var now = 0L
     var calls = 0
@@ -246,17 +267,17 @@ class TrackerDiscoveryTest {
   }
 
   @Test
-  fun missingMinimumUsesRegularIntervalForManualAnnounces() = runTest {
+  fun missingMinimumUsesAShorterRegularIntervalForManualAnnounces() = runTest {
     var now = 0L
     var calls = 0
     val tiers = TrackerTiers(listOf(listOf("a"))) { _, _, _ ->
       calls++
-      TrackerResponse(emptyList(), 600)
+      TrackerResponse(emptyList(), 120)
     }
     val discovery = TrackerDiscovery(metadata(), ByteArray(20), { 6881 }, tiers, nowMs = { now })
     val bits = booleanArrayOf(false, false)
     discovery.poll(bits, 0, 0)
-    now = 599_999
+    now = 119_999
     assertNull(discovery.poll(bits, 0, 0, manual = true))
     now++
     discovery.poll(bits, 0, 0, manual = true)
