@@ -77,11 +77,11 @@ internal suspend fun <T> fetchFromMetadataPeers(
   }
   fun failed(endpoint: PeerEndpoint, asked: Int, reason: String) {
     if (asked > retryDelaysMs.size) {
-      log.d { "$label from $endpoint failed $asked times, giving up: $reason" }
+      log.v { "$label from $endpoint failed $asked times, giving up: $reason" }
       return
     }
     val wait = retryDelaysMs[asked - 1]
-    log.d { "$label from $endpoint failed, asking again in ${wait / 1000}s: $reason" }
+    log.v { "$label from $endpoint failed, asking again in ${wait / 1000}s: $reason" }
     launch {
       delay(wait)
       ready.send(endpoint to asked)
@@ -90,7 +90,7 @@ internal suspend fun <T> fetchFromMetadataPeers(
   suspend fun ask(endpoint: PeerEndpoint, asked: Int) {
     try {
       log.v { "$label: asking $endpoint (attempt $asked)" }
-      if (found.complete(fetch(endpoint))) log.d { "$label received from $endpoint" }
+      if (found.complete(fetch(endpoint))) log.d { "$label received from a peer" }
     } catch (e: MetadataLookupFailure) {
       found.completeExceptionally(e)
     } catch (e: CancellationException) {

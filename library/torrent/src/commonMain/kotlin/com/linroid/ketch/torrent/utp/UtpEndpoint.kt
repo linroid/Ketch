@@ -112,9 +112,9 @@ internal class UtpEndpoint(
             lastReport = now
             for (entry in entries.values) {
               if (entry.socket.inFlight > 0 || entry.socket.writable == 0) {
-                // The ID tells apart successive connections to one peer.
+                // Per-peer detail, named by its ID: peer addresses are never logged.
                 val socket = entry.socket
-                log.d { "uTP ${entry.remote} id=${socket.receiveId}: ${socket.describe()}" }
+                log.v { "uTP connection id=${socket.receiveId}: ${socket.describe()}" }
               }
             }
           }
@@ -136,7 +136,7 @@ internal class UtpEndpoint(
         throw e
       } catch (e: Exception) {
         // A closed or full socket loses the packet; retransmission covers it.
-        log.v { "uTP packet to $remote not sent: ${e.describeWithoutUrls()}" }
+        log.v { "uTP packet not sent: ${e.describeWithoutUrls()}" }
       }
     }
     return result
