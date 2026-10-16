@@ -443,8 +443,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   never skipped. `Ketch` lists `KetchFeatures.PROXY` only when `HttpEngine.supportsProxies`, and
   otherwise refuses such proxies in `updateConfig` and `download`. `Multi`/`ConfigurableNetworkHttpEngine` return views sharing their selection and
   round robin. `KtorHttpEngine` resolves a `ProxyRoute` per request and redirect hop, keeps one
-  client per route (`HttpTransports`) and remembers redirects per proxy (`RedirectCache.Key`): JVM uses CIO for direct requests the JVM `ProxySelector`
-  would not proxy and OkHttp (HTTP/1.1) otherwise, SYSTEM reading `https_proxy`/`http_proxy`/
+  client per route (`HttpTransports`) and remembers redirects per proxy (`RedirectCache.Key`): JVM uses CIO for direct plain-HTTP requests the JVM
+  `ProxySelector` would not proxy and OkHttp (HTTP/1.1) otherwise, HTTPS always (the JVM's TLS:
+  CIO's speaks only TLS 1.2 and loses some servers' handshakes), SYSTEM reading `https_proxy`/`http_proxy`/
   `all_proxy`/`no_proxy` (`EnvironmentProxies`) then the JVM selector, which reads the OS settings
   with `-Djava.net.useSystemProxies=true` (the desktop launcher sets it); Android leaves SYSTEM to
   OkHttp; iOS sets `NSURLSession` proxy dictionaries. HTTP proxy credentials only go in `CONNECT`

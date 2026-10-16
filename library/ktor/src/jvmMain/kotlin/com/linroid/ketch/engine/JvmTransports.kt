@@ -7,6 +7,7 @@ import com.linroid.ketch.api.ProxyBypass
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import okhttp3.Dns
 import java.net.InetAddress
@@ -23,9 +24,11 @@ internal actual fun defaultTransports(): HttpTransports = JvmTransports(localAdd
  * The JVM's transports, bound to [localAddress] when it is set.
  *
  * [com.linroid.ketch.api.Proxy.System] takes the proxy from the environment, then from
- * [selector]. Requests that go directly use CIO, unless [selector] would send them through a
- * proxy, which CIO cannot be told not to use, or the engine is bound to an address; OkHttp
- * carries the rest.
+ * [selector]. Plain HTTP requests that go directly use CIO, unless [selector] would send them
+ * through a proxy, which CIO cannot be told not to use, or the engine is bound to an address;
+ * OkHttp carries the rest, HTTPS always: its TLS is the JVM's, while CIO's own speaks only TLS
+ * 1.2 and loses some servers' handshakes ("Not enough data available"), which trackers, web seeds
+ * and downloads then fail on.
  */
 internal class JvmTransports(
   private val localAddress: InetAddress?,
@@ -47,6 +50,9 @@ internal class JvmTransports(
       // Kept as before proxies could be chosen: OkHttp's protocols, bound to the address.
       localAddress != null -> clients.get(route) {
         okHttpClient(route, binding, http1Only = false)
+      }
+      url.protocol == URLProtocol.HTTPS -> clients.get(route) {
+        okHttpClient(route, binding, http1Only = true)
       }
       selectsDirect(url) -> clients.get(CIO_CLIENT) { cioClient() }
       else -> clients.get(route) { okHttpClient(route, binding, http1Only = true) }

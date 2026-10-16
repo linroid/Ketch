@@ -95,17 +95,21 @@ class JvmTransportsTest {
   }
 
   @Test
-  fun direct_usesCioOnlyWhenTheSelectorWouldToo() {
+  fun direct_usesCioOnlyForPlainHttpWhenTheSelectorWouldToo() {
     val proxied = JvmTransports(null, emptyMap()) {
       FixedSelector(JavaProxy(JavaProxy.Type.HTTP, InetSocketAddress.createUnresolved("jvm.test", 3128)))
     }
     val direct = JvmTransports(null, emptyMap()) { FixedSelector(JavaProxy.NO_PROXY) }
     try {
-      val forced = proxied.clientFor(https, Proxy.Direct)
+      val forced = proxied.clientFor(http, Proxy.Direct)
       assertEquals(ProxyRoute.Direct, forced.route)
       // CIO would ask the JVM's selector and take its proxy anyway.
       assertTrue(forced.client.engine.config !is CIOEngineConfig)
-      assertIs<CIOEngineConfig>(direct.clientFor(https, Proxy.System).client.engine.config)
+      assertIs<CIOEngineConfig>(direct.clientFor(http, Proxy.System).client.engine.config)
+      // HTTPS takes the JVM's TLS, which CIO's own cannot match.
+      val secure = direct.clientFor(https, Proxy.System)
+      assertEquals(ProxyRoute.Direct, secure.route)
+      assertTrue(secure.client.engine.config !is CIOEngineConfig)
     } finally {
       proxied.close()
       direct.close()

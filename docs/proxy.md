@@ -149,9 +149,10 @@ ketch.updateConfig(current.copy(proxy = Proxy.Manual("socks5://127.0.0.1:1080"))
 
 ## How it works
 
-On the JVM, direct requests use Ktor's CIO client. Requests through a proxy, and direct ones whose
-URL the JVM's `ProxySelector` would send through a proxy, use OkHttp limited to HTTP/1.1, so each
-segment keeps a connection of its own. Ketch keeps one client per route, and remembers the
+On the JVM, direct plain-HTTP requests use Ktor's CIO client. HTTPS requests, requests through a
+proxy, and direct ones whose URL the JVM's `ProxySelector` would send through a proxy, use OkHttp
+limited to HTTP/1.1, so each segment keeps a connection of its own. HTTPS always takes OkHttp
+because it uses the JVM's TLS: CIO's own speaks only TLS 1.2 and loses some servers' handshakes. Ketch keeps one client per route, and remembers the
 redirects a request followed per proxy, since a server may send each proxy to another mirror.
 
 Android uses OkHttp. iOS uses `NSURLSession` sessions with their proxy dictionary set (empty for
