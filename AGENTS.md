@@ -767,10 +767,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seeding the task at once if uploads resumed meanwhile;
   `SourceExtension.taskCompleted` alone never saves one, as it fires for every restored completed
   record and every `showSharing` copy
-- Peers at our own public address, any port, are left out of tracker and DHT answers and of
-  magnet lookups (`isOwnAddress`, checked again as each lookup peer's turn comes): our listener,
-  or stale announcements of earlier listen ports. The address is the router's while it maps our
-  port, else the one the DHT voted; an IPv4-mapped IPv6 peer (`::ffff:a.b.c.d`) is read as the
+- Peers at our own public address, any port, are left out of tracker and DHT answers, of
+  magnet lookups and of v1 swarms' dials (`isOwnAddress`, checked again as each lookup peer's
+  turn comes and as `TorrentSwarm` dials each peer, as peers found before the address was known
+  stay queued): our listener, or stale announcements of earlier listen ports. The address is the
+  router's while it maps our port, and the one the DHT voted (behind a second NAT the router's
+  is private); an IPv4-mapped IPv6 peer (`::ffff:a.b.c.d`) is read as the
   IPv4 one (`numericHost`), so no peer is dialed under two hosts
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines

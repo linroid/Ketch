@@ -265,7 +265,8 @@ internal object TorrentV2SessionLoop {
         bookLease = checkNotNull(state.reserve(TorrentV2Candidates.STATE_BYTES)) {
           "Peer candidate state budget exhausted"
         }
-        TorrentV2Candidates(it.document.hybrid != null, it.restricted, nowMs)
+        TorrentV2Candidates(it.document.hybrid != null, it.restricted, it.runtime.isOwnAddress,
+          nowMs)
           .also { candidates -> candidates.reset(it.generation()) }
       }
       val uploads = swarm?.let {

@@ -75,6 +75,8 @@ internal class KotlinTorrentSession(
   private val allowLocalPeers: Boolean = false,
   /** Our listen port as a peer at that address reaches it (BEP 10 `p`); 0 leaves it out. */
   private val listenPortFor: (PeerEndpoint) -> Int = { 0 },
+  /** Whether a peer is at our own public address, which the swarm never dials. */
+  private val isOwnAddress: (PeerEndpoint) -> Boolean = { false },
   /**
    * Only seed: when the file check finds the selection incomplete, stop with
    * [IncompleteSeedException] before any discovery instead of downloading.
@@ -439,7 +441,8 @@ internal class KotlinTorrentSession(
               peerBudget = peerBudget, stall = _stall, reannounce = { reannounceTrackers() },
               uploadPolicy = uploadPolicy,
               allowLocalPeers = allowLocalPeers, trackerOnly = trackerRestricted,
-              listenPortFor = listenPortFor, reporter = reporter, peerOutcomes = peerOutcomes,
+              listenPortFor = listenPortFor, isOwnAddress = isOwnAddress, reporter = reporter,
+              peerOutcomes = peerOutcomes,
               dhtPortFor = dhtPortFor, onDhtNode = onDhtNode, onUtpPeers = onUtpPeers,
               utpEnabled = utpEnabled, webSeedHttp = webSeedHttp,
               localPeers = { localPeers.load() },

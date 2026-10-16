@@ -131,6 +131,11 @@ internal class TorrentSwarm(
   trackerOnly: Boolean = false,
   /** Our listen port as a peer at that address reaches it (BEP 10 `p`); 0 leaves it out. */
   private val listenPortFor: (PeerEndpoint) -> Int = { 0 },
+  /**
+   * Whether a peer is at our own public address, read as each is dialed: peers trackers and the
+   * DHT named before the engine knew its address are often its own earlier listen ports.
+   */
+  private val isOwnAddress: (PeerEndpoint) -> Boolean = { false },
   private val nowMs: () -> Long = monotonicClock(),
   private val logLabel: String = logHash(store.metadata.infoHash.hex),
   /** Reports each connected peer and its payload among the task's live connections. */
@@ -503,6 +508,13 @@ internal class TorrentSwarm(
         while (active.size < limit && pending.isNotEmpty() && candidates-- > 0) {
           val endpoint = pending.removeFirst()
           if (endpoint in active) continue
+          if (isOwnAddress(endpoint)) {
+            // Known, as given up on, so its discovery does not queue it again.
+            log.v { "Peer $endpoint for $logLabel left out: our own address" }
+            attempts[endpoint] = MAX_DIAL_ATTEMPTS
+            attemptedAt[endpoint] = now()
+            continue
+          }
           if ((retryAt[endpoint] ?: 0) > now()) {
             pending.addLast(endpoint)
             continue
@@ -593,7 +605,7 @@ internal class TorrentSwarm(
                 pending.addLast(listen)
               }
             } else if (failure !is IllegalArgumentException &&
-              (attempts[endpoint] ?: 0) < 3 && !complete) {
+              (attempts[endpoint] ?: 0) < MAX_DIAL_ATTEMPTS && !complete) {
               retryAt[endpoint] = now() + 1000L * (attempts[endpoint] ?: 1)
               pending.addLast(endpoint)
             }
@@ -1351,6 +1363,9 @@ private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
 
 /** Endpoints a swarm keeps to dial, known and queued together. */
 private const val MAX_CANDIDATES = 4096
+
+/** Times a swarm dials a peer before it gives up on it until it is revived or forgotten. */
+private const val MAX_DIAL_ATTEMPTS = 3
 
 /** CONNECTs (BEP 55) one peer may send a minute; each names a host we dial. */
 private const val MAX_CONNECTS_PER_MINUTE = 8

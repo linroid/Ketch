@@ -50,6 +50,11 @@ internal data class TorrentV2DialTarget(
 internal class TorrentV2Candidates(
   private val hybrid: Boolean,
   private val restricted: Boolean,
+  /**
+   * Whether an endpoint is at our own public address, read as each is dialed: peers trackers
+   * and the DHT named before the engine knew its address are often its own earlier listen ports.
+   */
+  private val isOwnAddress: (PeerEndpoint) -> Boolean = { false },
   private val nowMs: () -> Long,
 ) {
   /** [NEW] and [EXHAUSTED] entries are known but not counted as work. */
@@ -119,6 +124,10 @@ internal class TorrentV2Candidates(
     while (queue.isNotEmpty()) {
       val entry = entries[queue.removeFirst()] ?: continue
       if (entry.status != Status.QUEUED) continue
+      if (isOwnAddress(entry.endpoint)) {
+        move(entry, Status.EXHAUSTED)
+        continue
+      }
       val now = nowMs()
       if (entry.attempts == 0 || now - entry.windowStart >= ATTEMPT_WINDOW_MS) {
         entry.attempts = 0

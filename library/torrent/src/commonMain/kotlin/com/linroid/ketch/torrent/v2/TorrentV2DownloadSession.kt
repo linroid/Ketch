@@ -86,6 +86,8 @@ internal class TorrentV2Runtime(
    * `p`); zero leaves it out.
    */
   val listenPortFor: (PeerEndpoint) -> Int = { 0 },
+  /** Whether a peer is at our own public address, which the swarm never dials. */
+  val isOwnAddress: (PeerEndpoint) -> Boolean = { false },
   /** Test hook: peer exchange also shares and accepts loopback and private addresses. */
   val allowLocalPeers: Boolean = false,
   /**

@@ -30,6 +30,22 @@ class TorrentV2CandidatesTest {
   }.toByteString()
 
   @Test
+  fun ownAddress_isNeverDialed() {
+    // Our public address became known after the tracker named a's port there.
+    var own: String? = null
+    val book = TorrentV2Candidates(hybrid = false, restricted = false,
+      isOwnAddress = { it.host == own }) { now }
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.offer(b, PeerTopic.V2, PeerOrigin.TRACKER)
+    own = a.host
+    assertEquals(b, assertNotNull(book.next()).endpoint)
+    assertNull(book.next())
+    // Found again: still ours.
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertNull(book.next())
+  }
+
+  @Test
   fun deduplicatesAndBacksOffFiveFifteenThirtySeconds() {
     val book = book()
     book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
