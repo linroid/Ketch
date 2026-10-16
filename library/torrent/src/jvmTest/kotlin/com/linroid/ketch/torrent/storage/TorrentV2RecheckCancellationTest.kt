@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 
 class TorrentV2RecheckCancellationTest {
   @Test
-  fun canceledRecheckRetainsReservationsAndDoesNotPublishTheBlockedPiece() = runTest {
+  fun canceledRecheckRetainsItsSlotAndDoesNotPublishTheBlockedPiece() = runTest {
     val payload = byteArrayOf(1, 2, 3)
     val document = TorrentV2Document.parse(Bencode.encode(mapOf("info" to mapOf(
       "meta version" to 2L, "piece length" to 16_384L,
@@ -58,7 +58,8 @@ class TorrentV2RecheckCancellationTest {
         entered.await()
         scan.cancel()
         assertFalse(scan.isCompleted)
-        assertEquals(3, budget.allocated)
+        // The check reads through scratch of its own, never the transfer buffers; it holds a slot.
+        assertEquals(0, budget.allocated)
         assertEquals(0, slots.availablePermits)
         unblock.countDown()
         scan.join()

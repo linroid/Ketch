@@ -381,7 +381,10 @@ internal class TorrentV2PieceStore(
 
   /**
    * Under the mutex: hashes [layoutFile]'s pieces as stored, through at most 64 KiB of scratch,
-   * and publishes the ones that match. A file that cannot be read keeps none.
+   * and publishes the ones that match. A file that cannot be read keeps none. The scratch, as
+   * small as v1's, is not taken from [buffers]: other torrents' pieces may fill them, a check must
+   * never fail for want of one, and waiting for one under the mutex could wait on this store's own
+   * pieces.
    */
   private suspend fun checkFile(layoutFile: TorrentContentLayout.File, context: CoroutineContext) {
     val file = filesById.getValue(layoutFile.id)
@@ -393,7 +396,6 @@ internal class TorrentV2PieceStore(
     }
     verified.fill(false, range.first, range.last + 1)
     val scratchSize = minOf(layoutFile.length, verifier.layout.pieceLength, 65_536L).toInt()
-    val lease = checkNotNull(buffers.reserve(scratchSize)) { "Recheck budget exhausted" }
     var published = false
     try {
       val scratch = ByteArray(scratchSize)
@@ -439,7 +441,6 @@ internal class TorrentV2PieceStore(
       checkedFiles[file.v2Index] = true
     } finally {
       if (!published) verified.fill(false, range.first, range.last + 1)
-      lease.close()
     }
   }
 
