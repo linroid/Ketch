@@ -281,6 +281,9 @@ internal class TorrentSwarm(
     val delivered = mutableSetOf<PeerEndpoint>()
     // When a source naming a peer again last brought its dial forward.
     val broughtForwardAt = mutableMapOf<PeerEndpoint, Long>()
+    // Peers that brought payload, named again while a connection to them ran: a dial of theirs
+    // that fails without connecting is brought forward as if the source named them then.
+    val namedWhileActive = mutableSetOf<PeerEndpoint>()
     // Endpoints to dial, each one of [attempts].
     val pending = ArrayDeque<PeerEndpoint>()
     val results = Channel<PeerResult>(512)
@@ -306,6 +309,7 @@ internal class TorrentSwarm(
       faulty.remove(endpoint)
       delivered.remove(endpoint)
       broughtForwardAt.remove(endpoint)
+      namedWhileActive.remove(endpoint)
     }
     // Queues [endpoint], which a source named: one found for the first time, or one given up on
     // GIVEN_UP_MS or longer after its last dial, which starts over. When the swarm knows enough,
@@ -325,9 +329,13 @@ internal class TorrentSwarm(
       return true
     }
     // Discovery named [endpoint] again: a peer we downloaded from that waits to be dialed again
-    // may be back.
+    // may be back. One with a connection running waits for how that ends.
     fun foundAgain(endpoint: PeerEndpoint) {
       if (complete || endpoint !in delivered) return
+      if (endpoint in active) {
+        namedWhileActive += endpoint
+        return
+      }
       val wait = retryAt[endpoint] ?: return
       val dialedAt = attemptedAt[endpoint] ?: return
       val due = PeerRedial.foundAgainAt(now(), dialedAt, wait, broughtForwardAt[endpoint])
@@ -680,6 +688,7 @@ internal class TorrentSwarm(
             retryAt.clear()
             delivered.clear()
             broughtForwardAt.clear()
+            namedWhileActive.clear()
             done.complete(Unit)
           }
           selections?.onReceive { done ->
@@ -705,6 +714,10 @@ internal class TorrentSwarm(
             val endpoint = result.endpoint
             val failure = result.failure
             active.remove(endpoint)
+            // A source named it during a dial that never connected: it may be back now. Named
+            // while connected, it was no news.
+            val namedWhileDialing = namedWhileActive.remove(endpoint) && !result.incoming &&
+              result.attempt.stage != PeerStage.CONNECTED
             diagnostics.record(endpoint, result.attempt, failure, result.incoming, result.flags)
             if (failure is TorrentStorageException) throw failure
             val broughtPayload = result.attempt.payload > 0 || result.inherited
@@ -747,6 +760,7 @@ internal class TorrentSwarm(
               faulty += endpoint
             } else if (!complete) {
               redial(endpoint, broughtPayload, lasted)
+              if (namedWhileDialing) foundAgain(endpoint)
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }

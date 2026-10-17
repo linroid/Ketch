@@ -76,6 +76,31 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun droppedPeer_foundWhileBeingDialed_isDialedThirtySecondsAfterThatDial() = swarmTest { rig ->
+    rig.dialedPeerSendsAPieceAndDrops()
+    // Refused 5, 20 and 50 s after it dropped; its fourth dial, a minute later, hangs.
+    while (rig.dials.load() < 4) rig.advanceTo(rig.clock.load() + 5_000)
+    rig.holdNextDial.store(true)
+    var release: CompletableDeferred<Unit>? = null
+    while (release == null) {
+      rig.advanceTo(rig.clock.load() + 5_000)
+      release = rig.heldDials.tryReceive().getOrNull()
+    }
+    // It started at most a step ago.
+    val dialedAt = rig.clock.load()
+    // Local discovery names the peer as it comes back, then the dial fails. Its next dial would
+    // come two minutes later; it is dialed 30 s after the one that failed instead.
+    rig.peers.send(rig.listener.local)
+    delay(300)
+    rig.advanceTo(dialedAt + 5_000)
+    release.complete(Unit)
+    delay(300)
+    val reached = rig.reachAgain(upAt = rig.clock.load())
+    // 30 s, and a step or two for the swarm's tick.
+    assertTrue(reached - dialedAt <= 45_000, "Reached ${reached - dialedAt} ms after that dial")
+  }
+
+  @Test
   fun droppedPeer_foundAgainEveryMinute_isDialedSoonerOnlyEveryFiveMinutes() = swarmTest { rig ->
     rig.dialedPeerSendsAPieceAndDrops()
     val dropped = rig.dials.load()
@@ -244,6 +269,9 @@ class TorrentSwarmRedialTest {
     val clock: AtomicLong,
     val down: AtomicBoolean,
     val dials: AtomicInt,
+    /** Holds the next dial until the deferred it sends to [heldDials] completes. */
+    val holdNextDial: AtomicBoolean,
+    val heldDials: Channel<CompletableDeferred<Unit>>,
     val transport: TorrentNetwork,
     /** Where the peer listens; dials of other endpoints are refused. */
     val listener: TorrentListener,
@@ -377,6 +405,8 @@ class TorrentSwarmRedialTest {
           val clock = AtomicLong(0)
           val down = AtomicBoolean(false)
           val dials = AtomicInt(0)
+          val holdNextDial = AtomicBoolean(false)
+          val heldDials = Channel<CompletableDeferred<Unit>>(Channel.UNLIMITED)
           val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
             "ketch-redial-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
           val store = TorrentPieceStore(metadata, root / "data", emptySet(), "redial")
@@ -385,6 +415,11 @@ class TorrentSwarmRedialTest {
           val network = object : TorrentNetwork by transport {
             override suspend fun connect(remote: PeerEndpoint): TorrentConnection {
               dials.addAndFetch(1)
+              if (holdNextDial.compareAndSet(expectedValue = true, newValue = false)) {
+                val release = CompletableDeferred<Unit>()
+                heldDials.send(release)
+                release.await()
+              }
               if (down.load() || remote.port != listener.local.port) {
                 throw IOException("Connection refused")
               }
@@ -393,7 +428,8 @@ class TorrentSwarmRedialTest {
           }
           val peers = Channel<PeerEndpoint>(Channel.UNLIMITED)
           val incoming = Channel<TorrentConnection>(4)
-          val rig = Rig(clock, down, dials, transport, listener, peers, incoming, this)
+          val rig = Rig(clock, down, dials, holdNextDial, heldDials, transport, listener, peers,
+            incoming, this)
           val swarm = launch {
             TorrentSwarm(store, network, TorrentBufferBudget(1024 * 1024),
               listenPortFor = listenPortFor, nowMs = { clock.load() },
