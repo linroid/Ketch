@@ -99,6 +99,11 @@ internal class TorrentPieceScheduler(
   private val searches = mutableMapOf<Int, Search>()
   // When each peer last looked for late blocks.
   private val lateScans = mutableMapOf<Int, Long>()
+  /**
+   * Per peer: the deadline of the blocks it was last handed. It sends what it is asked for in
+   * order, so it is never late with a block before those it was asked for earlier.
+   */
+  private val lastDue = mutableMapOf<Int, Long>()
   // Wanted pieces no connected peer or seed has, and when they were counted ([sourceless]).
   private var sourcelessCount = 0
   private var sourcelessAt = Long.MIN_VALUE / 2
@@ -263,8 +268,8 @@ internal class TorrentPieceScheduler(
    * blocks other peers are late with; in the endgame, also some blocks other peers have
    * outstanding ([endgame]).
    * [lateAfterMs] is how long [peer] may take to deliver what it is handed before another peer
-   * may ask for it too, and [copies] the most blocks others owe on time it may hold in the
-   * endgame ([endgameCopies]).
+   * may ask for it too, though never less than what it was handed before has left, and [copies]
+   * the most blocks others owe on time it may hold in the endgame ([endgameCopies]).
    */
   suspend fun request(
     peer: Int,
@@ -276,7 +281,7 @@ internal class TorrentPieceScheduler(
     val pieces = availability[peer] ?: return@withLock Grant(emptyList(), false)
     val requests = ArrayList<PeerMessage.Request>(minOf(max, 64))
     val now = nowMs()
-    val dueAt = now + lateAfterMs
+    val dueAt = maxOf(now + lateAfterMs, lastDue[peer] ?: Long.MIN_VALUE)
     val iterator = withFree.iterator()
     while (requests.size < max && iterator.hasNext()) {
       val piece = iterator.next()
@@ -298,6 +303,7 @@ internal class TorrentPieceScheduler(
       // An idle peer takes over blocks a slow one sits on, which also frees their buffers.
       endgame(peer, pieces, eligible, max, copies, requests, now, dueAt, late = true)
     }
+    if (requests.isNotEmpty()) lastDue[peer] = dueAt
     Grant(requests, starved)
   }
 
@@ -609,6 +615,7 @@ internal class TorrentPieceScheduler(
     cancels.remove(peer)
     searches.remove(peer)
     lateScans.remove(peer)
+    lastDue.remove(peer)
     for (piece in open.values.toList()) {
       if (!piece.committing && piece.outstanding == 0 &&
         availability.values.none { it[piece.index] }) close(piece)
@@ -800,7 +807,7 @@ internal class TorrentPieceScheduler(
       if (!wanted[index] || verified[index] || openPieces[index] != null ||
         seedOwned[index] != 1 || !pieces[index] || !eligible(index)) continue
       val piece = openPiece(index, now) ?: return true
-      take(piece, peer, max, requests, now, now + DEFAULT_LATE_MS)
+      take(piece, peer, max, requests, now, dueAt)
       if (piece.free > 0) withFree += piece
     }
     return false
@@ -829,7 +836,8 @@ internal class TorrentPieceScheduler(
    * The [capacity] blocks offered that are due last, latest first; of blocks due together, the
    * one asked for later ([OpenPiece.askedAt]), which its owner sends later. That is not always
    * the one offered later: a piece whose blocks are free again is handed out after pieces that
-   * opened after it.
+   * opened after it. An owner is never due sooner for a block it was asked for later
+   * ([lastDue]), so of its blocks those it sends last come first.
    */
   private class DueLast(capacity: Int) {
     private val pieces = arrayOfNulls<OpenPiece>(maxOf(0, capacity))

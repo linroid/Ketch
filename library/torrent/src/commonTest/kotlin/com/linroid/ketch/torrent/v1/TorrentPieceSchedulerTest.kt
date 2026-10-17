@@ -322,6 +322,50 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun endgame_ownerGivenLessTime_isNeverDueSoonerForWhatItWasAskedLater() = runTest {
+    var now = 0L
+    val budget = TorrentBufferBudget(2 * piece)
+    val scheduler = scheduler(pieces = 2, budget, clock = { now })
+    for (peer in 1..2) scheduler.availability(peer, all(2))
+    val first = scheduler.request(1, max = 4, lateAfterMs = 6_000).requests
+    assertEquals(listOf(0, 0, 0, 0), first.map { it.index })
+    // Measured faster, peer 1 is given less time for what it is asked next, which it still sends
+    // after piece 0.
+    now = 500
+    val second = scheduler.request(1, max = 4, lateAfterMs = 4_000).requests
+    assertEquals(listOf(1, 1, 1, 1), second.map { it.index })
+    // Its blocks are due last: those copied are the ones it sends last.
+    assertEquals(second.reversed(), scheduler.request(2, max = 4, copies = 4).requests)
+    // Nor is it late with them while it is not late with piece 0's, sent before them.
+    now = 4_600
+    assertEquals(0, scheduler.health(limit = 0).lateBlocks)
+    for (peer in 1..2) scheduler.remove(peer)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun endgame_pieceAWebSeedFetches_isNotLateBeforeWhatItsPeerWasAskedEarlier() = runTest {
+    var now = 0L
+    // Room for the peer's piece, the seed's and the peer's copy of the seed's.
+    val budget = TorrentBufferBudget(3 * piece)
+    val scheduler = scheduler(pieces = 2, budget, clock = { now })
+    scheduler.availability(-1, all(2))
+    scheduler.availability(1, all(2))
+    assertEquals(listOf(0, 0, 0, 0),
+      scheduler.request(1, max = 4, lateAfterMs = 10_000).requests.map { it.index })
+    assertEquals(listOf(1), scheduler.claimRun(-1, maxPieces = 2, maxBytes = 2 * piece)
+      .map { it.index })
+    // In the endgame the peer also fetches the piece the seed fetches, after piece 0.
+    assertEquals(listOf(1, 1, 1, 1),
+      scheduler.request(1, max = 4, lateAfterMs = 4_000).requests.map { it.index })
+    now = 6_500
+    assertEquals(0, scheduler.health(limit = 0).lateBlocks)
+    scheduler.release(-1, 1)
+    for (peer in listOf(-1, 1)) scheduler.remove(peer)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun endgame_copyItsOwnerGaveUp_keepsWhenItWasAskedFor() = runTest {
     var now = 0L
     val budget = TorrentBufferBudget(2 * piece)

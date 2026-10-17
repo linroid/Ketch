@@ -794,7 +794,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   reannounces to trackers (5, 10, up to 30 minutes apart), revives peers it gave up on, and after
   two minutes relaunches dropped web seeds. The inspector says why
   (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
-  its queue's time at its rate, 4 to 30 s) is asked of another peer with room, and the endgame
+  its queue's time at its rate, 4 to 30 s, never before those it was asked for earlier) is asked
+  of another peer with room, and the endgame
   starts once every unopened piece is one no source has. V2 and hybrid owners do the same
   (`TorrentV2PieceScheduler.planDuplicate`: one copy per block, 8 per peer, 64 per session, none
   while under a quarter of the transfer budget is free; the first copy cancels the other, and in
