@@ -31,7 +31,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -317,6 +320,44 @@ class TorrentWebSeedTest {
           // The corrupt piece, and what came of the run after it, were thrown away.
           assertTrue(counted.discarded.load() >= PIECE)
           assertEquals(payload.size.toLong(), counted.received.load() - counted.discarded.load())
+        }
+      }
+    }
+  }
+
+  @Test
+  fun stoppedWhileThrottled_countsTheWaitingChunkAsDiscarded() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(4 * PIECE) { (it * 5 + 3).toByte() }
+        val url = "http://mirror.test/data"
+        withStore(singleFile(payload, url)) { store, _ ->
+          val counted = Payload()
+          val waiting = CompletableDeferred<Unit>()
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>().also { it.close() }
+          try {
+            val swarm = launch {
+              TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                downloadPayload = { size ->
+                  // Counted, then held by the limits before the first piece is in.
+                  if (counted.received.addAndFetch(size.toLong()) > PIECE) {
+                    waiting.complete(Unit)
+                    awaitCancellation()
+                  }
+                },
+                onDiscarded = { counted.discarded.addAndFetch(it) },
+                webSeedHttp = TorrentHttp(MirrorEngine(mapOf(url to payload))),
+              ).run(peers)
+            }
+            waiting.await()
+            swarm.cancelAndJoin()
+          } finally {
+            network.close()
+          }
+          assertEquals(0, store.verifiedPieces().count { it })
+          assertTrue(counted.received.load() > PIECE)
+          assertEquals(counted.received.load(), counted.discarded.load())
         }
       }
     }

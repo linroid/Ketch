@@ -214,7 +214,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private val reporter: ConnectionReporter = ConnectionReporter.None,
   private val retryMs: Long = WEB_SEED_RETRY_MS,
   private val idleTimeoutMs: Long = WEB_SEED_IDLE_MS,
-  /** Counts and rate-limits payload, as for peers. */
+  /** Counts payload as received, then rate-limits it, as for peers. */
   private val downloadPayload: suspend (Int) -> Unit = {},
   /**
    * Counts the payload [downloadPayload] counted that no verified piece keeps: pieces that fail
@@ -413,9 +413,10 @@ internal class WebSeedWorker<P : WebSeedPiece>(
             total += bytes.size
             handle.received(bytes.size)
             stats.payload.addAndFetch(bytes.size.toLong())
-            downloadPayload(bytes.size)
-            // Once counted as received, so what is discarded never exceeds it.
+            // Before the throttle, as the engines count it received: a run stopped while it
+            // waits still accounts for the chunk.
             runPayload.addAndFetch(bytes.size.toLong())
+            downloadPayload(bytes.size)
             var read = 0
             while (read < bytes.size) {
               val target = request.parts[part]

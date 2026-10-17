@@ -95,7 +95,7 @@ internal class TorrentV2WebSeeds private constructor(
   private val reporter: ConnectionReporter,
   private val logLabel: String,
   private val retryMs: Long,
-  /** Counts and rate-limits payload, as for peers. */
+  /** Counts payload as received, then rate-limits it, as for peers. */
   private val downloadPayload: suspend (Int) -> Unit,
 ) {
   private val log = KetchLogger("TorrentWebSeed")

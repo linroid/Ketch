@@ -635,12 +635,13 @@ internal class TorrentV2DownloadSession private constructor(
     val webSeedThrottled = AtomicLong(0)
     val webSeeds = TorrentV2WebSeeds.of(document, layout, store, runtime.webSeedHttp, reporter,
       label, webSeedRetryMs) { bytes ->
+      // Received before it waits, so a stop meanwhile leaves it to be counted as discarded.
+      store.recordReceived(bytes)
       val start = clock()
       globalRate.acquire(bytes)
       downloadRate.acquire(bytes)
       throttle(bytes)
       webSeedThrottled.addAndFetch(clock() - start)
-      store.recordReceived(bytes)
     }
     val mirrors = webSeeds?.let { launch { it.run() } }
     try {
