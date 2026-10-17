@@ -112,8 +112,18 @@ class WebDavIntegrationTest {
     }
   }
 
+  @Test
+  fun sameOriginRedirect_answersDigestForTheNewTarget() = runTest(timeout = 30.seconds) {
+    withServer { server ->
+      val task = server.start(connections = 2, path = ALIAS)
+      val state = assertIs<DownloadState.Completed>(task.state.first { it.isTerminal })
+      assertContentEquals(server.content, File(state.outputPath).readBytes())
+    }
+  }
+
   private companion object {
     const val PROBE = "bytes=0-0"
+    const val ALIAS = "/dav/alias.bin"
   }
 
   private suspend fun withServer(
@@ -197,6 +207,11 @@ class WebDavIntegrationTest {
 
     private fun handle(exchange: HttpExchange) {
       methods += exchange.requestMethod
+      if (exchange.requestURI.rawPath == ALIAS) {
+        exchange.responseHeaders.add("Location", "/dav/My%20File.bin")
+        exchange.sendResponseHeaders(301, -1)
+        return
+      }
       if (!authorized(exchange)) {
         exchange.responseHeaders.add(
           "WWW-Authenticate",

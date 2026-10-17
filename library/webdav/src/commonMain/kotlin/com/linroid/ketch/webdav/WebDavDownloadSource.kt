@@ -61,7 +61,7 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val (link, headers) = input as ResolveInput.Url
     val url = parse(link)
-    return inspect(WebDavClient(engineFor(config.proxy), url, headers), link, url, config)
+    return inspect(WebDavClient(engineFor(config.proxy), url, headers), link, url, config).resolved
   }
 
   /**
@@ -76,12 +76,19 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     val url = parse(context.url)
     val client = WebDavClient(engineFor(context.config.proxy), url, context.headers)
     // Asked on every run: it answers the server's challenge and tells whether the file changed.
-    val resolved = inspect(client, context.url, url, context.config)
+    val inspection = inspect(client, context.url, url, context.config)
+    val resolved = inspection.resolved
     val current = stateOf(resolved)
+    // Bytes written before this run are only kept when a strong validator ties them to the file.
+    var continuable = true
     if (state != null) {
       log.i { "Resuming download for taskId=${context.taskId}" }
       requireUnchanged(context.taskId, state, current)
       context.publishedChecksum = resolved.checksum
+      continuable = hasValidator(state)
+      if (!continuable) {
+        log.w { "No strong ETag or Last-Modified for taskId=${context.taskId}; starting over" }
+      }
     }
     observedLock.withLock { observed[context.taskId] = state ?: current }
 
@@ -94,14 +101,14 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     // The segments are sized from this value; downloadAll resegments for any later change.
     val requested = context.maxConnections.value
     val connections = if (ranges) context.effectiveConnections(requested) else 1
-    val segments = plan(context, totalBytes, ranges, connections)
+    val segments = plan(context, totalBytes, ranges && continuable, connections)
     context.segments.value = segments
 
     SegmentedDownloadHelper(
       progressIntervalMs = context.config.progressIntervalMs,
       tag = "WebDavSource",
     ).downloadAll(context, segments, totalBytes, ranges, requested) { segment, onProgress ->
-      downloadSegment(context, client, url, segment, onProgress)
+      downloadSegment(context, client, url, inspection.conditions, segment, onProgress)
     }
   }
 
@@ -114,13 +121,23 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     super.cleanup(context, state, deleteFiles)
   }
 
-  /** Reads what the server says about the file at [url] into a resolution of [link]. */
+  /**
+   * What the server said about a file: its resolution, and the conditions every ranged `GET` of
+   * it carries so that each answers from the same version.
+   */
+  private class Inspection(val resolved: ResolvedSource, val conditions: Map<String, String>)
+
+  /**
+   * Reads what the server says about the file at [url] into a resolution of [link]. Its entity
+   * tag and modification time are the `GET` probe's where it sends them, as those are what the
+   * ranged `GET`s carry and their conditions compare, else the `PROPFIND`'s.
+   */
   private suspend fun inspect(
     client: WebDavClient,
     link: String,
     url: WebDavUrl,
     config: DownloadConfig,
-  ): ResolvedSource {
+  ): Inspection {
     val properties = client.propfind()
     if (properties?.collection == true) {
       throw KetchError.SourceError(TYPE, detail = "This WebDAV link is a folder; link to a file")
@@ -128,11 +145,12 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     val info = client.probe()
     val totalBytes = info.contentLength ?: properties?.contentLength ?: -1
     val ranges = info.acceptRanges && totalBytes > 0
+    val etag = info.etag ?: properties?.etag
     log.d {
       "WebDAV file: dav=${properties != null}, totalBytes=$totalBytes, ranges=$ranges, " +
-        "etag=${properties?.etag ?: info.etag}"
+        "etag=$etag"
     }
-    return ResolvedSource(
+    val resolved = ResolvedSource(
       url = link,
       sourceType = TYPE,
       totalBytes = totalBytes,
@@ -141,25 +159,39 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
         ?: properties?.displayName?.let(::sanitizeFileName),
       maxSegments = if (ranges) config.maxConnectionsPerDownload else 1,
       metadata = buildMap {
-        (properties?.etag ?: info.etag)?.let { put(META_ETAG, it) }
-        (properties?.lastModified ?: info.lastModified)?.let { put(META_LAST_MODIFIED, it) }
+        etag?.let { put(META_ETAG, it) }
+        (info.lastModified ?: properties?.lastModified)?.let { put(META_LAST_MODIFIED, it) }
         if (properties != null) put(META_DAV, "true")
       },
       contentType = properties?.contentType ?: info.contentType,
       checksum = info.checksum,
     )
+    // Only validators the GET itself sent: a server may not compare one only PROPFIND reports.
+    val getEtag = info.etag
+    val getLastModified = info.lastModified
+    val conditions = when {
+      getEtag != null && isStrong(getEtag) -> mapOf(IF_MATCH to getEtag)
+      getLastModified != null -> mapOf(IF_UNMODIFIED_SINCE to getLastModified)
+      else -> emptyMap()
+    }
+    return Inspection(resolved, conditions)
   }
 
-  /** Fails with [KetchError.FileChanged] when [current] is not the file [saved] describes. */
+  /**
+   * Fails with [KetchError.FileChanged] when [current] is not the file [saved] describes, by its
+   * strong entity tag, else its modification time (a weak tag only says the content is
+   * equivalent, not the same bytes), and its size.
+   */
   private fun requireUnchanged(
     taskId: String,
     saved: WebDavSourceState,
     current: WebDavSourceState,
   ) {
+    val savedTag = saved.etag?.takeIf(::isStrong)?.let(::strongTag)
+    val currentTag = current.etag?.takeIf(::isStrong)?.let(::strongTag)
     val reason = when {
-      saved.etag != null && normalizedEtag(saved.etag) != current.etag?.let(::normalizedEtag) ->
-        "ETag"
-      saved.etag == null && saved.lastModified != null &&
+      savedTag != null && savedTag != currentTag -> "ETag"
+      savedTag == null && saved.lastModified != null &&
         saved.lastModified != current.lastModified -> "Last-Modified"
       saved.totalBytes >= 0 && current.totalBytes >= 0 &&
         saved.totalBytes != current.totalBytes -> "Size"
@@ -230,11 +262,16 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     return holds
   }
 
-  /** Downloads the bytes [segment] still needs with one ranged `GET`. */
+  /**
+   * Downloads the bytes [segment] still needs with one ranged `GET` carrying [conditions]; a
+   * `412` means the file changed since the run inspected it, and fails with
+   * [KetchError.FileChanged] rather than mix two versions.
+   */
   private suspend fun downloadSegment(
     context: DownloadContext,
     client: WebDavClient,
     url: WebDavUrl,
+    conditions: Map<String, String>,
     segment: Segment,
     onProgress: suspend (bytesDownloaded: Long) -> Unit,
   ): Segment {
@@ -245,7 +282,7 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     try {
       observeExchanges(handle, spec) {
         context.watchdog.watch { monitor ->
-          client.download(segment.currentOffset..segment.end) { data ->
+          client.download(segment.currentOffset..segment.end, conditions) { data ->
             currentCoroutineContext().ensureActive()
             monitor.received(data.size)
             if (data.size > segment.totalBytes - downloaded) {
@@ -259,6 +296,10 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
           }
         }
       }
+    } catch (e: KetchError.Http) {
+      if (e.code != 412) throw e
+      log.w { "Precondition failed for taskId=${context.taskId} - file has changed on server" }
+      throw KetchError.FileChanged("File changed on server during the download")
     } finally {
       handle.close()
     }
@@ -336,9 +377,18 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
       totalBytes = resolved.totalBytes,
     )
 
-    /** [etag] without its weak prefix and quotes, as servers write the same tag either way. */
-    private fun normalizedEtag(etag: String): String =
-      etag.trim().removePrefix("W/").removeSurrounding("\"")
+    private const val IF_MATCH = "If-Match"
+    private const val IF_UNMODIFIED_SINCE = "If-Unmodified-Since"
+
+    /** Whether [etag] is a strong entity tag, one that names the exact bytes. */
+    private fun isStrong(etag: String): Boolean = !etag.trim().startsWith("W/")
+
+    /** A strong [etag] without its quotes, which `getetag` and `ETag` may write differently. */
+    private fun strongTag(etag: String): String = etag.trim().removeSurrounding("\"")
+
+    /** Whether [state] ties the bytes written to one version: a strong tag or a modification time. */
+    private fun hasValidator(state: WebDavSourceState): Boolean =
+      state.etag?.let(::isStrong) == true || state.lastModified != null
 
     /** Runs a file operation, reporting its failures as [KetchError.Disk]. */
     private inline fun <T> disk(block: () -> T): T = try {

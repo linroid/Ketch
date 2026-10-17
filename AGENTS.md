@@ -671,8 +671,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   HLS and DASH; see [WebDAV](docs/webdav.md). Requests go through the shared `HttpEngine`, so
   proxies, network interfaces, redirects and live connections behave as for HTTP
 - Every resolve and every run sends a `PROPFIND` with `Depth: 0` (`HttpEngine.request`, which
-  returns `HttpReply` with the status and headers of any status and reads at most 1 MiB of a
-  success's body; `KtorHttpEngine` and the network engines implement it, the default throws
+  returns `HttpReply` with the status and headers of any status, the URL that answered after
+  redirects, and at most 1 MiB of a success's body; `KtorHttpEngine` and the network engines
+  implement it, the default throws
   `UnsupportedOperationException`) for `getcontentlength`, `getetag`, `getlastmodified`,
   `getcontenttype`, `displayname` and `resourcetype`: a collection fails with
   `KetchError.SourceError`, a resource the multistatus reports with another status fails with
@@ -681,18 +682,24 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   probe (`HttpEngine.probe`, else `head`) tells range support and the size
 - Downloads in segments over `SegmentedDownloadHelper` (ranged `GET`s, `TransferWatchdog`,
   throttle, `ConnectionReporter` with `httpConnectionSpec`/`observeExchanges`, now public), one
-  connection without ranges, and streams content of unknown size. `WebDavSourceState` (entity
-  tag, modification time, size) is what the run found (`store` keeps it per task until
-  `cleanup`), else the resolution's; a resume fails with `KetchError.FileChanged` when the tag
-  (weak prefix and quotes ignored), else the modification time, or the size differs, and keeps
-  saved segments only while the file on disk holds them
+  connection without ranges, and streams content of unknown size. Each segment `GET` carries
+  `If-Match` with the probe's strong `ETag`, else `If-Unmodified-Since` with its
+  `Last-Modified`, and a `412` fails with `KetchError.FileChanged`. `WebDavSourceState` (entity
+  tag, modification time, size; the probe's, else the `PROPFIND`'s) is what the run found
+  (`store` keeps it per task until `cleanup`), else the resolution's; a resume fails with
+  `KetchError.FileChanged` when the strong tag (quotes ignored), else the modification time, or
+  the size differs. Weak tags are never compared; a state with neither a strong tag nor a
+  modification time starts over from zero, and saved segments are kept only while the file on
+  disk holds them
 - Sign-in (`WebDavClient`): credentials from the link's user info, else an
   `Authorization: Basic` header (the apps' Sign in), which is then not sent as it is; other
   `Authorization` headers pass through. Nothing is sent before a `401`; `Challenge` parses
   `WWW-Authenticate` and `Authenticator` answers Digest (RFC 7616: `SHA-256` over `MD5`, `-sess`,
   `qop=auth` or none, `userhash`, a nonce count per nonce) else Basic, warning over plain HTTP. A
   `401` during a download fetches a new challenge with a `HEAD` once and retries; refused or
-  missing credentials are `KetchError.AuthenticationFailed`
+  missing credentials are `KetchError.AuthenticationFailed`. A redirect to another path of the
+  same origin (`HttpReply.url`) moves the client there, so Digest answers name the target the
+  server checks; other origins never get credentials
 - The apps read the schemes as `LinkKind.WebDav` (quick add, palette), and Sign in adds the
   Basic header
 - Tests: `WebDavDownloadSourceTest` over `FakeDavServer` (commonTest), RFC 2617/7616 Digest

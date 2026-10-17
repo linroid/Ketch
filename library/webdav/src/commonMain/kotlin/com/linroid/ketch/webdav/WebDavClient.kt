@@ -26,6 +26,10 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * A `401` with no credentials to answer it, or one that refuses them, fails with
  * [KetchError.AuthenticationFailed]. A Digest nonce that expires during a download is answered
  * again ([download]).
+ *
+ * A redirect to another path of the same origin, such as a folder's trailing slash or a
+ * canonical path, moves the client there: later requests go to that URL and Digest answers name
+ * its target, as the server checks them against the request it received.
  */
 internal class WebDavClient(
   private val engine: HttpEngine,
@@ -50,9 +54,13 @@ internal class WebDavClient(
   @Volatile
   private var generation = 0
 
-  /** The headers of a [method] request, with credentials once a challenge was answered. */
-  fun headers(method: String): Map<String, String> {
-    val authorization = authenticator?.authorization(method, url.requestTarget)
+  /** Where requests go: the link's URL, or the same-origin one a redirect led to. */
+  @Volatile
+  private var target = Target(url.httpUrl, url.requestTarget)
+
+  /** The headers of a [method] request to [to], with credentials once a challenge was answered. */
+  private fun headers(method: String, to: Target = target): Map<String, String> {
+    val authorization = authenticator?.authorization(method, to.requestTarget)
       ?: return headers
     return headers + (AUTHORIZATION to authorization)
   }
@@ -96,16 +104,27 @@ internal class WebDavClient(
    * `HEAD` for engines that cannot probe.
    */
   suspend fun probe(): ServerInfo = authorized {
+    val to = target
     try {
-      engine.probe(url.httpUrl, headers("GET"))
+      engine.probe(to.httpUrl, headers("GET", to))
     } catch (_: UnsupportedOperationException) {
-      engine.head(url.httpUrl, headers(HEAD))
+      engine.head(to.httpUrl, headers(HEAD, to))
     }
   }
 
-  /** [HttpEngine.download] of [range], answering a challenge the server makes first. */
-  suspend fun download(range: LongRange?, onData: suspend (ByteArray) -> Unit) {
-    authorized { engine.download(url.httpUrl, range, headers("GET"), onData) }
+  /**
+   * [HttpEngine.download] of [range] with [conditions], such as `If-Match`, answering a challenge
+   * the server makes first.
+   */
+  suspend fun download(
+    range: LongRange?,
+    conditions: Map<String, String> = emptyMap(),
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    authorized {
+      val to = target
+      engine.download(to.httpUrl, range, headers("GET", to) + conditions, onData)
+    }
   }
 
   /**
@@ -122,7 +141,9 @@ internal class WebDavClient(
       challengeLock.withLock {
         // Another request may have answered a new challenge meanwhile.
         if (generation == seen) {
-          val reply = engine.request(HEAD, url.httpUrl, headers(HEAD))
+          val to = target
+          val reply = engine.request(HEAD, to.httpUrl, headers(HEAD, to))
+          follow(reply)
           if (reply.status == 401) answer(reply)
         }
       }
@@ -141,13 +162,30 @@ internal class WebDavClient(
     extra: Map<String, String>,
     body: HttpBody?,
   ): HttpReply {
-    val reply = engine.request(method, url.httpUrl, headers(method) + extra, body)
+    val first = target
+    val reply = engine.request(method, first.httpUrl, headers(method, first) + extra, body)
+    follow(reply)
     if (reply.status != 401) return reply
     if (authenticator == null) throw authenticationFailed(null)
     challengeLock.withLock { answer(reply) }
-    val retried = engine.request(method, url.httpUrl, headers(method) + extra, body)
+    // Sent where the challenge came from, so its Digest names the target the server checks.
+    val to = target
+    val retried = engine.request(method, to.httpUrl, headers(method, to) + extra, body)
+    follow(retried)
     if (retried.status == 401) throw authenticationFailed(null)
     return retried
+  }
+
+  /**
+   * Moves [target] to the URL that answered [reply] when a redirect led to another path of the
+   * same origin. Another origin never gets the credentials, so the client stays.
+   */
+  private fun follow(reply: HttpReply) {
+    val answered = reply.url ?: return
+    val current = target
+    if (answered == current.httpUrl || origin(answered) != origin(current.httpUrl)) return
+    log.d { "Redirected to another path of the same origin; requesting it from now on" }
+    target = Target(answered, requestTargetOf(answered))
   }
 
   /** Answers the challenges of [reply], a `401`; must hold [challengeLock]. */
@@ -169,7 +207,28 @@ internal class WebDavClient(
   private fun authenticationFailed(cause: Throwable?) =
     KetchError.AuthenticationFailed(WebDavDownloadSource.TYPE, cause)
 
-  private companion object {
+  /** A URL requests go to, and its path and query as Digest answers name them. */
+  private class Target(val httpUrl: String, val requestTarget: String)
+
+  internal companion object {
+    /** The scheme, host and port of an HTTP(S) [url], lowercase, with the default port. */
+    internal fun origin(url: String): String {
+      val scheme = url.substringBefore("://").lowercase()
+      val authority = url.substringAfter("://").takeWhile { it != '/' && it != '?' && it != '#' }
+        .substringAfterLast('@').lowercase()
+      val defaultPort = if (scheme == "https") ":443" else ":80"
+      return "$scheme://" + authority.removeSuffix(defaultPort)
+    }
+
+    /** The path and query of an HTTP(S) [url], `/` for none. */
+    internal fun requestTargetOf(url: String): String {
+      val rest = url.substringAfter("://").substringBefore('#')
+      val start = rest.indexOfFirst { it == '/' || it == '?' }
+      if (start < 0) return "/"
+      val target = rest.substring(start)
+      return if (target.startsWith('?')) "/$target" else target
+    }
+
     const val AUTHORIZATION = "Authorization"
     const val WWW_AUTHENTICATE = "WWW-Authenticate"
     const val DEPTH = "Depth"

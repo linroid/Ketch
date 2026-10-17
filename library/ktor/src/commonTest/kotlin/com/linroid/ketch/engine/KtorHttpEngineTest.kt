@@ -609,6 +609,7 @@ class KtorHttpEngineTest {
       assertEquals(207, reply.status)
       assertEquals(listOf("PROPFIND", "PROPFIND"), requests.map { it.method.value })
       assertEquals("/dav/dir/", requests.last().url.encodedPath)
+      assertEquals("https://example.com/dav/dir/", reply.url)
     }
   }
 

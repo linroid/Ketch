@@ -269,6 +269,7 @@ class KtorHttpEngine private constructor(
           } else {
             ByteArray(0)
           },
+          url = response.call.request.url.toString(),
         )
       }
     }

@@ -140,11 +140,14 @@ class HttpBody(val bytes: ByteArray, val contentType: String)
  * @property status the status code
  * @property headers the response headers by lowercase name, each with its values in order
  * @property body the body of a success, empty for other statuses
+ * @property url the URL that answered, after the redirects the engine followed, or `null` when
+ *   the engine does not say
  */
 class HttpReply(
   val status: Int,
   val headers: Map<String, List<String>>,
   val body: ByteArray,
+  val url: String? = null,
 ) {
   /** Whether [status] is a success (2xx). */
   val isSuccess: Boolean get() = status in 200..299

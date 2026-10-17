@@ -38,6 +38,9 @@ internal class FakeDavServer(
   val requests = mutableListOf<String>()
   val ranged = mutableListOf<LongRange?>()
 
+  /** The conditional headers of each download, such as `If-Match: "v1"`. */
+  val conditions = mutableListOf<List<String>>()
+
   /** A `Range` request the server ends early, after this many bytes, once. */
   var dropAfter: Long? = null
 
@@ -80,6 +83,14 @@ internal class FakeDavServer(
   ) {
     if (!authorized("GET", headers)) throw KetchError.Http(401)
     ranged += range
+    val ifMatch = headers["If-Match"]
+    val ifUnmodifiedSince = headers["If-Unmodified-Since"]
+    conditions += listOfNotNull(
+      ifMatch?.let { "If-Match: $it" },
+      ifUnmodifiedSince?.let { "If-Unmodified-Since: $it" },
+    )
+    if (ifMatch != null && ifMatch != etag) throw KetchError.Http(412)
+    if (ifUnmodifiedSince != null && ifUnmodifiedSince != lastModified) throw KetchError.Http(412)
     if (range != null && !ranges && range.first != 0L) {
       throw KetchError.Unsupported(IllegalStateException("Server returned a different range"))
     }

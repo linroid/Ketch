@@ -26,10 +26,15 @@ link adds is the `PROPFIND` check below and Digest sign-in.
    but not its properties, and Ketch reads its headers instead.
 2. A ranged `GET` of the first byte checks whether the server sends byte ranges.
 3. The file downloads in segments, one ranged `GET` per connection, like an HTTP download. A
-   server without ranges uses one connection and restarts from zero.
-4. A pause, a retry or a restart of Ketch continues from the bytes written, once a new
-   `PROPFIND` reports the same entity tag (else modification time) and size. A file that changed
-   fails with `FileChanged` rather than mix two versions.
+   server without ranges uses one connection and restarts from zero. Every segment carries
+   `If-Match` with the strong entity tag the probe saw, else `If-Unmodified-Since` with its
+   modification time, so a file replaced during the download fails with `FileChanged` (`412`)
+   instead of mixing two versions.
+4. A pause, a retry or a restart of Ketch continues from the bytes written, once the server
+   reports the same strong entity tag, else the same modification time, and size; a file that
+   changed fails with `FileChanged`. A weak entity tag (`W/"…"`) only says the content is
+   equivalent, so it is never compared, and a file with neither validator downloads again from
+   the start.
 
 Proxies, the network interfaces chosen in Settings, speed limits, stalled-connection timeouts,
 checksums and the live connections list apply as they do to HTTP downloads.
@@ -46,7 +51,8 @@ Ketch sends no credentials until the server asks for them (`401`). It then answe
 Credentials come from the link, else from an `Authorization: Basic` header of the request (what
 the apps' Sign in adds). Any other `Authorization` header, such as a bearer token, is sent as it
 is. Credentials the server refuses fail with `AuthenticationFailed`. Redirects to another host
-never carry them.
+never carry them; after a redirect to another path of the same server, such as a canonical
+path, requests go to that path and Digest answers name it.
 
 ## In code
 

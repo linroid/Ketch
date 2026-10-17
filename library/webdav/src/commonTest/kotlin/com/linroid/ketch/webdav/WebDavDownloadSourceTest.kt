@@ -224,6 +224,78 @@ class WebDavDownloadSourceTest {
   }
 
   @Test
+  fun segments_carryTheStrongEtag_andFailWhenTheFileChanges() = runTest {
+    val server = FakeDavServer(content)
+    val engine = object : com.linroid.ketch.core.engine.HttpEngine by server {
+      override suspend fun probe(
+        url: String,
+        headers: Map<String, String>,
+      ): com.linroid.ketch.core.engine.ServerInfo {
+        val info = server.probe(url, headers)
+        // A new version of the same size lands between the inspection and the segments.
+        server.etag = "\"v2\""
+        return info
+      }
+    }
+    val source = WebDavDownloadSource(engine)
+    assertFailsWith<KetchError.FileChanged> {
+      source.download(context(MemoryFile(), connections = 2), null)
+    }
+    assertTrue(server.conditions.isNotEmpty())
+    assertTrue(server.conditions.all { it == listOf("If-Match: \"v1\"") })
+  }
+
+  @Test
+  fun segments_withAWeakEtag_carryTheModificationTime() = runTest {
+    val server = FakeDavServer(content, etag = "W/\"v1\"")
+    val file = MemoryFile()
+    WebDavDownloadSource(server).download(context(file, connections = 2), null)
+    assertContentEquals(content, file.data)
+    assertEquals(
+      List(2) { listOf("If-Unmodified-Since: Mon, 12 Oct 2026 08:00:00 GMT") },
+      server.conditions,
+    )
+  }
+
+  @Test
+  fun resume_withAWeakEtag_comparesTheModificationTime() = runTest {
+    val server = FakeDavServer(content, etag = "W/\"v1\"").apply { dropAfter = 1_000 }
+    val source = WebDavDownloadSource(server)
+    val file = MemoryFile()
+    val context = context(file, connections = 1, preResolved = source.resolve(URL))
+    assertFailsWith<KetchError.Network> { source.download(context, null) }
+    val state = source.store(context)
+
+    // Weak tags that differ do not decide; the unchanged modification time keeps the bytes.
+    server.etag = "W/\"v1-gzip\""
+    server.ranged.clear()
+    source.download(context, state)
+    assertContentEquals(content, file.data)
+    assertEquals(listOf<LongRange?>(1_000L..9_999L), server.ranged)
+
+    server.lastModified = "Tue, 13 Oct 2026 08:00:00 GMT"
+    assertFailsWith<KetchError.FileChanged> { source.download(context, state) }
+  }
+
+  @Test
+  fun resume_withoutAValidator_startsOver() = runTest {
+    val server = FakeDavServer(content, etag = "W/\"v1\"", lastModified = null)
+      .apply { dropAfter = 1_000 }
+    val source = WebDavDownloadSource(server)
+    val file = MemoryFile()
+    val context = context(file, connections = 1, preResolved = source.resolve(URL))
+    assertFailsWith<KetchError.Network> { source.download(context, null) }
+    val state = source.store(context)
+
+    server.ranged.clear()
+    server.conditions.clear()
+    source.download(context, state)
+    assertContentEquals(content, file.data)
+    assertEquals(listOf<LongRange?>(0L..9_999L), server.ranged)
+    assertEquals(listOf(emptyList()), server.conditions)
+  }
+
+  @Test
   fun store_beforeTheRun_usesTheResolution() = runTest {
     val source = WebDavDownloadSource(FakeDavServer(content))
     val context = context(MemoryFile(), preResolved = source.resolve(URL))
