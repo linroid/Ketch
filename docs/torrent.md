@@ -124,7 +124,8 @@ What happens next depends on the task's state:
 - **Paused, queued, scheduled or failed**: the new selection applies when the task starts.
 - **Completed**: adding files downloads them into the same folder (Queued, Downloading, then
   Completed again), taking over the task's seeding if it seeds. Removing files only changes the
-  task's size, and seeding shares the smaller selection from then on.
+  task's size, and seeding shares the smaller selection from then on, also when the task was
+  still checking its files to seed again after a restart.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.

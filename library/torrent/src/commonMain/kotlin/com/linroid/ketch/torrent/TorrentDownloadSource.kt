@@ -880,6 +880,7 @@ class TorrentDownloadSource(
         markSeeding(taskId)
         watchSeeder(taskId, session)
         log.i { "Torrent taskId=$taskId seeds again" }
+        seedLatestSelection(task)
       } else {
         log.i { "Torrent taskId=$taskId does not seed: $outcome" }
       }
@@ -902,6 +903,28 @@ class TorrentDownloadSource(
             slots.release()
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Applies to a seeder that now seeds the smaller selection its task saved while the seeder
+   * checked its files: [changeSeedingSelection] only changes a seeder once it is marked seeding,
+   * so a selection saved from then on reaches it, and one saved before is read here. A selection
+   * that adds files reopens the task instead, whose run takes the seeder over.
+   */
+  private suspend fun seedLatestSelection(task: SeedingTask) {
+    val latest = task.selection()
+    val seeded = task.selectedFileIds
+    if (latest.isEmpty() || latest == seeded) return
+    if (seeded.isNotEmpty() && !seeded.containsAll(latest)) return
+    try {
+      changeSeedingSelection(task.taskId, latest)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w {
+        "Torrent taskId=${task.taskId} seeds its previous selection: ${e.describeCauses()}"
       }
     }
   }

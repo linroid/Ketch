@@ -823,7 +823,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selected files, refuse one whose path holds a file they did not create, keep deselected
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more, the run that takes
-  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). A lent seeder
+  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). One that
+  shrinks while its restored seeder still checks its files has it seed the smaller selection
+  once it seeds: `startSeeding` reads the task's selection again (`SeedingTask.selection`)
+  after marking it seeding, which `changeSeedingSelection` requires. A lent seeder
   pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again,
   and its discovery keeps only the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges

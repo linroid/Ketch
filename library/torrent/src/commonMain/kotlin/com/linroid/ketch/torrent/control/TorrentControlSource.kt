@@ -142,6 +142,8 @@ internal class LiveTorrent(
  * @property selectedFileIds the task's files; empty for every file
  * @property connections opens the task's live network connections while it seeds, as
  *   [DownloadContext.connections] does while it downloads
+ * @property selection reads the task's files now: a selection saved while the seeder checked
+ *   its files differs from [selectedFileIds]
  */
 internal class SeedingTask(
   val taskId: String,
@@ -151,6 +153,7 @@ internal class SeedingTask(
   val outputPath: String,
   val selectedFileIds: Set<String>,
   val connections: ConnectionReporter = ConnectionReporter.None,
+  val selection: () -> Set<String> = { selectedFileIds },
 )
 
 /** How an attempt to share a completed task ended, or why it would not start. */
