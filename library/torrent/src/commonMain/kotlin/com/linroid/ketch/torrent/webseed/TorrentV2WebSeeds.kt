@@ -104,13 +104,10 @@ internal class TorrentV2WebSeeds private constructor(
   val stats = WebSeedStats()
 
   /**
-   * Payload the seeds received and threw away so far, for a stall check, which the bytes arriving
-   * next come after ([WebSeedStats.checked]).
+   * The seeds' payload since the last stall check, for one, which the bytes arriving next come
+   * after ([WebSeedStats.checked]).
    */
-  fun checkWaste(): WebSeedWaste = stats.checked()
-
-  /** Payload the seeds received that may still be thrown away ([WebSeedStats.unsettled]). */
-  val unsettledBytes: Long get() = stats.unsettled.load()
+  fun checkPayload(): WebSeedLedger = stats.checked()
   private val events = Channel<Event>(Channel.UNLIMITED)
   // A run no seed took goes back to the loop, which returns its pieces to the scheduler.
   private val assignments = urls.indices.map { seed ->

@@ -884,6 +884,50 @@ class TorrentV2WebSeedTest {
   }
 
   @Test
+  fun corruptPieceWithinOneCheck_stallsHalfAMinuteAfterTheLastKeptPayload() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("data.bin" to 65_536, "other.bin" to 20_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val data = "http://mirror.test/pub/pack/data.bin"
+    // The only source sends a part of 7,001 bytes when the test lets it, and its first copy of
+    // piece 1 is corrupt.
+    val mirror = MirrorEngine(mapOf(data to fixture.payloads[0],
+      "http://mirror.test/pub/pack/other.bin" to fixture.payloads[1]),
+      damage = mapOf(data to 32_768L + 100))
+    val stepped = Stepped(mirror)
+    suspend fun deliver(parts: Int) {
+      val delivered = stepped.delivered + parts
+      repeat(parts) { stepped.steps.send(Unit) }
+      while (stepped.delivered < delivered) delay(10)
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, stepped, selected = setOf(wanted)) { run ->
+      stepped.asked.await()
+      // Payload that may still be kept is payload: a part at 25 s, though nothing verified yet,
+      // keeps the download from stalling 15 s later.
+      run.skip(25_000)
+      deliver(1)
+      run.skip(14_000)
+      delay(1_200)
+      assertNull(run.session.stall.value)
+      // The next parts verify piece 0 and bring the first bytes of piece 1: the last payload
+      // kept, which a check counts before the clock moves on.
+      deliver(4)
+      delay(1_200)
+      // 20 s later the rest of piece 1 comes within one check, corrupt: the last part fails the
+      // run, and the seed asks for the piece again.
+      run.skip(20_000)
+      deliver(4)
+      stepped.steps.send(Unit)
+      withTimeout(5_000) { while (mirror.requests.count { it.first == data } < 2) delay(10) }
+      // Thrown away, piece 1 never was payload: only the no-payload clock can stall the download
+      // before a minute has passed since piece 0, and it does once 30 s have.
+      run.skip(15_000)
+      val stall = withTimeout(5_000) { run.session.stall.first { it != null } }
+      assertEquals(TorrentStallReason.NO_PEERS, stall?.reason)
+    }
+  }
+
+  @Test
   fun webSeeds_sayTheyDownloadOnlyOnceARunIsHandedOut() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {

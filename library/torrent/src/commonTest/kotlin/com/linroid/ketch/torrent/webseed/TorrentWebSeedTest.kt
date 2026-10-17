@@ -42,6 +42,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -413,7 +414,7 @@ class TorrentWebSeedTest {
   }
 
   @Test
-  fun corruptPiece_isRecentWasteOnlyForWhatArrivedSinceTheLastStallCheck() = runTest {
+  fun corruptPiece_isThrownAwayByTheStallCheckEachPartArrivedAfter() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         val payload = ByteArray(PIECE) { (it * 3 + 7).toByte() }
@@ -428,13 +429,13 @@ class TorrentWebSeedTest {
             // The first part arrives before a stall check, the rest after it.
             mirror.steps.send(Unit)
             while (mirror.delivered == 0) delay(10)
-            assertEquals(WebSeedWaste(checks = 0, bytes = 0, recent = 0), stats.checked())
+            assertEquals(WebSeedLedger(checks = 0, arrived = 7_001), stats.checked())
             mirror.steps.send(Unit)
             mirror.steps.send(Unit)
             while (stats.wasted == 0L) delay(10)
-            // The check counted the first part as payload, and no check the rest.
-            assertEquals(WebSeedWaste(checks = 1, bytes = PIECE.toLong(), recent = PIECE - 7_001L),
-              stats.checked())
+            // The check counted the first part, the next counts the rest: each takes its own back.
+            assertEquals(WebSeedLedger(checks = 1, arrived = PIECE - 7_001L,
+              wasted = mapOf(0L to 7_001L, 1L to PIECE - 7_001L)), stats.checked())
             running.cancel()
           }
         }
@@ -443,7 +444,7 @@ class TorrentWebSeedTest {
   }
 
   @Test
-  fun corruptPieceAfterAVerifiedOne_isAllTheRecentWaste() = runTest {
+  fun corruptPieceAfterAVerifiedOne_throwsAwayOnlyItsOwnBytes() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         val payload = ByteArray(2 * PIECE) { (it * 17 + 3).toByte() }
@@ -458,7 +459,8 @@ class TorrentWebSeedTest {
             while (stats.wasted == 0L) delay(10)
             // No check came meanwhile: of what arrived, the first piece is kept.
             assertTrue(store.verifiedPieces()[0])
-            assertEquals(WebSeedWaste(checks = 0, bytes = PIECE.toLong(), recent = PIECE.toLong()),
+            assertEquals(WebSeedLedger(checks = 0, arrived = 2L * PIECE,
+              kept = mapOf(0L to PIECE.toLong()), wasted = mapOf(0L to PIECE.toLong())),
               stats.checked())
             running.cancel()
           }
@@ -1375,6 +1377,77 @@ class TorrentWebSeedTest {
             }
           }
           assertTrue(lines.drain().none { "makes progress again" in it })
+        }
+      }
+    }
+  }
+
+  @Test
+  fun corruptPieceWithinOneCheck_stallsHalfAMinuteAfterTheLastKeptPayload() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val payload = ByteArray(2 * PIECE) { (it * 11 + 5).toByte() }
+        val url = "http://mirror.test/data"
+        // The only source sends a part of 7,001 bytes when the test lets it, and its first copy
+        // of piece 1 is corrupt.
+        val mirror = MirrorEngine(mapOf(url to payload), damage = mapOf(url to PIECE + 100L))
+        val stepped = Stepped(mirror)
+        withStore(singleFile(payload, url)) { store, _ ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>()
+          // Moves the clock on and lets the swarm check itself; returns the stall it published.
+          suspend fun at(time: Long): TorrentStall? {
+            clock = time
+            delay(300)
+            return stall.value
+          }
+          suspend fun deliver(parts: Int) {
+            val delivered = stepped.delivered + parts
+            repeat(parts) { stepped.steps.send(Unit) }
+            while (stepped.delivered < delivered) delay(10)
+          }
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(stepped), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              stepped.asked.await()
+              // Payload that may still be kept is payload: parts at 0 s and 25 s, though nothing
+              // verified yet, keep the swarm from stalling at 40 s.
+              deliver(1)
+              at(1_000)
+              at(25_000)
+              deliver(1)
+              at(26_000)
+              assertNull(at(40_000))
+              // The next part verifies piece 0 and brings the first bytes of piece 1, counted at
+              // 41 s: the last payload kept.
+              deliver(1)
+              assertTrue(store.verifiedPieces()[0])
+              delay(300)
+              at(41_000)
+              at(60_000)
+              // The rest of piece 1 comes within one check, corrupt: the last part fails the run,
+              // and the seed asks for the piece again.
+              deliver(1)
+              stepped.steps.send(Unit)
+              while (mirror.requests.size < 2) delay(10)
+              at(61_000)
+              // Thrown away, piece 1 never was payload: only the no-payload clock can stall the
+              // swarm before 100 s, half a minute after the last payload kept.
+              assertNull(at(70_000))
+              clock = 71_000
+              assertEquals(TorrentStallReason.NO_PEERS,
+                withTimeout(5_000) { stall.filterNotNull().first() }.reason)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
         }
       }
     }

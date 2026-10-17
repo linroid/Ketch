@@ -39,6 +39,7 @@ import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import com.linroid.ketch.torrent.v2.peer.PeerV2Origin
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
 import com.linroid.ketch.torrent.webseed.TorrentV2WebSeeds
+import com.linroid.ketch.torrent.webseed.WebSeedLedger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.ChannelResult
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -315,7 +316,8 @@ internal object TorrentV2SessionLoop {
       val cancels = ArrayDeque<TorrentV2PieceScheduler.Cancel>()
       // Notices a download that stopped making progress, says why and recovers ([checkStall]).
       val watchdog = swarm?.stall?.let { TorrentStallWatchdog(nowMs) }
-      val payloadAtStart = store.receivedBytes()
+      // Payload received from peers; stall checks count web seeds' in [mirrors].
+      var peerPayload = 0L
       // Time requests waited on speed limits, which is never a stall.
       var throttledMs = 0L
 
@@ -592,6 +594,7 @@ internal object TorrentV2SessionLoop {
             (value.value as? PeerBlockExchange.Response.Rejected)?.let { rejected(view, it) }
             if (block != null) {
               store.recordReceived(block.ticket.request.length)
+              peerPayload += block.ticket.request.length
               // What crossed the wire: on a v1 route, the canonical block with its padding.
               view.traffic?.received(block.ticket.wire.length)
               view.receivedSinceRechoke += block.ticket.request.length
@@ -868,10 +871,6 @@ internal object TorrentV2SessionLoop {
         val missing = if (!downloading || !connected && returning.isEmpty()) null else {
           pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::obtainable)
         }
-        // In this order, so no web seed byte looks kept before it is (see StallSignals).
-        val payload = store.receivedBytes() - payloadAtStart
-        val unsettled = mirrors?.unsettledBytes ?: 0
-        val wasted = mirrors?.checkWaste()
         val due = stallWatchdog.check(StallSignals(
           downloading = downloading,
           peers = peers.size,
@@ -881,10 +880,8 @@ internal object TorrentV2SessionLoop {
           lateBlocks = if (downloading) pieces.lateCount() else 0,
           webSeeds = answering.size,
           droppedWebSeeds = stoppedMirrors.size,
-          payloadBytes = payload,
-          unsettledBytes = unsettled,
-          wastedBytes = wasted?.bytes ?: 0,
-          recentWastedBytes = wasted?.recent ?: 0,
+          peerPayloadBytes = peerPayload,
+          webSeedPayload = mirrors?.checkPayload() ?: WebSeedLedger(checks = 0, arrived = 0),
           throttledMs = throttledMs + swarm.webSeedThrottledMs(),
           pieceLength = layout.pieceLength,
         ))

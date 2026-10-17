@@ -217,7 +217,8 @@ internal class TorrentSwarm(
   private val unchoking = mutableSetOf<Int>()
   // The one connection kept to each peer, guarded like [connected].
   private val identities = mutableMapOf<PeerIdentity, PeerWorker>()
-  // Payload received from peers and web seeds, and time spent waiting on speed limits for it.
+  // Payload received from peers (web seeds count theirs in their stats), and time spent waiting
+  // on speed limits for peers' and web seeds'.
   private val payloadReceived = AtomicLong(0)
   private val throttledMs = AtomicLong(0)
   private val uploaded = AtomicLong(0)
@@ -401,12 +402,11 @@ internal class TorrentSwarm(
       SwarmWebSeedPieces(-1 - number, url, store, scheduler,
         onVerified = { progressEvents.trySend(Unit) })
     }
-    // Payload from web seeds counts and is throttled as peers' does.
+    // Payload from web seeds is throttled as peers' is; stall checks count it in [webSeedStats].
     val webSeedPayload: suspend (Int) -> Unit = { size ->
       val at = nowMs()
       downloadPayload(size)
       throttledMs.addAndFetch(nowMs() - at)
-      payloadReceived.addAndFetch(size.toLong())
     }
     // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
     val webSeedWorkers = webSeedUrls.mapIndexed { number, url ->
@@ -517,17 +517,13 @@ internal class TorrentSwarm(
       val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
       }
-      // In this order, so no web seed byte looks kept before it is (see StallSignals).
-      val payload = payloadReceived.load()
-      val unsettled = webSeedStats.unsettled.load()
-      val wasted = webSeedStats.checked()
       val due = watchdog.check(StallSignals(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
-        droppedWebSeeds = webSeeds.size - active.size, payloadBytes = payload,
-        unsettledBytes = unsettled, wastedBytes = wasted.bytes, recentWastedBytes = wasted.recent,
-        throttledMs = throttledMs.load(), pieceLength = store.metadata.pieceLength,
+        droppedWebSeeds = webSeeds.size - active.size, peerPayloadBytes = payloadReceived.load(),
+        webSeedPayload = webSeedStats.checked(), throttledMs = throttledMs.load(),
+        pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall
       val previous = published.value
