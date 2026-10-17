@@ -294,6 +294,20 @@ class TorrentDownloadSourceResolveTest {
   }
 
   @Test
+  fun resolveContent_piecesLargerThanSupported_saysWhy() = runTest {
+    val content = Bencode.encode(mapOf("info" to mapOf(
+      "name" to "a.bin", "length" to 1L, "piece length" to 64L * 1024 * 1024,
+      "pieces" to ByteArray(20))))
+    val error = assertFailsWith<KetchError.SourceError> {
+      source.resolve(ResolveInput.Content(content, "large.torrent"))
+    }
+    // The reason travels with the error, as remote clients see no cause.
+    val reason = "The torrent's pieces are 64 MiB, larger than the 16 MiB Ketch supports"
+    assertEquals(reason, error.detail)
+    assertEquals(reason, error.message)
+  }
+
+  @Test
   fun resolveMetainfo_trackerOnlyWithoutAUsableTracker_refused() {
     val metainfo = withTrackers(TorrentV2Fixture.build(listOf("a.bin" to 40_000)).metainfo,
       listOf(listOf("wss://tracker.test/announce")))
@@ -333,6 +347,7 @@ class TorrentDownloadSourceResolveTest {
       source.resolve(ResolveInput.Content("d8:announce".encodeToByteArray(), "broken.torrent"))
     }
     assertEquals("torrent", error.sourceType)
+    assertEquals("Unexpected end of bencode", error.detail)
   }
 
   // -- resolve via .torrent URL --

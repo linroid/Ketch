@@ -1078,7 +1078,10 @@ class TorrentDownloadSource(
       is ResolveInput.Content -> resolveContent(input.bytes)
     }
 
-  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
+  /**
+   * Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. A
+   * refusal is a source error that says why, as one for a `.torrent` URL is.
+   */
   private suspend fun resolveContent(content: ByteArray): ResolvedSource =
     withContext(TorrentDispatchers.engine) {
       try {
@@ -1086,7 +1089,8 @@ class TorrentDownloadSource(
       } catch (e: CancellationException) { throw e
       } catch (e: Exception) {
         if (e is KetchError) throw e
-        throw KetchError.SourceError(TYPE, e)
+        // Content in memory never fails on a disk, whatever the parser throws.
+        throw torrentSourceError(e)
       }
     }
 
@@ -2052,9 +2056,13 @@ internal fun torrentFailure(error: Throwable): KetchError = when (error) {
   is TimeoutCancellationException -> KetchError.Network(error)
   is TorrentStorageException -> KetchError.Disk(error.cause)
   is IOException -> KetchError.Disk(error)
-  else -> KetchError.SourceError(TorrentDownloadSource.TYPE, error,
-    detail = error.message?.let(::withoutUrls)?.trim()?.take(MAX_FAILURE_DETAIL)?.ifEmpty { null })
+  else -> torrentSourceError(error)
 }
+
+/** A [KetchError.SourceError] for [error], with its message, without URLs, as the `detail`. */
+internal fun torrentSourceError(error: Throwable): KetchError.SourceError =
+  KetchError.SourceError(TorrentDownloadSource.TYPE, error,
+    detail = error.message?.let(::withoutUrls)?.trim()?.take(MAX_FAILURE_DETAIL)?.ifEmpty { null })
 
 /** The longest failure message a torrent's source error carries. */
 private const val MAX_FAILURE_DETAIL = 200
