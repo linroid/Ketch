@@ -2,9 +2,6 @@ package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.LogLevel
-import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.torrent.RecordingConnections
 import com.linroid.ketch.torrent.TorrentUploadPolicy
@@ -36,6 +33,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -577,30 +575,6 @@ class TorrentWebSeedTest {
     }
   }
 
-  /** Runs [block] with the info lines Ketch logs meanwhile, which [block] gets as they come. */
-  private suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) {
-    val lines = Channel<String>(Channel.UNLIMITED)
-    KetchLogger.setLogger(object : Logger {
-      override fun v(message: String) = Unit
-      override fun d(message: String) = Unit
-      override fun i(message: String) {
-        lines.trySend(message)
-      }
-      override fun w(message: String, throwable: Throwable?) = Unit
-      override fun e(message: String, throwable: Throwable?) = Unit
-      override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
-    })
-    try {
-      block(lines)
-    } finally {
-      KetchLogger.setLogger(Logger.None)
-    }
-  }
-
-  private fun Channel<String>.drain(): List<String> = buildList {
-    while (true) add(tryReceive().getOrNull() ?: break)
-  }
-
   @Test
   fun corruptPieceAfterAStall_isNoProgress() = runTest {
     withContext(Dispatchers.Default) {
@@ -685,6 +659,46 @@ class TorrentWebSeedTest {
           val logged = lines.drain()
           assertTrue(logged.any { "stalled: unknown" in it }, logged.toString())
           assertTrue(logged.none { "makes progress again" in it }, logged.toString())
+        }
+      }
+    }
+  }
+
+  @Test
+  fun seedingSwarm_startsItsWebSeedsOnlyOnceTheSelectionGrows() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val mirror = MirrorEngine(mirrorFiles)
+        withStore(multiFile("http://mirror.test/pub"), selected = setOf(0)) { store, output ->
+          runSwarm(store, mirror)
+          assertTrue(store.completed())
+          withInfoLog { lines ->
+            val network = createTorrentNetwork()
+            val selections = Channel<CompletableDeferred<Unit>>()
+            try {
+              coroutineScope {
+                val swarm = launch {
+                  TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                    uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION },
+                    webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5)
+                    .run(Channel(), selections = selections)
+                }
+                // Seeding, it has nothing to fetch from its seed.
+                delay(300)
+                assertTrue(lines.drain().none { "web seed(s) too" in it })
+                // c.bin is wanted too: the seed starts and fetches it.
+                store.changeSelection(setOf(0, 3))
+                CompletableDeferred<Unit>().also { selections.send(it) }.await()
+                while (!store.completed()) delay(10)
+                assertEquals(1, lines.drain().count { "web seed(s) too" in it })
+                swarm.cancel()
+              }
+            } finally {
+              network.close()
+            }
+          }
+          assertContentEquals(parts[3].second,
+            torrentFileSystem.read(output / "c.bin") { readByteArray() })
         }
       }
     }

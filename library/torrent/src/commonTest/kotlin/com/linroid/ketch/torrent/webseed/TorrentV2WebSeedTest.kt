@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.torrent.RecordingConnections
@@ -22,14 +23,17 @@ import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import com.linroid.ketch.torrent.v2.TorrentV2DiscoverySink
 import com.linroid.ketch.torrent.v2.TorrentV2DownloadSession
+import com.linroid.ketch.torrent.v2.TorrentV2PieceScheduler
 import com.linroid.ketch.torrent.v2.TorrentV2Runtime
 import com.linroid.ketch.torrent.v2.TorrentV2SessionOptions
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -469,6 +473,38 @@ class TorrentV2WebSeedTest {
       while (mirror.requests.count { it.first == bad } < 2) delay(10)
       delay(2_000)
       assertEquals(TorrentStallReason.MISSING_PIECES, run.session.stall.value?.reason)
+    }
+  }
+
+  @Test
+  fun webSeeds_sayTheyDownloadOnlyOnceARunIsHandedOut() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val fixture = TorrentV2Fixture.build(listOf("data.iso" to 40_000),
+          webSeeds = listOf("http://mirror.test/data.iso"))
+        val gate = Gate(MirrorEngine(mapOf("http://mirror.test/data.iso" to fixture.payloads[0])))
+        val buffers = TorrentBufferBudget(4 * 1024 * 1024)
+        val store = TorrentV2PieceStore(fixture.document, FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-v2-webseed-log", emptySet(), "webseed", buffers, Semaphore(4))
+        val seeds = assertNotNull(TorrentV2WebSeeds.of(fixture.document, fixture.layout, store,
+          TorrentHttp(gate), ConnectionReporter.None, "test", retryMs = 5) {})
+        withInfoLog { lines ->
+          coroutineScope {
+            val running = launch { seeds.run() }
+            // Idle, as in a transfer that only seeds: nothing to say yet.
+            assertIs<TorrentV2WebSeeds.Event.Idle>(seeds.updates.receive())
+            assertTrue(lines.drain().none { "web seed(s) too" in it })
+            val lease = assertNotNull(buffers.reserve(32_768 + 512))
+            assertTrue(seeds.assign(0,
+              listOf(TorrentV2PieceScheduler.WebSeedClaim(0, ByteArray(32_768), lease))))
+            assertEquals(1, lines.drain().count { "web seed(s) too" in it })
+            gate.asked.await()
+            running.cancel()
+          }
+        }
+        seeds.close()
+        assertEquals(0, buffers.allocated)
+      }
     }
   }
 

@@ -681,7 +681,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   outside the endgame. A run is the first free wanted piece and the free wanted pieces after it,
   at most `WEB_SEED_RUN_PIECES` (16) and `WEB_SEED_RUN_BYTES` (4 MiB), no more than its share of
   the free pieces split between every peer and seed (the swarm joins every seed before any
-  claims), and later pieces only take buffers that leave half the budget free; an endgame
+  claims, once it wants pieces: one that only seeds never starts them, and a v2 transfer logs
+  its seeds at the first run it hands out), and later pieces only take buffers that leave half the
+  budget free; an endgame
   duplicate is a single piece. `WebSeedLayout` maps a piece to one range request per file it spans
   (multi-file: URL + name + path, segments percent-encoded); the worker joins a run's spans that
   follow each other in a file into one request, and commits and gives back each piece as its last

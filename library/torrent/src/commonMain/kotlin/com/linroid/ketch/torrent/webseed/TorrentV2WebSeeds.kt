@@ -84,7 +84,8 @@ internal class WebSeedV2Layout private constructor(
  * pieces from its scheduler ([TorrentV2PieceScheduler.claimWebSeedRun]) and [assign]s it, and the
  * seed reports each piece [Event.Done] once the store verified and wrote it, or gave it back. The
  * store verifies a mirror's piece against the piece layers as it does a peer's. A seed that
- * stopped can be started again ([relaunch]).
+ * stopped can be started again ([relaunch]). Only the session loop calls [assign], [reclaim] and
+ * [relaunch].
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2WebSeeds private constructor(
@@ -152,9 +153,18 @@ internal class TorrentV2WebSeeds private constructor(
     class Failed(val cause: TorrentStorageException) : Event
   }
 
+  // Whether a run was handed out yet: a transfer that only seeds never hands one out.
+  private var assigned = false
+
   /** Hands [run] to [seed], which said it was idle; false when it cannot take it. */
-  fun assign(seed: Int, run: List<TorrentV2PieceScheduler.WebSeedClaim>): Boolean =
-    assignments[seed].trySend(run).isSuccess
+  fun assign(seed: Int, run: List<TorrentV2PieceScheduler.WebSeedClaim>): Boolean {
+    if (!assignments[seed].trySend(run).isSuccess) return false
+    if (!assigned) {
+      assigned = true
+      log.i { "Transfer $logLabel: downloading from ${urls.size} web seed(s) too" }
+    }
+    return true
+  }
 
   /**
    * The run handed to [seed] that it stopped before taking, for the loop to give back; empty
@@ -175,7 +185,6 @@ internal class TorrentV2WebSeeds private constructor(
 
   /** Runs every seed, and those [relaunch] starts again, until the transfer cancels them. */
   suspend fun run(): Unit = coroutineScope {
-    log.i { "Transfer $logLabel: downloading from ${urls.size} web seed(s) too" }
     for (seed in urls.indices) launchSeed(seed)
     for (seed in relaunches) {
       log.i { "Transfer $logLabel: starting web seed ${redactUrl(urls[seed])} again" }

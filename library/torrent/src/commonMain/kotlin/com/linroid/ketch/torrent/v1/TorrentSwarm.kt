@@ -301,11 +301,10 @@ internal class TorrentSwarm(
     // A web seed's storage failure stops the swarm, as a peer's does.
     val webSeedFailures = Channel<TorrentStorageException>(1)
     val webSeedUrls = webSeedHttp?.let { store.metadata.webSeeds }.orEmpty()
-    // Negative IDs never collide with peer workers'. Every seed joins before any claims a run,
-    // so the first runs leave the other seeds their share.
+    // Negative IDs never collide with peer workers'.
     val webSeedPieces = webSeedUrls.mapIndexed { number, url ->
       SwarmWebSeedPieces(-1 - number, url, store, scheduler,
-        onVerified = { progressEvents.trySend(Unit) }).also { it.join() }
+        onVerified = { progressEvents.trySend(Unit) })
     }
     // Payload from web seeds counts and is throttled as peers' does.
     val webSeedPayload: suspend (Int) -> Unit = { size ->
@@ -328,8 +327,13 @@ internal class TorrentSwarm(
         webSeedFailures.trySend(e)
       }
     }
-    val webSeeds = webSeedUrls.indices.mapTo(mutableListOf()) { launchWebSeed(it) }
-    if (webSeeds.isNotEmpty()) {
+    val webSeeds = mutableListOf<Job>()
+    // Web seeds start once pieces are wanted: a swarm that only seeds never needs them. Every
+    // seed joins before any claims a run, so the first runs leave the other seeds their share.
+    suspend fun startWebSeeds() {
+      if (webSeeds.isNotEmpty() || webSeedUrls.isEmpty()) return
+      webSeedPieces.forEach { it.join() }
+      webSeedUrls.indices.mapTo(webSeeds) { launchWebSeed(it) }
       log.i { "Swarm $logLabel: downloading from ${webSeeds.size} web seed(s) too" }
     }
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
@@ -501,6 +505,7 @@ internal class TorrentSwarm(
           onCompleted()
           complete = true
         }
+        if (!complete) startWebSeeds()
         val policy = uploadPolicy()
         // Workers apply what changed on their next pass; this loop ticks at least every 100 ms.
         chokerMutex.withLock { choker.update(uploadAllowed(policy, complete), seeding = complete) }
