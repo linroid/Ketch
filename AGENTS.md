@@ -357,9 +357,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SegmentLane.admit` allows and report it with `commit`; a lane whose tail was taken ends its
   transfer by throwing a `CancellationException` (`LaneDrainedException`) once it reaches its
   new end, which the helper
-  counts as done, as it does any transfer that ends once its lane is complete. A batch still
-  fails as a whole when a lane fails. Split ranges are saved as segments of their own, ordered and
-  indexed by offset
+  counts as done, as it does any transfer that ends once its lane is complete. Split ranges are
+  saved as segments of their own, ordered and indexed by offset
+- Per-range retries (with range support): a connection whose transfer fails with a retryable
+  `KetchError` other than a 429 releases its lane (`SegmentLedger.release`) and waits
+  `RetryPolicy.delayMs` while the others keep running; the next connection to finish takes the
+  released bytes whole, whatever their size, and the failed one then `rejoin`s: its own lane when
+  nobody took it, else a split like a finished connection, or it ends (also early, once another
+  connection ended for lack of work). Its retries count from zero after a transfer that wrote
+  bytes. The batch fails, and `DownloadExecution` retries the run from saved segments, when a
+  connection runs out of `retryCount`, the error is not retryable, it is a 429 (so
+  `HttpDownloadSource` lowers the connections), or no other connection is transferring (an
+  outage, not one connection)
 - Servers without Range support use a single connection; resuming them restarts from zero
 - Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
   connection; a retry or resume restarts it, and the completed task records the file's size
@@ -2324,8 +2333,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Each `Ketch` serializes task coordination on a `limitedParallelism(1)` view of
   `KetchDispatchers.main`; `network` runs transfers and `disk` blocking file I/O
 - Each connection runs as a child of one `coroutineScope`, its transfers in a job of their own
-  that a steal can cancel: a failed segment cancels the batch and the retry continues from saved
-  segment progress; a connection change cancels and resegments it
+  that a steal can cancel: a connection that fails retryably retries its own range while the
+  others run, and other failures cancel the batch, whose retry continues from saved segment
+  progress; a connection change cancels and resegments it
 - Structured concurrency for cleanup on cancel/pause
 
 ## Development Guidelines
@@ -2412,9 +2422,9 @@ Planned features not yet implemented:
    web pages by analyzing network requests, HTML, and embedded players
 3. **Lane scheduler** - The rest of the `LaneScheduler` / `RangeLedger` from the helper devices
    [proposal](docs/design/multi-instance-downloads.md), beyond today's work stealing
-   (`SegmentLedger`): a failed range retries alone instead of cancelling the batch, a minimum
-   segment size keeps small files on one connection from the start, lowering the connection count
-   drains the slowest lane instead of resegmenting, and stalled lanes are revoked in the endgame
+   and per-range retries (`SegmentLedger`): a minimum segment size keeps small files on one
+   connection from the start, lowering the connection count drains the slowest lane instead of
+   resegmenting, and stalled lanes are revoked in the endgame
 4. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)

@@ -235,8 +235,11 @@ DownloadRequest
   |            file `<name>.ketch` through the FileAccessor. Every chunk passes the per-task and
   |            global token buckets. A connection that finishes its range takes over the tail of
   |            the one expected to finish last (SegmentLedger.steal), split where both finish
-  |            together, while at least 1 MiB is left to hand over. A connection-count change
-  |            resegments the remaining bytes without losing progress.
+  |            together, while at least 1 MiB is left to hand over. A connection that fails
+  |            retryably (not a 429) releases its range to the others and retries after a delay
+  |            (SegmentLedger.release/rejoin); the batch fails only when it runs out of retries,
+  |            or no other connection is transferring. A connection-count change resegments the
+  |            remaining bytes without losing progress.
   v
 [7. Persist]   Every saveIntervalMs, and as the run starts and stops, the segments and the
   |            source's state (DownloadSource.store) are saved to the TaskStore.

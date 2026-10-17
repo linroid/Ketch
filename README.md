@@ -96,7 +96,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **Parallel connections** — Ketch splits a file into ranges and downloads them at once. The
   Connections tab shows every connection as a lane with its own speed, and you can add or remove
   connections while the download runs. A connection that finishes early takes over the rest of a
-  slower one, so a download never waits on its slowest connection.
+  slower one, so a download never waits on its slowest connection, and one that fails retries
+  its own range while the others keep going.
 - **Several networks at once** — Spread one download over Wi-Fi, Ethernet and, on Android,
   cellular data ([how it works](docs/multiple-networks.md)).
 - **Proxies** — Download through the system's proxy, an HTTP or SOCKS5 proxy with a username and

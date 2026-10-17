@@ -3,7 +3,9 @@ package com.linroid.ketch.core.segment
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.RetryPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.NonCancellable
@@ -19,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -34,7 +37,8 @@ import kotlin.time.TimeSource
  *
  * Each segment runs over its own connection as a [SegmentLane]. A connection that finishes early
  * takes over the remaining bytes of a slower one, so a download no longer waits on its slowest
- * connection.
+ * connection. A connection that fails retryably gives its remaining bytes up to the others and
+ * retries on its own, after [RetryPolicy]'s delay, while the others keep running.
  *
  * @param progressIntervalMs minimum interval between progress
  *   reports in milliseconds
@@ -60,6 +64,14 @@ class SegmentedDownloadHelper(
    * batch is canceled, progress is snapshotted, segments are
    * merged/split via [SegmentCalculator.resegment], and a new
    * batch starts.
+   *
+   * With [supportsRanges], a connection whose transfer fails with a retryable [KetchError] other
+   * than HTTP 429 does not stop the others: its unwritten bytes go to the next connection that
+   * finishes, and it waits [RetryPolicy.delayMs] before taking them back, or another
+   * connection's tail when they were taken. Its retries count from zero again after a transfer
+   * that wrote bytes. The batch fails, for the download to retry the run, when a connection runs
+   * out of retries, the error is not retryable, it is a 429 (the source then lowers the
+   * connections), or no other connection is transferring.
    *
    * @param context the download context with progress callbacks
    * @param segments initial list of segments (some may already
@@ -202,7 +214,9 @@ class SegmentedDownloadHelper(
 
         try {
           lanes.map { lane ->
-            launch { runConnection(context, ledger, lane, downloadSegment) }
+            launch {
+              runConnection(context, ledger, lane, retriesAlone = supportsRanges, downloadSegment)
+            }
           }.joinAll()
         } finally {
           watcherJob?.cancel()
@@ -224,16 +238,49 @@ class SegmentedDownloadHelper(
     }
   }
 
-  /** Runs one connection: [first], then every tail it takes over from slower connections. */
+  /**
+   * Runs one connection: [first], then every tail it takes over from slower connections. With
+   * [retriesAlone], a retryable failure releases the lane and retries after a delay instead of
+   * failing the batch, as [downloadAll] describes.
+   */
   private suspend fun runConnection(
     context: DownloadContext,
     ledger: SegmentLedger,
     first: SegmentLane,
+    retriesAlone: Boolean,
     downloadSegment: suspend (lane: SegmentLane) -> Unit,
   ) {
+    val policy = RetryPolicy(context.config)
+    var retries = 0
     var lane = first
     while (true) {
-      runLane(lane, downloadSegment)
+      try {
+        runLane(lane, downloadSegment)
+      } catch (e: KetchError) {
+        if (!retriesAlone || !e.isRetryable || (e is KetchError.Http && e.code == 429)) throw e
+        if (lane.laneBytes > 0) retries = 0
+        if (!policy.allows(retries) || !ledger.release(lane)) throw e
+        retries++
+        val delayMs = policy.delayMs(retries)
+        log.w {
+          "Range ${lane.offset}..${lane.end} failed for taskId=${context.taskId}, " +
+            "retrying the connection in ${delayMs}ms: ${e.describeCauses()}"
+        }
+        context.segments.value = ledger.snapshot()
+        val ended = ledger.ended.value
+        // Stop waiting once a connection ended for lack of work: none is left for this one.
+        withTimeoutOrNull(delayMs) { ledger.ended.first { it > ended } }
+        val steal = ledger.rejoin(lane) ?: return
+        if (steal.victimIdle) steal.victim.transfer?.cancel(LaneDrainedException())
+        if (steal.lane !== lane) {
+          log.d {
+            "Taking over ${steal.lane.start}..${steal.lane.end} instead of the range at " +
+              "${lane.start} for taskId=${context.taskId}"
+          }
+        }
+        lane = steal.lane
+        continue
+      }
       log.d { "Range ${lane.start}..${lane.end} completed for taskId=${context.taskId}" }
       context.segments.value = ledger.snapshot()
       val steal = ledger.steal(lane) ?: return
@@ -256,16 +303,19 @@ class SegmentedDownloadHelper(
     lane: SegmentLane,
     downloadSegment: suspend (lane: SegmentLane) -> Unit,
   ) {
-    coroutineScope {
-      lane.transfer = launch {
-        try {
-          downloadSegment(lane)
-        } catch (e: Exception) {
-          if (!lane.isComplete) throw e
+    try {
+      coroutineScope {
+        lane.transfer = launch {
+          try {
+            downloadSegment(lane)
+          } catch (e: Exception) {
+            if (!lane.isComplete) throw e
+          }
         }
       }
+    } finally {
+      lane.transfer = null
     }
-    lane.transfer = null
     if (!lane.isComplete) {
       throw KetchError.Network(
         Exception(

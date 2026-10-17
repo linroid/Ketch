@@ -299,6 +299,143 @@ class SegmentedDownloadHelperTest {
     assertEquals(listOf(0L..99L), requests)
   }
 
+  @Test
+  fun downloadAll_failedConnectionRetriesItsRangeWhileOthersKeepRunning() = runTest {
+    val context = twoLaneContext(DownloadConfig(retryDelayMs = 1_000))
+    val written = IntArray(100)
+    val requests = mutableListOf<LongRange>()
+    SegmentedDownloadHelper(timeSource = testScheduler.timeSource)
+      .downloadAll(context, context.segments.value, 100) { lane ->
+        requests.add(lane.offset..lane.end)
+        if (lane.start == 0L && requests.size <= 2) {
+          lane.write(written, 10)
+          throw KetchError.Network(Exception("connection reset"))
+        }
+        // The other connection gets 10 bytes a second, so it still runs when the first retries.
+        while (!lane.isComplete) {
+          if (lane.start == 50L) delay(1_000)
+          lane.write(written, 10)
+        }
+      }
+    assertTrue(written.all { it == 1 }, "Every byte must be written exactly once")
+    assertEquals(listOf(0L..49L, 50L..99L, 10L..49L), requests)
+    assertTrue(context.segments.value.all { it.isComplete })
+  }
+
+  @Test
+  fun downloadAll_finishedConnectionTakesFailedConnectionsBytes() = runTest {
+    val context = twoLaneContext(DownloadConfig(retryDelayMs = 10_000))
+    val written = IntArray(100)
+    val requests = mutableListOf<LongRange>()
+    SegmentedDownloadHelper(timeSource = testScheduler.timeSource)
+      .downloadAll(context, context.segments.value, 100) { lane ->
+        requests.add(lane.offset..lane.end)
+        if (requests.size == 1) throw KetchError.Http(503)
+        delay(100)
+        lane.write(written, lane.remaining.toInt())
+      }
+    assertTrue(written.all { it == 1 }, "Every byte must be written exactly once")
+    // Taken whole, though smaller than the smallest split.
+    assertEquals(listOf(0L..49L, 50L..99L, 0L..49L), requests)
+    assertTrue(currentTime < 5_000, "The batch must not wait for the retry, took $currentTime ms")
+    val result = context.segments.value
+    assertTrue(result.all { it.isComplete })
+    assertEquals(listOf(0L..49L, 50L..99L), result.map { it.start..it.end })
+  }
+
+  @Test
+  fun downloadAll_connectionOutOfRetries_failsBatch() = runTest {
+    val context = twoLaneContext(DownloadConfig(retryCount = 2, retryDelayMs = 100))
+    var attempts = 0
+    assertFailsWith<KetchError.Network> {
+      SegmentedDownloadHelper().downloadAll(context, context.segments.value, 100) { lane ->
+        if (lane.start == 50L) awaitCancellation()
+        attempts++
+        throw KetchError.Network(Exception("connection reset"))
+      }
+    }
+    assertEquals(3, attempts, "The first attempt and two retries")
+  }
+
+  @Test
+  fun downloadAll_retriesCountAgainAfterProgress() = runTest {
+    val context = twoLaneContext(DownloadConfig(retryCount = 1, retryDelayMs = 100))
+    var attempts = 0
+    SegmentedDownloadHelper().downloadAll(context, context.segments.value, 100) { lane ->
+      if (lane.start == 50L) {
+        delay(10_000)
+        lane.fill()
+        return@downloadAll
+      }
+      attempts++
+      lane.fill(10)
+      if (!lane.isComplete) throw KetchError.Network(Exception("connection reset"))
+    }
+    assertEquals(5, attempts)
+    assertTrue(context.segments.value.all { it.isComplete })
+  }
+
+  @Test
+  fun downloadAll_rateLimitedConnection_failsBatch() = runTest {
+    val context = twoLaneContext()
+    var attempts = 0
+    val error = assertFailsWith<KetchError.Http> {
+      SegmentedDownloadHelper().downloadAll(context, context.segments.value, 100) { lane ->
+        if (lane.start == 50L) awaitCancellation()
+        attempts++
+        throw KetchError.Http(429)
+      }
+    }
+    assertEquals(429, error.code)
+    assertEquals(1, attempts, "A 429 must reach the source, which lowers the connections")
+  }
+
+  @Test
+  fun downloadAll_nonRetryableFailure_failsBatch() = runTest {
+    val context = twoLaneContext()
+    var attempts = 0
+    assertFailsWith<KetchError.Disk> {
+      SegmentedDownloadHelper().downloadAll(context, context.segments.value, 100) { lane ->
+        if (lane.start == 50L) awaitCancellation()
+        attempts++
+        throw KetchError.Disk(Exception("disk full"))
+      }
+    }
+    assertEquals(1, attempts)
+  }
+
+  @Test
+  fun downloadAll_everyConnectionFailing_failsBatch() = runTest {
+    val context = twoLaneContext(DownloadConfig(retryDelayMs = 10_000))
+    var attempts = 0
+    assertFailsWith<KetchError.Network> {
+      SegmentedDownloadHelper().downloadAll(context, context.segments.value, 100) { lane ->
+        attempts++
+        lane.fill(5)
+        throw KetchError.Network(Exception("network down"))
+      }
+    }
+    assertEquals(2, attempts, "The last connection to fail must end the batch")
+    assertEquals(0L, currentTime, "The batch must not wait for the first connection's retry")
+    assertEquals(listOf(5L, 5L), context.segments.value.map { it.downloadedBytes })
+  }
+
+  @Test
+  fun downloadAll_withoutRangeSupport_failureFailsBatch() = runTest {
+    val context = twoLaneContext()
+    var attempts = 0
+    assertFailsWith<KetchError.Network> {
+      SegmentedDownloadHelper().downloadAll(
+        context, context.segments.value, 100, supportsRanges = false,
+      ) { lane ->
+        if (lane.start == 50L) awaitCancellation()
+        attempts++
+        throw KetchError.Network(Exception("connection reset"))
+      }
+    }
+    assertEquals(1, attempts)
+  }
+
   /** Downloads [context]'s segments; the first [firstBatch] requests wait until cancelled. */
   private suspend fun downloadBlockingFirstBatch(
     context: DownloadContext,
@@ -311,6 +448,15 @@ class SegmentedDownloadHelperTest {
       lane.fill()
     }
   }
+
+  private fun twoLaneContext(config: DownloadConfig = DownloadConfig.Default) = context(
+    connections = MutableStateFlow(2),
+    config = config,
+    segments = listOf(
+      Segment(index = 0, start = 0, end = 49),
+      Segment(index = 1, start = 50, end = 99),
+    ),
+  )
 
   private fun context(
     connections: MutableStateFlow<Int> = MutableStateFlow(0),
@@ -340,4 +486,12 @@ internal suspend fun SegmentLane.fill(bytes: Long = remaining) {
     commit(allowed)
     left -= allowed
   }
+}
+
+/** Writes the lane's next [bytes] into [written], counting each byte. */
+private suspend fun SegmentLane.write(written: IntArray, bytes: Int) {
+  val offset = offset
+  val allowed = admit(bytes)
+  for (i in 0 until allowed) written[(offset + i).toInt()]++
+  commit(allowed)
 }

@@ -3,6 +3,9 @@ package com.linroid.ketch.core.segment
 import com.linroid.ketch.api.Segment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
@@ -37,7 +40,7 @@ class SegmentLane internal constructor(
   val start: Long,
   cursor: Long,
   limit: Long,
-  internal val startedAt: TimeMark,
+  startedAt: TimeMark,
 ) {
   /** The next offset to write. */
   @Volatile
@@ -52,6 +55,15 @@ class SegmentLane internal constructor(
 
   /** Whether another lane took over this one's tail. */
   internal var cut: Boolean = false
+
+  /**
+   * Whether this lane's connection failed and waits to retry: its remaining bytes are free for
+   * the next connection that asks [SegmentLedger.steal] or [SegmentLedger.rejoin].
+   */
+  internal var released: Boolean = false
+
+  /** When this lane's current transfer began, for its rate. */
+  internal var startedAt: TimeMark = startedAt
 
   /** Bytes committed since this lane started, for its rate. */
   internal var laneBytes: Long = 0
@@ -89,7 +101,10 @@ class SegmentLane internal constructor(
 /** Ends the transfer of a lane whose remaining bytes another lane took over. */
 internal class LaneDrainedException : CancellationException("Lane drained")
 
-/** A lane [SegmentLedger.steal] handed to a connection, taken from [victim]'s tail. */
+/**
+ * A lane [SegmentLedger.steal] handed to a connection, taken from [victim]'s tail, or all of
+ * [victim]'s remaining bytes when its connection failed.
+ */
 internal class Steal(val lane: SegmentLane, val victim: SegmentLane, val victimIdle: Boolean)
 
 /**
@@ -101,6 +116,11 @@ internal class Steal(val lane: SegmentLane, val victim: SegmentLane, val victimI
  * moves a byte already admitted, and leaves both lanes at least [minSplitBytes]. A connection
  * that received nothing in its last measured lane takes nothing, and a lane that received
  * nothing hands all of it over.
+ *
+ * A connection whose transfer failed [release]s its lane while it waits to retry: the next
+ * connection to finish takes all its remaining bytes, whatever their size, and the failed one
+ * [rejoin]s once it waited, taking its own lane back if nobody did, else a split like a finished
+ * connection.
  *
  * @param minSplitBytes the smallest range a split hands over; [Long.MAX_VALUE] never splits
  * @param rateWindow how long a lane runs before its rate counts
@@ -126,6 +146,17 @@ internal class SegmentLedger(
 
   /** The lanes of the incomplete segments the ledger started with. */
   val initialLanes: List<SegmentLane> = lanes.filter { !it.isComplete }
+
+  /** Connections transferring, or about to: every lane's but those waiting to retry. */
+  private var active = initialLanes.size
+
+  private val _ended = MutableStateFlow(0)
+
+  /**
+   * How many connections ended because nothing was left to take: a connection waiting to retry
+   * has nothing left either once it rises.
+   */
+  val ended: StateFlow<Int> = _ended.asStateFlow()
 
   /** The ranges as segments, ordered and indexed by offset. */
   suspend fun snapshot(): List<Segment> = mutex.withLock {
@@ -162,10 +193,61 @@ internal class SegmentLedger(
    * [thief], which finished its own; `null` when no lane has enough left to be worth it.
    */
   suspend fun steal(thief: SegmentLane): Steal? = mutex.withLock {
-    if (minSplitBytes == Long.MAX_VALUE) return@withLock null
+    takeOver(thief, rateOf(thief)).also {
+      if (it == null) {
+        active--
+        _ended.value++
+      }
+    }
+  }
+
+  /**
+   * Gives up [lane] after its transfer failed, so other connections can take its remaining bytes
+   * while its connection waits to retry. Returns `false`, changing nothing, when no other
+   * connection is transferring: the failure is then likely the server's or the network's, not
+   * this connection's.
+   */
+  suspend fun release(lane: SegmentLane): Boolean = mutex.withLock {
+    if (active <= 1) return@withLock false
+    active--
+    // Bytes admitted but not committed were never written.
+    lane.admitted = lane.cursor
+    lane.released = lane.cursor < lane.limit
+    true
+  }
+
+  /**
+   * The lane a connection that [release]d [lane] runs once it waited to retry: [lane] again when
+   * no other connection took it, else a tail split off another lane; `null` when nothing is left
+   * worth taking, and the connection ends.
+   */
+  suspend fun rejoin(lane: SegmentLane): Steal? = mutex.withLock {
+    val steal = if (lane.released) {
+      lane.released = false
+      restart(lane)
+      Steal(lane, lane, victimIdle = false)
+    } else {
+      // The failed connection's own rate says nothing of the next transfer.
+      takeOver(lane, thiefRate = null)
+    }
+    if (steal != null) active++
+    steal
+  }
+
+  private fun takeOver(thief: SegmentLane, thiefRate: Double?): Steal? {
+    lanes.firstOrNull { it.released }?.let { orphan ->
+      // A failed connection's bytes go whole to the first connection free to take them.
+      val lane = SegmentLane(this, orphan.cursor, orphan.cursor, orphan.limit, timeSource.markNow())
+      orphan.released = false
+      orphan.limit = orphan.cursor
+      // Nothing written: the new lane replaces it rather than leave an empty range.
+      if (orphan.cursor == orphan.start) lanes.remove(orphan)
+      lanes += lane
+      return Steal(lane, orphan, victimIdle = false)
+    }
+    if (minSplitBytes == Long.MAX_VALUE) return null
     val candidates = lanes.filter { it !== thief && it.limit - it.admitted >= minSplitBytes }
-    if (candidates.isEmpty()) return@withLock null
-    val thiefRate = rateOf(thief)
+    if (candidates.isEmpty()) return null
     val rates = candidates.associateWith { rateOf(it) }
     val known = rates.values.filterNotNull().sorted()
     val typical = thiefRate ?: known.getOrNull(known.size / 2)
@@ -192,9 +274,14 @@ internal class SegmentLedger(
       if (split == victim.start) lanes -= victim
       lanes += lane
       val idle = victim.cursor == victim.admitted && victim.cursor >= victim.limit
-      return@withLock Steal(lane, victim, idle)
+      return Steal(lane, victim, idle)
     }
-    null
+    return null
+  }
+
+  private fun restart(lane: SegmentLane) {
+    lane.startedAt = timeSource.markNow()
+    lane.laneBytes = 0
   }
 
   /**
