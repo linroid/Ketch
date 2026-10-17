@@ -418,8 +418,8 @@ tracker's staff to allow Ketch if it is refused.
   torrents save to the platform's default directory instead. iOS saves inside the app sandbox.
 - Limits: `.torrent` files up to 4 MiB, 10,000 files per torrent (padding files aside) and
   16 MiB pieces, for v1, v2 and hybrid torrents alike: a torrent with larger pieces is refused
-  when it is added. Many peers or large pieces use more memory. A torrent or magnet keeps its first
-  128 trackers.
+  when it is resolved or previewed, and a link added directly fails as soon as it starts. Many
+  peers or large pieces use more memory. A torrent or magnet keeps its first 128 trackers.
 - Ketch does not create torrents and has no ratio management.
 
 ## For developers

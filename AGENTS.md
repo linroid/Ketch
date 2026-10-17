@@ -678,8 +678,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   parser takes 10,000 content files at any depth (1,000,000 bencode values), and v2 resolution
   and tracker-only lookups skip trackers Ketch cannot announce to, such as `wss://`
   (`TrackerConfiguration.usable`; `prepare` stays strict for edits). New metainfo inputs that
-  are private or resolved tracker-only, with no tracker left and no web seed, are refused
-  (`requireDiscoverable`), as are pieces over 16 MiB (`MAX_PIECE_LENGTH`,
+  are private or resolved tracker-only, with no tracker left and no web seed, are refused when
+  resolved, by a preview or by the first run of a link added directly (`requireDiscoverable`),
+  as are pieces over 16 MiB (`MAX_PIECE_LENGTH`,
   `requireSupportedPieceLength`: the v1 parser, v2 and hybrid resolution and a v2 magnet's info
   before its piece layers); the metainfo a task saved is read without those checks when it
   resumes and when its file table is built (`newInput = false`), and admission refuses its pieces
