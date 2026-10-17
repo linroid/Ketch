@@ -29,6 +29,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okio.FileSystem
 import okio.IOException
 import okio.Path
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -36,12 +38,14 @@ import kotlin.test.assertTrue
 
 /**
  * The v1 swarm requests blocks, not pieces: its requests run across piece ends, peers share one
- * piece's buffer, and blocks received before a choke are kept.
+ * piece's buffer, blocks received before a choke are kept, and in the endgame an idle peer copies
+ * about a second of its own rate.
  */
 class TorrentSwarmPipelineTest {
   private val block = PeerWire.BLOCK_SIZE
   private val unchoke = PeerMessage.Control(PeerMessage.Signal.UNCHOKE)
   private val choke = PeerMessage.Control(PeerMessage.Signal.CHOKE)
+  private val notInterested = PeerMessage.Control(PeerMessage.Signal.NOT_INTERESTED)
 
   private class Fixture(val pieces: Int, val pieceLength: Int) {
     val payload = ByteArray(pieces * pieceLength) { (it * 29 + 3).toByte() }
@@ -74,10 +78,14 @@ class TorrentSwarmPipelineTest {
   private fun budget(fixture: Fixture, pieces: Int, peers: Int) = TorrentBufferBudget(
     pieces * fixture.pieceLength + peers * (2 * PeerWire.MAX_FRAME_SIZE + fixture.pieces * 4))
 
-  /** Accepts the swarm's connection on a fresh listener and runs [script] as a seed. */
+  /**
+   * Accepts the swarm's connection on a fresh listener and runs [script] as a peer with the
+   * pieces it [has], every one unless told otherwise.
+   */
   private suspend fun CoroutineScope.seed(
     fixture: Fixture,
     peers: Channel<PeerEndpoint>,
+    has: BooleanArray = BooleanArray(fixture.pieces) { true },
     fast: Boolean = false,
     script: suspend (PeerWire) -> Unit,
   ) = fixture.network.listen(PeerEndpoint("127.0.0.1", 0)).let { listener ->
@@ -88,7 +96,7 @@ class TorrentSwarmPipelineTest {
         val wire = PeerWire(connection, fixture.metadata)
         wire.handshake(PeerHandshake(fixture.metadata.infoHash, torrentRandomBytes(20), false,
           false, fast = fast))
-        wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(fixture.pieces) { true })))
+        wire.send(PeerMessage.Bitfield(pieceBitfield(has)))
         script(wire)
       } catch (_: IOException) {
         // The swarm closes its peers once it is done.
@@ -259,6 +267,84 @@ class TorrentSwarmPipelineTest {
     } finally {
       swarm.cancelAndJoin()
       first.cancelAndJoin()
+      fixture.close()
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun endgame_idleFastPeer_copiesMoreOfAStalledPeersQueueThanTheFewest() = pipelineTest {
+    // Pieces of 16 blocks: the fast peer has the first four, the stalled one the other three.
+    val fixture = Fixture(pieces = 7, pieceLength = 16 * block)
+    val clock = AtomicLong(0)
+    val peers = Channel<PeerEndpoint>(2)
+    val owed = CompletableDeferred<Set<PeerMessage.Request>>()
+    val measured = CompletableDeferred<Unit>()
+    val announce = CompletableDeferred<Unit>()
+    val copied = CompletableDeferred<Set<PeerMessage.Request>>()
+    val stalled = seed(fixture, peers, has = BooleanArray(7) { it >= 4 }) { wire ->
+      wire.send(unchoke)
+      // It serves its first piece, then nothing, while we ask it for the rest of its pieces.
+      var answered = 0
+      val unanswered = mutableSetOf<PeerMessage.Request>()
+      while (true) {
+        val message = wire.read()
+        if (message !is PeerMessage.Request) continue
+        if (answered < 16) {
+          wire.send(fixture.block(message))
+          answered++
+        } else {
+          unanswered += message
+          // Every block of its other two pieces.
+          if (unanswered.size == 32) owed.complete(unanswered.toSet())
+        }
+      }
+    }
+    val fast = seed(fixture, peers, has = BooleanArray(7) { it < 4 }) { wire ->
+      wire.send(unchoke)
+      // It serves its four pieces, after which it has nothing we want.
+      while (true) {
+        val message = wire.read()
+        if (message == notInterested) break
+        if (message is PeerMessage.Request) wire.send(fixture.block(message))
+      }
+      measured.complete(Unit)
+      announce.await()
+      val stalledOwes = owed.await()
+      // It now has the stalled peer's pieces too, and nothing else is left to fetch.
+      wire.sendAll((4 until 7).map { PeerMessage.Have(it) })
+      val copies = mutableSetOf<PeerMessage.Request>()
+      withTimeoutOrNull(2_000) {
+        while (copies.size < stalledOwes.size) {
+          val message = wire.read()
+          if (message is PeerMessage.Request) copies += message
+        }
+      }
+      copied.complete(copies.toSet())
+      for (request in copies) wire.send(fixture.block(request))
+      wire.serve(fixture)
+    }
+    peers.close()
+    val budget = budget(fixture, pieces = 7, peers = 2)
+    val swarm = launch {
+      TorrentSwarm(fixture.store, fixture.network, budget, nowMs = { clock.load() }).run(peers)
+    }
+    try {
+      measured.await()
+      // The fast peer's 64 blocks took half a second: 2 MiB/s, a second of which is 128 blocks.
+      clock.store(500)
+      val stalledOwes = owed.await()
+      assertTrue(stalledOwes.size > TorrentPieceScheduler.ENDGAME_DUPLICATES)
+      // None of them is late yet; the fast peer still copies them all before any copy arrives.
+      announce.complete(Unit)
+      assertEquals(stalledOwes, copied.await())
+      swarm.join()
+      assertContentEquals(fixture.payload, fixture.output())
+      assertEquals(0, budget.allocated)
+    } finally {
+      swarm.cancelAndJoin()
+      stalled.cancelAndJoin()
+      fast.cancelAndJoin()
       fixture.close()
     }
   }
