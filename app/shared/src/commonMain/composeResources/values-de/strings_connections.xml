@@ -20,6 +20,10 @@
   <string name="connections_peer_choked">Gedrosselt</string>
   <string name="connections_peer_unchoked">Nicht gedrosselt</string>
   <string name="connections_peer_uploading">Lädt hoch</string>
+  <string name="connections_peer_interested">Interessiert</string>
+  <string name="connections_detail_hint">Klicke auf die Aufgabe, um sie in den Downloads anzuzeigen.</string>
+  <string name="connections_show_details">Details anzeigen</string>
+  <string name="connections_hide_details">Details ausblenden</string>
   <string name="connections_empty_body">Verbindungen erscheinen hier, während Downloads laufen oder Torrents seeden.</string>
   <string name="connections_no_match">Keine passenden Verbindungen</string>
   <string name="connections_unsupported_title">Dieses Gerät meldet seine Verbindungen nicht</string>

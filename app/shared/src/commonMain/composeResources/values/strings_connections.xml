@@ -36,6 +36,13 @@
   <string name="connections_peer_unchoked">Unchoked</string>
   <!-- After the peer's state: this device sends data to the peer. -->
   <string name="connections_peer_uploading">Uploading</string>
+  <!-- In a connection's details, after the peer's state: the peer wants pieces this device has. -->
+  <string name="connections_peer_interested">Interested</string>
+  <!-- Under a connection's details on hover: the task cell of the row opens the task. -->
+  <string name="connections_detail_hint">Click the task to show it in Downloads.</string>
+  <!-- Accessibility labels of a list row, which opens and closes its details when tapped. -->
+  <string name="connections_show_details">Show details</string>
+  <string name="connections_hide_details">Hide details</string>
   <!-- Shown while nothing is connected. -->
   <string name="connections_empty_body">Connections show here while downloads run or torrents seed.</string>
   <string name="connections_no_match">No connections match</string>

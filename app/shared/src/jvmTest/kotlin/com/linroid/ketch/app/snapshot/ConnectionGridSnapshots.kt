@@ -27,6 +27,8 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.state.ConnectionCellKey
+import com.linroid.ketch.app.ui.connections.ConnectionDetails
+import com.linroid.ketch.app.ui.connections.connectionRows
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.DeviceConnections
 import com.linroid.ketch.app.state.DeviceHealth
@@ -197,6 +199,74 @@ class ConnectionGridSnapshots {
             }
           }
         }
+      }
+    }
+  }
+
+  @Test
+  fun detailsCard_peerAndHttp_listEveryDetail() {
+    val size = SnapshotSize(420.dp, 640.dp, KetchDensity.Compact)
+    val grid = ConnectionSamples.grid(ConnectionSamples.mixed(), limit = 24)
+    val rows = connectionRows(grid, mapOf(LOCAL_DEVICE_ID to "MacBook"))
+    val shown = listOf(
+      rows.first { it.connection.peer != null },
+      rows.first { it.connection.secure == true },
+    )
+    SnapshotTheme.entries.forEach { theme ->
+      snapshot("connections-details-card", size, theme) {
+        Column(
+          verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4),
+          modifier = Modifier.padding(KetchTheme.spacing.s4),
+        ) {
+          for (row in shown) {
+            Panel(360.dp) { ConnectionDetails(row, showDevice = true, hint = true) }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun page_hoverClickAndSort_onlyTheTaskShowsTheTask() {
+    val data = {
+      val sample = SampleData.downloads()
+      SampleData(sample.tasks, connections = ConnectionSamples.mixed())
+    }
+    val size = SnapshotSize.Desktop
+    val theme = SnapshotTheme.Light
+    // The fifth row, a torrent peer, under the longest-open sort.
+    val peerRow = 322.dp
+    appSnapshot("connections-page-hover", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.hover(360.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-hover-task", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.hover(560.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-click-endpoint", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.click(360.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-click-task", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.click(560.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-sort", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.click(912.dp, 127.dp)
+      scene.settle()
+      check(state.appSettings.ui.sort["connections"] == "down:desc") {
+        "The sort was not saved: ${state.appSettings.ui.sort}"
       }
     }
   }

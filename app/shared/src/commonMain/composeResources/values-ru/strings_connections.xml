@@ -20,6 +20,10 @@
   <string name="connections_peer_choked">Заблокирован</string>
   <string name="connections_peer_unchoked">Разблокирован</string>
   <string name="connections_peer_uploading">Отдаём</string>
+  <string name="connections_peer_interested">Заинтересован</string>
+  <string name="connections_detail_hint">Нажмите на задачу, чтобы открыть её в загрузках.</string>
+  <string name="connections_show_details">Показать подробности</string>
+  <string name="connections_hide_details">Скрыть подробности</string>
   <string name="connections_empty_body">Подключения появляются здесь, пока идут загрузки или раздаются торренты.</string>
   <string name="connections_no_match">Нет подходящих подключений</string>
   <string name="connections_unsupported_title">Это устройство не сообщает о своих подключениях</string>

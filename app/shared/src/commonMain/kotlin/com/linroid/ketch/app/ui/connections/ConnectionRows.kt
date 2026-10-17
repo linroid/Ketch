@@ -102,7 +102,32 @@ internal enum class ConnectionSort(
 internal data class ConnectionArrangement(
   val sort: ConnectionSort = ConnectionSort.Opened,
   val descending: Boolean = true,
-)
+) {
+  /** This arrangement as `[ui] sort` keeps it, such as `down:desc`. */
+  fun encode(): String = "${sort.name.lowercase()}:${if (descending) DESC else ASC}"
+
+  companion object {
+    /** The `[ui] sort` key the page keeps its arrangement under. */
+    const val KEY = "connections"
+
+    private const val ASC = "asc"
+    private const val DESC = "desc"
+
+    /** Decodes [value] made by [encode]; a missing or malformed one gives the default. */
+    fun decode(value: String?): ConnectionArrangement {
+      val parts = value?.split(':') ?: return ConnectionArrangement()
+      if (parts.size != 2) return ConnectionArrangement()
+      val sort = ConnectionSort.entries.firstOrNull { it.name.lowercase() == parts[0] }
+        ?: return ConnectionArrangement()
+      val descending = when (parts[1]) {
+        DESC -> true
+        ASC -> false
+        else -> return ConnectionArrangement()
+      }
+      return ConnectionArrangement(sort, descending)
+    }
+  }
+}
 
 /**
  * The arrangement after a click on [sort]'s header: its natural direction first (largest first

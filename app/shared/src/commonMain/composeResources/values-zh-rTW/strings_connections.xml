@@ -20,6 +20,10 @@
   <string name="connections_peer_choked">已阻塞</string>
   <string name="connections_peer_unchoked">未阻塞</string>
   <string name="connections_peer_uploading">上傳中</string>
+  <string name="connections_peer_interested">有興趣</string>
+  <string name="connections_detail_hint">點擊任務即可在下載中顯示。</string>
+  <string name="connections_show_details">顯示詳細資訊</string>
+  <string name="connections_hide_details">隱藏詳細資訊</string>
   <string name="connections_empty_body">下載進行或做種時，連線會顯示在這裡。</string>
   <string name="connections_no_match">沒有相符的連線</string>
   <string name="connections_unsupported_title">此裝置不回報其連線</string>

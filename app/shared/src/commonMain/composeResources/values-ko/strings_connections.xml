@@ -20,6 +20,10 @@
   <string name="connections_peer_choked">초크됨</string>
   <string name="connections_peer_unchoked">초크 해제됨</string>
   <string name="connections_peer_uploading">업로드 중</string>
+  <string name="connections_peer_interested">관심 있음</string>
+  <string name="connections_detail_hint">작업을 클릭하면 다운로드에서 표시합니다.</string>
+  <string name="connections_show_details">세부 정보 보기</string>
+  <string name="connections_hide_details">세부 정보 숨기기</string>
   <string name="connections_empty_body">다운로드가 진행되거나 토렌트를 시딩하는 동안 여기에 연결이 표시됩니다.</string>
   <string name="connections_no_match">일치하는 연결이 없습니다</string>
   <string name="connections_unsupported_title">이 기기는 연결 정보를 보고하지 않습니다</string>

@@ -1419,8 +1419,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and phones show two-line rows. Chips pick a source by its commonest protocol family
   (`sourceFilters`) and the field searches endpoints, tasks, protocols, peer clients and devices
   (`matching`). Each row leads with ↓, ↑, both or a dot, and its speeds are drawn in the traffic
-  colors, so direction never rests on color alone; a row shows its task, on its Connections tab
-  for HTTP and FTP. `ConnectionGridModel` asks each online device for its own stream
+  colors, so direction never rests on color alone. A table row shows every detail in a hover card
+  (`KetchHoverCard`, `ConnectionDetails`; long-press on touch, and keyboard focus on the task
+  link) and only its task cell shows the
+  task, on its Connections tab for HTTP and FTP; a list row opens its details when tapped, with
+  Show task. The table's sort is kept in `[ui] sort` (`connections`) `ConnectionGridModel` asks each online device for its own stream
   (`AppState.connectionGrid.state(limit)`, the limit split between devices) only while the page
   is on screen, stopping 5 s after, and asks again with backoff (1 s doubling to 30 s) when one
   fails or ends; a device refusing it as unsupported is listed, not asked again. The Pulse bar's
