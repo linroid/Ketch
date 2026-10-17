@@ -334,6 +334,8 @@ class RemoteKetch internal constructor(
       contentType(ContentType.Application.Json)
       setBody(ResolveUrlRequest(input.url, input.headers))
     }
+    // Older servers answer these with 500, which stays a RemoteApiException.
+    resolveRefusal(response)?.let { throw it }
     checkSuccess(response)
     return response.body()
   }
@@ -343,10 +345,8 @@ class RemoteKetch internal constructor(
       contentType(ContentType.Application.OctetStream)
       setBody(input.bytes)
     }
+    resolveRefusal(response)?.let { throw it }
     when (response.status) {
-      HttpStatusCode.UnsupportedMediaType -> throw KetchError.Unsupported()
-      HttpStatusCode.UnprocessableEntity ->
-        throw json.decodeFromString(KetchError.tolerantSerializer(), response.bodyAsText())
       HttpStatusCode.PayloadTooLarge -> throw IllegalArgumentException("File is too large")
       HttpStatusCode.NotFound, HttpStatusCode.NotImplemented ->
         throw UnsupportedOperationException("Resolving file content is unavailable")
@@ -354,6 +354,18 @@ class RemoteKetch internal constructor(
     checkSuccess(response)
     return response.body()
   }
+
+  /**
+   * The error a resolve the server refused for its input throws, as [KetchApi.resolve] does: one
+   * no source takes, or a source's own, decoded with its reason.
+   */
+  private suspend fun resolveRefusal(response: HttpResponse): KetchError? =
+    when (response.status) {
+      HttpStatusCode.UnsupportedMediaType -> KetchError.Unsupported()
+      HttpStatusCode.UnprocessableEntity ->
+        json.decodeFromString(KetchError.tolerantSerializer(), response.bodyAsText())
+      else -> null
+    }
 
   override suspend fun start() {
     log.i { "Connecting to $host:$port" }

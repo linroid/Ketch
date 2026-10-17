@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.resolve
@@ -14,6 +15,7 @@ import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.http.HttpRequestLifecycle
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -71,8 +73,9 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
   post<Api.Resolve> {
     val body = call.receiveJson<ResolveUrlRequest>()
     log.i { "POST /api/resolve url=${redactUrl(body.url)}" }
-    val resolved = ketch.resolve(body.url, body.properties)
-    call.respond(resolved)
+    call.respondResolved("No download source handles this URL") {
+      ketch.resolve(body.url, body.properties)
+    }
   }.stopWhenClientLeaves()
 
   post<Api.Resolve.Content> { resource ->
@@ -86,15 +89,9 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
     }
     log.i { "POST /api/resolve/content fileName=${resource.fileName} size=${content.size}" }
     try {
-      call.respond(ketch.resolve(content, resource.fileName))
-    } catch (e: KetchError.Unsupported) {
-      call.respond(
-        HttpStatusCode.UnsupportedMediaType,
-        ErrorResponse("unsupported", "No download source recognizes this content"),
-      )
-    } catch (e: KetchError.SourceError) {
-      // Typed like the errors in task snapshots, so clients can tell a malformed file apart.
-      call.respond<KetchError>(HttpStatusCode.UnprocessableEntity, e)
+      call.respondResolved("No download source recognizes this content") {
+        ketch.resolve(content, resource.fileName)
+      }
     } catch (e: UnsupportedOperationException) {
       call.respond(
         HttpStatusCode.NotImplemented,
@@ -102,6 +99,27 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
       )
     }
   }.stopWhenClientLeaves()
+}
+
+/**
+ * Responds with what [resolve] found. An input no source takes answers 415 `unsupported` with
+ * [unsupported], and a source's refusal, such as a torrent with pieces too large, 422 with the
+ * [KetchError] itself, typed like the errors in task snapshots, so clients keep its reason.
+ */
+private suspend inline fun ApplicationCall.respondResolved(
+  unsupported: String,
+  resolve: () -> ResolvedSource,
+) {
+  val resolved = try {
+    resolve()
+  } catch (e: KetchError.Unsupported) {
+    respond(HttpStatusCode.UnsupportedMediaType, ErrorResponse("unsupported", unsupported))
+    return
+  } catch (e: KetchError.SourceError) {
+    respond<KetchError>(HttpStatusCode.UnprocessableEntity, e)
+    return
+  }
+  respond(resolved)
 }
 
 /** Upper bound for uploaded content ([ResolveInput.Content.MAX_CONTENT_BYTES]). */

@@ -1528,7 +1528,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   per-task speed limit, priority and connections (0 is Auto; older servers answer 400
   `invalid_connections`, which `RemoteDownloadTask` turns into `UnsupportedOperationException`);
   status (with `KetchStatus.features`), config, network interfaces, and resolving URLs or
-  uploaded file content
+  uploaded file content. Both resolve routes (`respondResolved`) answer an input no source takes
+  with 415 `unsupported` and a source's refusal with 422 and the typed `KetchError`, its `detail`
+  saying why, which `RemoteKetch.resolve` throws again; older servers answered a URL's refusals
+  with 500, still a `RemoteApiException`
 - Event stream (`StreamRoutes`, `EventHub`; `/api/status` lists `events.stream`): `GET
   /api/stream` opens one SSE stream per client (at most 32, 429 `too_many_streams` beyond; a
   comment every 15 s, which also frees the streams of clients that left). It sends `hello` (the
