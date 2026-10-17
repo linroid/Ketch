@@ -2,6 +2,7 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
@@ -42,10 +43,14 @@ import kotlin.time.Duration.Companion.minutes
 class CancelRaceTest {
   private val folder = "/tmp/ketch-cancel-race/"
 
-  private fun request(vararg ids: String) = DownloadRequest(
+  private fun request(
+    vararg ids: String,
+    priority: DownloadPriority = DownloadPriority.NORMAL,
+  ) = DownloadRequest(
     url = "pick:files",
     destination = Destination(folder),
     selectedFileIds = ids.toSet(),
+    priority = priority,
   )
 
   private fun TestScope.ketch(
@@ -148,6 +153,42 @@ class CancelRaceTest {
       runCurrent()
       assertIs<DownloadState.Downloading>(next.state.value)
       assertEquals(next.taskId, source.runs.value.last().context.taskId)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun resume_urgentCanceledWhileTheQueueSavesIt_preemptsNobody() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store, maxConcurrent = 1)
+    try {
+      val running = ketch.download(request("0"))
+      val urgent = ketch.download(request("1", priority = DownloadPriority.URGENT))
+      runCurrent()
+      assertIs<DownloadState.Paused>(running.state.value)
+      // Paused, the urgent task gives the slot back to the one it pushed out.
+      urgent.pause()
+      runCurrent()
+      assertIs<DownloadState.Downloading>(running.state.value)
+      val runs = source.runs.value.size
+      val gate = SaveGate(store) { it.taskId == urgent.taskId && it.state == TaskState.QUEUED }
+      val resuming = launch { urgent.resume() }
+      runCurrent()
+      assertTrue(gate.held.isCompleted)
+
+      val canceling = launch { urgent.cancel() }
+      runCurrent()
+      gate.release.complete(Unit)
+      resuming.join()
+      canceling.join()
+      runCurrent()
+
+      assertIs<DownloadState.Canceled>(urgent.state.value)
+      // Never pushed out for it, the running task keeps its run.
+      assertIs<DownloadState.Downloading>(running.state.value)
+      assertEquals(runs, source.runs.value.size)
     } finally {
       ketch.close()
     }

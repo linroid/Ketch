@@ -86,6 +86,11 @@ internal class DownloadQueue(
           removeActive(handle.taskId)
         }
         markQueued(handle)
+        // Canceled while it saved: it takes no slot and pushes no task out of one.
+        if (handle.mutableState.value is DownloadState.Canceled) {
+          log.d { "Not queueing taskId=${handle.taskId}, canceled as it was saved" }
+          return
+        }
         val entry = QueueEntry(
           handle = handle,
           priority = handle.request.priority,
@@ -369,8 +374,8 @@ internal class DownloadQueue(
 
   /**
    * Shows the task queued and saves it so. A cancel, which never waits for the queue, may land
-   * while the record saves: the task then stays canceled, and the coordinator refuses to start
-   * it.
+   * while the record saves: the task then stays canceled, [enqueue] leaves it out of the queue
+   * and the coordinator refuses to start it.
    */
   private suspend fun markQueued(handle: TaskHandle) {
     handle.record.update {
