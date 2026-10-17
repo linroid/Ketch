@@ -27,8 +27,8 @@ import com.linroid.ketch.torrent.peer.PeerOrigin
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
-import com.linroid.ketch.torrent.v2.TorrentV2DiscoverySink
 import com.linroid.ketch.torrent.v2.PeerTopic
+import com.linroid.ketch.torrent.v2.TorrentV2DiscoverySink
 import com.linroid.ketch.torrent.v2.TorrentV2DownloadSession
 import com.linroid.ketch.torrent.v2.TorrentV2PieceScheduler
 import com.linroid.ketch.torrent.v2.TorrentV2Runtime
