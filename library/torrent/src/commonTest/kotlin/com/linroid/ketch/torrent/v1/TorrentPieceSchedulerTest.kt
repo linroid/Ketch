@@ -322,6 +322,29 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun endgame_copyItsOwnerGaveUp_keepsWhenItWasAskedFor() = runTest {
+    var now = 0L
+    val budget = TorrentBufferBudget(2 * piece)
+    val scheduler = scheduler(pieces = 2, budget, clock = { now })
+    for (peer in 1..3) scheduler.availability(peer, all(2))
+    assertEquals(8, scheduler.request(1, max = 8).requests.size)
+    // Peer 2 copies every block, those peer 1 would send last first, and sends them in that order.
+    val copied = scheduler.request(2, max = 8, lateAfterMs = 1_000, copies = 8).requests
+    assertEquals(8, copied.size)
+    // Peer 1 leaves: peer 2 owes its copies, those it was asked for last still due last.
+    scheduler.remove(1)
+    assertEquals(copied.takeLast(2).reversed(),
+      scheduler.request(3, max = 8, copies = 2).requests)
+    // Peer 2 is late with the rest once its copies' deadline passed, not one from when peer 1
+    // left.
+    now = 1_500
+    assertEquals(copied.dropLast(2).sortedWith(compareBy({ it.index }, { it.begin })),
+      scheduler.request(3, max = 8, copies = 2).requests)
+    for (peer in 2..3) scheduler.remove(peer)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun endgameCopies_peerRate_aboutASecondOfItWithinThePipeline() {
     val fewest = TorrentPieceScheduler.ENDGAME_DUPLICATES
     // A second of 2 MiB/s is 128 blocks.

@@ -1061,7 +1061,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   for blocks one other peer owes: any it is late with, and, once they owe none of their own, about
   a second of their rate on time (`endgameCopies`: at least `ENDGAME_DUPLICATES`, 16, within their
   pipeline), due last first, so the copy arrives before the owner gets to the block and cancels
-  it. Each pass, `poll` hands a worker the requests to cancel (the
+  it; an owner that gives a copied block back leaves it to the copier, due and ordered as its copy
+  was asked for. Each pass, `poll` hands a worker the requests to cancel (the
   other copy arrived, or the piece is done or unwanted), newly verified pieces for HAVEs (an
   append-only log with a cursor per peer) and its interest: workers start not interested and send
   INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A
