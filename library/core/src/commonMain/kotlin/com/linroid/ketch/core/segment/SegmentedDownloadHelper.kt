@@ -40,7 +40,7 @@ import kotlin.time.TimeSource
  *   reports in milliseconds
  * @param tag log tag for this helper instance
  * @param minSplitBytes the smallest range a connection takes over from another; smaller tails
- *   finish on the connection that has them
+ *   finish on the connection that has them; [Long.MAX_VALUE] never takes one over
  * @param timeSource measures the connections' rates, which decide where a range is split
  */
 class SegmentedDownloadHelper(

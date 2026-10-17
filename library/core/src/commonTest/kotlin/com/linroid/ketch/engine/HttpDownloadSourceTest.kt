@@ -193,9 +193,38 @@ class HttpDownloadSourceTest {
   fun download_finishedConnectionTakesOverTheSlowOnesTail() = runTest {
     val size = 4 * 1024 * 1024
     val half = size / 2L
+    val (requests, context) = downloadWithSlowSecondConnection(
+      ServerInfo(size.toLong(), true, null, null),
+    )
+    assertTrue(
+      requests.any { it.first > half },
+      "The first connection must take over the end of the second one: $requests",
+    )
+    assertTrue(context.segments.value.all { it.isComplete })
+    assertEquals(size.toLong(), context.segments.value.sumOf { it.totalBytes })
+  }
+
+  @Test
+  fun download_requestQuota_neverTakesOverRanges() = runTest {
+    val size = 4 * 1024 * 1024L
+    val (requests, _) = downloadWithSlowSecondConnection(
+      ServerInfo(size, true, null, null, rateLimitRemaining = 2),
+    )
+    assertEquals(2, requests.size, "Taking over a range would spend a request: $requests")
+  }
+
+  /**
+   * Downloads [serverInfo]'s content over two connections, the second of which starts slow, and
+   * checks the file; returns the requests sent and the context.
+   */
+  private suspend fun downloadWithSlowSecondConnection(
+    serverInfo: ServerInfo,
+  ): Pair<List<LongRange>, DownloadContext> {
+    val size = checkNotNull(serverInfo.contentLength).toInt()
+    val half = size / 2L
     val content = ByteArray(size) { (it * 31 % 251).toByte() }
     val requests = mutableListOf<LongRange>()
-    val fake = FakeHttpEngine(ServerInfo(size.toLong(), true, null, null))
+    val fake = FakeHttpEngine(serverInfo)
     val engine = object : HttpEngine by fake {
       override suspend fun download(
         url: String,
@@ -222,12 +251,7 @@ class HttpDownloadSourceTest {
     HttpDownloadSource(engine).download(context, null)
 
     assertContentEquals(content, file.bytes)
-    assertTrue(
-      requests.any { it.first > half },
-      "The first connection must take over the end of the second one: $requests",
-    )
-    assertTrue(context.segments.value.all { it.isComplete })
-    assertEquals(size.toLong(), context.segments.value.sumOf { it.totalBytes })
+    return requests to context
   }
 
   private fun context(

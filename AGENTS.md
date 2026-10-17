@@ -314,7 +314,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   for a new request's setup), else in half; a lane that received nothing in that time hands over
   everything it has not admitted, and its idle transfer is cancelled. Only ranges of at least
   `DEFAULT_MIN_SPLIT_BYTES` (1 MiB) are handed over, so small files stay on their connections,
-  and never without range support. Sources write what `SegmentLane.admit` allows and report it
+  and never without range support or when an HTTP server counts the requests left
+  (`RateLimit-Remaining`), as each takeover is a request. Sources write what `SegmentLane.admit` allows and report it
   with `commit`; a lane whose tail was taken ends its transfer by throwing a
   `CancellationException` (`LaneDrainedException`) once it reaches its new end, which the helper
   counts as done, as it does any transfer that ends once its lane is complete. A batch still

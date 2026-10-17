@@ -143,7 +143,10 @@ internal class HttpDownloadSource(
       }
     }
 
-    downloadSegments(context, segments, totalBytes, resolved.supportsResume, requested)
+    downloadSegments(
+      context, segments, totalBytes, resolved.supportsResume, requested,
+      quotaLimited = remaining != null,
+    )
   }
 
   /** Continues from [context]'s segments once the server's identity still matches [state]. */
@@ -221,7 +224,10 @@ internal class HttpDownloadSource(
       context.segments.value = validatedSegments
     }
 
-    downloadSegments(context, validatedSegments, totalBytes, serverInfo.supportsResume, requested)
+    downloadSegments(
+      context, validatedSegments, totalBytes, serverInfo.supportsResume, requested,
+      quotaLimited = serverInfo.rateLimitRemaining != null,
+    )
   }
 
   private suspend fun validateLocalFile(
@@ -270,6 +276,9 @@ internal class HttpDownloadSource(
    * resegmentation support. Delegates the concurrent batch loop
    * to [SegmentedDownloadHelper], whose connections take over the
    * remaining ranges of slower ones with requests of their own.
+   *
+   * @param quotaLimited whether the server counts the requests left (`RateLimit-Remaining`).
+   *   Taking over a range costs a request, so such downloads keep to their segments' requests.
    */
   private suspend fun downloadSegments(
     context: DownloadContext,
@@ -277,11 +286,20 @@ internal class HttpDownloadSource(
     totalBytes: Long,
     supportsRanges: Boolean,
     requestedConnections: Int,
+    quotaLimited: Boolean,
   ) {
-    val segmentHelper = SegmentedDownloadHelper(
-      progressIntervalMs = context.config.progressIntervalMs,
-      tag = "HttpSource",
-    )
+    val segmentHelper = if (quotaLimited) {
+      SegmentedDownloadHelper(
+        progressIntervalMs = context.config.progressIntervalMs,
+        tag = "HttpSource",
+        minSplitBytes = Long.MAX_VALUE,
+      )
+    } else {
+      SegmentedDownloadHelper(
+        progressIntervalMs = context.config.progressIntervalMs,
+        tag = "HttpSource",
+      )
+    }
     val engine = httpEngine.through(context.config.proxy)
     segmentHelper.downloadAll(
       context, segments, totalBytes, supportsRanges, requestedConnections,
