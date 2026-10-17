@@ -882,12 +882,19 @@ internal class KotlinTorrentEngine(
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)
       val trackerState = TorrentBufferBudget(
         maxOf(1, trackerControlStateWeight().toInt()))
+      // Discovery runs as long as the session, seeding included: it keeps what it reads, not the
+      // spec, whose throttle belongs to the run that opened the session.
+      val metadata = spec.metadata
+      val privacy = spec.privacy
+      val magnetUri = spec.magnetUri
       val session = KotlinTorrentSession(store, network, v1Shares.share(), scope,
         connections = config.connectionsPerTorrent, uploadBudget = exchangeBudgets.uploads,
         peerBudget = exchangeBudgets.peers,
         uploadPolicy = { uploadPolicy.load() },
         checkpoint = checkpoint, peerId = peerId,
-        discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
+        discover = { peers, owner ->
+          discover(metadata, privacy, magnetUri, peers, owner, trackerState)
+        },
         downloadThrottle = { downloadRate.acquire(it) }, taskThrottle = spec.throttle,
         engineUploadRate = uploadRate,
         trackerConfigurationBudget = exchangeBudgets.sessions,
@@ -1010,15 +1017,17 @@ internal class KotlinTorrentEngine(
           v2CreationLog(output, spec.taskId)
         } else null, legacySelections = spec.legacySelections)
       val custom = spec.discover
+      // Discovery runs as long as the owner, seeding included: it keeps what it reads, not the
+      // spec, whose throttle belongs to the run that opened the owner.
       val discovery: suspend (TorrentV2DiscoverySink) -> Unit = if (custom != null) {
         val topic = if (spec.discoverMode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1
           else PeerTopic.V2
         { sink -> sink.relay(topic = topic, discover = custom) }
       } else {
-        { sink ->
-          discoverV2(document, layout, store, spec.trackerTiers, spec.magnetUri, spec.privacy,
-            sink)
-        }
+        val tiers = spec.trackerTiers
+        val magnetUri = spec.magnetUri
+        val privacy = spec.privacy
+        { sink -> discoverV2(document, layout, store, tiers, magnetUri, privacy, sink) }
       }
       val session = TorrentV2DownloadSession.open(scope, document, layout, selection, store,
         TorrentV2Runtime(network, peerId.toByteString(), budget, exchangeBudgets.sessions,
@@ -1225,12 +1234,13 @@ internal class KotlinTorrentEngine(
   }
 
   private suspend fun discover(
-    spec: TorrentTaskSpec,
+    metadata: TorrentMetadata,
+    privacy: TorrentDiscoveryPrivacy,
+    magnetUri: String?,
     output: SendChannel<PeerEndpoint>,
     session: KotlinTorrentSession,
     trackerState: TorrentBufferBudget,
   ) = supervisorScope {
-    val metadata = spec.metadata
     val configuration = session.trackerConfiguration()
     val trackerTiers = configuration.tiers
     if (trackerTiers.isNotEmpty()) launch {
@@ -1280,7 +1290,7 @@ internal class KotlinTorrentEngine(
         }
       }
     }
-    if (!metadata.isPrivate && spec.privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
+    if (!metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       for (url in extraTrackers(trackerTiers.flatten())) launch {
         val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
           TrackerTiers(listOf(listOf(url)), ::announceToTracker), nowMs = nowMs,
@@ -1291,7 +1301,7 @@ internal class KotlinTorrentEngine(
             stopped = stopped)
         }) { _, found -> found.forEach { output.send(it) } }
       }
-      spec.magnetUri?.let { uri -> launch {
+      magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
           attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
         }
