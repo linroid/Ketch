@@ -69,8 +69,8 @@ internal enum class StallRecovery {
  * each at most once per its own cooldown, announcing to trackers less often each time it does not
  * help. Pieces missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS]
  * once the last one goes, so a peer that reconnects at once does not flip the reason, and those
- * missing when dropped web seeds start again stay missing as long while the seeds ask for them.
- * Web seeds never decide the reason otherwise: a stall stores nothing from them.
+ * missing when dropped web seeds start again stay missing for as long, while the seeds ask for
+ * them once more. Web seeds never decide the reason otherwise: a stall stores nothing from them.
  *
  * Not thread-safe: one swarm loop calls it.
  */
