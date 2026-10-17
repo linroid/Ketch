@@ -416,8 +416,8 @@ internal class DownloadCoordinator(
   private suspend fun fail(handle: TaskHandle, error: KetchError) {
     val taskId = handle.taskId
     // An expected failure, such as a source's refusal or a server's error, says why in one line;
-    // an unknown one, or one of the disk, keeps its stack trace for a bug report.
-    if (error is KetchError.Unknown || error is KetchError.Disk) {
+    // an unknown one, one of the disk or one a bug caused keeps its stack trace for a bug report.
+    if (error is KetchError.Unknown || error is KetchError.Disk || error.causedByBug()) {
       log.e(error) { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
     } else {
       log.w { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
@@ -516,6 +516,24 @@ internal class DownloadCoordinator(
 
   private companion object {
     val FINISHED_STATES = setOf(TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED)
+
+    /**
+     * Whether the error's deepest cause looks like a bug rather than a refusal, a timeout or a
+     * failing network or disk: an [Error], or a [RuntimeException] other than an
+     * [IllegalArgumentException] or a cancellation, such as an [IndexOutOfBoundsException] a
+     * source reported as its own [KetchError.SourceError].
+     */
+    fun KetchError.causedByBug(): Boolean {
+      // Bounded, as a cause chain may loop.
+      val root = generateSequence<Throwable>(this) { it.cause?.takeIf { cause -> cause !== it } }
+        .take(MAX_CAUSES)
+        .last()
+      return root is Error ||
+        (root is RuntimeException && root !is IllegalArgumentException &&
+          root !is CancellationException)
+    }
+
+    const val MAX_CAUSES = 16
   }
 }
 

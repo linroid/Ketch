@@ -13,6 +13,7 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
+import com.linroid.ketch.core.engine.TransferStalledException
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -44,7 +45,11 @@ class FailureLoggingTest {
     }
   }
 
-  /** `fail:refused` fails as a source refuses content; `fail:bug` with an unexpected error. */
+  /**
+   * `fail:refused` fails as a source refuses content, `fail:wrapped-refusal` as one that says why
+   * with the refusal it caught, `fail:stalled` as a transfer stalls; `fail:bug` with an unexpected
+   * error and `fail:wrapped-bug` with a bug the source reported as its own error.
+   */
   private class FailingSource : DownloadSource<Unit> {
     override val type = "failing"
     override val stateSerializer = Unit.serializer()
@@ -58,6 +63,17 @@ class FailureLoggingTest {
     override suspend fun download(context: DownloadContext, state: Unit?) {
       when (context.url) {
         "fail:refused" -> throw KetchError.SourceError(type, detail = "The pieces are too large")
+        "fail:wrapped-refusal" -> throw KetchError.SourceError(
+          sourceType = type,
+          cause = IllegalArgumentException("Resume torrent changed"),
+          detail = "Resume torrent changed",
+        )
+        "fail:stalled" -> throw KetchError.Network(TransferStalledException("No data for 60s"))
+        "fail:wrapped-bug" -> throw KetchError.SourceError(
+          sourceType = type,
+          cause = IndexOutOfBoundsException("Index 5 out of bounds"),
+          detail = "Index 5 out of bounds",
+        )
         else -> throw IllegalStateException("a bug")
       }
     }
@@ -107,6 +123,43 @@ class FailureLoggingTest {
       val line = capture.records.single { "Download failed" in it.message }
       assertEquals("e", line.level)
       assertIs<KetchError.Unknown>(assertNotNull(line.throwable))
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun download_sourceWrapsAnExpectedFailure_logsAWarningWithoutATrace() = runTest {
+    for (url in listOf("fail:wrapped-refusal", "fail:stalled")) {
+      val capture = Capture()
+      val ketch = ketch(capture)
+      try {
+        val task = ketch.download(request(url))
+        runCurrent()
+        assertIs<DownloadState.Failed>(task.state.value)
+
+        val line = capture.records.single { "Download failed" in it.message }
+        assertEquals("w", line.level, url)
+        assertNull(line.throwable, url)
+      } finally {
+        ketch.close()
+      }
+    }
+  }
+
+  @Test
+  fun download_sourceWrapsABug_logsAnErrorWithItsTrace() = runTest {
+    val capture = Capture()
+    val ketch = ketch(capture)
+    try {
+      val task = ketch.download(request("fail:wrapped-bug"))
+      runCurrent()
+      assertIs<DownloadState.Failed>(task.state.value)
+
+      val line = capture.records.single { "Download failed" in it.message }
+      assertEquals("e", line.level)
+      val error = assertIs<KetchError.SourceError>(assertNotNull(line.throwable))
+      assertIs<IndexOutOfBoundsException>(error.cause)
     } finally {
       ketch.close()
     }

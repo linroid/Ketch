@@ -2127,8 +2127,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
   problems), error (fatal). A failed download is a warning with its cause chain, an error with
-  its stack trace only when it is `KetchError.Unknown` or `Disk`; an input no source takes is
-  logged at debug, as its caller is told
+  its stack trace only when it is `KetchError.Unknown` or `Disk` or a bug caused it: its root
+  cause is an `Error`, or a `RuntimeException` other than `IllegalArgumentException` and
+  cancellations, as in a torrent `SourceError` wrapping an `IndexOutOfBoundsException`. An input
+  no source takes is logged at debug, as its caller is told
 - Include `taskId=` in every task-scoped message; torrent engine code also uses `logHash()`
 - Never log credentials: pass URLs through `redactUrl()`, tracker URLs through
   `trackerLabel()`, and describe tracker errors with `describeWithoutUrls()`
