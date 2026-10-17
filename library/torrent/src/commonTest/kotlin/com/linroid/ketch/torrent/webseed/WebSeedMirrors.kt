@@ -4,8 +4,10 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 
 /**
  * Serves [files] by URL with Range support; [corrupt] flips bytes, [missing] answers 404. The
@@ -87,4 +89,30 @@ internal fun mirrorHosts(vararg engines: HttpEngine): HttpEngine = object : Http
   }
 
   override fun close() = Unit
+}
+
+/**
+ * Answers through [engine], except while [down] says the mirror is down: then every request fails
+ * with a network error, counted in [refused].
+ */
+@OptIn(ExperimentalAtomicApi::class)
+internal class Outage(
+  private val engine: HttpEngine,
+  private val down: () -> Boolean,
+) : HttpEngine by engine {
+  private val refusals = AtomicInt(0)
+  val refused: Int get() = refusals.load()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    if (down()) {
+      refusals.incrementAndFetch()
+      throw KetchError.Network()
+    }
+    engine.download(url, range, headers, onData)
+  }
 }

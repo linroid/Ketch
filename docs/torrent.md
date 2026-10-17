@@ -691,7 +691,9 @@ reachable peer. A magnet's metadata still comes from peers.
   corrupt twice, it no longer fetches: the seed goes on with the rest of the torrent, as when a
   mirror has since changed one file. Other failures back it off (2 seconds, doubling to a minute).
   Five failed runs in a row without a verified piece drop it, as does having nothing left it can
-  serve before it served anything; a download that stalls starts dropped seeds again.
+  serve before it served anything; a download that stalls starts dropped seeds again. Started
+  again, a seed asks once more for the files it lacked, but never for the pieces it sent corrupt,
+  and a seed left with only those is not started again.
 - Requests go through the source's HTTP engine with the system's proxy settings, count against the
   download limits, fail after 30 seconds without data, and show among the task's live connections
   as `HTTP`.

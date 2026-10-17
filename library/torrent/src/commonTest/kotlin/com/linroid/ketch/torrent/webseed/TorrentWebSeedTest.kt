@@ -19,7 +19,9 @@ import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import com.linroid.ketch.torrent.v1.TorrentPieceScheduler
 import com.linroid.ketch.torrent.v1.TorrentSwarm
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
@@ -441,6 +443,68 @@ class TorrentWebSeedTest {
           }
           // Never asked for the lost file again.
           assertTrue(partial.requests.count { it.first == stale } <= 1)
+        }
+      }
+    }
+  }
+
+  /** Two files: "stale.bin" is piece 0, "good.bin" pieces 1 to 3. */
+  private val staleSet = ByteArray(PIECE) { (it * 7 + 1).toByte() } to
+    ByteArray(3 * PIECE) { (it * 13 + 5).toByte() }
+
+  private fun staleSetMetadata(): TorrentMetadata {
+    val (stale, good) = staleSet
+    return TorrentMetadata.fromBencode(Bencode.encode(mapOf(
+      "info" to mapOf("name" to "set", "piece length" to PIECE.toLong(),
+        "pieces" to hashes(stale + good, PIECE),
+        "files" to listOf(
+          mapOf("length" to stale.size.toLong(), "path" to listOf("stale.bin")),
+          mapOf("length" to good.size.toLong(), "path" to listOf("good.bin"))
+        )),
+      "url-list" to "http://mirror.test/pub/",
+    )))
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun relaunchedSeed_neverAsksAgainForPiecesItSentCorrupt() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        // The mirror has another stale.bin, and is down from when it sent it twice until it is
+        // restored.
+        val mirror = MirrorEngine(mapOf(staleUrl to stale.reversedArray(),
+          "http://mirror.test/pub/set/good.bin" to good))
+        val restored = AtomicBoolean(false)
+        val outage = Outage(mirror) {
+          !restored.load() && mirror.requests.count { it.first == staleUrl } >= 2
+        }
+        withStore(staleSetMetadata()) { store, _ ->
+          store.initialize()
+          val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
+            store.verifiedPieces(), store::pieceSize, TorrentBufferBudget(4 * 1024 * 1024))
+          val pieces = SwarmWebSeedPieces(-1, "http://mirror.test/pub/", store, scheduler)
+          val worker = WebSeedWorker("http://mirror.test/pub/", pieces, TorrentHttp(outage),
+            WebSeedStats(), "test", retryMs = 5)
+          pieces.join()
+          // Dropped while the mirror is down, knowing piece 0 is not the torrent's there.
+          worker.run()
+          assertEquals(setOf(0), pieces.unservable)
+          assertTrue(pieces.mayServe())
+          restored.store(true)
+          coroutineScope {
+            val started = launch {
+              pieces.join()
+              worker.run()
+            }
+            while (!(1..3).all { store.verifiedPieces()[it] }) delay(10)
+            started.cancel()
+          }
+          // Started again, it fetched the rest, never the copy it knows is stale.
+          assertEquals(2, mirror.requests.count { it.first == staleUrl })
+          assertEquals(setOf(0), pieces.unservable)
+          assertFalse(pieces.mayServe())
         }
       }
     }

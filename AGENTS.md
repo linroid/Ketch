@@ -688,7 +688,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   byte arrives (`WebSeedPieces.release(piece, verified)`), so a corrupt piece or a dropped
   response keeps the pieces before it and gives the rest back. Pieces are SHA-1 checked like
   peers'; a failed run backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row
-  drop it.
+  drop it. One `WebSeedWorker` serves its seed for the whole transfer, so a seed a stall starts
+  again keeps its verdicts: it is never asked again for the pieces it sent corrupt (joining
+  without them, `SwarmWebSeedPieces.unservable`, `TorrentV2WebSeeds.corruptPieces`), only for the
+  files it lacked, and one left with nothing else is not started again (`mayServe`).
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
   with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
   `TorrentV2Document.webSeeds` (v2 magnets keep `ws` in the metainfo `TorrentV2MetadataExchange`

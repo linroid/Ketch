@@ -424,4 +424,37 @@ class TorrentV2WebSeedTest {
       assertTrue(mirror.requests.isNotEmpty())
     }
   }
+
+  /** Waits until [outage] has refused requests and stopped getting more: its seed was dropped. */
+  private suspend fun awaitDropped(outage: Outage) {
+    while (outage.refused == 0) delay(10)
+    var seen = -1
+    while (seen != outage.refused) {
+      seen = outage.refused
+      delay(1_000)
+    }
+  }
+
+  @Test
+  fun relaunchedSeed_neverAsksAgainForPiecesItSentCorrupt() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    // The mirror has another bad.bin, and is down from when it sent it twice until restored.
+    val mirror = MirrorEngine(mapOf(bad to fixture.payloads[0].reversedArray(),
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
+    val restored = AtomicBoolean(false)
+    val outage = Outage(mirror) {
+      !restored.load() && mirror.requests.count { it.first == bad } >= 2
+    }
+    stalling(fixture, outage) { run ->
+      awaitDropped(outage)
+      restored.store(true)
+      // Two minutes of stall start the seed again: it fetches good.bin, never bad.bin again.
+      run.skip(130_000)
+      run.session.downloadedBytes.first { it == 40_000L }
+      delay(500)
+      assertEquals(2, mirror.requests.count { it.first == bad })
+    }
+  }
 }

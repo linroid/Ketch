@@ -21,6 +21,7 @@ import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.update
 
 /**
  * Maps v2 and hybrid pieces onto the files of one web seed (BEP 19). A v2 piece lies in a single
@@ -111,8 +112,16 @@ internal class TorrentV2WebSeeds private constructor(
     })
   }
 
-  // The pieces each seed cannot serve, which its workers report and the loop reads.
+  // The pieces each seed cannot serve, which its workers report and the loop reads, and of
+  // those the ones it sent corrupt, which it is never asked for again while the transfer runs.
   private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
+  private val corrupt = urls.indices.map { AtomicReference(emptySet<Int>()) }
+
+  // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
+  private val workers = urls.indices.map { seed ->
+    WebSeedWorker(urls[seed], Pieces(seed), http, stats, logLabel, reporter, retryMs,
+      downloadPayload = downloadPayload)
+  }
 
   // Seeds started again after they stopped, which [run] launches.
   private val relaunches = Channel<Int>(Channel.UNLIMITED)
@@ -122,6 +131,9 @@ internal class TorrentV2WebSeeds private constructor(
 
   /** Whether [seed] may be asked for piece [index]: false once it could not serve it. */
   fun serves(seed: Int, index: Int): Boolean = index !in unservable[seed].load()
+
+  /** The pieces [seed] sent corrupt: started again, it is still never asked for them. */
+  fun corruptPieces(seed: Int): Set<Int> = corrupt[seed].load()
 
   sealed interface Event {
     /** [seed] waits for a piece. */
@@ -150,11 +162,11 @@ internal class TorrentV2WebSeeds private constructor(
 
   /**
    * Starts [seed], which [Event.Stopped], again, as a stalled transfer asks: it may be asked for
-   * every piece again, those it could not serve included, as its mirror may have them by now.
-   * False once the seeds closed.
+   * the files it lacked again, as its mirror may have them by now, but never for the pieces it
+   * sent corrupt. False once the seeds closed.
    */
   fun relaunch(seed: Int): Boolean {
-    unservable[seed].store(emptySet())
+    unservable[seed].store(corrupt[seed].load())
     return relaunches.trySend(seed).isSuccess
   }
 
@@ -170,8 +182,7 @@ internal class TorrentV2WebSeeds private constructor(
 
   private fun CoroutineScope.launchSeed(seed: Int) = launch {
     try {
-      WebSeedWorker(urls[seed], Pieces(seed), http, stats, logLabel, reporter, retryMs,
-        downloadPayload = downloadPayload).run()
+      workers[seed].run()
     } catch (e: TorrentStorageException) {
       events.trySend(Event.Failed(e))
     }
@@ -184,7 +195,10 @@ internal class TorrentV2WebSeeds private constructor(
     assignments.forEach { it.cancel() }
   }
 
-  /** One seed's view: pieces arrive from the loop through its assignment queue. */
+  /**
+   * One seed's view: pieces arrive from the loop through its assignment queue. It serves the
+   * seed's worker each time the seed starts.
+   */
   private inner class Pieces(private val seed: Int) :
     WebSeedPieces<TorrentV2PieceScheduler.WebSeedClaim> {
     private val layout = layouts[seed]
@@ -228,12 +242,9 @@ internal class TorrentV2WebSeeds private constructor(
       piece.lease.close()
     }
 
-    override suspend fun unavailable(indices: Set<Int>) {
-      val pieces = unservable[seed]
-      while (true) {
-        val current = pieces.load()
-        if (pieces.compareAndSet(current, current + indices)) break
-      }
+    override suspend fun unavailable(indices: Set<Int>, stale: Boolean) {
+      if (stale) corrupt[seed].update { it + indices }
+      unservable[seed].update { it + indices }
     }
 
     override fun piecesOf(url: String): Set<Int> = layout.piecesOf(url)
@@ -245,6 +256,8 @@ internal class TorrentV2WebSeeds private constructor(
     }
 
     override suspend fun stop() {
+      // Started again, it tells the loop it is idle anew.
+      waiting = false
       events.trySend(Event.Stopped(seed))
     }
   }

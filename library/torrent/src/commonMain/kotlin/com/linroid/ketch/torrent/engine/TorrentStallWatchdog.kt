@@ -13,8 +13,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property missingFileIds the files those pieces belong to.
  * @property lateBlocks requested blocks their peer is late with.
  * @property webSeeds web seeds running now.
- * @property droppedWebSeeds web seeds that stopped, which [StallRecovery.RELAUNCH_WEB_SEEDS]
- *   starts again.
+ * @property droppedWebSeeds web seeds that stopped and would have a wanted piece to fetch,
+ *   which [StallRecovery.RELAUNCH_WEB_SEEDS] starts again.
  * @property payloadBytes payload received so far, from peers and web seeds.
  * @property throttledMs time spent so far waiting on speed limits, which is never a stall: the
  *   waits of every peer added up, of which a check counts at most the time since the last.

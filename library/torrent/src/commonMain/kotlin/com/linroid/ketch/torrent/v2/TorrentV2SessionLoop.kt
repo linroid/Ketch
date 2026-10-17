@@ -320,6 +320,10 @@ internal object TorrentV2SessionLoop {
       fun sourced(index: Int): Boolean = rarity.hasAny(index) || mirrors != null &&
         mirrors.urls.indices.any { it !in stoppedMirrors && mirrors.serves(it, index) }
 
+      /** Whether stopped web seed [seed], started again, would have a needed piece to fetch. */
+      fun mirrorMayServe(seed: Int): Boolean =
+        mirrors != null && pieces.needsOutside(mirrors.corruptPieces(seed))
+
       /** Tells peers to cancel the requests other peers delivered first. */
       fun sendCancels() {
         cancels.addAll(pieces.takeCancels())
@@ -842,7 +846,7 @@ internal object TorrentV2SessionLoop {
           missingFileIds = missing?.fileIds.orEmpty(),
           lateBlocks = if (downloading) pieces.lateCount() else 0,
           webSeeds = mirrorsRunning,
-          droppedWebSeeds = stoppedMirrors.size,
+          droppedWebSeeds = stoppedMirrors.count(::mirrorMayServe),
           payloadBytes = store.receivedBytes() - payloadAtStart,
           throttledMs = throttledMs + swarm.webSeedThrottledMs(),
           pieceLength = layout.pieceLength,
@@ -865,7 +869,7 @@ internal object TorrentV2SessionLoop {
             }
             StallRecovery.RELAUNCH_WEB_SEEDS -> if (mirrors != null) {
               for (seed in stoppedMirrors.toList()) {
-                if (!mirrors.relaunch(seed)) continue
+                if (!mirrorMayServe(seed) || !mirrors.relaunch(seed)) continue
                 stoppedMirrors -= seed
                 mirrorsRunning++
               }
