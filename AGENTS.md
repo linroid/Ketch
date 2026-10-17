@@ -1529,9 +1529,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (and, on the old stream, for a 404/405 without a body, 501 or `unsupported`), and reads the
   stream as text in a `channelFlow` (Darwin runs `execute` elsewhere). It drops repeats and ends
   with the failure when the stream drops or closes, never reconnecting
-- Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`).
-  `KetchServer` binds to `127.0.0.1` by default and logs a warning when it listens elsewhere
-  without a token. Tokens are compared in constant time (SHA-256 digests,
+- Bearer-token auth (`ServerConfig.apiToken`), CORS and mDNS advertising (`_ketch._tcp`;
+  JmDNS through `DnsSdRegistrar`, on macOS `NativeMdnsRegistrar`'s `dns-sd -R` under a shell
+  that stops it once its stdin pipe from the server ends, `stdinBoundCommand`, so a server
+  killed with `kill -9` leaves no stale advertisement). `KetchServer` binds to `127.0.0.1` by
+  default and logs a warning when it listens elsewhere without a token. Tokens are compared in
+  constant time (SHA-256 digests,
   `MessageDigest.isEqual`); an address that sends ten wrong tokens within a minute gets 429
   `too_many_attempts` for any token until the minute ends (`AuthThrottle`)
 - `ketch server` listening beyond loopback always has a token: `--token`, `KETCH_API_TOKEN`,
