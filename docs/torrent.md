@@ -699,6 +699,11 @@ directly; it is asked to forward the port the router got to the router's externa
 external port; when another device holds that port, UPnP picks another. Only engines listening on
 every interface map ports.
 
+When Ketch shuts down, the routers get 2 seconds to remove the mappings, and the log says once
+how many of them confirmed it; a router that already lost a mapping counts. One that did not
+confirm keeps forwarding the port until the mapping's lease ends, or, when the router only takes
+permanent UPnP leases, until the router itself drops it.
+
 ### Local discovery details
 
 While a public torrent runs, the engine joins `239.192.152.143:6771` on each interface with a

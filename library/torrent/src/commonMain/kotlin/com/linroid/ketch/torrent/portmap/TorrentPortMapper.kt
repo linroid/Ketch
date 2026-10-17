@@ -113,6 +113,9 @@ internal class TorrentPortMapper(
   private class Requested(val gateway: Gateway, val mapping: PortMapping, val layer: Int) {
     fun matches(gateway: Gateway, mapping: PortMapping) =
       this.gateway.sameAs(gateway) && gateway.sameMapping(this.mapping, mapping)
+
+    /** Whether this is one of the mappings [layer] holds. */
+    fun heldBy(layer: Mapped) = layer.mappings.any { matches(layer.gateway, it) }
   }
 
   /** One layer's mappings and the external address its gateway reports. */
@@ -125,6 +128,9 @@ internal class TorrentPortMapper(
     val tcpExternal: Int get() = mappings.first { it.protocol == MappedProtocol.TCP }.externalPort
     val udpExternal: Int? get() = mappings.firstOrNull { it.protocol == MappedProtocol.UDP }
       ?.externalPort
+
+    /** Whether the gateway keeps a mapping until it is removed: UPnP's lease 0. */
+    val permanent: Boolean get() = mappings.any { it.lifetimeSeconds == 0L }
   }
 
   /**
@@ -186,18 +192,67 @@ internal class TorrentPortMapper(
     }
   }
 
-  /** Stops renewing and removes the mappings, giving the gateways at most [timeoutMs]. */
+  /**
+   * Stops renewing and removes the mappings, giving the gateways at most [timeoutMs], and logs
+   * once whether they did. A mapping whose removal its gateway did not confirm stays until its
+   * lease ends, or until the router drops it where UPnP leased it permanently.
+   */
   suspend fun stop(timeoutMs: Long = 2_000) {
     job?.cancel()
     withContext(NonCancellable) {
-      withTimeoutOrNull(timeoutMs) {
+      // The layers mapped, read once the pass holding them let go, and the removals confirmed.
+      var layers: List<Mapped>? = null
+      var removing = emptyList<Requested>()
+      val confirmed = mutableSetOf<Requested>()
+      val finished = withTimeoutOrNull(timeoutMs) {
         mutex.withLock {
-          outermostFirst(requested).forEach { unmap(it.gateway, it.mapping) }
+          layers = current
+          removing = outermostFirst(requested)
+          for (request in removing) {
+            if (unmap(request.gateway, request.mapping)) confirmed += request
+          }
           requested.clear()
           current = emptyList()
         }
+      } != null
+      val kept = layers?.filterNot { layer ->
+        removing.filter { it.heldBy(layer) }.all { it in confirmed }
+      }
+      logRemoval(layers, kept, finished, timeoutMs)
+    }
+  }
+
+  /**
+   * Logs how removing the mappings of [layers] went, naming only the port and the layers: [kept]
+   * are the layers whose gateway did not confirm every removal; both are null when the removal
+   * timed out before it began.
+   */
+  private fun logRemoval(
+    layers: List<Mapped>?,
+    kept: List<Mapped>?,
+    finished: Boolean,
+    timeoutMs: Long,
+  ) {
+    if (layers != null && layers.isEmpty()) return
+    val head = if (finished) "Removing the mapping of port $tcpPort" else {
+      "Removing the mapping of port $tcpPort timed out after ${timeoutMs}ms"
+    }
+    log.i {
+      when {
+        layers == null || kept == null -> "$head; the gateways forward the port ${until(null)}"
+        kept.isEmpty() -> "Removed the mapping of port $tcpPort through ${layers.size} NAT layer(s)"
+        else -> "$head: ${layers.size - kept.size} of ${layers.size} NAT layer(s) confirmed it; " +
+          "the others forward the port ${until(kept)}"
       }
     }
+  }
+
+  /** Until when the gateways of [kept], or of unknown layers when null, forward the port. */
+  private fun until(kept: List<Mapped>?): String = when {
+    kept == null || kept.any { it.permanent } && !kept.all { it.permanent } ->
+      "until their lease ends, a permanent UPnP lease until the router drops it"
+    kept.all { it.permanent } -> "until the router drops it, as UPnP leased it for good"
+    else -> "until their lease ends"
   }
 
   /** Maps (or renews) the ports through every layer that answers; empty when none did. */
@@ -453,21 +508,28 @@ internal class TorrentPortMapper(
    */
   private fun outermostFirst(requests: List<Requested>) = requests.sortedByDescending { it.layer }
 
-  private suspend fun unmap(gateway: Gateway, mapping: PortMapping) {
-    try {
-      when (gateway) {
-        is Gateway.NatPmp ->
-          natPmp.map(gateway.address, mapping.protocol, mapping.internalPort, 0, 0)
-        is Gateway.Pcp -> pcp?.map(gateway.address, gateway.client, mapping.protocol,
-          mapping.internalPort, 0, 0, gateway.nonce)
-        is Gateway.Upnp ->
-          upnp.deletePortMapping(gateway.gateway, mapping.protocol, mapping.externalPort)
+  /** Removes [mapping] from [gateway]; true once the gateway confirmed it holds no such mapping. */
+  private suspend fun unmap(gateway: Gateway, mapping: PortMapping): Boolean = try {
+    when (gateway) {
+      is Gateway.NatPmp ->
+        natPmp.map(gateway.address, mapping.protocol, mapping.internalPort, 0, 0) != null
+      is Gateway.Pcp -> pcp?.map(gateway.address, gateway.client, mapping.protocol,
+        mapping.internalPort, 0, 0, gateway.nonce) != null
+      is Gateway.Upnp -> {
+        upnp.deletePortMapping(gateway.gateway, mapping.protocol, mapping.externalPort)
+        true
       }
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      log.d { "Removing a port mapping failed: ${e.describeWithoutUrls()}" }
     }
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: UpnpException) {
+    // NoSuchEntryInArray: the router holds no such mapping, as when it already lost it.
+    val gone = e.code == UPNP_NO_SUCH_ENTRY
+    if (!gone) log.d { "Removing a port mapping failed: ${e.describeWithoutUrls()}" }
+    gone
+  } catch (e: Exception) {
+    log.d { "Removing a port mapping failed: ${e.describeWithoutUrls()}" }
+    false
   }
 
   companion object {
@@ -479,6 +541,9 @@ internal class TorrentPortMapper(
 
     /** Gateways a layer's PCP request goes to, one after another. */
     private const val MAX_PCP_GATEWAYS = 4
+
+    /** The UPnP fault a router answers for a mapping it does not hold. */
+    private const val UPNP_NO_SUCH_ENTRY = 714
   }
 }
 

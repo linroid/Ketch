@@ -955,7 +955,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   address, and whether the address is public) what `KotlinTorrentEngine.reachability` reads.
   Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
   2 s, which the engine starts as its stopped window opens; UPnP tries other ports on 718 and
-  permanent leases on 725. `PortMappingTest` and
+  permanent leases on 725. `stop` logs once (info, the port and layer counts only) how many layers
+  confirmed the removal (UPnP fault 714, no such entry, counts) and, if not all, that the rest
+  forward the port until their lease ends, or until the router drops a permanent one.
+  `PortMappingTest` and
   `NatLayersTest` run them against scripted gateways on loopback, and `TorrentShutdownTest` an
   engine's (`portMapGateways`)
 - Reachability (`KotlinTorrentEngine.reachability`, `reachabilityStatus`, through the
