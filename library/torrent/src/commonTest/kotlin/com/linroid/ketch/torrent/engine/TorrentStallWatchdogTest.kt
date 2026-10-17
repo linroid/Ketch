@@ -239,6 +239,23 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun peerConnectingAfterARelaunch_isHeardAtOnce() {
+    // Every web seed found two pieces it could not serve, and was dropped; no peer is connected.
+    val due = runTo(121_000) {
+      signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
+    }
+    assertTrue(StallRecovery.RELAUNCH_WEB_SEEDS in due)
+    runTo(123_000) { signals(webSeeds = 1) }
+    assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
+    // A peer with those pieces connects while the seed asks again: nothing is missing now.
+    runTo(124_000) { signals(peers = 1, webSeeds = 1) }
+    val stall = assertNotNull(watchdog.stall)
+    assertEquals(TorrentStallReason.CHOKED, stall.reason)
+    assertEquals(0, stall.missingPieces)
+    assertEquals(emptyList(), stall.missingFileIds)
+  }
+
+  @Test
   fun waitingOnSpeedLimits_isNoStall() {
     // Payload trickles in, every second of it spent waiting on a speed limit.
     runTo(600_000) { time -> signals(payloadBytes = time / 100, throttledMs = time, peers = 1) }

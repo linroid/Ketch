@@ -780,8 +780,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   back after a gap once none of it can be thrown away, once until the next piece; time waiting on
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
   peer or running web seed has and every stopped one that refused pieces could not serve, and their
-  files, kept 10 s after the last source leaves or dropped web seeds start again; no peers, all
-  choking, whatever web seeds do; slow peers) the session publishes
+  files, kept 10 s after the last source leaves or dropped web seeds start again, unless more
+  peers connect; no peers, all choking, whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
   seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may
   be until its piece is stored (`WebSeedStats.unsettled`, `StallSignals`); a gap is told from any

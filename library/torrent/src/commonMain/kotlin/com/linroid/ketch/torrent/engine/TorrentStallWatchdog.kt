@@ -71,7 +71,8 @@ internal enum class StallRecovery {
  * help. Pieces missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS]
  * once the last one goes, so a peer that reconnects at once does not flip the reason, and those
  * missing when dropped web seeds start again stay missing for as long, while the seeds ask for
- * them once more. Web seeds never decide the reason otherwise: a stall stores nothing from them.
+ * them once more, unless more peers connect meanwhile. Web seeds never decide the reason
+ * otherwise: a stall stores nothing from them.
  *
  * Not thread-safe: one swarm loop calls it.
  */
@@ -102,8 +103,10 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var sourcedAt = Long.MIN_VALUE / 2
   private var sourcedMissing = 0
   private var sourcedFiles = emptyList<String>()
-  // When dropped web seeds were last started again, and what was missing then.
+  // When dropped web seeds were last started again, the peers connected and what was missing
+  // then.
   private var relaunchedAt = Long.MIN_VALUE / 2
+  private var relaunchPeers = 0
   private var relaunchMissing = 0
   private var relaunchFiles = emptyList<String>()
 
@@ -159,8 +162,9 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       missing = sourcedMissing
       missingFiles = sourcedFiles
     }
-    // Web seeds started again offer every piece until they find again what they cannot serve.
-    if (missing == 0 && now - relaunchedAt < SOURCE_GRACE_MS) {
+    // Web seeds started again offer every piece until they find again what they cannot serve; a
+    // peer that connected since may have those pieces, so it has its say at once.
+    if (missing == 0 && now - relaunchedAt < SOURCE_GRACE_MS && signals.peers <= relaunchPeers) {
       missing = relaunchMissing
       missingFiles = relaunchFiles
     }
@@ -213,6 +217,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       due += StallRecovery.RELAUNCH_WEB_SEEDS
       relaunchAt = now + RELAUNCH_MS
       relaunchedAt = now
+      relaunchPeers = signals.peers
       relaunchMissing = missing
       relaunchFiles = missingFiles
     }
@@ -312,7 +317,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
 
     /**
      * How long pieces missing while something was connected stay missing once nothing is, or once
-     * dropped web seeds start again.
+     * dropped web seeds start again and no more peers connect.
      */
     const val SOURCE_GRACE_MS = 10_000L
 

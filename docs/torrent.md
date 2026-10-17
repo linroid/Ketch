@@ -817,7 +817,8 @@ the most telling order:
   finish. A torrent whose files changed at its only web seed stops here, also once that seed was
   dropped. Pieces missing while a peer was connected stay missing for 10 seconds after the last
   one leaves, so a peer that reconnects at once does not change the reason, and so do those
-  missing when dropped web seeds start again, while they ask once more.
+  missing when dropped web seeds start again, while they ask once more, unless more peers connect
+  meanwhile.
 - **No peers**: no peer is connected, and no wanted piece is missing. A stalled download stores
   nothing from its web seeds either, so whether they are fetching or waiting to retry never
   changes the reason.
