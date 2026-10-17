@@ -10,6 +10,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
@@ -460,6 +461,28 @@ class IntakeStateTest {
     assertEquals(entry, session.torrentStage)
     assertEquals(setOf("0", "1"), entry.selectedFiles)
     assertEquals("Download 2 files · 2.0 KB", session.primaryLabel.load())
+  }
+
+  @Test
+  fun submit_streamWithVariants_downloadsTheBestWithoutPicking() = runTest {
+    val url = "https://example.com/video/master.m3u8"
+    val api = IntakeTestApi(check = { _, _ ->
+      ready(url).copy(
+        sourceType = "hls",
+        totalBytes = -1,
+        files = listOf(SourceFile("0", "1080p"), SourceFile("1", "720p")),
+        selectionMode = FileSelectionMode.SINGLE,
+      )
+    })
+    val session = session(api, IntakeRequest(url))
+    val entry = session.entries.single()
+
+    assertNull(session.torrentStage)
+    assertTrue(entry.files.isEmpty())
+    session.submit {}
+    runCurrent()
+
+    assertEquals(emptySet(), api.base.requests.single().selectedFileIds)
   }
 
   @Test

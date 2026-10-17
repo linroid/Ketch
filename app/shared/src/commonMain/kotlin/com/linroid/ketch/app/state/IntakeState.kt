@@ -16,6 +16,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
@@ -272,8 +273,14 @@ class IntakeEntry internal constructor(source: IntakeSource) {
       is IntakeSource.Range -> false
     }
 
-  /** The files of a torrent with several, once its file list arrived; otherwise empty. */
-  val files: List<SourceFile> get() = resolved?.files?.takeIf { it.size > 1 }.orEmpty()
+  /**
+   * The files of a torrent with several, once its file list arrived; otherwise empty. A stream's
+   * variants, a single choice, are not picked here: it downloads the best, and the inspector's
+   * Files tab switches to another.
+   */
+  val files: List<SourceFile>
+    get() = resolved?.takeIf { it.selectionMode == FileSelectionMode.MULTIPLE }?.files
+      ?.takeIf { it.size > 1 }.orEmpty()
 
   /** The link the row stands for: a range's first link, or a file's resolved `torrent:` id. */
   val url: String?
@@ -1777,7 +1784,7 @@ class IntakeSession internal constructor(
     }
     result.onSuccess { resolved ->
       entry.status = IntakeStatus.Ready(resolved)
-      if (resolved.files.size > 1 && entry.selectedFiles == null) {
+      if (entry.files.isNotEmpty() && entry.selectedFiles == null) {
         entry.selectedFiles = defaultTorrentSelection(resolved.files)
         // A torrent on its own goes straight to its files.
         if (entries.singleOrNull() === entry && torrentStage == null) torrentStage = entry

@@ -8,20 +8,29 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.SelectionPlan
+import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.media.MediaDownloadHelper
-import com.linroid.ketch.core.media.MediaPlan
+import com.linroid.ketch.core.media.MediaVariant
+import com.linroid.ketch.core.media.mediaVariantIds
+import com.linroid.ketch.core.media.mediaVariantNames
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
 
 /**
- * Downloads finite, unencrypted DASH streams into one file.
+ * Downloads finite, unencrypted DASH streams into one file: the representation the task selects
+ * (the highest bandwidth by default), with a separate audio adaptation set merged in.
  * Register through `Ketch(additionalSources = listOf(DashDownloadSource(httpEngine)))`.
  * Transfers share the supplied engine; closing this source does not close it.
  */
 class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
   override val type: String = "dash"
   override val stateSerializer: KSerializer<Unit> = Unit.serializer()
-  override val features: Set<String> = setOf(KetchFeatures.FINITE_DASH)
+  override val features: Set<String> = setOf(
+    KetchFeatures.FINITE_DASH,
+    KetchFeatures.FILE_SELECTION,
+    KetchFeatures.AWAIT_FILE_SELECTION,
+  )
   override val previousTypes: Set<String> = setOf("media")
   private val helper = MediaDownloadHelper(httpEngine, type)
 
@@ -31,20 +40,43 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val (url, headers) = input as ResolveInput.Url
-    return helper.resolve(url, plan(url, headers, config.proxy))
+    val stream = stream(url, headers, config.proxy)
+    val variants = variants(stream)
+    return helper.resolve(url, stream.plan(), variants, variants.firstOrNull()?.id)
   }
 
-  /** Media transfers restart from zero; no byte offset can identify a refreshed manifest part. */
+  override suspend fun planSelection(request: SelectionRequest<Unit>): SelectionPlan =
+    helper.planSelection(request)
+
+  /**
+   * Media transfers restart from zero; no byte offset can identify a refreshed manifest part. A
+   * new representation selected while it runs restarts it with that one.
+   */
   override suspend fun download(context: DownloadContext, state: Unit?) {
-    helper.download(context, plan(context.url, context.headers, context.config.proxy))
+    helper.downloadFollowingSelection(context) { selected ->
+      val stream = stream(context.url, context.headers, context.config.proxy)
+      val variants = variants(stream)
+      val chosen = helper.chosenVariant(context, selected, variants)
+      stream.plan(chosen?.let(variants::indexOf) ?: 0)
+    }
   }
 
-  private suspend fun plan(
+  private suspend fun stream(
     original: String,
     headers: Map<String, String>,
     proxy: Proxy,
-  ): MediaPlan {
+  ): DashStream {
     val manifest = helper.fetchManifest(original, headers, proxy)
-    return parseDash(manifest.text, manifest.url)
+    return parseDashStream(manifest.text, manifest.url)
+  }
+
+  private fun variants(stream: DashStream): List<MediaVariant> {
+    val names = mediaVariantNames(stream.variants.map { it.height }, stream.variants.map {
+      it.bandwidth
+    })
+    val ids = mediaVariantIds(stream.variants.map { it.key })
+    return stream.variants.mapIndexed { index, variant ->
+      MediaVariant(ids[index], names[index], variant.bandwidth, variant.metadata)
+    }
   }
 }
