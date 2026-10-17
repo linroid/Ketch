@@ -61,6 +61,35 @@ class ActiveConnectionsTest {
     assertEquals(ConnectionDirection.OUTGOING, connection.direction)
     assertNull(connection.peer)
     assertNull(connection.port)
+    assertNull(connection.closedAt)
     assertEquals(0, snapshot.total)
+    // Servers from before totals and closed connections.
+    assertNull(snapshot.receivedBytes)
+    assertNull(snapshot.sentBytes)
+    assertTrue(snapshot.closed.isEmpty())
+  }
+
+  @Test
+  fun snapshot_withTotalsAndClosedConnections_roundTrips() {
+    val closed = ActiveConnection(
+      id = 3,
+      taskId = "t",
+      source = "http",
+      host = "example.com",
+      downloadedBytes = 4096,
+      openedAt = Instant.parse("2026-10-01T14:29:00Z"),
+      closedAt = Instant.parse("2026-10-01T14:29:30Z"),
+    )
+    val snapshot = ActiveConnections(
+      sampledAt = Instant.parse("2026-10-01T14:30:00Z"),
+      receivedBytes = 10_000,
+      sentBytes = 20,
+      closed = listOf(closed),
+    )
+
+    val json = Json.encodeToString(ActiveConnections.serializer(), snapshot)
+
+    assertTrue("\"closedAt\":\"2026-10-01T14:29:30Z\"" in json, json)
+    assertEquals(snapshot, Json.decodeFromString(ActiveConnections.serializer(), json))
   }
 }
