@@ -268,7 +268,8 @@ internal class HttpDownloadSource(
   /**
    * Downloads segments via HTTP Range requests with dynamic
    * resegmentation support. Delegates the concurrent batch loop
-   * to [SegmentedDownloadHelper].
+   * to [SegmentedDownloadHelper], whose connections take over the
+   * remaining ranges of slower ones with requests of their own.
    */
   private suspend fun downloadSegments(
     context: DownloadContext,
@@ -284,7 +285,7 @@ internal class HttpDownloadSource(
     val engine = httpEngine.through(context.config.proxy)
     segmentHelper.downloadAll(
       context, segments, totalBytes, supportsRanges, requestedConnections,
-    ) { segment, onProgress ->
+    ) { lane ->
       val throttleLimiter = object : SpeedLimiter {
         override suspend fun acquire(bytes: Int) {
           context.throttle(bytes)
@@ -294,12 +295,12 @@ internal class HttpDownloadSource(
         engine, context.fileAccessor,
         throttleLimiter, SpeedLimiter.Unlimited, context.taskId, context.watchdog,
       )
-      // One connection per segment request; a complete segment sends none.
+      // One connection per range request; a range another connection already took sends none.
       val spec = httpConnectionSpec(TYPE, context.url, context.config.proxy)
-      val handle = if (segment.isComplete) ConnectionHandle.None else context.connections.open(spec)
+      val handle = if (lane.isComplete) ConnectionHandle.None else context.connections.open(spec)
       try {
         observeExchanges(handle, spec) {
-          downloader.download(context.url, segment, context.headers, handle, onProgress)
+          downloader.download(context.url, lane, context.headers, handle)
         }
       } finally {
         handle.close()
