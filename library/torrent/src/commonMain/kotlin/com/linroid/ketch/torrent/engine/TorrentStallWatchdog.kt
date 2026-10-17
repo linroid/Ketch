@@ -61,13 +61,13 @@ internal enum class StallRecovery {
  * [MAX_PIECE_MS]), counted from the last verified piece or from payload coming back after a gap,
  * as the gap was no slow piece, once nothing can throw that payload away any more and none was
  * meanwhile. It does so once until the next piece verifies, so payload that comes and goes never
- * keeps a stall from showing. Payload later thrown away is no payload: it takes back the checks that counted it,
- * newest first, but a gap is told from when any payload last arrived, so payload thrown away never
- * makes the next look back after one. Time spent waiting on speed limits counts as progress: a
- * slow limit is no stall. Recoveries start once it has lasted [RECOVER_AFTER_MS], each at most
- * once per its own cooldown, announcing to trackers less often each time it does not help. Pieces
- * missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS] once the last
- * one goes, so a peer that reconnects at once does not flip the reason.
+ * keeps a stall from showing. Payload later thrown away is no payload: it takes back the checks
+ * that counted it, newest first, but a gap is told from when any payload last arrived, so payload
+ * thrown away never makes the next look back after one. Time spent waiting on speed limits counts
+ * as progress: a slow limit is no stall. Recoveries start once it has lasted [RECOVER_AFTER_MS],
+ * each at most once per its own cooldown, announcing to trackers less often each time it does not
+ * help. Pieces missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS]
+ * once the last one goes, so a peer that reconnects at once does not flip the reason.
  *
  * Not thread-safe: one swarm loop calls it.
  */
