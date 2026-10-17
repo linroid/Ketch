@@ -210,10 +210,12 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
  * corrupt one or a dropped connection are kept and only the rest go back. [pieces] hands it
  * pieces nobody else fetches, except in the endgame. A piece it sends corrupt twice, or a file
  * it answers with an error that will not change (404, a different range), it no longer claims,
- * and fetches the rest; other failed requests back it off, doubling from [retryMs]. [MAX_FAILURES]
- * failed runs in a row, without a piece verified between them, drop it until it is started
- * again, as does having nothing left it can serve before it served anything. Only
- * [TorrentStorageException] escapes [run].
+ * and fetches the rest; other failed requests back it off, doubling from [retryMs]. A failure
+ * that may pass, such as a reset connection, a timeout or a busy server, first halves how many
+ * requests it sends at once, down to one, as a server or proxy may refuse that many; each run
+ * that works allows one more again. [MAX_FAILURES] failed runs in a row besides those, without a
+ * piece verified between them, drop it until it is started again, as does having nothing left it
+ * can serve before it served anything. Only [TorrentStorageException] escapes [run].
  *
  * One worker serves its seed for the whole transfer: [run] starts it again after it was
  * dropped, keeping what it learned, such as the pieces it sent corrupt.
@@ -242,10 +244,15 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private var refused = false
   // Pieces it sent corrupt once, also kept: a second time, the copy it has is not the torrent's.
   private val corrupted = mutableSetOf<Int>()
+  // Requests for other files a run sends at once, also kept.
+  private var parallel = PARALLEL_REQUESTS
 
   /** Fetches until the transfer cancels it or it is dropped; never twice at once. */
   suspend fun run() {
+    // Failed runs in a row, which set the backoff, and of those the ones that drop the seed: all
+    // but the ones that lowered its parallelism.
     var failures = 0
+    var strikes = 0
     try {
       while (true) {
         val claimed = pieces.claim()
@@ -287,10 +294,15 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         if (progressed) served = true
         if (failure == null) {
           failures = 0
+          strikes = 0
+          parallel = minOf(parallel + 1, PARALLEL_REQUESTS)
           continue
         }
         // A run that verified pieces before failing made progress.
-        if (progressed) failures = 0
+        if (progressed) {
+          failures = 0
+          strikes = 0
+        }
         failures++
         stats.failures.incrementAndFetch()
         disconnect()
@@ -309,7 +321,13 @@ internal class WebSeedWorker<P : WebSeedPiece>(
           val stale = failure is CorruptWebSeedPiece
           withContext(NonCancellable) { pieces.unavailable(unservable, stale) }
         }
-        if (failures >= MAX_FAILURES) {
+        // A failure that may pass sends fewer requests at once before it counts.
+        if (unservable.isEmpty() && failure !is CorruptWebSeedPiece && parallel > 1) {
+          parallel /= 2
+        } else {
+          strikes++
+        }
+        if (strikes >= MAX_FAILURES) {
           stats.dropped.incrementAndFetch()
           log.i {
             "Dropped web seed $label of $logLabel after $failures failures: " +
@@ -366,7 +384,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   /**
    * Fetches [run], storing each piece once its bytes are in and removing it from [run] once
    * given back; a corrupt piece or a failed request ends the run there. Once the first request
-   * is answered, those for the other files go out [PARALLEL_REQUESTS] at a time: one at a time, a
+   * is answered, those for the other files go out [parallel] at a time: one at a time, a
    * run of many small files spent most of its time waiting for answers, and on mirrors that
    * redirect each file, as archive.org does, for two of them per file. A mirror that fails sees
    * one request per run. What arrived for the pieces a failed run gives back unstored counts as
@@ -392,7 +410,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
       }
       val first = requests.firstOrNull() ?: return
       fetch(handle, first, run, arrived, received)
-      val slots = Semaphore(PARALLEL_REQUESTS)
+      val slots = Semaphore(parallel)
       coroutineScope {
         for (request in requests.drop(1)) launch {
           slots.withPermit { fetch(handle, request, run, arrived, received) }
@@ -521,10 +539,13 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   }
 
   companion object {
-    /** Failures in a row after which a web seed is dropped for the rest of the run. */
+    /**
+     * Failed runs in a row, besides those that lowered its parallelism, after which a web seed is
+     * dropped until it is started again.
+     */
     const val MAX_FAILURES = 5
 
-    /** Requests one seed runs at once, each for another file. */
+    /** The most requests one seed runs at once, each for another file. */
     const val PARALLEL_REQUESTS = 4
 
     private const val SOURCE = "torrent"

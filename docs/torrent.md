@@ -681,19 +681,21 @@ reachable peer. A magnet's metadata still comes from peers.
   the torrent name and the file's path, percent-encoded.
 - Each seed fetches runs of whole pieces no one else is fetching, up to 16 pieces or 4 MiB, with
   one range request per file a run spans, and no more than its share of the free pieces. Once the
-  first request of a run is answered, the others go out four at a time. Later pieces of a run only
-  use buffers that leave half the buffer limit free.
+  first request of a run is answered, the others go out up to four at a time. Later pieces of a
+  run only use buffers that leave half the buffer limit free.
 - Each piece is checked as it arrives, like a peer's: SHA-1 for v1, the piece layer for v2 and
   hybrid. BEP 47 padding files are never requested.
 - In the endgame a seed may fetch one piece a peer is fetching; the first verified copy wins.
 - A failed request or corrupt piece keeps the pieces stored before it and gives back the rest. A
   file the seed answers with 404, 410, 416 or another range than asked, and a piece it sends
   corrupt twice, it no longer fetches: the seed goes on with the rest of the torrent, as when a
-  mirror has since changed one file. Other failures back it off (2 seconds, doubling to a minute).
-  Five failed runs in a row without a verified piece drop it, as does having nothing left it can
-  serve before it served anything; a download that stalls starts dropped seeds again. Started
-  again, a seed asks once more for the files it lacked, but never for the pieces it sent corrupt,
-  and a seed left with only those is not started again.
+  mirror has since changed one file. Other failures back it off (2 seconds, doubling to a minute),
+  and those that may pass, such as a reset connection, first halve how many requests it sends at
+  once, down to one, as a server or proxy may refuse that many; each run that works allows one
+  more. Five further failed runs in a row without a verified piece drop it, as does having nothing
+  left it can serve before it served anything; a download that stalls starts dropped seeds again.
+  Started again, a seed asks once more for the files it lacked, but never for the pieces it sent
+  corrupt, and a seed left with only those is not started again.
 - Requests go through the source's HTTP engine with the system's proxy settings, count against the
   download limits, fail after 30 seconds without data, and show among the task's live connections
   as `HTTP`.

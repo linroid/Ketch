@@ -414,6 +414,25 @@ class TorrentWebSeedTest {
   }
 
   @Test
+  fun mirrorRefusingParallelRequests_isAskedOneFileAtATime() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        // A proxy in front of the mirror refuses a second connection while one is open.
+        val proxy = OneAtATime(MirrorEngine(mirrorFiles))
+        withStore(multiFile("http://mirror.test/pub")) { store, output ->
+          runSwarm(store, proxy)
+          assertTrue(store.completed())
+          for ((path, bytes) in parts) {
+            assertContentEquals(bytes, torrentFileSystem.read(output / path) { readByteArray() })
+          }
+          // Four requests at once, then two: each refusal halved them, without dropping the seed.
+          assertEquals(2, proxy.refused)
+        }
+      }
+    }
+  }
+
+  @Test
   fun missingFile_404_dropsTheSeedAndTheSwarmFails() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {

@@ -4,10 +4,12 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import okio.IOException
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
 
 /**
@@ -132,5 +134,35 @@ internal class Gate(private val engine: HttpEngine) : HttpEngine by engine {
     asked.complete(Unit)
     open.await()
     engine.download(url, range, headers, onData)
+  }
+}
+
+/**
+ * Refuses a request to [engine] with a network error while another is under way, as some proxies
+ * do, counting them in [refused]; each request it lets through takes a moment.
+ */
+@OptIn(ExperimentalAtomicApi::class)
+internal class OneAtATime(private val engine: HttpEngine) : HttpEngine by engine {
+  private val running = AtomicInt(0)
+  private val refusals = AtomicInt(0)
+  val refused: Int get() = refusals.load()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    if (running.incrementAndFetch() > 1) {
+      running.decrementAndFetch()
+      refusals.incrementAndFetch()
+      throw KetchError.Network()
+    }
+    try {
+      delay(100)
+      engine.download(url, range, headers, onData)
+    } finally {
+      running.decrementAndFetch()
+    }
   }
 }
