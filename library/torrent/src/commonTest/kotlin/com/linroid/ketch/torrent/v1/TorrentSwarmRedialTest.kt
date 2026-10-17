@@ -98,7 +98,7 @@ class TorrentSwarmRedialTest {
     // minutes after it dropped, later on a loaded machine, which handles each refusal a step or
     // more late.
     while (rig.dials.load() - dropped < 10 && rig.clock.load() < 3_600_000) {
-      rig.advanceTo(rig.clock.load() + 60_000)
+      rig.advanceTo(rig.clock.load() + 60_000, step = 60_000)
     }
     val tenth = rig.clock.load()
     // Then it is given up: never dialed five minutes later, and forgotten.
