@@ -104,15 +104,22 @@ interface ConnectionHandle {
   }
 }
 
-/** Every connection open at [sampledAt], with rates, and how many were not tracked. */
+/**
+ * Every connection open at [sampledAt], with rates, and how many were not tracked; the
+ * connections that closed lately, newest first; and the bytes every connection moved since the
+ * registry started.
+ */
 internal class ConnectionSample(
   val sampledAt: Instant,
   val connections: List<ActiveConnection>,
   val dropped: Long,
+  val closed: List<ActiveConnection> = emptyList(),
+  val receivedBytes: Long = 0,
+  val sentBytes: Long = 0,
 ) {
   /**
-   * At most [limit] connections, the fastest by combined rate, ordered by when they opened;
-   * the totals cover every connection.
+   * At most [limit] connections, the fastest by combined rate, ordered by when they opened, and
+   * at most [limit] of the latest closed ones; the totals cover every connection.
    */
   fun snapshot(limit: Int): ActiveConnections {
     val chosen = if (connections.size <= limit) {
@@ -127,6 +134,9 @@ internal class ConnectionSample(
       downloadBps = connections.sumOf { it.downloadBps },
       uploadBps = connections.sumOf { it.uploadBps },
       dropped = dropped,
+      receivedBytes = receivedBytes,
+      sentBytes = sentBytes,
+      closed = if (closed.size <= limit) closed else closed.take(limit),
     )
   }
 
@@ -142,8 +152,11 @@ internal class ConnectionSample(
  * atomic add per chunk; [samples] reads the counters once per [interval], only while collected.
  *
  * Holds at most [maxRegistered] connections at once: past that, [ConnectionReporter.open]
- * returns [ConnectionHandle.None] and counts the connection as dropped. [countryOf] names each
- * connection's country as it is sampled.
+ * returns a handle that only adds to the totals and counts the connection as dropped.
+ * [countryOf] names each connection's country as it is sampled.
+ *
+ * A connection that closes adds its bytes to the registry's totals, so they never drop, and is
+ * kept with its final counts among the last [maxClosed] closed ones for [closedRetention].
  */
 internal class ConnectionRegistry(
   scope: CoroutineScope,
@@ -152,11 +165,39 @@ internal class ConnectionRegistry(
   private val maxRegistered: Int = MAX_REGISTERED,
   private val interval: Duration = 1.seconds,
   private val countryOf: (String) -> String? = { null },
+  private val maxClosed: Int = MAX_CLOSED,
+  private val closedRetention: Duration = CLOSED_RETENTION,
 ) {
   private val log = KetchLogger("Connections")
   private val nextId = AtomicLong(0)
   private val live = AtomicReference<Map<Long, Entry>>(emptyMap())
   private val dropped = AtomicLong(0)
+
+  /** The bytes of every connection that closed, and of those never tracked. */
+  private val closedReceived = AtomicLong(0)
+  private val closedSent = AtomicLong(0)
+
+  /** The handle of connections past [maxRegistered]: their bytes still count in the totals. */
+  private val untracked = object : ConnectionHandle {
+    override fun received(bytes: Int) {
+      if (bytes > 0) closedReceived.addAndFetch(bytes.toLong())
+    }
+
+    override fun sent(bytes: Int) {
+      if (bytes > 0) closedSent.addAndFetch(bytes.toLong())
+    }
+
+    override fun describe(spec: ConnectionSpec) {}
+
+    override fun close() {}
+  }
+
+  /** The last [maxClosed] connections that closed, newest first. */
+  private val recent = AtomicReference<List<Closed>>(emptyList())
+
+  /** The totals the last sample reported, which later ones never go below. */
+  @Volatile private var lastReceived = 0L
+  @Volatile private var lastSent = 0L
   private val openedSinceLog = AtomicLong(0)
   private val closedSinceLog = AtomicLong(0)
   private val droppedSinceLog = AtomicLong(0)
@@ -222,7 +263,7 @@ internal class ConnectionRegistry(
         dropped.addAndFetch(1)
         droppedSinceLog.addAndFetch(1)
         logCounts()
-        return ConnectionHandle.None
+        return untracked
       }
       if (live.compareAndSet(current, current + (entry.id to entry))) break
     }
@@ -237,8 +278,33 @@ internal class ConnectionRegistry(
       if (entry.id !in current) return
       if (live.compareAndSet(current, current - entry.id)) break
     }
+    // Added once it left the live map, so a sample between the two counts it at most once; the
+    // sampler keeps the totals from dropping meanwhile.
+    val received = entry.receivedBytes.load()
+    val sent = entry.sentBytes.load()
+    closedReceived.addAndFetch(received)
+    closedSent.addAndFetch(sent)
+    if (maxClosed > 0) {
+      val closed = Closed(entry.connection(received, sent, clock.now()), timeSource.markNow())
+      while (true) {
+        val current = recent.load()
+        val next = (listOf(closed) + current).take(maxClosed)
+        if (recent.compareAndSet(current, next)) break
+      }
+    }
     closedSinceLog.addAndFetch(1)
     logCounts()
+  }
+
+  /** The closed connections kept, dropping those closed more than [closedRetention] ago. */
+  private fun recentClosed(now: ComparableTimeMark): List<ActiveConnection> {
+    while (true) {
+      val current = recent.load()
+      val kept = current.filter { now - it.mark < closedRetention }
+      if (kept.size == current.size || recent.compareAndSet(current, kept)) {
+        return kept.map { it.connection }
+      }
+    }
   }
 
   /** Logs the counts of the last minute, at most once a minute, when something happens. */
@@ -293,7 +359,40 @@ internal class ConnectionRegistry(
     fun record(now: ComparableTimeMark, received: Long, sent: Long) {
       points = (points + Point(now, received, sent)).takeLast(HISTORY)
     }
+
+    /** What is known about it, with the counters given and rates of [downloadBps]/[uploadBps]. */
+    fun connection(
+      received: Long,
+      sent: Long,
+      closedAt: Instant? = null,
+      downloadBps: Long = 0,
+      uploadBps: Long = 0,
+    ): ActiveConnection {
+      val spec = spec
+      return ActiveConnection(
+        id = id,
+        taskId = taskId,
+        source = spec.source,
+        protocol = spec.protocol,
+        secure = spec.secure,
+        direction = spec.direction,
+        host = spec.host,
+        port = spec.port,
+        route = spec.route,
+        downloadBps = downloadBps,
+        uploadBps = uploadBps,
+        downloadedBytes = received,
+        uploadedBytes = sent,
+        openedAt = openedAt,
+        peer = spec.peer,
+        country = countryOf(spec.host),
+        closedAt = closedAt,
+      )
+    }
   }
+
+  /** A connection that closed at [mark], as it was then. */
+  private class Closed(val connection: ActiveConnection, val mark: ComparableTimeMark)
 
   /** The counters of one connection at one sample. */
   private class Point(val mark: ComparableTimeMark, val received: Long, val sent: Long)
@@ -328,35 +427,39 @@ internal class ConnectionRegistry(
    */
   private fun sample(): ConnectionSample {
     val now = timeSource.markNow()
+    // Read before the live connections, so one closing meanwhile is counted at most once.
+    var totalReceived = closedReceived.load()
+    var totalSent = closedSent.load()
     val entries = live.load()
     val connections = ArrayList<ActiveConnection>(entries.size)
     for (entry in entries.values) {
       val received = entry.receivedBytes.load()
       val sent = entry.sentBytes.load()
+      totalReceived += received
+      totalSent += sent
       val base = entry.base(now) ?: Point(entry.openedMark, 0, 0)
       val elapsedMs = (now - base.mark).inWholeMilliseconds
       entry.record(now, received, sent)
-      val spec = entry.spec
-      connections += ActiveConnection(
-        id = entry.id,
-        taskId = entry.taskId,
-        source = spec.source,
-        protocol = spec.protocol,
-        secure = spec.secure,
-        direction = spec.direction,
-        host = spec.host,
-        port = spec.port,
-        route = spec.route,
+      connections += entry.connection(
+        received = received,
+        sent = sent,
         downloadBps = rate(received - base.received, elapsedMs),
         uploadBps = rate(sent - base.sent, elapsedMs),
-        downloadedBytes = received,
-        uploadedBytes = sent,
-        openedAt = entry.openedAt,
-        peer = spec.peer,
-        country = countryOf(spec.host),
       )
     }
-    return ConnectionSample(clock.now(), connections, dropped.load())
+    // A connection that left the live map but has not added its bytes yet is missed until the
+    // next sample; the totals never go back meanwhile.
+    totalReceived = maxOf(totalReceived, lastReceived).also { lastReceived = it }
+    totalSent = maxOf(totalSent, lastSent).also { lastSent = it }
+    return ConnectionSample(
+      sampledAt = clock.now(),
+      connections = connections,
+      dropped = dropped.load(),
+      // One that closed since the live connections were read is listed as open until next time.
+      closed = recentClosed(now).filter { it.id !in entries },
+      receivedBytes = totalReceived,
+      sentBytes = totalSent,
+    )
   }
 
   private fun rate(bytes: Long, elapsedMs: Long): Long =
@@ -365,6 +468,12 @@ internal class ConnectionRegistry(
   companion object {
     /** The most connections one instance tracks at once. */
     const val MAX_REGISTERED: Int = 4096
+
+    /** The most closed connections one instance keeps. */
+    const val MAX_CLOSED: Int = 256
+
+    /** How long one instance keeps a closed connection. */
+    val CLOSED_RETENTION: Duration = 10.minutes
 
     private const val HISTORY = 2
     private val LOG_INTERVAL = 1.minutes

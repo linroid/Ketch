@@ -4,7 +4,6 @@ import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.Proxy
-import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionRegistry
 import com.linroid.ketch.core.engine.ConnectionSample
 import com.linroid.ketch.core.engine.ConnectionSpec
@@ -20,7 +19,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -94,11 +92,17 @@ class ConnectionRegistryTest {
         connection(id = 4, openedAt = 0, down = 5),
       ),
       dropped = 3,
+      closed = listOf(connection(id = 9, openedAt = 0), connection(id = 8, openedAt = 0)),
+      receivedBytes = 7_000,
+      sentBytes = 900,
     )
 
-    val snapshot = sample.snapshot(limit = 2)
+    val snapshot = sample.snapshot(limit = 1)
 
-    assertEquals(listOf(2L, 3L), snapshot.connections.map { it.id })
+    assertEquals(listOf(2L, 3L), sample.snapshot(limit = 2).connections.map { it.id })
+    assertEquals(listOf(9L), snapshot.closed.map { it.id })
+    assertEquals(7_000L, snapshot.receivedBytes)
+    assertEquals(900L, snapshot.sentBytes)
     assertEquals(4, snapshot.total)
     assertEquals(515L, snapshot.downloadBps)
     assertEquals(2500L, snapshot.uploadBps)
@@ -141,20 +145,28 @@ class ConnectionRegistryTest {
   }
 
   @Test
-  fun open_pastMaximum_countsDroppedAndReturnsNoOpHandle() = runTest {
+  fun open_pastMaximum_countsDroppedAndOnlyItsBytes() = runTest {
     val registry = registry(maxRegistered = 2)
     val reporter = registry.reporter("task")
     val first = reporter.open(spec)
-    reporter.open(spec)
+    val second = reporter.open(spec)
 
-    assertSame(ConnectionHandle.None, reporter.open(spec))
+    val untracked = reporter.open(spec)
+    untracked.received(700)
+    untracked.sent(30)
+    untracked.close()
     first.close()
     val samples = collectSamples(registry)
     runCurrent()
 
     assertEquals(1, samples.last().connections.size)
     assertEquals(1L, samples.last().dropped)
-    assertFalse(reporter.open(spec) === ConnectionHandle.None)
+    // Never listed, open or closed, yet in the totals.
+    assertEquals(listOf(1L), samples.last().closed.map { it.id })
+    assertEquals(700L, samples.last().receivedBytes)
+    assertEquals(30L, samples.last().sentBytes)
+    assertTrue(reporter.open(spec) !== untracked)
+    second.close()
   }
 
   @Test
@@ -266,6 +278,99 @@ class ConnectionRegistryTest {
   }
 
   @Test
+  fun totals_keepTheBytesOfClosedConnections() = runTest {
+    val registry = registry()
+    val reporter = registry.reporter("task")
+    val first = reporter.open(spec)
+    first.received(1000)
+    first.sent(200)
+    val samples = collectSamples(registry)
+    runCurrent()
+    assertEquals(1000L, samples.last().receivedBytes)
+
+    first.close()
+    val second = reporter.open(spec.copy(host = "mirror.example.com"))
+    second.received(500)
+    tick()
+
+    assertEquals(1500L, samples.last().receivedBytes)
+    assertEquals(200L, samples.last().sentBytes)
+    second.close()
+    tick()
+    val last = samples.last()
+    assertEquals(1500L, last.receivedBytes)
+    assertTrue(last.connections.isEmpty())
+    assertEquals(samples.map { it.receivedBytes }.sorted(), samples.map { it.receivedBytes })
+  }
+
+  @Test
+  fun closed_keepsFinalCountsAndWhenItClosed_newestFirst() = runTest {
+    val registry = registry()
+    val reporter = registry.reporter("task")
+    val first = reporter.open(spec)
+    first.received(1000)
+    advanceTimeBy(3.seconds)
+    first.close()
+    reporter.open(spec.copy(host = "mirror.example.com")).close()
+
+    val snapshot = registry.snapshots(10).first()
+
+    assertTrue(snapshot.connections.isEmpty())
+    assertEquals(listOf("mirror.example.com", "cdn.example.com"), snapshot.closed.map { it.host })
+    val closed = snapshot.closed.last()
+    assertEquals(FixedClock.now(), closed.closedAt)
+    assertEquals(1000L, closed.downloadedBytes)
+    assertEquals(0L, closed.downloadBps)
+    assertEquals(1000L, snapshot.receivedBytes)
+  }
+
+  @Test
+  fun closed_keepsOnlyTheLatest() = runTest {
+    val registry = registry(maxClosed = 3)
+    val reporter = registry.reporter("task")
+    repeat(5) { reporter.open(spec).close() }
+
+    val snapshot = registry.snapshots(10).first()
+
+    assertEquals(listOf(5L, 4L, 3L), snapshot.closed.map { it.id })
+    assertEquals(listOf(5L, 4L), registry.snapshots(2).first().closed.map { it.id })
+  }
+
+  @Test
+  fun closed_expireAfterTheRetention() = runTest {
+    val registry = registry()
+    val reporter = registry.reporter("task")
+    reporter.open(spec).also { it.received(100) }.close()
+    advanceTimeBy(ConnectionRegistry.CLOSED_RETENTION - 1.seconds)
+    reporter.open(spec).close()
+
+    assertEquals(listOf(2L, 1L), registry.snapshots(10).first().closed.map { it.id })
+    advanceTimeBy(2.seconds)
+    val later = registry.snapshots(10).first()
+    assertEquals(listOf(2L), later.closed.map { it.id })
+    // Its bytes stay in the totals.
+    assertEquals(100L, later.receivedBytes)
+    advanceTimeBy(ConnectionRegistry.CLOSED_RETENTION)
+    assertTrue(registry.snapshots(10).first().closed.isEmpty())
+  }
+
+  @Test
+  fun snapshots_idleWithClosedConnections_areNotSentAgain() = runTest {
+    val registry = registry()
+    val reporter = registry.reporter("task")
+    reporter.open(spec).also { it.received(100) }.close()
+    reporter.open(spec)
+    val snapshots = mutableListOf<ActiveConnections>()
+    backgroundScope.launch { registry.snapshots(10).collect { snapshots += it } }
+    runCurrent()
+
+    repeat(5) { tick() }
+
+    assertEquals(1, snapshots.size)
+    assertEquals(1, snapshots.single().closed.size)
+  }
+
+  @Test
   fun httpConnectionSpec_usesUrlHostPortAndProxyRoute() {
     val direct = httpConnectionSpec("http", "https://User:pw@CDN.Example.com/a", Proxy.Direct)
     assertEquals("cdn.example.com", direct.host)
@@ -294,13 +399,16 @@ class ConnectionRegistryTest {
     assertTrue("http" in spec.toString())
   }
 
-  private fun TestScope.registry(maxRegistered: Int = ConnectionRegistry.MAX_REGISTERED) =
-    ConnectionRegistry(
-      scope = backgroundScope,
-      clock = FixedClock,
-      timeSource = testScheduler.timeSource,
-      maxRegistered = maxRegistered,
-    )
+  private fun TestScope.registry(
+    maxRegistered: Int = ConnectionRegistry.MAX_REGISTERED,
+    maxClosed: Int = ConnectionRegistry.MAX_CLOSED,
+  ) = ConnectionRegistry(
+    scope = backgroundScope,
+    clock = FixedClock,
+    timeSource = testScheduler.timeSource,
+    maxRegistered = maxRegistered,
+    maxClosed = maxClosed,
+  )
 
   private fun TestScope.collectSamples(registry: ConnectionRegistry): List<ConnectionSample> {
     val samples = mutableListOf<ConnectionSample>()

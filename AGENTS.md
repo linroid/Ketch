@@ -479,7 +479,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   with `UnsupportedOperationException` when collected. `limit` must be in 1..1024 (default 256): a
   snapshot keeps the fastest connections, ordered by when they opened, while `total`,
   `downloadBps` and `uploadBps` cover all of them
-- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`). Sources open
+- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`, their bytes
+  still in the totals). Sources open
   a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
   seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
   `close` close what a source leaked. Its sampler reads the counters once a second, rates over
@@ -488,6 +489,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   another (a one-shot `GET /api/connections` included) measures from them; one with nothing
   recent to measure from notes the counters and sends its first sample a second later, so an idle
   connection reads 0 rather than its average since it opened
+- Totals and closed connections: a connection that closes adds its bytes to the registry's
+  counters, so `ActiveConnections.receivedBytes`/`sentBytes` cover every connection since the
+  engine started and never drop (the sampler never reports less than it did), and joins
+  `ActiveConnections.closed`, newest first, with `ActiveConnection.closedAt`, its final counts and
+  no rates: the last `ConnectionRegistry.MAX_CLOSED` (256) for `CLOSED_RETENTION` (10 minutes),
+  at most `limit` per snapshot. A connection still listed as open is left out of `closed`.
+  Closed entries never change, so idle repeats stay deduplicated; their expiry is a change.
+  Older servers send neither (`null` totals, an empty list), and the server routes and
+  `RemoteKetch` pass both through unchanged
 - Countries: `ActiveConnection.country` is the ISO code an engine given a `CountryLookup` names
   for the host, listed as `KetchFeatures.COUNTRIES` (`net.countries`) with
   `controller(CountryDatabase)`. `DbIpCountryDatabase` (desktop app, Android app, `ketch server`)
@@ -1389,7 +1399,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and phones show two-line rows. Chips pick a source by its commonest protocol family
   (`sourceFilters`) and the field searches endpoints, tasks, protocols, peer clients and devices
   (`matching`). Each row leads with ↓, ↑, both or a dot, and its speeds are drawn in the traffic
-  colors, so direction never rests on color alone. A table row shows every detail in a hover card
+  colors, so direction never rests on color alone. The header adds what the devices received and
+  sent in all once one reports totals (`headerSummary`), and while closed connections are known
+  an Open / Closed / All switch (`ConnectionStatus`, `withStatus`; Open by default, not saved)
+  sits before the chips, whose counts follow it. Closed rows (`ConnectionRow.closed`,
+  `ConnectionCell.closedAgo`, from their device's clock, plus `LocalClosedSince`, the time since
+  the snapshot arrived, ticking each second, as devices send no idle repeats) are dimmed and say
+  how long ago they closed in place of the speeds (`closedAgoText`); their Open column and sort
+  are how long they were open, and their details add Closed and Was open. A table row shows every
+  detail in a hover card
   (`KetchHoverCard`, `ConnectionDetails`; long-press on touch, and keyboard focus on the task
   link) and only its task cell shows the
   task, on its Connections tab for HTTP and FTP; a list row opens its details when tapped, with

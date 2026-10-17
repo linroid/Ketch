@@ -31,4 +31,11 @@
   <plurals name="connections_more">
     <item quantity="other">另有 %1$d 個較慢的連線未列出</item>
   </plurals>
+  <string name="connections_status_open">使用中</string>
+  <string name="connections_status_closed">已關閉</string>
+  <string name="connections_closed_ago">%1$s前</string>
+  <string name="connections_row_closed">%1$s前關閉</string>
+  <string name="connections_detail_was_open">持續了</string>
+  <string name="connections_total_received">已接收 %1$s</string>
+  <string name="connections_total_sent">已傳送 %1$s</string>
 </resources>

@@ -60,4 +60,16 @@
   <string name="connections_countries_failed">Couldn't get the country database: %1$s</string>
   <!-- The attribution the database's licence (CC BY 4.0) asks for. -->
   <string name="connections_countries_attribution">IP geolocation by DB-IP (db-ip.com)</string>
+  <!-- The switch beside the protocol chips: connections still open, ones that closed lately, or both. -->
+  <string name="connections_status_open">Open</string>
+  <string name="connections_status_closed">Closed</string>
+  <!-- In a closed connection's details, after "Closed": how long ago it closed, such as "2m 5s ago". -->
+  <string name="connections_closed_ago">%1$s ago</string>
+  <!-- A closed connection's row, in place of its speeds: how long ago it closed. -->
+  <string name="connections_row_closed">Closed %1$s ago</string>
+  <!-- In a closed connection's details: how long it was open. -->
+  <string name="connections_detail_was_open">Was open</string>
+  <!-- After the page's summary: bytes every connection received and sent since the device started. -->
+  <string name="connections_total_received">%1$s received</string>
+  <string name="connections_total_sent">%1$s sent</string>
 </resources>

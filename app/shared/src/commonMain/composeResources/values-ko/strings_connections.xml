@@ -31,4 +31,11 @@
   <plurals name="connections_more">
     <item quantity="other">더 느린 연결 %1$d개는 표시되지 않습니다</item>
   </plurals>
+  <string name="connections_status_open">열림</string>
+  <string name="connections_status_closed">닫힘</string>
+  <string name="connections_closed_ago">%1$s 전</string>
+  <string name="connections_row_closed">%1$s 전에 닫힘</string>
+  <string name="connections_detail_was_open">연결되어 있던 시간</string>
+  <string name="connections_total_received">받음 %1$s</string>
+  <string name="connections_total_sent">보냄 %1$s</string>
 </resources>
