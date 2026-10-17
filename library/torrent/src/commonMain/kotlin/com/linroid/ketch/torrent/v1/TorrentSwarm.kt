@@ -685,7 +685,8 @@ internal class TorrentSwarm(
             val alias = result.alias
             if (failure is DuplicatePeerException) {
               // The connection kept to the peer dials it again once it closes, unless it closed
-              // first. Until then, or until forgotten, it is given up on.
+              // first. Until then, or until forgotten 5 minutes from now, it is given up on.
+              if (!result.incoming && endpoint !in pending) attemptedAt[endpoint] = now()
               log.v { "Peer $endpoint for $logLabel is connected over another connection" }
             } else if (result.incoming && alias != null) {
               // It listens where we dialed it too, and was kept over that dial.

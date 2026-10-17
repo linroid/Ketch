@@ -835,8 +835,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the other reaches it on (`TorrentAdvertisedPort.portFor`, also the BEP 10 `p` it sends): the
   listen port for a peer at a local address, which dials the address local discovery announces, else
   the port a router maps, so both ends agree while a router maps another. The endpoint of the
-  connection closed is given up until found again 5 minutes later (v1 `DuplicatePeerException`,
-  `TorrentV2Candidates.duplicate`)
+  connection closed is given up until found again 5 minutes after the close (v1
+  `DuplicatePeerException`, `TorrentV2Candidates.duplicate`)
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
   built directly in tests never reach the router): `TorrentPortMapper` maps through every NAT

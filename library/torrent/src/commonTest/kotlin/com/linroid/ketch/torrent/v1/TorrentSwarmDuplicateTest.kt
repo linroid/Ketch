@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.v1
 
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
@@ -114,6 +115,52 @@ class TorrentSwarmDuplicateTest {
     theirs.close()
   }
 
+  @Test
+  fun displacedDial_isNotDialedAgainForFiveMinutesFromItsClose() = swarmTest(
+    complete = true,
+  ) { rig ->
+    val peers = Channel<PeerEndpoint>(2)
+    peers.send(rig.listener.local)
+    val incoming = Channel<TorrentConnection>(1)
+    val dialedKept = CompletableDeferred<PeerWire>()
+    val server = launch { answer(rig.listener.accept(), dialedKept, CompletableDeferred()) }
+    // A seed keeps a leecher connected however long it takes nothing. We listen on a port above
+    // the leecher's, so both keep the connection it dials.
+    val swarm = launch {
+      rig.swarm(listenPortFor = { it.port + 1 },
+        uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION).run(peers, incoming)
+    }
+    val outgoing = dialedKept.await()
+    // Longer than an endpoint stays known after its last dial.
+    rig.advance(360_000)
+    val ours = rig.network.transport.listen(PeerEndpoint("127.0.0.1", 0))
+    val theirs = try {
+      val client = rig.network.transport.connect(ours.local)
+      incoming.send(ours.accept())
+      client
+    } finally {
+      ours.close()
+    }
+    val wire = PeerWire(theirs, metadata)
+    wire.handshake(PeerHandshake(metadata.infoHash, peerId, false, false))
+    assertTrue(wire.read() is PeerMessage.Bitfield)
+    assertNotNull(withTimeoutOrNull(5_000) {
+      try {
+        while (true) outgoing.read()
+      } catch (_: IOException) {
+      }
+    }, "The connection we dialed was kept too")
+    // Found again a minute after that connection closed, it is still given up on.
+    val dials = rig.network.dials.load()
+    rig.advance(60_000)
+    peers.send(rig.listener.local)
+    delay(500)
+    assertEquals(dials, rig.network.dials.load())
+    swarm.cancelAndJoin()
+    server.cancelAndJoin()
+    theirs.close()
+  }
+
   /**
    * Answers a connection as the peer; the first one whose handshake the swarm follows up is
    * [kept], one it closes completes [closed].
@@ -147,8 +194,17 @@ class TorrentSwarmDuplicateTest {
   ) {
     private val clock = AtomicLong(0)
 
-    fun swarm(listenPortFor: (PeerEndpoint) -> Int = { 0 }) = TorrentSwarm(store, network,
-      TorrentBufferBudget(1024 * 1024), nowMs = { clock.load() }, listenPortFor = listenPortFor)
+    fun swarm(
+      listenPortFor: (PeerEndpoint) -> Int = { 0 },
+      uploadPolicy: TorrentUploadPolicy = TorrentUploadPolicy.DISABLED,
+    ) = TorrentSwarm(store, network, TorrentBufferBudget(1024 * 1024),
+      uploadPolicy = { uploadPolicy }, nowMs = { clock.load() }, listenPortFor = listenPortFor)
+
+    /** Moves the swarm's clock [ms] on and lets its loop look. */
+    suspend fun advance(ms: Long) {
+      clock.addAndFetch(ms)
+      delay(300)
+    }
 
     /** The closed connection's endpoint is not retried, though a failed one would be by now. */
     suspend fun assertNotDialedAgain() {
@@ -183,13 +239,21 @@ class TorrentSwarmDuplicateTest {
     }
   }
 
-  private fun swarmTest(body: suspend CoroutineScope.(Rig) -> Unit) = runTest {
+  /** Runs [body] with an empty store, or a [complete] one. */
+  private fun swarmTest(
+    complete: Boolean = false,
+    body: suspend CoroutineScope.(Rig) -> Unit,
+  ) = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(20_000) {
         coroutineScope {
           val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
             "ketch-duplicate-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
           val store = TorrentPieceStore(metadata, root / "data", emptySet(), "duplicate")
+          if (complete) {
+            store.initialize()
+            store.commit(0, payload)
+          }
           val transport = createTorrentNetwork()
           val listener = transport.listen(PeerEndpoint("127.0.0.1", 0))
           try {

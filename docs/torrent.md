@@ -640,7 +640,7 @@ This section describes the engine's protocol behavior for people who debug swarm
   for others, so they agree while a router forwards another port. Peers are told apart by the ID
   they claim and their host; addresses on this machine and its local networks count as one host,
   while a public host claiming another peer's ID is a different peer. The address of the connection
-  closed is not dialed again for five minutes.
+  closed is not dialed again for five minutes after the close.
 
 ### Encryption details
 
