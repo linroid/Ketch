@@ -152,8 +152,8 @@ internal class ConnectionSample(
  * atomic add per chunk; [samples] reads the counters once per [interval], only while collected.
  *
  * Holds at most [maxRegistered] connections at once: past that, [ConnectionReporter.open]
- * returns [ConnectionHandle.None] and counts the connection as dropped. [countryOf] names each
- * connection's country as it is sampled.
+ * returns a handle that only adds to the totals and counts the connection as dropped.
+ * [countryOf] names each connection's country as it is sampled.
  *
  * A connection that closes adds its bytes to the registry's totals, so they never drop, and is
  * kept with its final counts among the last [maxClosed] closed ones for [closedRetention].
@@ -173,9 +173,24 @@ internal class ConnectionRegistry(
   private val live = AtomicReference<Map<Long, Entry>>(emptyMap())
   private val dropped = AtomicLong(0)
 
-  /** The bytes of every connection that closed. */
+  /** The bytes of every connection that closed, and of those never tracked. */
   private val closedReceived = AtomicLong(0)
   private val closedSent = AtomicLong(0)
+
+  /** The handle of connections past [maxRegistered]: their bytes still count in the totals. */
+  private val untracked = object : ConnectionHandle {
+    override fun received(bytes: Int) {
+      if (bytes > 0) closedReceived.addAndFetch(bytes.toLong())
+    }
+
+    override fun sent(bytes: Int) {
+      if (bytes > 0) closedSent.addAndFetch(bytes.toLong())
+    }
+
+    override fun describe(spec: ConnectionSpec) {}
+
+    override fun close() {}
+  }
 
   /** The last [maxClosed] connections that closed, newest first. */
   private val recent = AtomicReference<List<Closed>>(emptyList())
@@ -248,7 +263,7 @@ internal class ConnectionRegistry(
         dropped.addAndFetch(1)
         droppedSinceLog.addAndFetch(1)
         logCounts()
-        return ConnectionHandle.None
+        return untracked
       }
       if (live.compareAndSet(current, current + (entry.id to entry))) break
     }

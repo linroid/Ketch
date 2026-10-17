@@ -4,7 +4,6 @@ import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.Proxy
-import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionRegistry
 import com.linroid.ketch.core.engine.ConnectionSample
 import com.linroid.ketch.core.engine.ConnectionSpec
@@ -20,7 +19,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -147,20 +145,28 @@ class ConnectionRegistryTest {
   }
 
   @Test
-  fun open_pastMaximum_countsDroppedAndReturnsNoOpHandle() = runTest {
+  fun open_pastMaximum_countsDroppedAndOnlyItsBytes() = runTest {
     val registry = registry(maxRegistered = 2)
     val reporter = registry.reporter("task")
     val first = reporter.open(spec)
-    reporter.open(spec)
+    val second = reporter.open(spec)
 
-    assertSame(ConnectionHandle.None, reporter.open(spec))
+    val untracked = reporter.open(spec)
+    untracked.received(700)
+    untracked.sent(30)
+    untracked.close()
     first.close()
     val samples = collectSamples(registry)
     runCurrent()
 
     assertEquals(1, samples.last().connections.size)
     assertEquals(1L, samples.last().dropped)
-    assertFalse(reporter.open(spec) === ConnectionHandle.None)
+    // Never listed, open or closed, yet in the totals.
+    assertEquals(listOf(1L), samples.last().closed.map { it.id })
+    assertEquals(700L, samples.last().receivedBytes)
+    assertEquals(30L, samples.last().sentBytes)
+    assertTrue(reporter.open(spec) !== untracked)
+    second.close()
   }
 
   @Test

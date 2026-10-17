@@ -111,7 +111,10 @@ internal fun ConnectionDetails(
       ),
     )
     if (row.closed) {
-      Detail(Res.string.connections_status_closed.text(), closedAgoText(row, detail = true).resolve())
+      Detail(
+        Res.string.connections_status_closed.text(),
+        closedAgoText(row, detail = true, since = LocalClosedSince.current).resolve(),
+      )
       Detail(Res.string.connections_detail_was_open.text(), durationText(row.cell.age).resolve())
     } else {
       Detail(Res.string.connections_column_open.text(), durationText(row.cell.age).resolve())

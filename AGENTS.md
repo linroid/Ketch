@@ -479,7 +479,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   with `UnsupportedOperationException` when collected. `limit` must be in 1..1024 (default 256): a
   snapshot keeps the fastest connections, ordered by when they opened, while `total`,
   `downloadBps` and `uploadBps` cover all of them
-- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`). Sources open
+- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`, their bytes
+  still in the totals). Sources open
   a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
   seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
   `close` close what a source leaked. Its sampler reads the counters once a second, rates over
@@ -1402,9 +1403,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   sent in all once one reports totals (`headerSummary`), and while closed connections are known
   an Open / Closed / All switch (`ConnectionStatus`, `withStatus`; Open by default, not saved)
   sits before the chips, whose counts follow it. Closed rows (`ConnectionRow.closed`,
-  `ConnectionCell.closedAgo`, from their device's clock) are dimmed and say how long ago they
-  closed in place of the speeds (`closedAgoText`); their Open column and sort are how long they
-  were open, and their details add Closed and Was open. A table row shows every detail in a hover card
+  `ConnectionCell.closedAgo`, from their device's clock, plus `LocalClosedSince`, the time since
+  the snapshot arrived, ticking each second, as devices send no idle repeats) are dimmed and say
+  how long ago they closed in place of the speeds (`closedAgoText`); their Open column and sort
+  are how long they were open, and their details add Closed and Was open. A table row shows every
+  detail in a hover card
   (`KetchHoverCard`, `ConnectionDetails`; long-press on touch, and keyboard focus on the task
   link) and only its task cell shows the
   task, on its Connections tab for HTTP and FTP; a list row opens its details when tapped, with

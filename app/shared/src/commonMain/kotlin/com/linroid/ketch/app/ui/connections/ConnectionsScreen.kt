@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -70,6 +72,7 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.ConnectionGridState
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.state.TrafficDirection
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
@@ -135,14 +138,16 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Connections page (`⌘7`): every live connection of the shown devices, the fastest
  * [PAGE_LIMIT] of them, and those that closed lately. Wide windows show a table whose headers
  * sort it, narrow ones and phones two-line rows; a switch picks open or closed connections,
- * chips a protocol, and the field searches endpoints, tasks, protocols and devices. A table row shows its details on hover and its task when its task is clicked; a list
- * row opens its details when tapped, with a button that shows its task.
+ * chips a protocol, and the field searches endpoints, tasks, protocols and devices. A table row
+ * shows its details on hover and its task when its task is clicked; a list row opens its details
+ * when tapped, with a button that shows its task.
  *
  * Devices stream their connections only while the page shows, and stop five seconds after it
  * leaves (see [com.linroid.ketch.app.state.ConnectionGridModel]).
@@ -175,65 +180,80 @@ fun ConnectionsScreen(state: AppState) {
   val rows = remember(all, shownSource, query, arrangement) {
     all.matching(shownSource, query).arranged(arrangement)
   }
+  // Devices send nothing while their connections stay the same, so how long ago one closed
+  // advances here, from when its snapshot arrived, while closed rows show.
+  val timeSource = LocalTimeSource.current
+  val arrived = remember(grid) { timeSource.markNow() }
+  var since by remember(grid) { mutableStateOf(Duration.ZERO) }
+  if (rows.any { it.closed }) {
+    LaunchedEffect(arrived) {
+      while (true) {
+        delay(CLOSED_TICK)
+        since = arrived.elapsedNow()
+      }
+    }
+  }
   val onShow: (ConnectionRow) -> Unit = { row ->
     state.showConnections(row.cell.task, segments = row.connection.source in SEGMENTED_SOURCES)
   }
   val padding = KetchTheme.density.pagePadding
-  Column(Modifier.fillMaxSize()) {
-    if (!phone) PageHeader(grid)
-    Toolbar(
-      status = status,
-      counts = { every.withStatus(it).size },
-      onStatus = { statusName = it.name },
-      showStatus = grid.closed.isNotEmpty() || status != ConnectionStatus.Open,
-      filters = filters,
-      total = all.size,
-      source = shownSource,
-      onSource = { source = it },
-      query = query,
-      onQuery = { query = it },
-      stacked = phone,
-    )
-    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-      when {
-        !grid.supported -> Message(
-          title = stringResource(Res.string.connections_unsupported_title),
-          body = stringResource(Res.string.connections_unsupported_body),
-        )
-        all.isEmpty() -> Message(
-          title = stringResource(Res.string.pulse_connections_none),
-          body = stringResource(Res.string.connections_empty_body),
-        )
-        rows.isEmpty() -> Message(title = stringResource(Res.string.connections_no_match))
-        !phone && maxWidth >= TableColumn.TableMinWidth -> ConnectionTable(
-          rows = rows,
-          columns = fitColumns(
-            available = maxWidth - padding * 2 - TablePadding * 2,
-            devices = scope == DeviceScope.All,
-            peers = all.any { it.connection.peer != null },
-          ),
-          showDevices = scope == DeviceScope.All,
-          arrangement = arrangement,
-          onSort = { sort ->
-            val next = arrangement.next(sort).encode()
-            sorted = next
-            state.appSettings.saveUi {
-              it.copy(sort = it.sort + (ConnectionArrangement.KEY to next))
-            }
-          },
-          onShow = onShow,
-          modifier = Modifier.padding(horizontal = padding),
-        )
-        else -> ConnectionList(rows, showDevices = scope == DeviceScope.All, onShow = onShow)
+  CompositionLocalProvider(LocalClosedSince provides since) {
+    Column(Modifier.fillMaxSize()) {
+      if (!phone) PageHeader(grid)
+      Toolbar(
+        status = status,
+        counts = { every.withStatus(it).size },
+        onStatus = { statusName = it.name },
+        showStatus = grid.closed.isNotEmpty() || status != ConnectionStatus.Open,
+        filters = filters,
+        total = all.size,
+        source = shownSource,
+        onSource = { source = it },
+        query = query,
+        onQuery = { query = it },
+        stacked = phone,
+      )
+      BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        when {
+          !grid.supported -> Message(
+            title = stringResource(Res.string.connections_unsupported_title),
+            body = stringResource(Res.string.connections_unsupported_body),
+          )
+          all.isEmpty() -> Message(
+            title = stringResource(Res.string.pulse_connections_none),
+            body = stringResource(Res.string.connections_empty_body),
+          )
+          rows.isEmpty() -> Message(title = stringResource(Res.string.connections_no_match))
+          !phone && maxWidth >= TableColumn.TableMinWidth -> ConnectionTable(
+            rows = rows,
+            columns = fitColumns(
+              available = maxWidth - padding * 2 - TablePadding * 2,
+              devices = scope == DeviceScope.All,
+              peers = all.any { it.connection.peer != null },
+            ),
+            showDevices = scope == DeviceScope.All,
+            arrangement = arrangement,
+            onSort = { sort ->
+              val next = arrangement.next(sort).encode()
+              sorted = next
+              state.appSettings.saveUi {
+                it.copy(sort = it.sort + (ConnectionArrangement.KEY to next))
+              }
+            },
+            onShow = onShow,
+            modifier = Modifier.padding(horizontal = padding),
+          )
+          else -> ConnectionList(rows, showDevices = scope == DeviceScope.All, onShow = onShow)
+        }
       }
+      // The connections past the limit are open ones, which the Closed view leaves out anyway.
+      if (status != ConnectionStatus.Closed) Footer(grid, listed = openCount)
+      // Every shown device, idle ones too, so their later connections carry countries; read with
+      // their presence, as a remote device lists its database once its status arrives.
+      val shown by state.shownInstances.collectAsState()
+      state.instanceManager.presence.collectAsState().value
+      CountryFooter(state, shown.map { it.deviceId })
     }
-    // The connections past the limit are open ones, which the Closed view leaves out anyway.
-    if (status != ConnectionStatus.Closed) Footer(grid, listed = openCount)
-    // Every shown device, idle ones too, so their later connections carry countries; read with
-    // their presence, as a remote device lists its database once its status arrives.
-    val shown by state.shownInstances.collectAsState()
-    state.instanceManager.presence.collectAsState().value
-    CountryFooter(state, shown.map { it.deviceId })
   }
 }
 
@@ -672,7 +692,7 @@ private fun TableRow(
             val width = column.width +
               if (ConnectionColumn.Up in columns) ConnectionColumn.Up.width else 0.dp
             NumberCell(
-              text = closedAgoText(row).resolve(),
+              text = closedAgoText(row, since = LocalClosedSince.current).resolve(),
               modifier = Modifier.width(width).padding(horizontal = CellPadding),
               color = colors.textSecondary,
             )
@@ -685,7 +705,11 @@ private fun TableRow(
           }
           ConnectionColumn.Up -> if (row.closed) {
             if (ConnectionColumn.Down !in columns) {
-              NumberCell(closedAgoText(row).resolve(), modifier, colors.textSecondary)
+              NumberCell(
+                closedAgoText(row, since = LocalClosedSince.current).resolve(),
+                modifier,
+                colors.textSecondary,
+              )
             }
           } else {
             NumberCell(
@@ -910,7 +934,7 @@ private fun ListRow(row: ConnectionRow, showDevices: Boolean, onShow: (Connectio
         }
         if (row.closed) {
           Text(
-            text = closedAgoText(row).resolve(),
+            text = closedAgoText(row, since = LocalClosedSince.current).resolve(),
             style = type.numeralS,
             color = colors.textTertiary,
             maxLines = 1,
@@ -1029,12 +1053,16 @@ private fun peerText(row: ConnectionRow): UiText? = row.connection.peer?.let { p
 }
 
 /**
- * How long ago a closed connection closed, by its device's clock, as its row says it ("Closed
- * 2m 5s ago"), or as its details do after their label when [detail] ("2m 5s ago"); empty for an
- * open one.
+ * How long ago a closed connection closed, by its device's clock and [since] its snapshot
+ * arrived, as its row says it ("Closed 2m 5s ago"), or as its details do after their label when
+ * [detail] ("2m 5s ago"); empty for an open one.
  */
-internal fun closedAgoText(row: ConnectionRow, detail: Boolean = false): UiText {
-  val ago = row.cell.closedAgo ?: return UiText.Empty
+internal fun closedAgoText(
+  row: ConnectionRow,
+  detail: Boolean = false,
+  since: Duration = Duration.ZERO,
+): UiText {
+  val ago = (row.cell.closedAgo ?: return UiText.Empty) + since
   val text = if (detail) Res.string.connections_closed_ago else Res.string.connections_row_closed
   return text.text(durationText(ago))
 }
@@ -1062,6 +1090,12 @@ private val HideOrder = listOf(
 
 /** Columns only torrent peers fill. */
 private val PeerColumns = setOf(ConnectionColumn.Client, ConnectionColumn.Peer)
+
+/** How long it has been since the shown snapshots arrived, which closed rows add to their age. */
+internal val LocalClosedSince = compositionLocalOf { Duration.ZERO }
+
+/** How often closed rows say again how long ago they closed. */
+private val CLOSED_TICK = 1.seconds
 
 /** How closed connections' rows are dimmed. */
 private const val CLOSED_ALPHA = 0.55f

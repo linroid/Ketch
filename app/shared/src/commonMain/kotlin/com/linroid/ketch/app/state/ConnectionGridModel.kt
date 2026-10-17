@@ -277,7 +277,8 @@ class ConnectionGridModel(
       up += snapshot.uploadBps
       snapshot.receivedBytes?.let { received = (received ?: 0) + it }
       snapshot.sentBytes?.let { sent = (sent ?: 0) + it }
-      val tasks = tasksOf(snapshot.connections.map { connectionCell(source.deviceId, it, snapshot) })
+      val tasks =
+        tasksOf(snapshot.connections.map { connectionCell(source.deviceId, it, snapshot) })
       if (tasks.isNotEmpty()) devices += DeviceConnections(source.deviceId, source.name, tasks)
       val ended = tasksOf(snapshot.closed.map { connectionCell(source.deviceId, it, snapshot) })
       if (ended.isNotEmpty()) closed += DeviceConnections(source.deviceId, source.name, ended)

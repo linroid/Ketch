@@ -11,6 +11,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.ui.inspector.tabs.compactSizeText
 import com.linroid.ketch.app.ui.pulse.summaryText
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connections_closed_ago
 import ketch.app.shared.generated.resources.connections_row_closed
 import ketch.app.shared.generated.resources.connections_total_received
 import ketch.app.shared.generated.resources.connections_total_sent
@@ -172,6 +173,11 @@ class ConnectionRowsTest {
     assertEquals(
       Res.string.connections_row_closed.text(durationText(30.seconds)),
       closedAgoText(row),
+    )
+    // It advances from when the snapshot arrived, as devices send no idle repeats.
+    assertEquals(
+      Res.string.connections_closed_ago.text(durationText(42.seconds)),
+      closedAgoText(row, detail = true, since = 12.seconds),
     )
     assertEquals(UiText.Empty, closedAgoText(all.first()))
   }
