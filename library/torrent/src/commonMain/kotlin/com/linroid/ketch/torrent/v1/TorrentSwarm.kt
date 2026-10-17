@@ -1131,6 +1131,11 @@ internal class TorrentSwarm(
           PeerMessage.Signal.UNCHOKE -> {
             refused.clear()
             rejects.clear()
+            // Its rate is measured from now on: the time it choked us says nothing of it.
+            if (wasChoking) {
+              rateBytes = 0
+              rateSince = nowMs()
+            }
           }
           // A peer that wants nothing more has no requests left (BEP 3).
           PeerMessage.Signal.NOT_INTERESTED -> rejectUploads()
@@ -1435,12 +1440,17 @@ internal class TorrentSwarm(
     /**
      * Updates the peer's rate every [RATE_WINDOW_MS], and [depth] to [QUEUE_TIME_MS] of it: deep
      * enough to cover a fast peer's round trip, shallow for a slow one, whose blocks others fetch.
+     * Only time the peer could send counts: choking us, it sends nothing but allowed-fast blocks,
+     * so a window that ends while it owes none is no sample, and a new one starts as it unchokes
+     * us. Counted, that time would lower its rate, and the blocks it is asked for next would be
+     * due far out.
      */
     private fun measureRate() {
       val now = nowMs()
       val elapsed = now - rateSince
       if (elapsed < RATE_WINDOW_MS) return
-      if (rateBytes > 0 || state.pendingCount > 0) {
+      val canSend = !state.choking || state.requests.any { state.allowsFast(it.index) }
+      if (canSend && (rateBytes > 0 || state.pendingCount > 0)) {
         val sample = rateBytes * 1000.0 / elapsed
         rate = if (rate == 0.0) sample else (rate + sample) / 2
         depth = (rate * QUEUE_TIME_MS / 1000 / PeerWire.BLOCK_SIZE).toInt()
