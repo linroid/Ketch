@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.webseed
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import kotlinx.coroutines.CompletableDeferred
 import okio.IOException
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
@@ -113,6 +114,23 @@ internal class Outage(
       refusals.incrementAndFetch()
       throw KetchError.Network()
     }
+    engine.download(url, range, headers, onData)
+  }
+}
+
+/** Holds every request of [engine] until [open] completes; [asked] once one comes. */
+internal class Gate(private val engine: HttpEngine) : HttpEngine by engine {
+  val open = CompletableDeferred<Unit>()
+  val asked = CompletableDeferred<Unit>()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    asked.complete(Unit)
+    open.await()
     engine.download(url, range, headers, onData)
   }
 }

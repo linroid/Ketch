@@ -408,13 +408,15 @@ internal class TorrentSwarm(
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
         droppedWebSeeds = dropped, payloadBytes = payloadReceived.load(),
-        throttledMs = throttledMs.load(), pieceLength = store.metadata.pieceLength,
+        wastedBytes = webSeedStats.wasted.load(), throttledMs = throttledMs.load(),
+        pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall
       val previous = published.value
       if (current?.reason != previous?.reason) {
-        if (current == null) log.i { "Swarm $logLabel makes progress again" }
-        else log.i { "Swarm $logLabel stalled: ${current.describe()}" }
+        if (current != null) log.i { "Swarm $logLabel stalled: ${current.describe()}" }
+        // A swarm that completed is no longer stalled, without making progress again.
+        else if (!complete) log.i { "Swarm $logLabel makes progress again" }
       }
       published.value = current
       for (recovery in due) {

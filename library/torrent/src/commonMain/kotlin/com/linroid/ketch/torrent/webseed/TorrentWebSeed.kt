@@ -128,17 +128,23 @@ internal fun encodeWebSeedSegment(segment: ByteArray): String = buildString {
 
 private const val HEX = "0123456789ABCDEF"
 
-/** Web seed counters of one swarm, for its periodic summary; any worker may count. */
+/**
+ * Web seed counters of one swarm, for its periodic summary and stall checks; any worker may
+ * count. [wasted] is the part of [payload] thrown away: bytes of pieces that failed their hash
+ * check or that a failed request cut off.
+ */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedStats {
   val payload = AtomicLong(0)
+  val wasted = AtomicLong(0)
   val pieces = AtomicInt(0)
   val failures = AtomicInt(0)
   val dropped = AtomicInt(0)
 
   fun summary(running: Int, total: Int): String =
     "webSeeds=$running/$total (dropped=${dropped.load()}), webSeedPieces=${pieces.load()}, " +
-      "webSeedPayload=${payload.load()}, webSeedFailures=${failures.load()}"
+      "webSeedPayload=${payload.load()}, webSeedWasted=${wasted.load()}, " +
+      "webSeedFailures=${failures.load()}"
 }
 
 /**
@@ -363,7 +369,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
    * is answered, those for the other files go out [PARALLEL_REQUESTS] at a time: one at a time, a
    * run of many small files spent most of its time waiting for answers, and on mirrors that
    * redirect each file, as archive.org does, for two of them per file. A mirror that fails sees
-   * one request per run.
+   * one request per run. What arrived for the pieces a failed run gives back unstored counts as
+   * [WebSeedStats.wasted].
    */
   private suspend fun fetch(run: MutableList<P?>) {
     val handle = connection ?: open().also { connection = it }
@@ -371,30 +378,43 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     // The bytes each piece still waits for: padding is never asked for.
     val missing = IntArray(run.size)
     for (request in requests) for (part in request.parts) missing[part.piece] += part.length
-    for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece)
-    // A piece spanning files completes from whichever request brings its last part.
-    val completion = Mutex()
-    val received: suspend (Int, Int) -> Unit = { piece, length ->
-      completion.withLock {
-        missing[piece] -= length
-        if (missing[piece] == 0) store(run, piece)
+    val asked = missing.copyOf()
+    val arrived = AtomicLong(0)
+    try {
+      for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece)
+      // A piece spanning files completes from whichever request brings its last part.
+      val completion = Mutex()
+      val received: suspend (Int, Int) -> Unit = { piece, length ->
+        completion.withLock {
+          missing[piece] -= length
+          if (missing[piece] == 0) store(run, piece)
+        }
       }
-    }
-    val first = requests.firstOrNull() ?: return
-    fetch(handle, first, run, received)
-    val slots = Semaphore(PARALLEL_REQUESTS)
-    coroutineScope {
-      for (request in requests.drop(1)) launch {
-        slots.withPermit { fetch(handle, request, run, received) }
+      val first = requests.firstOrNull() ?: return
+      fetch(handle, first, run, arrived, received)
+      val slots = Semaphore(PARALLEL_REQUESTS)
+      coroutineScope {
+        for (request in requests.drop(1)) launch {
+          slots.withPermit { fetch(handle, request, run, arrived, received) }
+        }
       }
+    } catch (e: Throwable) {
+      // Every piece stored had all its bytes; the rest of what arrived is thrown away.
+      val kept = run.indices.sumOf { if (run[it] == null) asked[it].toLong() else 0L }
+      stats.wasted.addAndFetch((arrived.load() - kept).coerceAtLeast(0))
+      throw e
     }
   }
 
-  /** Fetches [request] into [run]'s buffers, telling [received] of each part as it fills. */
+  /**
+   * Fetches [request] into [run]'s buffers, adding what comes to [arrived] and telling [received]
+   * of each part as it fills.
+   */
   private suspend fun fetch(
     handle: ConnectionHandle,
     request: Request,
     run: List<P?>,
+    arrived: AtomicLong,
     received: suspend (piece: Int, length: Int) -> Unit,
   ) {
     val length = request.last - request.first + 1
@@ -412,6 +432,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
             handle.received(bytes.size)
             stats.payload.addAndFetch(bytes.size.toLong())
             downloadPayload(bytes.size)
+            arrived.addAndFetch(bytes.size.toLong())
             var read = 0
             while (read < bytes.size) {
               val target = request.parts[part]

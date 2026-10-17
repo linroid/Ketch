@@ -15,6 +15,7 @@ class TorrentStallWatchdogTest {
 
   private fun signals(
     payloadBytes: Long = 0,
+    wastedBytes: Long = 0,
     throttledMs: Long = 0,
     peers: Int = 0,
     unchokingPeers: Int = 0,
@@ -25,7 +26,7 @@ class TorrentStallWatchdogTest {
     droppedWebSeeds: Int = 0,
     downloading: Boolean = true,
   ) = StallSignals(downloading, peers, unchokingPeers, missingPieces, missingFileIds, lateBlocks,
-    webSeeds, droppedWebSeeds, payloadBytes, throttledMs, pieceLength = 262_144)
+    webSeeds, droppedWebSeeds, payloadBytes, wastedBytes, throttledMs, pieceLength = 262_144)
 
   /** Checks once a second up to [until], as a swarm does. */
   private fun runTo(until: Long, signals: (Long) -> StallSignals): Set<StallRecovery> {
@@ -68,14 +69,49 @@ class TorrentStallWatchdogTest {
   fun recovered_thenStalledAgain_countsFromTheRecovery() {
     runTo(90_000) { signals() }
     assertEquals(90, watchdog.stall?.seconds)
-    // Payload alone does not end it: a piece has to verify.
+    // A verified piece ends it.
     runTo(95_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
-    assertNotNull(watchdog.stall)
     watchdog.progressed()
     assertNull(watchdog.stall)
     // Stalled again: its time counts from the piece that ended the last one.
     runTo(130_000) { signals(payloadBytes = 95_000) }
     assertEquals(35, assertNotNull(watchdog.stall).seconds)
+  }
+
+  @Test
+  fun payloadBackAfterAGap_endsTheStallAndGivesAPieceItsTimeAgain() {
+    runTo(90_000) { signals() }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+    // Peers are back and send payload: no stall, though no piece verified for 90 s.
+    runTo(95_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
+    assertNull(watchdog.stall)
+    // Still no piece once four 256 KiB pieces at 16 KiB/s are due: a stall again, which counts
+    // from the last verified piece.
+    runTo(154_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
+    assertNull(watchdog.stall)
+    runTo(156_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
+    val stall = assertNotNull(watchdog.stall)
+    assertEquals(TorrentStallReason.UNKNOWN, stall.reason)
+    assertEquals(156, stall.seconds)
+  }
+
+  @Test
+  fun wastedPayload_isNoProgress() {
+    runTo(40_000) { signals(webSeeds = 1) }
+    assertNotNull(watchdog.stall)
+    // A web seed sends a piece that fails its hash check at once.
+    runTo(41_000) { signals(payloadBytes = 16_384, wastedBytes = 16_384, webSeeds = 1) }
+    assertEquals(41, assertNotNull(watchdog.stall).seconds)
+    // The next one arrives over four checks, which take it as payload, then fails too.
+    runTo(45_000) { time ->
+      signals(payloadBytes = 16_384 + (time - 41_000) * 4, wastedBytes = 16_384, webSeeds = 1)
+    }
+    assertNull(watchdog.stall)
+    runTo(46_000) { signals(payloadBytes = 32_768, wastedBytes = 32_768, webSeeds = 1) }
+    assertEquals(46, assertNotNull(watchdog.stall).seconds)
+    // Payload kept after it counts again.
+    runTo(47_000) { signals(payloadBytes = 40_000, wastedBytes = 32_768, webSeeds = 1) }
+    assertNull(watchdog.stall)
   }
 
   @Test

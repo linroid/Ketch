@@ -101,6 +101,9 @@ internal class TorrentV2WebSeeds private constructor(
 ) {
   private val log = KetchLogger("TorrentWebSeed")
   val stats = WebSeedStats()
+
+  /** Payload the seeds received and threw away so far ([WebSeedStats.wasted]). */
+  val wastedBytes: Long get() = stats.wasted.load()
   private val events = Channel<Event>(Channel.UNLIMITED)
   // A run no seed took goes back to the loop, which returns its pieces to the scheduler.
   private val assignments = urls.indices.map { seed ->

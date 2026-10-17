@@ -450,6 +450,28 @@ class TorrentV2WebSeedTest {
     }
   }
 
+  @Test
+  fun corruptPieceAfterAStall_isNoProgress() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    // The one file wanted is another bad.bin at the only source, which answers late.
+    val mirror = MirrorEngine(mapOf(bad to fixture.payloads[0].reversedArray(),
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
+    val gate = Gate(mirror)
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, gate, selected = setOf(wanted)) { run ->
+      gate.asked.await()
+      run.skip(40_000)
+      assertEquals(TorrentStallReason.UNKNOWN, run.session.stall.first { it != null }?.reason)
+      // The piece arrives, corrupt, twice: thrown away, it is no progress.
+      gate.open.complete(Unit)
+      while (mirror.requests.count { it.first == bad } < 2) delay(10)
+      delay(2_000)
+      assertEquals(TorrentStallReason.MISSING_PIECES, run.session.stall.value?.reason)
+    }
+  }
+
   /** Waits until [outage] has refused requests and stopped getting more: its seed was dropped. */
   private suspend fun awaitDropped(outage: Outage) {
     while (outage.refused == 0) delay(10)

@@ -854,6 +854,7 @@ internal object TorrentV2SessionLoop {
           webSeeds = mirrorsRunning,
           droppedWebSeeds = stoppedMirrors.count(::mirrorMayServe),
           payloadBytes = store.receivedBytes() - payloadAtStart,
+          wastedBytes = mirrors?.wastedBytes ?: 0,
           throttledMs = throttledMs + swarm.webSeedThrottledMs(),
           pieceLength = layout.pieceLength,
         ))

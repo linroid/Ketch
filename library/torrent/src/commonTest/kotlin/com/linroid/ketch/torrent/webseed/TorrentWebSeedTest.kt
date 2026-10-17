@@ -2,8 +2,12 @@ package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.torrent.RecordingConnections
+import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentStallReason
 import com.linroid.ketch.torrent.crypto.sha1Digest
@@ -549,6 +553,119 @@ class TorrentWebSeedTest {
           } finally {
             network.close()
           }
+        }
+      }
+    }
+  }
+
+  /** Runs [block] with the info lines Ketch logs meanwhile, which [block] gets as they come. */
+  private suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) {
+    val lines = Channel<String>(Channel.UNLIMITED)
+    KetchLogger.setLogger(object : Logger {
+      override fun v(message: String) = Unit
+      override fun d(message: String) = Unit
+      override fun i(message: String) {
+        lines.trySend(message)
+      }
+      override fun w(message: String, throwable: Throwable?) = Unit
+      override fun e(message: String, throwable: Throwable?) = Unit
+      override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
+    })
+    try {
+      block(lines)
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+  }
+
+  private fun Channel<String>.drain(): List<String> = buildList {
+    while (true) add(tryReceive().getOrNull() ?: break)
+  }
+
+  @Test
+  fun corruptPieceAfterAStall_isNoProgress() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        // The one file wanted is another stale.bin at the only source, which answers late.
+        val gate = Gate(MirrorEngine(mapOf(staleUrl to stale.reversedArray(),
+          "http://mirror.test/pub/set/good.bin" to good)))
+        withInfoLog { lines ->
+          withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
+            val network = createTorrentNetwork()
+            val peers = Channel<PeerEndpoint>()
+            try {
+              coroutineScope {
+                val swarm = launch {
+                  TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                    webSeedHttp = TorrentHttp(gate), webSeedRetryMs = 5, nowMs = { clock },
+                    stall = stall).run(peers)
+                }
+                gate.asked.await()
+                clock = 40_000
+                assertEquals(TorrentStallReason.UNKNOWN,
+                  withTimeout(5_000) { stall.filterNotNull().first() }.reason)
+                // The piece arrives, corrupt, twice: thrown away, it is no progress.
+                gate.open.complete(Unit)
+                delay(500)
+                clock = 41_000
+                val after = withTimeout(5_000) {
+                  stall.first { it?.reason != TorrentStallReason.UNKNOWN }
+                }
+                assertEquals(TorrentStallReason.MISSING_PIECES, after?.reason)
+                swarm.cancel()
+              }
+            } finally {
+              network.close()
+            }
+          }
+          assertTrue(lines.drain().none { "makes progress again" in it })
+        }
+      }
+    }
+  }
+
+  @Test
+  fun completingAfterAStall_isNotLoggedAsProgress() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val payload = ByteArray(2 * PIECE) { (it * 3 + 1).toByte() }
+        val gate = Gate(MirrorEngine(mapOf("http://mirror.test/data" to payload)))
+        withInfoLog { lines ->
+          withStore(singleFile(payload, "http://mirror.test/data")) { store, _ ->
+            val network = createTorrentNetwork()
+            val peers = Channel<PeerEndpoint>()
+            try {
+              coroutineScope {
+                val swarm = launch {
+                  TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                    uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION },
+                    webSeedHttp = TorrentHttp(gate), webSeedRetryMs = 5, nowMs = { clock },
+                    stall = stall).run(peers)
+                }
+                // The mirror answers late: a stall, then the whole torrent at once.
+                gate.asked.await()
+                clock = 40_000
+                withTimeout(5_000) { stall.filterNotNull().first() }
+                gate.open.complete(Unit)
+                while (!store.completed()) delay(10)
+                // Seeding, the swarm checks itself again: no stall, and no progress either.
+                clock = 41_000
+                withTimeout(5_000) { stall.first { it == null } }
+                swarm.cancel()
+              }
+            } finally {
+              network.close()
+            }
+          }
+          val logged = lines.drain()
+          assertTrue(logged.any { "stalled: unknown" in it }, logged.toString())
+          assertTrue(logged.none { "makes progress again" in it }, logged.toString())
         }
       }
     }
