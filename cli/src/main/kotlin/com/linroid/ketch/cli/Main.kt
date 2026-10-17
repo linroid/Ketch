@@ -5,7 +5,6 @@ import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.Proxy
@@ -49,7 +48,6 @@ import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
 import com.linroid.ketch.torrent.TorrentUploadPolicy
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -127,11 +125,9 @@ fun main(args: Array<String>) {
         printUsage()
         exitProcess(InstanceExit.USAGE)
       }
-      is DownloadArgs.Download -> if (parsed.listFiles) {
-        val status = runListFiles(parsed)
+      is DownloadArgs.Download -> {
+        val status = if (parsed.listFiles) runListFiles(parsed) else runDownload(parsed)
         if (status != 0) exitProcess(status)
-      } else {
-        runDownload(parsed)
       }
     }
   }
@@ -142,7 +138,11 @@ private fun printBanner() {
   println()
 }
 
-private fun runDownload(args: DownloadArgs.Download) {
+/**
+ * Downloads [args]' URL until it completes or fails, and returns its exit status, one of
+ * [DownloadExit].
+ */
+private fun runDownload(args: DownloadArgs.Download): Int {
   val speedLimit = args.speedLimit
   val destination = resolveDestination(args.destination)
 
@@ -184,60 +184,12 @@ private fun runDownload(args: DownloadArgs.Download) {
     ),
   )
 
-  runBlocking {
-    val task = ketch.download(args.toRequest(destination))
-
-    val limitLabel = if (speedLimit.isUnlimited) ""
-      else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
-    val monitor = launch {
-      task.state.collect { state ->
-        when (state) {
-          is DownloadState.Scheduled ->
-            println("[Scheduled] Waiting for scheduled time...")
-          is DownloadState.Queued ->
-            println("[Queued] Waiting for download slot...")
-          is DownloadState.Downloading -> {
-            val progress = state.progress
-            val downloaded = formatBytes(progress.downloadedBytes)
-            val amount = if (progress.totalBytes > 0) {
-              val pct = (progress.percent * 100).toInt()
-              "$pct%  $downloaded / ${formatBytes(progress.totalBytes)}"
-            } else {
-              downloaded
-            }
-            val speed = if (progress.bytesPerSecond > 0) {
-              "  ${formatBytes(progress.bytesPerSecond)}/s"
-            } else ""
-            print("\r[Downloading] $amount$speed$limitLabel    ")
-          }
-          is DownloadState.Paused ->
-            println("\n[Paused] Download paused.")
-          is DownloadState.Completed -> {
-            println("\n[Completed] Saved to ${state.outputPath}")
-            state.checksum?.let { println("[Verified] ${it.algorithm.label} matches") }
-          }
-          is DownloadState.Failed ->
-            println("\n[Failed] ${state.error.message}")
-          is DownloadState.Canceled ->
-            println("\n[Canceled] Download canceled.")
-        }
-      }
+  return runBlocking {
+    try {
+      downloadUntilDone(ketch, args.toRequest(destination))
+    } finally {
+      ketch.shutdown()
     }
-
-    val result = task.await()
-    monitor.cancel()
-    // The task lives only as long as this process: what a source kept beside its files to resume
-    // it, such as a torrent's sidecar or creation log, would only clutter the folder.
-    task.remove(deleteFiles = false)
-
-    result.fold(
-      onSuccess = { path -> println("\nDownload completed: $path") },
-      onFailure = { error ->
-        println("\nDownload failed: ${error.message}")
-      }
-    )
-
-    ketch.shutdown()
   }
 }
 

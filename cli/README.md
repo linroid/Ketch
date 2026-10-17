@@ -96,7 +96,8 @@ ketch [options] <url> [destination]
 ```
 
 Downloads one URL, prints its progress, and exits when it completes or fails, ending with
-`Download completed: <path>` or `Download failed: <reason>`. It handles:
+`Download completed: <path>` and status 0, or `Download failed: <reason>` on stderr and status 1,
+as when no source handles the link. It handles:
 
 - HTTP(S) URLs
 - FTP and FTPS URLs: `ftp://[user:password@]host[:port]/path`
