@@ -1038,7 +1038,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   frees the rest when the swarm stops. The peer that delivers the last block commits the piece
   (`Arrival.Complete`, then `finish`): a failed hash check blames it only when it sent every block,
   else one peer fetches the piece alone next. Once every wanted piece is open, idle peers also ask
-  for blocks one other peer owes. Each pass, `poll` hands a worker the requests to cancel (the
+  for blocks one other peer owes: any it is late with, and, once they owe none of their own, at
+  most `ENDGAME_DUPLICATES` (16) on time, due last first, so the copy arrives before the owner
+  gets to the block and cancels it. Each pass, `poll` hands a worker the requests to cancel (the
   other copy arrived, or the piece is done or unwanted), newly verified pieces for HAVEs (an
   append-only log with a cursor per peer) and its interest: workers start not interested and send
   INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A

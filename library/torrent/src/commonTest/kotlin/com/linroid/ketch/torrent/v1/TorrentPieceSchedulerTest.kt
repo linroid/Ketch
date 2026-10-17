@@ -179,15 +179,16 @@ class TorrentPieceSchedulerTest {
     scheduler.availability(1, all(1))
     scheduler.availability(2, all(1))
     val slow = scheduler.request(1, max = 4).requests
-    // Every piece is open and every block asked for: peer 2 asks for peer 1's too.
+    // Every piece is open and every block asked for: peer 2 asks for peer 1's too, those peer 1
+    // would send last first.
     val fast = scheduler.request(2, max = 4).requests
-    assertEquals(slow, fast)
+    assertEquals(slow.reversed(), fast)
     scheduler.deliver(2, fast.take(3))
     val cancels = scheduler.poll(1, 0).cancels
     assertEquals(fast.take(3), cancels)
     assertTrue(scheduler.poll(2, 0).cancels.isEmpty())
     // The slow copy of the last block arrives first this time.
-    assertIs<TorrentPieceScheduler.Arrival.Complete>(scheduler.deliver(1, slow.drop(3)))
+    assertIs<TorrentPieceScheduler.Arrival.Complete>(scheduler.deliver(1, slow.take(1)))
     assertEquals(fast.drop(3), scheduler.poll(2, 0).cancels)
     // Neither sent the piece alone, so neither is blamed for a failed check.
     assertFalse(scheduler.finish(1, 0, CommitOutcome.CORRUPT))
@@ -227,7 +228,53 @@ class TorrentPieceSchedulerTest {
     scheduler.availability(2, booleanArrayOf(true, false))
     val first = scheduler.request(1, max = 4, lateAfterMs = 60_000).requests
     // Piece 1 can never open, so the last piece left is fetched by both at once.
-    assertEquals(first, scheduler.request(2, max = 4).requests)
+    assertEquals(first.reversed(), scheduler.request(2, max = 4).requests)
+    for (peer in 1..2) scheduler.remove(peer)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun endgame_copiesAFewBlocksAtOnce_thoseTheirOwnerWouldSendLast() = runTest {
+    val copies = TorrentPieceScheduler.ENDGAME_DUPLICATES
+    // Pieces of four blocks: a torrent the budget holds whole, with more blocks than copies.
+    val pieces = copies / 4 + 2
+    val budget = TorrentBufferBudget(pieces * piece)
+    val scheduler = scheduler(pieces, budget)
+    scheduler.availability(1, all(pieces))
+    scheduler.availability(2, all(pieces))
+    val owed = scheduler.request(1, max = pieces * 4).requests
+    assertEquals(pieces * 4, owed.size)
+    // Peer 1 sends its blocks in order: copies of its last ones arrive before it gets to them.
+    val copied = scheduler.request(2, max = pieces * 4).requests
+    assertEquals(owed.reversed().take(copies), copied)
+    assertTrue(scheduler.request(2, max = pieces * 4).requests.isEmpty())
+    // As copies arrive, peer 2 takes the next ones from the end.
+    val last =
+      assertIs<TorrentPieceScheduler.Arrival.Complete>(scheduler.deliver(2, copied.take(4)))
+    assertFalse(scheduler.finish(2, last.index, CommitOutcome.VERIFIED))
+    assertEquals(owed.reversed().drop(copies).take(4),
+      scheduler.request(2, max = pieces * 4).requests)
+    for (peer in 1..2) scheduler.remove(peer)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun endgame_peerThatOwesBlocksCopiesOnlyThoseOthersAreLateWith() = runTest {
+    var now = 0L
+    val copies = TorrentPieceScheduler.ENDGAME_DUPLICATES
+    val pieces = copies / 4 + 2
+    val budget = TorrentBufferBudget(pieces * piece)
+    val scheduler = scheduler(pieces, budget, clock = { now })
+    scheduler.availability(1, all(pieces))
+    scheduler.availability(2, all(pieces))
+    assertEquals(4, scheduler.request(1, max = 4, lateAfterMs = 60_000).requests.size)
+    val slow = scheduler.request(2, max = pieces * 4, lateAfterMs = 1_000).requests
+    assertEquals((pieces - 1) * 4, slow.size)
+    // Every block is asked for, but peer 1 still owes its own: it copies none on time.
+    assertTrue(scheduler.request(1, max = pieces * 4).requests.isEmpty())
+    now = 1_500
+    // Late blocks are copied as the pipeline allows, beyond the few on-time copies.
+    assertEquals(slow, scheduler.request(1, max = pieces * 4).requests)
     for (peer in 1..2) scheduler.remove(peer)
     assertEquals(0, budget.allocated)
   }
