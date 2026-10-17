@@ -729,7 +729,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
   back after a gap once none of it can be thrown away, once until the next piece; time waiting on
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
-  peer or web seed has and their files, with nothing connected those a web seed could not serve,
+  peer or web seed has and their files, with nothing connected those every web seed could not serve,
   kept 10 s after the last source leaves; no peers, all choking, slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
   seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may

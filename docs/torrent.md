@@ -765,13 +765,14 @@ until a piece verifies, so payload that comes and goes does not hide a stall. It
 the most telling order:
 
 - **Missing pieces**: wanted pieces that no connected peer or web seed has, and the files they
-  belong to; with nothing connected, the pieces a web seed could not serve. The download waits for
-  a peer that has them; skipping those files lets the rest finish. A torrent whose files changed
-  at its only web seed stops here, also once that seed was dropped. Pieces missing while a peer
-  was connected stay missing for 10 seconds after the last one leaves, so a peer that reconnects
-  at once does not change the reason.
-- **No peers**: no peer is connected, no web seed is fetching, and no web seed found a piece it
-  could not serve.
+  belong to; with nothing connected, the pieces every web seed could not serve, as another one
+  may serve the rest once started again. The download waits for a peer that has them; skipping
+  those files lets the rest finish. A torrent whose files changed at its only web seed stops
+  here, also once that seed was dropped. Pieces missing while a peer was connected stay missing
+  for 10 seconds after the last one leaves, so a peer that reconnects at once does not change the
+  reason.
+- **No peers**: no peer is connected, no web seed is fetching, and no wanted piece is one every
+  web seed could not serve.
 - **Choked**: peers are connected, but none of them lets Ketch download yet.
 - **Slow peers**: peers are late with what was asked of them, which other peers are then asked
   for too.

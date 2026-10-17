@@ -473,7 +473,7 @@ class TorrentWebSeedTest {
   private val staleSet = ByteArray(PIECE) { (it * 7 + 1).toByte() } to
     ByteArray(3 * PIECE) { (it * 13 + 5).toByte() }
 
-  private fun staleSetMetadata(): TorrentMetadata {
+  private fun staleSetMetadata(seeds: Any = "http://mirror.test/pub/"): TorrentMetadata {
     val (stale, good) = staleSet
     return TorrentMetadata.fromBencode(Bencode.encode(mapOf(
       "info" to mapOf("name" to "set", "piece length" to PIECE.toLong(),
@@ -482,7 +482,7 @@ class TorrentWebSeedTest {
           mapOf("length" to stale.size.toLong(), "path" to listOf("stale.bin")),
           mapOf("length" to good.size.toLong(), "path" to listOf("good.bin"))
         )),
-      "url-list" to "http://mirror.test/pub/",
+      "url-list" to seeds,
     )))
   }
 
@@ -620,6 +620,67 @@ class TorrentWebSeedTest {
               assertEquals(1, reported.missingPieces)
               assertEquals(listOf("0"), reported.missingFileIds)
               assertEquals(0, reported.peers)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun pieceOneSeedLacked_isMissingOnlyOnceEverySeedLacksIt() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        val files = mapOf(staleUrl to stale, "http://mirror.test/pub/set/good.bin" to good)
+        // The first seed lacks stale.bin, the one file wanted; the second is down, and lacks it
+        // too once back. Both are dropped, and no peer connects.
+        val lacking = MirrorEngine(files - staleUrl)
+        val second = MirrorEngine(files - staleUrl)
+        val back = AtomicBoolean(false)
+        val down = Outage(second) { !back.load() }
+        val seeds = listOf("http://mirror0.test/pub/", "http://mirror1.test/pub/")
+        withStore(staleSetMetadata(seeds), selected = setOf(0)) { store, _ ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>()
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirrorHosts(lacking, down)), webSeedRetryMs = 5,
+                  nowMs = { clock }, stall = stall).run(peers)
+              }
+              while (lacking.requests.isEmpty() || down.refused < 2 + WebSeedWorker.MAX_FAILURES) {
+                delay(20)
+              }
+              delay(500)
+              // Nothing arrives for 40 s: the second seed may still serve stale.bin once started
+              // again, so it is not missing, and the download waits for a source.
+              clock = 40_000
+              val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+              assertEquals(TorrentStallReason.NO_PEERS, reported.reason)
+              assertEquals(0, reported.missingPieces)
+              // Two minutes into the stall both start again, and neither has stale.bin: missing.
+              back.store(true)
+              clock = 130_000
+              while (lacking.requests.count { it.first == staleUrl } < 2 ||
+                second.requests.none { it.first == staleUrl }) {
+                delay(20)
+              }
+              delay(500)
+              clock = 131_000
+              val missing = withTimeout(5_000) {
+                stall.filterNotNull().first { it.reason == TorrentStallReason.MISSING_PIECES }
+              }
+              assertEquals(1, missing.missingPieces)
+              assertEquals(listOf("0"), missing.missingFileIds)
               swarm.cancel()
             }
           } finally {

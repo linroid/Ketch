@@ -458,6 +458,40 @@ class TorrentV2WebSeedTest {
   }
 
   @Test
+  fun pieceOneSeedLacked_isMissingOnlyOnceEverySeedLacksIt() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror0.test/pub/", "http://mirror1.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    val files = mapOf(bad to fixture.payloads[0],
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1])
+    // The first seed lacks bad.bin, the one file wanted; the second is down, and lacks it too
+    // once back. Both are dropped, and no peer connects.
+    val lacking = MirrorEngine(files - bad)
+    val second = MirrorEngine(files - bad)
+    val back = AtomicBoolean(false)
+    val down = Outage(second) { !back.load() }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirrorHosts(lacking, down), selected = setOf(wanted)) { run ->
+      while (lacking.requests.none { it.first == bad }) delay(10)
+      awaitDropped(down)
+      // Nothing arrives for 40 s: the second seed may still serve bad.bin once started again, so
+      // it is not missing, and the download waits for a source.
+      run.skip(40_000)
+      val stall = assertNotNull(run.session.stall.first { it != null })
+      assertEquals(TorrentStallReason.NO_PEERS, stall.reason)
+      assertEquals(0, stall.missingPieces)
+      // Two minutes into the stall both start again, and neither has bad.bin: missing.
+      back.store(true)
+      run.skip(90_000)
+      val missing = run.session.stall.first { it?.reason == TorrentStallReason.MISSING_PIECES }
+      assertEquals(1, missing?.missingPieces)
+      assertEquals(listOf(wanted), missing?.missingFileIds)
+      assertEquals(2, lacking.requests.count { it.first == bad })
+      assertEquals(1, second.requests.count { it.first == bad })
+    }
+  }
+
+  @Test
   fun corruptPieceAfterAStall_isNoProgress() = runTest {
     val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
       webSeeds = listOf("http://mirror.test/pub/"))
