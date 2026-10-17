@@ -19,15 +19,28 @@ import com.linroid.ketch.torrent.engine.TorrentEngine
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.net.LocalIpv4Network
+import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentHttp
+import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.portmap.NatPmpClient
+import com.linroid.ketch.torrent.portmap.PortMapGateways
+import com.linroid.ketch.torrent.portmap.UpnpClient
+import com.linroid.ketch.torrent.portmap.natPmpGateway
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -104,8 +117,37 @@ class TorrentShutdownTest {
       createdAt = at, updatedAt = at, completedAt = at, control = TaskControl(sharing = true))
   }
 
-  @Test
-  fun shutdown_downloadAndSeeder_shareOneStoppedAnnounceWindow() = runTest {
+  /** What [shutdownTest]'s scenario left to check once Ketch shut down. */
+  private class Shutdown(
+    val trackers: SilentTrackers,
+    val store: MemoryTaskStore,
+    val source: TorrentDownloadSource,
+    /** The downloading task, when the scenario had one. */
+    val downloadId: String?,
+    val took: Duration,
+    /** When the router heard the first mapping removed, from the start of the shutdown. */
+    val removalStarted: Duration?,
+  ) {
+    /** Asserts that [tracker] heard one `stopped` announce, within the one window. */
+    fun assertStoppedInWindow(tracker: String) {
+      assertEquals(1, trackers.stoppedAnnounces(tracker), "$tracker: ${trackers.announces.value}")
+      // One window from the start of the shutdown, not one after another.
+      val ended = assertNotNull(trackers.stopped.value[tracker], tracker)
+      assertTrue(ended < 2_600.milliseconds, "$tracker said goodbye until $ended")
+    }
+  }
+
+  /**
+   * Runs Ketch with a completed task seeding and, with [download], a torrent no peer serves,
+   * against [SilentTrackers] and a router that maps the listen port but never answers its
+   * removal, as port mapping is on by default; shuts it down once every torrent announced and the
+   * port is mapped, right after [beforeShutdown], and hands [check] what happened.
+   */
+  private fun shutdownTest(
+    download: Boolean,
+    beforeShutdown: (TorrentDownloadSource) -> Unit = {},
+    check: suspend Shutdown.() -> Unit,
+  ) = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(30_000) {
         val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
@@ -115,52 +157,91 @@ class TorrentShutdownTest {
         val trackers = SilentTrackers(downloading.metainfo)
         val store = MemoryTaskStore()
         store.save(seedingRecord("seeder", seeding, root / "seeded"))
-        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false, portMapping = false,
+        val network = createTorrentNetwork()
+        val routerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        // The lifetime of each mapping the router was asked for; 0 removes one.
+        val mappings = MutableStateFlow(emptyList<Pair<Int, Int>>())
+        val router = natPmpGateway(network, routerScope, silentRemovals = true,
+          requests = mappings)
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           localDiscovery = false, uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION),
           trackers).also { source ->
           source.engineFactory = { config ->
-            KotlinTorrentEngine(config, http = TorrentHttp(trackers), listenHost = "127.0.0.1")
+            KotlinTorrentEngine(config, http = TorrentHttp(trackers), listenHost = "127.0.0.1",
+              portMapping = true, portMapGateways = PortMapGateways(NatPmpClient(network, router),
+                UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+                pcp = null,
+                // The gateway guesses for 127.0.0.2 include 127.0.0.1, where the router answers.
+                networks = { listOf(LocalIpv4Network(byteArrayOf(127, 0, 0, 2), 8)) }))
           }
         }
         val ketch = Ketch(trackers, taskStore = store, additionalSources = listOf(source))
         try {
           ketch.start()
           // No peer has the download's pieces: it downloads until Ketch stops.
-          val task = ketch.download(DownloadRequest("http://fixture/downloading.torrent",
-            destination = Destination((root / "downloading").toString())))
-          awaitStage("both torrents announced", task) {
+          val task = if (!download) null else {
+            ketch.download(DownloadRequest("http://fixture/downloading.torrent",
+              destination = Destination((root / "downloading").toString())))
+          }
+          awaitStage("every torrent announced", task) {
             trackers.announces.first {
-              trackers.heard(DOWNLOAD_TRACKER) && trackers.heard(SEED_TRACKER)
+              (task == null || trackers.heard(DOWNLOAD_TRACKER)) && trackers.heard(SEED_TRACKER)
             }
           }
           eventually("the seeder to seed") { source.seedingTaskIds.value == setOf("seeder") }
+          awaitStage("the router to map the port") {
+            mappings.first { asked -> asked.any { it.second > 0 } }
+          }
+          assertTrue(mappings.value.none { it.second == 0 }, "Removed early: ${mappings.value}")
+          val removal = routerScope.async {
+            mappings.first { asked -> asked.any { it.second == 0 } }
+            TimeSource.Monotonic.markNow()
+          }
 
+          beforeShutdown(source)
           val stopping = TimeSource.Monotonic.markNow()
           trackers.stopping.complete(stopping)
           ketch.shutdown(10.seconds)
           val took = stopping.elapsedNow()
-
-          for (tracker in listOf(DOWNLOAD_TRACKER, SEED_TRACKER)) {
-            val heard = trackers.announces.value
-            assertEquals(1, trackers.stoppedAnnounces(tracker), "$tracker: $heard")
-            // One window from the start of the shutdown, not one after another.
-            val ended = assertNotNull(trackers.stopped.value[tracker], tracker)
-            assertTrue(ended < 2_600.milliseconds, "$tracker said goodbye until $ended")
-          }
-          assertTrue(took < 3.seconds, "Shutting down took $took")
-          // The download is paused to resume, and the seeder saved its checkpoint.
-          val download = assertNotNull(store.load(task.taskId))
-          assertEquals(TaskState.DOWNLOADING, download.state)
-          assertNotNull(download.sourceState)
-          val seeder = assertNotNull(store.load("seeder")?.sourceState)
-          assertTrue(source.decodeState(seeder).resumeData.isNotEmpty())
+          val removalStarted = if (removal.isCompleted) removal.await() - stopping else null
+          Shutdown(trackers, store, source, task?.taskId, took, removalStarted).check()
         } finally {
           ketch.close()
+          withContext(NonCancellable) { routerScope.coroutineContext.job.cancelAndJoin() }
+          network.close()
           torrentFileSystem.deleteRecursively(root, mustExist = false)
         }
       }
     }
   }
+
+  @Test
+  fun shutdown_downloadAndSeeder_shareOneStoppedAnnounceWindow() =
+    shutdownTest(download = true) {
+      assertStoppedInWindow(DOWNLOAD_TRACKER)
+      assertStoppedInWindow(SEED_TRACKER)
+      // The router forgets the port meanwhile, however long it takes to answer.
+      val removal = assertNotNull(removalStarted, "No mapping removed")
+      assertTrue(removal < 1.seconds, "Removing the mapping began after $removal")
+      assertTrue(took < 3.seconds, "Shutting down took $took")
+      // The download is paused to resume, and the seeder saved its checkpoint.
+      val download = assertNotNull(store.load(assertNotNull(downloadId)))
+      assertEquals(TaskState.DOWNLOADING, download.state)
+      assertNotNull(download.sourceState)
+      val seeder = assertNotNull(store.load("seeder")?.sourceState)
+      assertTrue(source.decodeState(seeder).resumeData.isNotEmpty())
+    }
+
+  @Test
+  fun shutdown_seederOnly_removesThePortMappingWithinTheWindow() =
+    shutdownTest(download = false) {
+      assertStoppedInWindow(SEED_TRACKER)
+      val removal = assertNotNull(removalStarted, "No mapping removed")
+      assertTrue(removal < 1.seconds, "Removing the mapping began after $removal")
+      assertTrue(took < 3.seconds, "Shutting down took $took")
+      val seeder = assertNotNull(store.load("seeder")?.sourceState)
+      assertTrue(source.decodeState(seeder).resumeData.isNotEmpty())
+    }
 
   /** A completed one-file task of a torrent named [name], to seed, and its info hash. */
   private fun seedingTask(name: String): Pair<SeedingTask, String> {

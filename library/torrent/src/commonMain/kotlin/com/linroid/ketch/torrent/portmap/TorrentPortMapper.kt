@@ -31,6 +31,14 @@ internal data class PortMapLayers(
   val public: Boolean,
 )
 
+/** The gateways a [TorrentPortMapper] asks, and the networks it looks for them on. */
+internal class PortMapGateways(
+  val natPmp: NatPmpClient,
+  val upnp: UpnpClient,
+  val pcp: PcpClient?,
+  val networks: suspend () -> List<LocalIpv4Network> = ::localIpv4Networks,
+)
+
 /**
  * Asks the routers in front of us to forward our listen port, so peers behind other NATs can
  * reach us, through as many NAT layers as answer, up to [MAX_LAYERS]: the home router first,

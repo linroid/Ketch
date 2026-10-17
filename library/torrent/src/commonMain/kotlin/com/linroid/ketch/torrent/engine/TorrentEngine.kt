@@ -22,8 +22,8 @@ internal interface TorrentEngine {
 
   /**
    * Opens the one window every torrent's `stopped` announces share from now on, as the host
-   * begins to shut down: torrents that stop later get what is left of it. [stop] opens it unless
-   * it is open already.
+   * begins to shut down: torrents that stop later get what is left of it. The router's port
+   * mappings are removed meanwhile, for good. [stop] opens it unless it is open already.
    */
   fun openStoppedWindow() {}
 

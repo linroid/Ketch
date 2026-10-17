@@ -404,10 +404,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   with their final `store()` checkpoints and record writes, it awaits each source's
   `DownloadSource.stop()`, then closes the sources and the `HttpEngine`. The torrent source's
   `stopping()` opens its engine's one 2 s window for `stopped` announces
-  (`TorrentEngine.openStoppedWindow`) and stops its seeders side by side, each after saving its
-  checkpoint, while the downloads pause, so all of them announce within that window; its `stop()`
-  waits for them, stops seeders that started since, then stops the engine, whose remaining
-  sessions get what is left of the window while the router's port mappings are removed. Ketch
+  (`TorrentEngine.openStoppedWindow`, which also starts removing the router's port mappings, in
+  2 s at most) and stops its seeders side by side, each after saving its checkpoint, while the
+  downloads pause, so all of them announce, and the router forgets the port, within that window;
+  its `stop()` waits for them, stops seeders that started since, then stops the engine, whose
+  remaining sessions get what is left of the window. Ketch
   closes dispatchers it was given only once every cancelled coroutine has finished, never under
   them, and never `KetchDispatchers.Default`, whose `close()` does nothing.
   `KetchApi.shutdown(timeout)` (5 s by default; `close()` for other implementations) does the
@@ -953,8 +954,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentAdvertisedPort.setMapped` announces, and `PortMapLayers` (the layers, that port and
   address, and whether the address is public) what `KotlinTorrentEngine.reachability` reads.
   Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
-  2 s; UPnP tries other ports on 718 and permanent leases on 725. `PortMappingTest` and
-  `NatLayersTest` run them against scripted gateways on loopback
+  2 s, which the engine starts as its stopped window opens; UPnP tries other ports on 718 and
+  permanent leases on 725. `PortMappingTest` and
+  `NatLayersTest` run them against scripted gateways on loopback, and `TorrentShutdownTest` an
+  engine's (`portMapGateways`)
 - Reachability (`KotlinTorrentEngine.reachability`, `reachabilityStatus`, through the
   controller): `reachable` once a peer connected in over TCP from a public address (punched uTP
   connections and LAN peers prove nothing), `forwarded` when every layer up to a public address

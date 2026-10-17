@@ -76,57 +76,6 @@ class PortMappingTest {
       }
     }
 
-  /**
-   * A NAT-PMP gateway: external address 203.0.113.7, mappings to the internal port plus
-   * [offset], or the result code [refuse] when set. Records each request's opcode.
-   */
-  private suspend fun natPmpGateway(
-    network: TorrentNetwork,
-    scope: CoroutineScope,
-    offset: Int = 0,
-    /** Added to UDP mappings only, as a gateway that gives UDP another port. */
-    udpOffset: Int = 0,
-    refuse: Int = 0,
-    /** Grants mappings without replying, as a gateway whose replies are lost. */
-    silentGrants: Boolean = false,
-    /** Opcode and lifetime of each mapping request; the test reads it while the gateway runs. */
-    requests: MutableStateFlow<List<Pair<Int, Int>>> = MutableStateFlow(emptyList()),
-  ): Int {
-    val socket = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
-    scope.launch {
-      try {
-        while (true) {
-          val datagram = socket.receive()
-          val input = Buffer().write(datagram.bytes)
-          input.readByte()
-          val opcode = input.readByte().toInt()
-          val reply = Buffer().writeByte(0).writeByte(128 + opcode).writeShort(refuse).writeInt(1)
-          if (opcode == 0) {
-            reply.write(byteArrayOf(203.toByte(), 0, 113, 7))
-          } else {
-            input.readShort()
-            val internal = input.readShort().toInt() and 0xffff
-            val external = input.readShort().toInt() and 0xffff
-            val lifetime = input.readInt()
-            requests.update { it + (opcode to lifetime) }
-            if (silentGrants && lifetime != 0) continue
-            reply.writeShort(internal)
-              .writeShort(if (lifetime == 0) 0 else {
-                // A port asked for that is not the internal one is granted, as a free port is.
-                (external.takeIf { it != 0 && it != internal } ?: (internal + offset)) +
-                  if (opcode == 1) udpOffset else 0
-              })
-              .writeInt(lifetime)
-          }
-          socket.send(datagram.remote, reply.readByteArray())
-        }
-      } finally {
-        socket.close()
-      }
-    }
-    return socket.local.port
-  }
-
   @Test
   fun natPmp_externalAddressAndMappings() = gateways { network, scope ->
     val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())

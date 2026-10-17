@@ -64,6 +64,7 @@ import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.peer.classifyPeerOutcome
 import com.linroid.ketch.torrent.portmap.NatPmpClient
 import com.linroid.ketch.torrent.portmap.PcpClient
+import com.linroid.ketch.torrent.portmap.PortMapGateways
 import com.linroid.ketch.torrent.portmap.PortMapLayers
 import com.linroid.ketch.torrent.portmap.TorrentPortMapper
 import com.linroid.ketch.torrent.portmap.UpnpClient
@@ -198,6 +199,12 @@ internal class KotlinTorrentEngine(
    */
   private val portMapping: Boolean = false,
   /**
+   * Test hook: the gateways port mapping asks while [portMapping] allows it, wherever the engine
+   * listens. Null asks this machine's routers, and only for an engine listening on every
+   * interface.
+   */
+  private val portMapGateways: PortMapGateways? = null,
+  /**
    * Joins the LAN's local service discovery group (BEP 14); null, as for engines built directly,
    * never announces or listens there. Whether it does is [TorrentConfig.localDiscovery], which
    * [setLocalDiscovery] changes.
@@ -223,6 +230,18 @@ internal class KotlinTorrentEngine(
   private var portMapper: TorrentPortMapper? = null
   // Guards portMapper while it starts or stops.
   private val mapperMutex = Mutex()
+  /**
+   * Removes the router's port mappings for good, started when the stopped window opens
+   * ([openStoppedWindow]) so the router forgets our ports while the torrents say goodbye rather
+   * than after; [stopRuntime] waits for it. Announces still name the mapped port, which removing
+   * leaves as it was.
+   */
+  private val portMappingRemoval = scope.launch(start = CoroutineStart.LAZY) {
+    mapperMutex.withLock {
+      portMapper?.stop()
+      portMapper = null
+    }
+  }
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMappingEnabled = AtomicBoolean(config.portMapping)
   // Encryption over the connection budget over TCP, falling back to uTP.
@@ -522,15 +541,10 @@ internal class KotlinTorrentEngine(
               log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
             }
           }
-          // Meanwhile the router forgets our ports rather than forward them to whoever gets this
-          // address. Announces still name the mapped port, which stopping leaves as it was.
-          launch {
-            mapperMutex.withLock {
-              portMapper?.stop()
-              portMapper = null
-            }
-          }
         }
+        // Meanwhile, since the window opened, the router forgot our ports rather than forward
+        // them to whoever gets this address.
+        portMappingRemoval.join()
         nodes?.forEach { it.close() }
         udpMutex.withLock {
           udpPorts.values.forEach { it.close() }
@@ -554,6 +568,7 @@ internal class KotlinTorrentEngine(
 
   override fun openStoppedWindow() {
     stoppedDeadline.compareAndSet(null, TimeSource.Monotonic.markNow() + STOPPED_ANNOUNCE_TIME)
+    portMappingRemoval.start()
   }
 
   /**
@@ -1658,13 +1673,17 @@ internal class KotlinTorrentEngine(
   }
 
   /**
-   * Starts asking the router to forward the listen port, unless it already does or this engine
-   * may not ([portMapping], [listenHost] other than every interface).
+   * Starts asking the router to forward the listen port, unless it already does, the engine
+   * stops ([openStoppedWindow]) or this engine may not ([portMapping], [listenHost] other than
+   * every interface).
    */
   private suspend fun startPortMapping() = mapperMutex.withLock {
-    if (!portMapping || listenHost != WILDCARD_IPV4 || portMapper != null) return@withLock
-    // Once stopRuntime has stopped the mapper, a new one's ports would stay on the router.
-    if (!running.load()) return@withLock
+    if (!portMapping || portMapper != null) return@withLock
+    if (portMapGateways == null && listenHost != WILDCARD_IPV4) return@withLock
+    // Once the mapper is removed for good, a new one's ports would stay on the router.
+    if (!running.load() || stoppedDeadline.load() != null) return@withLock
+    val gateways = portMapGateways ?: PortMapGateways(NatPmpClient(directNetwork),
+      UpnpClient(directNetwork), PcpClient(directNetwork))
     portMapper = TorrentPortMapper(scope, advertisedPort.listenPort,
       // The socket DHT and uTP share on IPv4, once bound.
       udpPort = {
@@ -1673,8 +1692,8 @@ internal class KotlinTorrentEngine(
       onMapped = advertisedPort::setMapped,
       onExternalAddress = mappedAddress::store,
       onLayers = mappedLayers::store,
-      natPmp = NatPmpClient(directNetwork), upnp = UpnpClient(directNetwork),
-      pcp = PcpClient(directNetwork),
+      natPmp = gateways.natPmp, upnp = gateways.upnp, pcp = gateways.pcp,
+      networks = gateways.networks,
     ).also { it.start() }
   }
 
