@@ -269,7 +269,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   /**
    * Whether this seed was dropped, started again and dropped again, without answering in between
    * (sending payload, or verifying or refusing a piece): its mirror looks down rather than briefly
-   * unavailable, so what it may serve is no evidence of anything until it answers.
+   * unavailable, so what it may serve is no evidence of anything until a later start finds it
+   * answering, however soon its mirror is back.
    */
   val downAcrossRelaunch: Boolean get() = gone.load()
 

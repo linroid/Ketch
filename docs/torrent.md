@@ -817,9 +817,11 @@ the most telling order:
   has the missing pieces clears them at once and one that lacks them does not, and a mirror that
   has them back clears them as soon as its first bytes arrive. A web seed dropped only for
   failures that may pass, such as a host that is down or busy, counts as one that may serve
-  every piece it did not refuse until it has been started again, two minutes into the stall, and
-  dropped again without answering, so a mirror down for a while never makes Ketch offer to skip
-  a file it serves once back. From then on it counts for nothing until it answers, so a dead
+  every piece it did not refuse until it is started again and dropped again without answering.
+  So a mirror still failing when it is started again (two minutes into the stall, or at the first
+  relaunch after it was dropped; relaunches come 10 minutes apart) counts for nothing once it
+  gives up again, about half a minute later if it fails at once, until a later relaunch finds it
+  answering. Meanwhile Ketch may offer to skip a file that mirror serves once back, while a dead
   mirror hides missing pieces only until its first restart fails. The download waits for a peer
   that has them; skipping those files lets the rest finish. A torrent whose files changed at its
   only web seed stops here, also once that seed was dropped. Pieces missing while a peer was

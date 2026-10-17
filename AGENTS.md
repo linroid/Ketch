@@ -783,7 +783,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
   peer or running web seed has and every stopped one could not serve, a seed started again
   counting as stopped until it answers (`WebSeedWorker.unproven`) and one dropped again once
-  started again without answering aside, and their files, kept 10 s after the last source leaves;
+  started again without answering aside until a later relaunch finds it answering, and their
+  files, kept 10 s after the last source leaves;
   no peers, all choking, whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
   seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may

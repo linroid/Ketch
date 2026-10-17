@@ -14,8 +14,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  *   none with nothing connected and no such seed, as they wait for peers. A seed started again
  *   counts as stopped, by what it could not serve before, until it answers (sends payload, or
  *   verifies or refuses a piece), as it offers every piece meanwhile. A seed dropped again once
- *   started again, without answering in between, is left out: its mirror is down, which says
- *   nothing of what it serves.
+ *   started again, without answering in between, is left out until a later start finds it
+ *   answering: its mirror is down, which says nothing of what it serves.
  * @property missingFileIds the files those pieces belong to.
  * @property lateBlocks requested blocks their peer is late with.
  * @property webSeeds web seeds running now, fetching or not, but those started again that have yet
