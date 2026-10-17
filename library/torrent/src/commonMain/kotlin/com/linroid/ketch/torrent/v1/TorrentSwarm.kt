@@ -219,9 +219,9 @@ internal class TorrentSwarm(
 
   /**
    * A closed peer stream fails once no candidate is left to dial: while it downloads, the swarm
-   * dials endpoints again with backoff ([PeerRedial]), those that never brought payload a bounded
-   * number of times. Each of [selections] tells the swarm the store's selection changed; it
-   * completes the deferred once the scheduler follows it, keeping every peer connected.
+   * dials endpoints again with backoff a bounded number of times ([PeerRedial]). Each of
+   * [selections] tells the swarm the store's selection changed; it completes the deferred once
+   * the scheduler follows it, keeping every peer connected.
    */
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,
     kotlinx.coroutines.DelicateCoroutinesApi::class)
@@ -258,12 +258,16 @@ internal class TorrentSwarm(
       return peerBudget.reserve(peerOverhead)
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
-    // Known endpoints and their dials since they last brought payload (PeerRedial). Those not
-    // queued are given up on until forgotten, found again or revived.
+    // Every endpoint the swarm knows, queued or not, with its dials since it last brought payload
+    // (PeerRedial); at most MAX_CANDIDATES. Those not queued are given up on until forgotten,
+    // found again or revived.
     val attempts = linkedMapOf<PeerEndpoint, Int>()
     val attemptedAt = mutableMapOf<PeerEndpoint, Long>()
-    // Endpoints that brought payload, which a downloading swarm never gives up on.
+    // Endpoints that brought payload since they were last given up, dialed again for longer.
     val delivered = mutableSetOf<PeerEndpoint>()
+    // When a source naming a peer again last brought its dial forward.
+    val broughtForwardAt = mutableMapOf<PeerEndpoint, Long>()
+    // Endpoints to dial, each one of [attempts].
     val pending = ArrayDeque<PeerEndpoint>()
     val results = Channel<PeerResult>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
@@ -280,13 +284,39 @@ internal class TorrentSwarm(
     val now = nowMs
     var discoveryClosed = false
     var complete = false
+    // Queues [endpoint], found for the first time, unless the swarm knows enough already.
+    fun discover(endpoint: PeerEndpoint): Boolean {
+      if (endpoint in attempts || attempts.size >= MAX_CANDIDATES) return false
+      attempts[endpoint] = 0
+      pending.addLast(endpoint)
+      return true
+    }
     // Discovery named [endpoint] again: a peer we downloaded from that waits to be dialed again
     // may be back.
     fun foundAgain(endpoint: PeerEndpoint) {
       if (complete || endpoint !in delivered) return
       val wait = retryAt[endpoint] ?: return
-      val due = (attemptedAt[endpoint] ?: return) + PeerRedial.FOUND_AGAIN_MS
-      if (due < wait) retryAt[endpoint] = due
+      val dialedAt = attemptedAt[endpoint] ?: return
+      val due = PeerRedial.foundAgainAt(now(), dialedAt, wait, broughtForwardAt[endpoint])
+        ?: return
+      retryAt[endpoint] = due
+      broughtForwardAt[endpoint] = now()
+    }
+    // The connection to [endpoint], which we dialed, ended while we download: it is dialed again
+    // after its delay, or given up until forgotten. One that brought payload counts as its first
+    // dial.
+    fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean) {
+      if (broughtPayload) delivered += endpoint
+      val dials = if (broughtPayload) 1 else attempts[endpoint] ?: 1
+      attempts[endpoint] = dials
+      val delay = PeerRedial.delayMs(dials, endpoint in delivered)
+      if (delay == null) {
+        // Its dials are spent: found again later, it starts over as any endpoint does.
+        delivered -= endpoint
+        return
+      }
+      retryAt[endpoint] = now() + delay
+      if (endpoint !in pending) pending.addLast(endpoint)
     }
     // Hashes of stored pieces a selection made wanted; each wakes the loop when done.
     val rechecked = Channel<Unit>(Channel.CONFLATED)
@@ -366,10 +396,7 @@ internal class TorrentSwarm(
       for (endpoint in update.added) foundAgain(endpoint)
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
         update.dropped)
-      for (endpoint in pexDirectory.candidates()) {
-        if (endpoint !in attempts && endpoint !in pending &&
-          attempts.size + pending.size < MAX_CANDIDATES) pending.addLast(endpoint)
-      }
+      for (endpoint in pexDirectory.candidates()) discover(endpoint)
     }
     suspend fun logSummary() {
       // The inline lambda only runs, and only reads the store, when logging is enabled.
@@ -470,8 +497,11 @@ internal class TorrentSwarm(
       val incoming = connection != null
       // An incoming peer's source port is not a candidate, so it never counts as an attempt.
       if (!incoming) {
-        attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
-        attemptedAt[endpoint] = now()
+        val dials = attempts[endpoint] ?: 0
+        attempts[endpoint] = dials + 1
+        retryAt.remove(endpoint)
+        // A revive's dial of an endpoint given up on leaves when that was (PeerRedial.spent).
+        if (!PeerRedial.spent(dials, endpoint in delivered)) attemptedAt[endpoint] = now()
       }
       val flags = if (incoming) 0 else peerFlags[endpoint]
       val attempt = PeerAttempt(incoming, PeerIdentityHandshake.Mode.V1)
@@ -548,6 +578,7 @@ internal class TorrentSwarm(
           retryAt.remove(it)
           faulty.remove(it)
           delivered.remove(it)
+          broughtForwardAt.remove(it)
         }
         val limit = connections().coerceIn(1, 512)
         active.entries.drop(limit).forEach { it.value.cancel() }
@@ -558,7 +589,6 @@ internal class TorrentSwarm(
           if (isOwnAddress(endpoint)) {
             // Known, as given up on, so its discovery does not queue it again.
             log.v { "Peer $endpoint for $logLabel left out: our own address" }
-            attempts.getOrPut(endpoint) { 0 }
             attemptedAt[endpoint] = now()
             continue
           }
@@ -602,6 +632,7 @@ internal class TorrentSwarm(
             attemptedAt.clear()
             retryAt.clear()
             delivered.clear()
+            broughtForwardAt.clear()
             done.complete(Unit)
           }
           selections?.onReceive { done ->
@@ -621,10 +652,7 @@ internal class TorrentSwarm(
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
             else if (endpoint in attempts) foundAgain(endpoint)
-            else if (attempts.size + pending.size < MAX_CANDIDATES && endpoint !in pending) {
-              pending.addLast(endpoint)
-              discovered++
-            }
+            else if (discover(endpoint)) discovered++
           }
           results.onReceive { result ->
             val endpoint = result.endpoint
@@ -647,36 +675,23 @@ internal class TorrentSwarm(
               // both of us were seeds.
               val listen = result.listen
               if (listen != null && !trackerRestricted && !result.redundant &&
-                failure !is DuplicatePeerException && listen !in active &&
-                listen !in attempts && listen !in pending &&
-                attempts.size + pending.size < MAX_CANDIDATES) {
-                pending.addLast(listen)
-              }
+                failure !is DuplicatePeerException && listen !in active) discover(listen)
             } else if (failure is IllegalArgumentException) {
               faulty += endpoint
             } else if (failure is DuplicatePeerException) {
               // Given up on until forgotten: the peer is connected over another connection.
               log.v { "Peer $endpoint for $logLabel is connected over another connection" }
             } else if (!complete) {
-              if (result.attempt.payload > 0) {
-                delivered += endpoint
-                // Its dials start over: the connection counts as the first of them.
-                attempts[endpoint] = 1
-              }
-              val delay = PeerRedial.delayMs(attempts[endpoint] ?: 1, endpoint in delivered)
-              if (delay != null) {
-                retryAt[endpoint] = now() + delay
-                pending.addLast(endpoint)
-              }
+              redial(endpoint, broughtPayload = result.attempt.payload > 0)
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
           punches.onReceive { endpoint ->
             // Dialed at once and over uTP first, while the peer dials us; a seed answers too, as
             // that is how leechers behind NATs reach it. Bounded like every other candidate.
-            val queued = endpoint in pending
             if (endpoint !in active &&
-              (queued || attempts.size + pending.size < MAX_CANDIDATES)) {
+              (endpoint in attempts || attempts.size < MAX_CANDIDATES)) {
+              attempts.getOrPut(endpoint) { 0 }
               onUtpPeers(listOf(endpoint))
               retryAt.remove(endpoint)
               pending.remove(endpoint)

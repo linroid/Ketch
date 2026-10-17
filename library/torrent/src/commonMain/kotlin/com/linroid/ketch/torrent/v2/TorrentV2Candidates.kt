@@ -42,11 +42,11 @@ internal data class TorrentV2DialTarget(
 
 /**
  * The endpoints a v2 session may dial, owned by its loop. Endpoints are deduplicated, retried
- * with backoff while the session is incomplete ([PeerRedial]: those that never brought payload a
- * bounded number of times), and banned after protocol violations; a reset forgets everything but
- * the bans. A peer ID is only what a peer claims, so it is banned only together with the host it
- * came from. Flags peers advertised leave the book only inside dial targets. Restricted sessions
- * (private metainfo or tracker-only privacy) take only tracker peers.
+ * with backoff a bounded number of times while the session is incomplete ([PeerRedial]: more
+ * often those that brought payload), and banned after protocol violations; a reset forgets
+ * everything but the bans. A peer ID is only what a peer claims, so it is banned only together
+ * with the host it came from. Flags peers advertised leave the book only inside dial targets.
+ * Restricted sessions (private metainfo or tracker-only privacy) take only tracker peers.
  */
 internal class TorrentV2Candidates(
   private val hybrid: Boolean,
@@ -69,10 +69,12 @@ internal class TorrentV2Candidates(
     var v1Only = false
     /** Dials since it last brought payload. */
     var attempts = 0
-    /** It brought payload once, so a session that downloads never gives it up. */
+    /** It brought payload since it was last given up, so it is dialed again for longer. */
     var delivered = false
     /** When it was last dialed. */
     var dialedAt = 0L
+    /** When a source naming it again last brought its dial forward. */
+    var broughtForwardAt: Long? = null
     /** When it was given up on; it is dialed again once found after [ATTEMPT_WINDOW_MS]. */
     var givenUpAt = 0L
     var retryAt = 0L
@@ -97,7 +99,8 @@ internal class TorrentV2Candidates(
   /**
    * Records [endpoint]; offers already known, connected, banned or refused are ignored, except
    * that one given up on is dialed again once its window has passed, and one that brought payload
-   * and waits to be dialed again is dialed [PeerRedial.FOUND_AGAIN_MS] after its last dial.
+   * and waits to be dialed again is dialed [PeerRedial.FOUND_AGAIN_MS] after its last dial, at
+   * most once every [PeerRedial.FOUND_AGAIN_EVERY_MS].
    */
   fun offer(endpoint: PeerEndpoint, topic: PeerTopic, origin: PeerOrigin, flags: Int = 0) {
     // Flags describe the endpoint whatever happens to the offer itself.
@@ -114,8 +117,12 @@ internal class TorrentV2Candidates(
         enqueue(existing)
       } else if (existing.status == Status.WAITING && existing.delivered) {
         // A peer we downloaded from may be back.
-        existing.retryAt =
-          minOf(existing.retryAt, existing.dialedAt + PeerRedial.FOUND_AGAIN_MS)
+        val now = nowMs()
+        PeerRedial.foundAgainAt(now, existing.dialedAt, existing.retryAt,
+          existing.broughtForwardAt)?.let {
+          existing.retryAt = it
+          existing.broughtForwardAt = now
+        }
       }
       return
     }
@@ -306,9 +313,17 @@ internal class TorrentV2Candidates(
 
   private fun retry(entry: Entry, complete: Boolean) {
     // A seed retries nobody: the peer may dial us, or a source finds it again later.
-    val delay = if (complete) null else PeerRedial.delayMs(entry.attempts, entry.delivered)
-    if (delay == null) {
+    if (complete) {
       giveUp(entry)
+      return
+    }
+    val delay = PeerRedial.delayMs(entry.attempts, entry.delivered)
+    if (delay == null) {
+      // A revive's dial of an endpoint given up on leaves when that was (PeerRedial.spent).
+      val revived = PeerRedial.spent(entry.attempts - 1, entry.delivered)
+      // Its dials are spent: found again later, it starts over as any endpoint does.
+      entry.delivered = false
+      giveUp(entry, since = if (revived) entry.givenUpAt else nowMs())
       return
     }
     entry.retryAt = nowMs() + delay
@@ -316,8 +331,8 @@ internal class TorrentV2Candidates(
   }
 
   /** Kept until its window passes, so the same endpoint is not dialed again meanwhile. */
-  private fun giveUp(entry: Entry) {
-    entry.givenUpAt = nowMs()
+  private fun giveUp(entry: Entry, since: Long = nowMs()) {
+    entry.givenUpAt = since
     move(entry, Status.EXHAUSTED)
   }
 
