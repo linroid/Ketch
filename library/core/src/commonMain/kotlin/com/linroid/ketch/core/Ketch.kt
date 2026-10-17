@@ -94,7 +94,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -681,29 +680,30 @@ class Ketch(
       null
     }
     val now = Clock.System.now()
-    // Saving publishes the new request, so a running task shows the plan first, and the reports of
-    // its transfer, which reports the old selection until it receives the new one, are dropped
-    // meanwhile: the request never comes with the old selection's progress. A save that fails
-    // shows that progress again. A started task still queued, as its first report was dropped,
-    // shows the last one as the plan once delivered, else as it was.
+    fun segmentsOf(r: TaskRecord): List<Segment>? = when {
+      reopen -> plan.segments ?: emptyList()
+      // A task that never started (or waits for files) starts fresh: segments would make it
+      // resume without an output path.
+      r.outputPath == null -> r.segments
+      else -> plan.segments ?: r.segments
+    }
+    // Saving publishes the new request, so the task shows the plan first: the request never comes
+    // with the old selection's size. The reports of a running transfer, which reports the old
+    // selection until it receives the new one, are dropped meanwhile. A save that fails shows the
+    // old state again. A started task still queued, as its first report was dropped, shows the
+    // last one as the plan once delivered, else as it was.
     var delivered = false
     val delivery = coordinator.withProgressHeld(
       taskId,
       shown = { report -> if (delivered) plan.shown(report) else report },
     ) {
-      val shown = handle.show(plan)
+      val undo = handle.show(plan, starts = reopen || awaiting, segmentsOf(record))
       try {
         handle.record.update { r ->
           r.copy(
             request = r.request.copy(selectedFileIds = plan.fileIds),
             totalBytes = plan.totalBytes,
-            segments = when {
-              reopen -> plan.segments ?: emptyList()
-              // A task that never started (or waits for files) starts fresh: segments would make
-              // it resume without an output path.
-              r.outputPath == null -> r.segments
-              else -> plan.segments ?: r.segments
-            },
+            segments = segmentsOf(r),
             state = if (reopen || awaiting) TaskState.QUEUED else r.state,
             completedAt = if (reopen) null else r.completedAt,
             control = (r.control ?: TaskControl()).let { c ->
@@ -720,7 +720,7 @@ class Ketch(
           )
         }
       } catch (e: Throwable) {
-        shown?.let { (previous, planned) -> handle.mutableState.compareAndSet(planned, previous) }
+        undo?.invoke()
         throw e
       }
       // Whether or not the task ran when it was planned: the queue may have started it since, its
@@ -746,17 +746,14 @@ class Ketch(
         delivery == SelectionDelivery.DELIVERED -> Unit
         reopen || awaiting -> {
           queue.dequeue(taskId)
-          handle.mutableState.value = DownloadState.Queued
           queue.enqueue(handle, preferResume = true)
         }
-        else -> {
-          if (state is DownloadState.Completed && plan.changed) {
-            // What the source shares follows the smaller selection rather than reopening.
-            val task = handle as? DownloadTask
-            if (task != null) extensionOf(source.type)?.selectionChanged(task, plan.fileIds)
-          }
-          showStopped(handle, plan, handle.record.value.segments)
+        state is DownloadState.Completed && plan.changed -> {
+          // What the source shares follows the smaller selection rather than reopening.
+          val task = handle as? DownloadTask
+          if (task != null) extensionOf(source.type)?.selectionChanged(task, plan.fileIds)
         }
+        else -> Unit
       }
     }
     log.i {
@@ -869,15 +866,41 @@ class Ketch(
   }
 
   /**
-   * Shows [plan]'s progress and size while the task downloads. Returns the state it replaced and
-   * the one it shows, or `null` when the task does not download.
+   * Shows [plan] before the save that publishes it: a downloading task its progress and size, a
+   * task that starts once saved ([starts]: one that reopens or waits for its files) as queued, a
+   * completed task its size, and a paused one the progress of [segments], the segments saved
+   * with it. Other states show no size. Returns what takes the shown state back should the save
+   * fail, or `null` when nothing was shown.
    */
-  private fun TaskHandle.show(plan: SelectionPlan): Pair<DownloadState, DownloadState>? {
+  private fun TaskHandle.show(
+    plan: SelectionPlan,
+    starts: Boolean,
+    segments: List<Segment>?,
+  ): (() -> Unit)? {
     while (true) {
-      val current = mutableState.value as? DownloadState.Downloading ?: return null
-      val shown = current.copy(progress = plan.shown(current.progress))
+      val current = mutableState.value
+      val shown = when {
+        current is DownloadState.Downloading ->
+          current.copy(progress = plan.shown(current.progress))
+        starts && (current is DownloadState.Completed || current is DownloadState.Paused) ->
+          DownloadState.Queued
+        starts -> return null
+        current is DownloadState.Completed -> current.copy(totalBytes = plan.totalBytes)
+        current is DownloadState.Paused -> {
+          val downloaded = segments?.sumOf { it.downloadedBytes } ?: 0L
+          current.copy(progress = DownloadProgress(downloaded, plan.totalBytes))
+        }
+        else -> return null
+      }
       // A report that landed as the hold began is replaced too.
-      if (mutableState.compareAndSet(current, shown)) return current to shown
+      if (!mutableState.compareAndSet(current, shown)) continue
+      val previousSegments = mutableSegments.value
+      val shownSegments = segments?.takeIf { shown is DownloadState.Paused }
+      shownSegments?.let { mutableSegments.value = it }
+      return {
+        mutableState.compareAndSet(shown, current)
+        if (shownSegments != null) mutableSegments.compareAndSet(shownSegments, previousSegments)
+      }
     }
   }
 
@@ -887,28 +910,6 @@ class Ketch(
       ?: progress.downloadedBytes.coerceAtMost(totalBytes),
     totalBytes = totalBytes,
   )
-
-  /**
-   * Shows a saved selection on a task that is not running: a completed task's new size, or a
-   * paused one's saved [segments] and progress. Other states read the record when they start.
-   */
-  private fun showStopped(handle: TaskHandle, plan: SelectionPlan, segments: List<Segment>?) {
-    handle.mutableState.update { current ->
-      when (current) {
-        is DownloadState.Completed -> current.copy(totalBytes = plan.totalBytes)
-        is DownloadState.Paused -> current.copy(
-          progress = DownloadProgress(
-            segments?.sumOf { it.downloadedBytes } ?: 0L,
-            plan.totalBytes
-          ),
-        )
-        else -> current
-      }
-    }
-    if (segments != null && handle.mutableState.value is DownloadState.Paused) {
-      handle.mutableSegments.value = segments
-    }
-  }
 
   private fun DownloadState.isAwaitingFiles(): Boolean =
     this is DownloadState.Paused && reason == PauseReason.AwaitingFileSelection

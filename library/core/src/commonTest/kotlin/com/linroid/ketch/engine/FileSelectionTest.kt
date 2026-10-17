@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
@@ -26,6 +27,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -499,6 +501,156 @@ class FileSelectionTest {
       assertEquals(TaskState.COMPLETED, record.state)
       assertEquals(200, record.totalBytes)
       assertEquals(setOf("1"), record.request.selectedFileIds)
+      assertEquals(1, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  /**
+   * What a client following [task]'s request and state apart sees, as one frame per value either
+   * takes: the latest request's selection with the latest state.
+   */
+  private fun TestScope.follow(task: DownloadTask): List<Pair<Set<String>, DownloadState>> {
+    val frames = mutableListOf<Pair<Set<String>, DownloadState>>()
+    var selection = task.request.selectedFileIds
+    var state = task.state.value
+    val dispatcher = UnconfinedTestDispatcher(testScheduler)
+    backgroundScope.launch(dispatcher) {
+      task.requestState.collect {
+        selection = it.selectedFileIds
+        frames += selection to state
+      }
+    }
+    backgroundScope.launch(dispatcher) {
+      task.state.collect {
+        state = it
+        frames += selection to state
+      }
+    }
+    return frames
+  }
+
+  /** The size [state] shows, if it shows one. */
+  private fun sizeOf(state: DownloadState): Long? = when (state) {
+    is DownloadState.Completed -> state.totalBytes
+    is DownloadState.Downloading -> state.progress.totalBytes
+    is DownloadState.Paused -> state.progress.totalBytes
+    else -> null
+  }
+
+  @Test
+  fun selectFiles_completedShrink_neverShowsTheNewFilesWithTheOldSize() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+      assertEquals(300, assertIs<DownloadState.Completed>(task.state.value).totalBytes)
+      val frames = follow(task)
+
+      task.selectFiles(setOf("1"))
+      runCurrent()
+
+      assertEquals(setOf("1") to 200L, frames.last().let { (ids, state) -> ids to sizeOf(state) })
+      assertTrue(frames.none { (ids, state) -> ids == setOf("1") && sizeOf(state) == 300L })
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_completedExpand_neverShowsTheNewFilesWithTheOldSize() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+      assertEquals(100, assertIs<DownloadState.Completed>(task.state.value).totalBytes)
+      val frames = follow(task)
+
+      task.selectFiles(setOf("0", "1"))
+      runCurrent()
+
+      assertEquals(setOf("0", "1") to 300L,
+        frames.last().let { (ids, state) -> ids to sizeOf(state) })
+      assertTrue(frames.none { (ids, state) -> ids == setOf("0", "1") && sizeOf(state) == 100L })
+      source.runs.value.last().finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_pausedTask_neverShowsTheNewFilesWithTheOldSize() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      task.pause()
+      runCurrent()
+      assertEquals(100, assertIs<DownloadState.Paused>(task.state.value).progress.totalBytes)
+      val frames = follow(task)
+
+      task.selectFiles(setOf("0", "1"))
+      runCurrent()
+
+      assertEquals(setOf("0", "1") to 300L,
+        frames.last().let { (ids, state) -> ids to sizeOf(state) })
+      assertTrue(frames.none { (ids, state) -> ids == setOf("0", "1") && sizeOf(state) == 100L })
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_pausedTaskSaveFails_showsTheOldProgressAgain() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      task.pause()
+      runCurrent()
+      val paused = assertIs<DownloadState.Paused>(task.state.value)
+      val segments = task.segments.value
+      store.onSave = { check(it.request.selectedFileIds.size != 2) { "Disk full" } }
+
+      assertFailsWith<IllegalStateException> { task.selectFiles(setOf("0", "1")) }
+
+      assertEquals(paused, task.state.value)
+      assertEquals(segments, task.segments.value)
+      assertEquals(setOf("0"), task.request.selectedFileIds)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_completedExpandSaveFails_staysCompleted() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      store.onSave = { check(it.request.selectedFileIds.size != 2) { "Disk full" } }
+
+      assertFailsWith<IllegalStateException> { task.selectFiles(setOf("0", "1")) }
+      runCurrent()
+
+      assertEquals(completed, task.state.value)
+      assertEquals(TaskState.COMPLETED, store.load(task.taskId)?.state)
       assertEquals(1, source.runs.value.size)
     } finally {
       ketch.close()
