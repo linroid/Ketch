@@ -1515,9 +1515,9 @@ class TorrentDownloadSource(
    * the files an earlier run gave it. Should it check them again, the task keeps what the session
    * reported last. Either way the task shows that progress over the files it follows now, which
    * a selection taken meanwhile changes, as [planSelection] fits saved progress to a selection.
-   * The task follows a new selection from the moment it arrives, as Ketch shows it then, also
-   * while the session takes it, which can last: until it has, the session reports the files it
-   * had, and one checking its files checks them again.
+   * The task follows a new selection from the moment Ketch delivers it, as Ketch shows it then,
+   * also while the session takes it or an earlier one, which can last: until it has, the session
+   * reports the files it had, and one checking its files checks them again.
    */
   private suspend fun track(
     context: DownloadContext,
@@ -1532,20 +1532,33 @@ class TorrentDownloadSource(
     // All guarded by gate.
     var attached = true
     var appliedRevision = if (adopted) -1 else revision
-    // Whether the session is taking a selection, the one the run follows already.
+    // Whether the session is taking a selection.
     var applying = false
-    // The files the run follows: the ones it started with until it receives a selection. Ketch
-    // may run it again for a selection that came as the last run finished, with segments that
-    // still describe that run's files.
+    // The files the run follows: the ones it started with until it receives a selection, then
+    // the latest it received, also while the session still takes an earlier one. Ketch may run it
+    // again for a selection that came as the last run finished, with segments that still describe
+    // that run's files.
     var following = files
+    // The selection revision of [following].
+    var followed = revision
     // Each file's progress by file index, as Ketch restored or planned it, or as the session
     // last reported it, kept for files deselected meanwhile.
     val held = context.segments.value.associateTo(HashMap()) { it.index to it.downloadedBytes }
     // The size of the files the segments describe.
     var total = 0L
 
+    /** Under gate: follows the latest selection the run received, which Ketch shows already. */
+    fun follow() {
+      val latest = context.selection.value
+      if (latest.revision > followed) {
+        following = table.ordered(latest.fileIds.ifEmpty { table.ids })
+        followed = latest.revision
+      }
+    }
+
     /** Under gate: shows [held] over the files the run follows. */
     fun hold() {
+      follow()
       context.segments.value = table.segments(following) { held[it.id.toInt()] ?: 0 }
       total = table.totalOf(following)
     }
@@ -1557,7 +1570,10 @@ class TorrentDownloadSource(
         // Shown until the session reports the new selection, as taking it can last: one taken
         // while the session checks its files starts the check again.
         gate.withLock {
-          following = ids
+          if (update.revision >= followed) {
+            following = ids
+            followed = update.revision
+          }
           applying = true
           hold()
         }
@@ -1605,7 +1621,10 @@ class TorrentDownloadSource(
         // The revision the session runs, once its report describes the files the run follows: it
         // took the last selection the run received.
         val reporting = if (status in CHECKED) {
-          gate.withLock { appliedRevision.takeIf { it >= revision && !applying } }
+          gate.withLock {
+            follow()
+            appliedRevision.takeIf { it == followed && !applying }
+          }
         } else {
           null
         }
@@ -1623,7 +1642,8 @@ class TorrentDownloadSource(
             else -> table.segments(chosen) { 0 }
           }
           gate.withLock {
-            if (applying || appliedRevision != reporting) {
+            follow()
+            if (applying || appliedRevision != reporting || followed != reporting) {
               // A selection arrived as the session reported, which may still describe the last.
               hold()
             } else {
