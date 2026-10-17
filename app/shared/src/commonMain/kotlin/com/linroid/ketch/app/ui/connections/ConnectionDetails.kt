@@ -162,13 +162,15 @@ private fun transferText(rate: String?, total: UiText): String =
 /**
  * The task cell of a table row: the one part of the row that shows the task, so it reads as a
  * link on hover or focus. It tells [onHover] while the pointer is on it, so the row's hover card
- * can make way for its own tooltip.
+ * can make way for its own tooltip, and [onFocus] while it shows keyboard focus, so the card opens
+ * for the keyboard too.
  */
 @Composable
 internal fun TaskLink(
   row: ConnectionRow,
   onShow: (ConnectionRow) -> Unit,
   onHover: (Boolean) -> Unit,
+  onFocus: (Boolean) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val colors = KetchTheme.colors
@@ -176,6 +178,7 @@ internal fun TaskLink(
   val hovered by interactions.collectIsHoveredAsState()
   val focus = rememberFocusVisibility()
   LaunchedEffect(hovered) { onHover(hovered) }
+  LaunchedEffect(focus.visible) { onFocus(focus.visible) }
   val showTask = stringResource(Res.string.pulse_connection_show_task)
   val active = hovered || focus.visible
   KetchTooltip(text = showTask, modifier = modifier.fillMaxHeight()) {

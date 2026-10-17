@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.connections
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
@@ -195,6 +196,7 @@ fun ConnectionsScreen(state: AppState) {
             devices = scope == DeviceScope.All,
             peers = all.any { it.connection.peer != null },
           ),
+          showDevices = scope == DeviceScope.All,
           arrangement = arrangement,
           onSort = { sort ->
             val next = arrangement.next(sort).encode()
@@ -462,6 +464,7 @@ internal fun fitColumns(available: Dp, devices: Boolean, peers: Boolean): List<C
 private fun ConnectionTable(
   rows: List<ConnectionRow>,
   columns: List<ConnectionColumn>,
+  showDevices: Boolean,
   arrangement: ConnectionArrangement,
   onSort: (ConnectionSort) -> Unit,
   onShow: (ConnectionRow) -> Unit,
@@ -501,7 +504,7 @@ private fun ConnectionTable(
     }
     LazyColumn(Modifier.fillMaxSize()) {
       items(rows, key = { "${it.cell.key.deviceId}/${it.cell.key.id}" }) { row ->
-        TableRow(row, columns, showDevice = ConnectionColumn.Device in columns, onShow)
+        TableRow(row, columns, showDevice = showDevices, onShow)
       }
     }
   }
@@ -574,10 +577,13 @@ private fun TableRow(
   val type = KetchTheme.typography
   val connection = row.connection
   var taskHovered by remember { mutableStateOf(false) }
+  var taskFocused by remember { mutableStateOf(false) }
   RowFrame(
     modifier = Modifier.height(KetchTheme.density.tableRow),
     card = { ConnectionDetails(row, showDevice, hint = ConnectionColumn.Task in columns) },
     cardEnabled = !taskHovered,
+    // The task link is the row's one stop for the keyboard, so the card opens with its focus.
+    cardOpen = taskFocused,
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -600,6 +606,7 @@ private fun TableRow(
             row = row,
             onShow = onShow,
             onHover = { taskHovered = it },
+            onFocus = { taskFocused = it },
             modifier = Modifier.width(column.width),
           )
           ConnectionColumn.Protocol -> ProtocolCell(row, modifier)
@@ -629,13 +636,14 @@ private fun TableRow(
 
 /**
  * A row with the hover fill rows have, showing [card] where the pointer rests on it while
- * [cardEnabled], or running [onClick] when clicked if it is given.
+ * [cardEnabled] and always while [cardOpen], or running [onClick] when clicked if it is given.
  */
 @Composable
 private fun RowFrame(
   modifier: Modifier = Modifier,
   card: (@Composable () -> Unit)? = null,
   cardEnabled: Boolean = true,
+  cardOpen: Boolean = false,
   onClick: (() -> Unit)? = null,
   onClickLabel: String? = null,
   content: @Composable () -> Unit,
@@ -667,7 +675,9 @@ private fun RowFrame(
   if (card == null) {
     Box(frame) { content() }
   } else {
-    KetchHoverCard(card = card, enabled = cardEnabled, modifier = frame) { Box { content() } }
+    KetchHoverCard(card = card, enabled = cardEnabled, open = cardOpen, modifier = frame) {
+      Box { content() }
+    }
   }
 }
 
@@ -788,8 +798,11 @@ private fun ListRow(row: ConnectionRow, showDevices: Boolean, onShow: (Connectio
     peerText(row),
   ).joinText()
   var open by rememberSaveable { mutableStateOf(false) }
+  val motion = KetchTheme.motion
   RowFrame(
-    modifier = Modifier.heightIn(min = KetchTheme.density.tableRow).animateContentSize(),
+    modifier = Modifier
+      .heightIn(min = KetchTheme.density.tableRow)
+      .animateContentSize(tween(motion.short, easing = motion.easeStandard)),
     onClick = { open = !open },
     onClickLabel = stringResource(
       if (open) Res.string.connections_hide_details else Res.string.connections_show_details,

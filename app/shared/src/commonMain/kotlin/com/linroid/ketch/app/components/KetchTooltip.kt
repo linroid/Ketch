@@ -70,20 +70,24 @@ fun KetchTooltip(
  * pointer rather than centered, as [content] may be as wide as a table row, and it never takes
  * clicks or focus: what it shows must also be reachable another way.
  *
- * @param enabled whether the card shows at all, such as off while a control inside [content] is
- *   hovered, which shows its own tooltip.
+ * @param enabled whether hovering shows the card, such as off while a control inside [content]
+ *   is hovered, which shows its own tooltip.
+ * @param open shows the card whatever the pointer does, such as while a control inside [content]
+ *   has keyboard focus, so the details are not for pointers only.
  */
 @Composable
 fun KetchHoverCard(
   card: @Composable () -> Unit,
   modifier: Modifier = Modifier,
   enabled: Boolean = true,
+  open: Boolean = false,
   content: @Composable () -> Unit,
 ) {
   val colors = KetchTheme.colors
   val gap = with(LocalDensity.current) { TooltipGap.roundToPx() }
   HoverPopup(
     enabled = enabled,
+    open = open,
     delayMillis = HOVER_CARD_DELAY_MILLIS,
     positionProvider = { pointerX ->
       remember(gap, pointerX) { PointerPositionProvider(gap, pointerX) }
@@ -110,13 +114,14 @@ fun KetchHoverCard(
 
 /**
  * [content], with [popup] shown after the pointer rests on it for [delayMillis] or while it is
- * long-pressed on touch screens, placed by the provider [positionProvider] makes from where the
+ * long-pressed on touch screens, or while [open], placed by the provider [positionProvider] makes from where the
  * pointer was, in pixels from [content]'s left edge, as the popup opened.
  */
 @Composable
 private fun HoverPopup(
   enabled: Boolean,
   delayMillis: Long,
+  open: Boolean = false,
   positionProvider: @Composable (pointerX: Int) -> PopupPositionProvider,
   popup: @Composable () -> Unit,
   modifier: Modifier,
@@ -181,7 +186,7 @@ private fun HoverPopup(
       },
   ) {
     content()
-    if (enabled && (touchShown || hoverShown && !suppressed)) {
+    if (open || enabled && (touchShown || hoverShown && !suppressed)) {
       Popup(
         popupPositionProvider = positionProvider(openedAt),
         properties = PopupProperties(focusable = false),
