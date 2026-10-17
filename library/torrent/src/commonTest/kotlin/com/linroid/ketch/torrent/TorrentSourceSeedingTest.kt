@@ -903,6 +903,26 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
+  fun startSeeding_v1FileDeletedThenDropped_seedsWithoutTheSharedPieces() {
+    val torrent = MultiFileTorrent()
+    v1Seeding(torrent) { source, engine, output ->
+      val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+      // Deleted before anything kept a copy of the pieces it shares with f0 and f2.
+      torrentFileSystem.delete(output / "f1")
+
+      val outcome = source.startSeeding(v1SeedingTask(torrent, output, ids - "1"))
+
+      assertEquals(SeedingOutcome.SEEDING, outcome)
+      val shared = setOf(torrent.piecesOf(1).first, torrent.piecesOf(1).last)
+      val kept = (torrent.piecesOf(0) + torrent.piecesOf(2)).toSet() - shared
+      val pieces = BooleanArray(torrent.pieceCount) { it in kept }
+      assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
+      assertEquals(TorrentSessionState.SEEDING, source.sessionOf("seeder")?.state?.value)
+      source.stopSeeding("seeder")
+    }
+  }
+
+  @Test
   fun taskUploadLimitAppliesToV2Seeder() = v2Seeding { source, engine, root ->
     source.resumeSeeded("seeder", fixture, root / "seeding")
     // One byte a second: the bucket's first block is all a peer gets for now.

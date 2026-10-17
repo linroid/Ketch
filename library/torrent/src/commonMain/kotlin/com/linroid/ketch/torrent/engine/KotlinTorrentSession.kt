@@ -82,7 +82,9 @@ internal class KotlinTorrentSession(
   private val isOwnAddress: (PeerEndpoint) -> Boolean = { false },
   /**
    * Only seed: when the file check finds the selection incomplete, stop with
-   * [IncompleteSeedException] before any discovery instead of downloading.
+   * [IncompleteSeedException] before any discovery instead of downloading, unless only pieces
+   * shared with deleted files outside the selection are missing
+   * ([TorrentPieceStore.setAsideLostPieces]): it seeds without them.
    */
   private val seedOnly: Boolean = false,
   /** The swarm's clock, for its peer deadlines; tests pass virtual time. */
@@ -411,11 +413,22 @@ internal class KotlinTorrentSession(
             "${_downloadedBytes.value}/${store.totalSelectedBytes} bytes"
         }
         if (seedOnly && !store.completed()) {
-          // No discovery or peer: seeding only serves a completed selection.
-          log.i { "Completed torrent $label changed on disk; not seeding" }
-          _failure.value = IncompleteSeedException()
-          _state.value = TorrentSessionState.STOPPED
-          return@launch
+          // Pieces a selected file shares with a deselected one deleted from disk are set
+          // aside: seeding serves the rest, and never downloads them. Trackers never hear
+          // `completed`, as a file is left out of the selection.
+          val setAside = store.setAsideLostPieces()
+          if (setAside > 0) {
+            log.w {
+              "Torrent $label cannot serve $setAside piece(s) it shares with deleted files " +
+                "outside its selection; seeding the rest"
+            }
+          } else {
+            // No discovery or peer: seeding only serves a completed selection.
+            log.i { "Completed torrent $label changed on disk; not seeding" }
+            _failure.value = IncompleteSeedException()
+            _state.value = TorrentSessionState.STOPPED
+            return@launch
+          }
         }
         if (store.completed() && uploadPolicy() != TorrentUploadPolicy.SEED_AFTER_COMPLETION &&
           store.finishIfComplete()) {

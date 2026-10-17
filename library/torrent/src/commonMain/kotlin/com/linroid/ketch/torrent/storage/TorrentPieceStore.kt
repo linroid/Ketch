@@ -98,6 +98,9 @@ internal class TorrentPieceStore(
   private var selectionVersion = 0L
   // Under the mutex: newly wanted pieces whose stored bytes may already verify.
   private val pendingRecheck = linkedSetOf<Int>()
+  // Under the mutex: pieces of the selection [setAsideLostPieces] left out of [wanted], until the
+  // files are checked again or the selection adds a file.
+  private var setAside: Set<Int> = emptySet()
   private val ownedFiles = linkedMapOf<Path, String>()
   private val ownedDirectories = linkedMapOf<Path, String>()
   private val sidecar: Path
@@ -352,6 +355,12 @@ internal class TorrentPieceStore(
 
   suspend fun recheck(): BooleanArray = mutex.withLock {
     check(initialized)
+    if (setAside.isNotEmpty()) {
+      // Pieces set aside are wanted again, and the check finds whether they verify now.
+      setAside = emptySet()
+      wanted = wantedFor(selected)
+      selectionVersion++
+    }
     storageOperation {
       verified.fill(false)
       fileProgress.fill(0)
@@ -371,6 +380,54 @@ internal class TorrentPieceStore(
       keepSharedSidecars(selected, wanted, chunk)
       verified.copyOf()
     }
+  }
+
+  /**
+   * For a session that only seeds and never downloads: when each wanted piece that did not
+   * verify holds bytes of a file outside the selection that are gone (the file deleted or cut
+   * short, or kept in a sidecar that is gone too) while the selected files are whole, stops
+   * wanting those pieces, so the rest completes the selection. They are neither verified nor
+   * offered to peers. Returns how many it set aside: 0, setting none aside, when any other piece
+   * is missing. They are wanted again once the files are checked again or the selection adds a
+   * file.
+   */
+  suspend fun setAsideLostPieces(): Int = mutex.withLock {
+    check(initialized)
+    val missing = wanted.indices.filter { wanted[it] && !verified[it] }
+    if (missing.isEmpty()) return@withLock 0
+    val chunk = ByteArray(CHECK_CHUNK_BYTES)
+    val lost = storageOperation { missing.all { lostOutsideSelection(it, chunk) } }
+    currentCoroutineContext().ensureActive()
+    if (!lost) return@withLock 0
+    setAside = missing.toSet()
+    wanted = wanted.copyOf().also { for (index in missing) it[index] = false }
+    remaining = 0
+    selectionVersion++
+    missing.size
+  }
+
+  /**
+   * Whether piece [index] lost the bytes of a file outside the selection: that file is gone from
+   * disk or too short, or was never in place, and the piece has no owned sidecar that verifies.
+   * The selected files it spans must hold their part of it, so one cut short still counts as
+   * changed.
+   */
+  private fun lostOutsideSelection(index: Int, chunk: ByteArray): Boolean {
+    val path = sidecar / "$index.piece"
+    if (ownedSidecar(path) && sidecarMatches(index, path, chunk)) return false
+    val start = index * metadata.pieceLength
+    val end = start + pieceSize(index)
+    var lost = false
+    for (file in overlappingFiles(index)) {
+      if (overlap(start, end, file) == 0L || padding[file]) continue
+      // The file's bytes up to the end of its span of the piece.
+      val needed = minOf(end, offsets[file] + metadata.files[file].size) - offsets[file]
+      val stored = (file in selected || file in materialized) &&
+        (fileSystem.metadataOrNull(filePath(file))?.size ?: -1) >= needed
+      if (file in selected && !stored) return false
+      if (file !in selected && !stored) lost = true
+    }
+    return lost
   }
 
   /**
@@ -606,6 +663,11 @@ internal class TorrentPieceStore(
     }
     val previousWanted = wanted
     val added = next.filter { it !in selected }.sorted()
+    // Pieces set aside stay so while the selection only drops files; one it adds wants them.
+    val keptAside = if (added.isNotEmpty()) emptySet() else {
+      setAside.filterTo(HashSet()) { nextWanted[it] }
+    }
+    for (index in keptAside) nextWanted[index] = false
     val recheck = storageOperation {
       val moved = mutableSetOf<Int>()
       for (file in added) {
@@ -658,6 +720,7 @@ internal class TorrentPieceStore(
       }
     }
     pendingRecheck += recheck
+    setAside = keptAside
     publishSelection(next, nextWanted)
     viewLocked(recheck.toIntArray())
   }

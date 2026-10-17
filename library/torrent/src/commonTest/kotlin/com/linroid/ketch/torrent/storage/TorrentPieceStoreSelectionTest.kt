@@ -309,6 +309,126 @@ class TorrentPieceStoreSelectionTest {
     }
   }
 
+  /** A completed task whose file skip was deleted, then dropped: a store of a and b, checked. */
+  private suspend fun droppedAfterDeletion(root: Path): TorrentPieceStore {
+    completeStore(root).finish()
+    torrentFileSystem.delete(root / "pack/skip")
+    val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+    store.initialize()
+    assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
+    return store
+  }
+
+  @Test
+  fun setAsideLostPieces_droppedFileDeletedFirst_completesWithoutItsPieces() = runTest {
+    val root = root()
+    try {
+      val store = droppedAfterDeletion(root)
+      assertFalse(store.completed())
+      assertEquals(2, store.setAsideLostPieces())
+      assertTrue(store.completed())
+      val view = store.selectionView()
+      assertContentEquals(booleanArrayOf(false, false, true), view.wanted)
+      assertContentEquals(booleanArrayOf(false, false, true), view.verified)
+      assertEquals(CommitOutcome.NOT_WANTED, store.commit(0, piece(0)))
+      assertFalse(torrentFileSystem.exists(root / "pack/skip"))
+      // Truncating and flushing the selected files works, as when a seeder completes.
+      store.finish()
+      assertEquals("012", text(root / "pack/a"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_deletedFileCreatedAgainEmpty_completesWithoutItsPieces() = runTest {
+    val root = root()
+    try {
+      completeStore(root).finish()
+      torrentFileSystem.delete(root / "pack/skip")
+      // A check of every file creates skip again, empty, before the drop reaches it.
+      val store = TorrentPieceStore(metadata, root / "pack", emptySet(), "test")
+      store.initialize()
+      assertEquals(0L, torrentFileSystem.metadata(root / "pack/skip").size)
+      store.changeSelection(setOf(0, 2))
+      assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
+      assertEquals(2, store.setAsideLostPieces())
+      assertTrue(store.completed())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_selectionChanges_keepsThemAsideUntilAFileIsAdded() = runTest {
+    val root = root()
+    try {
+      val store = droppedAfterDeletion(root)
+      store.setAsideLostPieces()
+      // Dropping a: piece 0 is no longer wanted, piece 1 stays aside for b.
+      store.changeSelection(setOf(2))
+      assertTrue(store.completed())
+      assertContentEquals(booleanArrayOf(false, false, true), store.selectionView().wanted)
+      // Adding a back wants both again.
+      store.changeSelection(setOf(0, 2))
+      assertFalse(store.completed())
+      assertContentEquals(booleanArrayOf(true, true, true), store.selectionView().wanted)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_recheck_wantsThemAgain() = runTest {
+    val root = root()
+    try {
+      val store = droppedAfterDeletion(root)
+      store.setAsideLostPieces()
+      assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
+      assertFalse(store.completed())
+      assertContentEquals(booleanArrayOf(true, true, true), store.selectionView().wanted)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_selectedFileChanged_setsNothingAside() = runTest {
+    val root = root()
+    try {
+      completeStore(root).finish()
+      torrentFileSystem.delete(root / "pack/skip")
+      torrentFileSystem.write(root / "pack/b") { writeUtf8("78X") }
+      val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      store.initialize()
+      assertContentEquals(booleanArrayOf(false, false, false), store.recheck())
+      // Piece 2 holds b alone: b changed, which no seeder can serve around.
+      assertEquals(0, store.setAsideLostPieces())
+      assertFalse(store.completed())
+      assertContentEquals(booleanArrayOf(true, true, true), store.selectionView().wanted)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_selectedFileCutShort_setsNothingAside() = runTest {
+    val root = root()
+    try {
+      completeStore(root).finish()
+      torrentFileSystem.delete(root / "pack/skip")
+      torrentFileSystem.write(root / "pack/a") { writeUtf8("01") }
+      val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      store.initialize()
+      assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
+      // Piece 0 lost skip's byte, but a is short too: the file changed.
+      assertEquals(0, store.setAsideLostPieces())
+      assertFalse(store.completed())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
   @Test
   fun recheck_changeWhilePaused_healsFromSidecar() = runTest {
     val root = root()
