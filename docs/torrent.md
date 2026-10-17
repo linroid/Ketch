@@ -629,6 +629,13 @@ This section describes the engine's protocol behavior for people who debug swarm
   again, and a tracker, the DHT, peer exchange or local discovery naming it again has it dialed
   30 seconds after its last dial. A stalled download with no peer at all dials every peer it knows
   again every minute. A seeding torrent dials nobody back.
+- **One connection per peer**: a peer reached at two addresses, such as loopback from a magnet's
+  `x.pe` and its LAN address from local discovery, or dialed while it dials Ketch, keeps one
+  connection, and both ends agree which: of two dialed the same way the first, otherwise the one
+  the side with the lower listen port dialed, as libtorrent decides. Peers are told apart by the
+  ID they claim and their host; addresses on this machine and its local networks count as one
+  host, while a public host claiming another peer's ID is a different peer. The address of the
+  connection closed is not dialed again for five minutes.
 
 ### Encryption details
 

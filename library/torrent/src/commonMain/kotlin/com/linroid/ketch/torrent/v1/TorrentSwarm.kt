@@ -36,6 +36,7 @@ import com.linroid.ketch.torrent.peer.PeerExchange
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerFlagBook
 import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerIdentity
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerOrigin
@@ -54,6 +55,7 @@ import com.linroid.ketch.torrent.peer.TorrentPeerDirectory
 import com.linroid.ketch.torrent.peer.UPLOAD_SLOTS
 import com.linroid.ketch.torrent.peer.allowedFastOffer
 import com.linroid.ketch.torrent.peer.isFastExtension
+import com.linroid.ketch.torrent.peer.keepsOutgoing
 import com.linroid.ketch.torrent.peer.pexFlags
 import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.peer.servesMetadata
@@ -65,6 +67,7 @@ import com.linroid.ketch.torrent.webseed.SwarmWebSeedPieces
 import com.linroid.ketch.torrent.webseed.WEB_SEED_RETRY_MS
 import com.linroid.ketch.torrent.webseed.WebSeedStats
 import com.linroid.ketch.torrent.webseed.WebSeedWorker
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
@@ -89,6 +92,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import okio.IOException
 
 /**
@@ -198,6 +203,8 @@ internal class TorrentSwarm(
   private val connected = mutableMapOf<Int, PexContact>()
   // Connected peers that unchoke us, guarded like [connected].
   private val unchoking = mutableSetOf<Int>()
+  // The one connection kept to each peer, guarded like [connected].
+  private val identities = mutableMapOf<PeerIdentity, PeerWorker>()
   // Payload received from peers and web seeds, and time spent waiting on speed limits for it.
   private val payloadReceived = AtomicLong(0)
   private val throttledMs = AtomicLong(0)
@@ -625,7 +632,7 @@ internal class TorrentSwarm(
             active.remove(endpoint)
             diagnostics.record(endpoint, result.attempt, failure, result.incoming, result.flags)
             if (failure is TorrentStorageException) throw failure
-            if (failure != null) {
+            if (failure != null && failure !is DuplicatePeerException) {
               connectFailures++
               if (failure is CorruptPieceException) corruptPieces++
               log.v { "Peer $endpoint for $logLabel closed: ${failure.describeWithoutUrls()}" }
@@ -640,13 +647,16 @@ internal class TorrentSwarm(
               // both of us were seeds.
               val listen = result.listen
               if (listen != null && !trackerRestricted && !result.redundant &&
-                listen !in active &&
+                failure !is DuplicatePeerException && listen !in active &&
                 listen !in attempts && listen !in pending &&
                 attempts.size + pending.size < MAX_CANDIDATES) {
                 pending.addLast(listen)
               }
             } else if (failure is IllegalArgumentException) {
               faulty += endpoint
+            } else if (failure is DuplicatePeerException) {
+              // Given up on until forgotten: the peer is connected over another connection.
+              log.v { "Peer $endpoint for $logLabel is connected over another connection" }
             } else if (!complete) {
               if (result.attempt.payload > 0) {
                 delivered += endpoint
@@ -824,6 +834,10 @@ internal class TorrentSwarm(
     private var lastWrite = TimeSource.Monotonic.markNow()
     /** This connection among the task's live connections, once its handshake succeeded. */
     private var traffic: PeerTraffic? = null
+    /** The peer this connection reaches, once it is the connection kept to it. */
+    private var identity: PeerIdentity? = null
+    /** Another connection to the same peer, one both ends keep, replaced this one. */
+    private val displaced = AtomicBoolean(false)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     suspend fun run() = supervisorScope {
@@ -873,7 +887,10 @@ internal class TorrentSwarm(
           }
         }
       } finally {
-        withContext(NonCancellable) { holepunch.leave(id) }
+        withContext(NonCancellable) {
+          holepunch.leave(id)
+          release()
+        }
         holepunchOut.cancel()
         traffic?.close()
         uploadCache.close()
@@ -886,6 +903,7 @@ internal class TorrentSwarm(
       val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true,
         dht = dhtPort > 0, fast = true))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+      claim(handshake.peerId.toByteString())
       fast = handshake.fast
       state = PeerProtocolState(store.pieceCount, maxPending = MAX_PIPELINE, fast = fast)
       attempt.stage = PeerStage.CONNECTED
@@ -913,6 +931,38 @@ internal class TorrentSwarm(
       })
       if (dhtPort > 0 && handshake.dht) wire.send(PeerMessage.Port(dhtPort))
       if (fast && uploadingFast()) offerAllowedFast()
+    }
+
+    /**
+     * Keeps this connection unless the peer is connected already ([PeerIdentity]): of two
+     * connections of one direction the first stays; otherwise both ends keep the same one
+     * ([keepsOutgoing]), which replaces the other. A duplicate fails with [DuplicatePeerException].
+     */
+    private suspend fun claim(remoteId: ByteString) {
+      val key = PeerIdentity.of(endpoint.host, remoteId)
+      val kept = connectedMutex.withLock {
+        val existing = identities[key]
+        val outgoing = if (incoming) existing?.takeUnless { it.incoming }?.endpoint else endpoint
+        val replaces = existing != null && existing.incoming != incoming && outgoing != null &&
+          !incoming == keepsOutgoing(listenPortFor(outgoing), outgoing, peerId.toByteString(),
+            remoteId)
+        if (existing == null || replaces) {
+          existing?.displaced?.store(true)
+          identities[key] = this
+          identity = key
+        }
+        identity != null
+      }
+      if (!kept) {
+        attempt.stage = PeerStage.CONNECTED
+        throw DuplicatePeerException()
+      }
+    }
+
+    /** Lets another connection to the same peer be kept once this one ends. */
+    private suspend fun release() {
+      val key = identity ?: return
+      connectedMutex.withLock { if (identities[key] === this) identities.remove(key) }
     }
 
     /**
@@ -1320,6 +1370,7 @@ internal class TorrentSwarm(
 
     /** Runs after every message and idle tick: upload slot, PEX, HAVEs, deadlines, requests. */
     private suspend fun maintain() {
+      if (displaced.load()) throw DuplicatePeerException()
       uploadCache.expire()
       val unchoked = chokerMutex.withLock {
         if (reportedInterest != state.interested) {
@@ -1456,6 +1507,9 @@ private const val IDLE_MS = 100L
 
 /** An [IllegalArgumentException], so the swarm never retries the peer that sent the piece. */
 internal class CorruptPieceException : IllegalArgumentException("Peer sent a corrupt piece")
+
+/** Closes a connection to a peer the swarm keeps another connection to. */
+internal class DuplicatePeerException : IOException("Peer is connected over another connection")
 
 private suspend fun <T> storage(block: suspend () -> T): T = try {
   block()

@@ -214,6 +214,15 @@ internal class TorrentV2Candidates(
   }
 
   /**
+   * A dial to [endpoint] reached a peer connected under another endpoint already: it is given up
+   * on until some source finds it after its window, or a stalled session revives it.
+   */
+  fun duplicate(endpoint: PeerEndpoint) {
+    val entry = entries[endpoint] ?: return
+    if (entry.status == Status.DIALING) giveUp(entry)
+  }
+
+  /**
    * An incoming peer from [source] closed. Its source port is ephemeral and never dialed; its
    * [listen] port, when the peer told us, becomes a candidate unless the session is restricted.
    * A [complete] session does not dial it back: it is kept as tried until its window passes.

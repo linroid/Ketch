@@ -198,7 +198,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
   `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
   (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`,
-  `PeerDiagnostics` and `TorrentChoker`
+  `PeerDiagnostics`, `PeerRedial` (when swarms dial an endpoint again), `PeerIdentity` and
+  `keepsOutgoing` (duplicate connections) and `TorrentChoker`
 - `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `SwarmHolepunch`,
   `TorrentPieceScheduler`, `TorrentPeerDownloader`, `TorrentUploadCache`
 - `com.linroid.ketch.torrent.v2` -- v2 and hybrid sessions: `TorrentV2DownloadSession`,
@@ -816,6 +817,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   last dial. A revive dials every waiting or given-up endpoint at once and keeps its count; a
   stall without a single peer revives every minute (`LONELY_REVIVE_MS`), others every five. A
   complete swarm dials nobody back
+- One connection per peer, in v1 and v2 swarms (`PeerIdentity`): peers are told apart by the ID
+  they claim and their host, where loopback, private, link-local and unique local hosts count as
+  one (`localTorrentAddress`), as one client there is reached at several addresses (loopback
+  from `x.pe`, its LAN address from LSD); a public host claiming another's ID is another peer. Of
+  two connections of one direction the first stays; of opposite directions both ends keep the
+  one the side with the lower listen port dialed, else the higher peer ID's (`keepsOutgoing`, as
+  libtorrent decides), and a v1 worker it replaces ends at its next pass. The endpoint of the
+  connection closed is given up until found again 5 minutes later (v1 `DuplicatePeerException`,
+  `TorrentV2Candidates.duplicate`)
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
   built directly in tests never reach the router): `TorrentPortMapper` maps through every NAT

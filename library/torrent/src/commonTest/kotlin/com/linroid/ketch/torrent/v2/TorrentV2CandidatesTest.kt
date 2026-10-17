@@ -124,6 +124,20 @@ class TorrentV2CandidatesTest {
   }
 
   @Test
+  fun duplicate_isGivenUpUntilFoundAfterItsWindow() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    // It reached a peer we are connected to at another address.
+    book.duplicate(assertNotNull(book.next()).endpoint)
+    assertFalse(book.hasWork())
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    assertNull(book.next())
+    now += TorrentV2Candidates.ATTEMPT_WINDOW_MS
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    assertEquals(a, book.next()?.endpoint)
+  }
+
+  @Test
   fun neverOffersIncomingSourcePort() {
     val source = PeerEndpoint("10.0.0.9", 51_234)
     val listen = PeerEndpoint("10.0.0.9", 6881)
