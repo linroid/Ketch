@@ -152,16 +152,22 @@ class TorrentSwarmRedialTest {
     // It refuses from the start: dialed at 0, 10, 30 and 60 s on 10 s steps, then given up.
     rig.down.store(true)
     rig.peers.send(rig.listener.local)
+    // Timed from its fourth dial, as a loaded machine handles each refusal a step or more late.
+    while (rig.dials.load() < 4) rig.advanceTo(rig.clock.load() + 10_000)
     // Without a peer, the stalled swarm dials it again every minute from 60 s on. Those dials
     // leave when it was given up, so found again five minutes after that it starts over.
-    rig.advanceTo(400_000, step = 10_000)
+    rig.advanceTo(rig.clock.load() + 340_000, step = 10_000)
     val before = rig.dials.load()
-    // Found again, it is dialed as a new endpoint is: at once, then 5, 15 and 30 s later.
+    val found = rig.clock.load()
+    // Found again, it is dialed as a new endpoint is: at once, then 5, 15 and 30 s later, where
+    // one it still remembered would be dialed at most three times in that minute and a half.
     rig.peers.send(rig.listener.local)
-    rig.advanceTo(460_000, step = 10_000)
+    rig.advanceTo(found + 90_000, step = 10_000)
+    // Let the swarm's tick reach a dial due on the last step.
+    delay(300)
     val dials = rig.dials.load() - before
-    assertTrue(dials >= 4, "Dialed $dials times in the minute after it was found again")
-    rig.reachAgain(upAt = 460_000, step = 10_000, served = intArrayOf(0, 1))
+    assertTrue(dials >= 4, "Dialed $dials times in the 90 s after it was found again")
+    rig.reachAgain(upAt = rig.clock.load(), step = 10_000, served = intArrayOf(0, 1))
   }
 
   @Test
