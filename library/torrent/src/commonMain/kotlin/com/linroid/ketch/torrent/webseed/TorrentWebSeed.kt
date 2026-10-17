@@ -216,12 +216,21 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private val idleTimeoutMs: Long = WEB_SEED_IDLE_MS,
   /** Counts and rate-limits payload, as for peers. */
   private val downloadPayload: suspend (Int) -> Unit = {},
+  /**
+   * Counts the payload [downloadPayload] counted that no verified piece keeps: pieces that fail
+   * their hash check or that the selection dropped, and those a failed or stopped run gives back
+   * partly or wholly fetched. Called once a run ends.
+   */
+  private val discardPayload: (Long) -> Unit = {},
 ) {
   private val log = KetchLogger("TorrentWebSeed")
   private val label = redactUrl(url)
   private var connection: ConnectionHandle? = null
   // Pieces this seed verified, as the requests of a run store them side by side.
   private val verifiedPieces = AtomicInt(0)
+  // The payload the current run received, and the part of it verified pieces keep.
+  private val runPayload = AtomicLong(0)
+  private val runKept = AtomicLong(0)
 
   suspend fun run() {
     var failures = 0
@@ -266,6 +275,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
               run[index] = null
             }
           }
+          val discarded = runPayload.exchange(0) - runKept.exchange(0)
+          if (discarded > 0) discardPayload(discarded)
         }
         val progressed = verifiedPieces.load() != verifiedBefore
         if (progressed) served = true
@@ -360,13 +371,15 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     // The bytes each piece still waits for: padding is never asked for.
     val missing = IntArray(run.size)
     for (request in requests) for (part in request.parts) missing[part.piece] += part.length
-    for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece)
+    // What each piece's requests bring, which a verified piece keeps.
+    val expected = missing.copyOf()
+    for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece, 0)
     // A piece spanning files completes from whichever request brings its last part.
     val completion = Mutex()
     val received: suspend (Int, Int) -> Unit = { piece, length ->
       completion.withLock {
         missing[piece] -= length
-        if (missing[piece] == 0) store(run, piece)
+        if (missing[piece] == 0) store(run, piece, expected[piece])
       }
     }
     val first = requests.firstOrNull() ?: return
@@ -401,6 +414,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
             handle.received(bytes.size)
             stats.payload.addAndFetch(bytes.size.toLong())
             downloadPayload(bytes.size)
+            // Once counted as received, so what is discarded never exceeds it.
+            runPayload.addAndFetch(bytes.size.toLong())
             var read = 0
             while (read < bytes.size) {
               val target = request.parts[part]
@@ -433,8 +448,11 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     if (total != length) throw IOException("Web seed response ended early")
   }
 
-  /** Stores piece [piece] of [run] and gives it back; a corrupt piece fails the run. */
-  private suspend fun store(run: MutableList<P?>, piece: Int) {
+  /**
+   * Stores piece [piece] of [run], whose requests brought [bytes], and gives it back; a corrupt
+   * piece fails the run.
+   */
+  private suspend fun store(run: MutableList<P?>, piece: Int, bytes: Int) {
     val claim = checkNotNull(run[piece])
     val outcome = webSeedStorage { pieces.commit(claim) }
     if (outcome == CommitOutcome.CORRUPT) {
@@ -446,6 +464,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     if (verified) {
       stats.pieces.incrementAndFetch()
       verifiedPieces.incrementAndFetch()
+      runKept.addAndFetch(bytes.toLong())
     }
     run[piece] = null
     withContext(NonCancellable) { pieces.release(claim, verified) }

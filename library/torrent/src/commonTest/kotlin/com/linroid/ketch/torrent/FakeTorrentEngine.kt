@@ -49,6 +49,13 @@ internal class FakeTorrentEngine : TorrentEngine {
     isRunning = false
   }
 
+  var closed = false
+    private set
+
+  override fun close() {
+    closed = true
+  }
+
   override suspend fun fetchMetadata(
     magnetUri: String,
   ): TorrentMetadata? {

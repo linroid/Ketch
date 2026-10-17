@@ -23,6 +23,8 @@ internal class TorrentV2Checkpoint private constructor(
   val selectionGeneration: Long,
   val receivedBytes: Long,
   val uploadedBytes: Long,
+  /** Payload received from peers and web seeds that was thrown away rather than verified. */
+  val discardedBytes: Long,
 ) {
   data class Owned(val components: List<String>, val identity: String, val directory: Boolean)
   val mappingVersion: Int get() = 1
@@ -82,6 +84,8 @@ internal class TorrentV2Checkpoint private constructor(
       put("selection generation", selectionGeneration)
       put("received", receivedBytes)
       put("uploaded", uploadedBytes)
+      // Older builds ignore it, and read a checkpoint without it as none discarded.
+      put("discarded", discardedBytes)
     }
     return MAGIC + Bencode.encode(values, maxBytes = MAX_BYTES - MAGIC.size)
   }
@@ -95,7 +99,7 @@ internal class TorrentV2Checkpoint private constructor(
     require(selected.size in 1..100_000 && selected.all { it.isNotEmpty() && it.length <= 128 })
     require(verifiedHint.size <= 125_000)
     require(layoutGeneration >= 0 && selectionGeneration >= 0 &&
-      receivedBytes >= 0 && uploadedBytes >= 0)
+      receivedBytes >= 0 && uploadedBytes >= 0 && discardedBytes >= 0)
     require(owned.size in 1..220_000)
     val entries = owned.associateBy { it.components }
     require(entries.size == owned.size && entries[emptyList()]?.directory == true)
@@ -124,10 +128,11 @@ internal class TorrentV2Checkpoint private constructor(
       selectionGeneration: Long = 0,
       receivedBytes: Long = 0,
       uploadedBytes: Long = 0,
+      discardedBytes: Long = 0,
     ): TorrentV2Checkpoint = TorrentV2Checkpoint(taskId, document.identity, output,
       selected.ifEmpty { TorrentOutputMapping.from(document).files.map { it.id }.toSet() }.toSet(),
       owned.map { it.copy(components = it.components.toList()) }, verifiedHint,
-      layoutGeneration, selectionGeneration, receivedBytes, uploadedBytes).also {
+      layoutGeneration, selectionGeneration, receivedBytes, uploadedBytes, discardedBytes).also {
       it.validateStructure()
       it.validateContent(document)
     }
@@ -179,7 +184,8 @@ internal class TorrentV2Checkpoint private constructor(
         requireNotNull(root["verified"]?.bytes).toByteString(),
         requireNotNull(root["layout generation"]?.integer),
         requireNotNull(root["selection generation"]?.integer),
-        requireNotNull(root["received"]?.integer), requireNotNull(root["uploaded"]?.integer)).also {
+        requireNotNull(root["received"]?.integer), requireNotNull(root["uploaded"]?.integer),
+        root["discarded"]?.let { requireNotNull(it.integer) } ?: 0L).also {
         it.validateStructure()
       }
     }

@@ -57,6 +57,26 @@ class TorrentV2CheckpointTest {
   }
 
   @Test
+  fun discardedPayload_roundTripsAndReadsAsNoneFromOlderCheckpoints() {
+    val saved = TorrentV2Checkpoint.create(document, "task", output, setOf("0"), owned,
+      byteArrayOf(0x80.toByte()).toByteString(), receivedBytes = 123, uploadedBytes = 45,
+      discardedBytes = 67)
+    assertEquals(67L, assertNotNull(TorrentV2Checkpoint.decode(saved.encode())).discardedBytes)
+    // Written before discards were counted.
+    assertEquals(0L, assertNotNull(TorrentV2Checkpoint.decode(mutate {})).discardedBytes)
+    assertFailsWith<IllegalArgumentException> {
+      TorrentV2Checkpoint.decode(mutate { it["discarded"] = -1L })
+    }
+    // The counters read alone, as snapshots without a session do.
+    val counters = assertNotNull(checkpointPayload(saved.encode()))
+    assertEquals(123L, counters.received)
+    assertEquals(45L, counters.uploaded)
+    assertEquals(67L, counters.discarded)
+    assertNull(counters.uploadSpeed)
+    assertEquals(0L, assertNotNull(checkpointPayload(mutate {})).discarded)
+  }
+
+  @Test
   fun contentValidationRejectsForeignOwnershipSelectionsAndHintPadding() {
     for (bytes in listOf(
       mutate { it["selected"] = listOf("999") },

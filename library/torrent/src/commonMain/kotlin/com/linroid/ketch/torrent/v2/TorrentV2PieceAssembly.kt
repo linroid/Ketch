@@ -19,6 +19,9 @@ internal class TorrentV2PieceAssembly private constructor(
   private val lease: TorrentBufferBudget.Lease,
 ) {
   private var count = 0
+  /** The payload of the blocks it holds. */
+  var receivedBytes = 0L
+    private set
   private enum class Owner { ACTOR, COMMITTING, CLOSED }
   // A queued Claim is itself the ownership token; stale claims cannot affect a later handoff.
   private val owner = AtomicReference<Any>(Owner.ACTOR)
@@ -54,6 +57,7 @@ internal class TorrentV2PieceAssembly private constructor(
       block.bytes.copyInto(bytes, request.begin)
       received[slot] = true
       count++
+      receivedBytes += request.length
       return true
     } finally {
       block.close()

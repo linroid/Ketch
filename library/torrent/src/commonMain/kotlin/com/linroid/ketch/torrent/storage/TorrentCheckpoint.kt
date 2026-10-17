@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.storage
 
+import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.peer.pieceBitfield
@@ -22,9 +23,12 @@ internal data class TorrentCheckpoint(
   val uploadedBytes: Long = 0,
   val trackerConfiguration: TrackerConfiguration? = null,
   val trackerRevision: Long = 0,
+  /** Payload received from peers and web seeds that was thrown away rather than verified. */
+  val discardedBytes: Long = 0,
 ) {
   init {
     require(trackerRevision >= 0)
+    require(receivedBytes >= 0 && uploadedBytes >= 0 && discardedBytes >= 0)
     require(trackerRevision == 0L || trackerConfiguration != null)
   }
 
@@ -33,6 +37,8 @@ internal data class TorrentCheckpoint(
 
   fun encode(): ByteArray = Bencode.encode(mapOf(
     "received" to receivedBytes, "uploaded" to uploadedBytes,
+    // Older builds ignore it, and read a checkpoint without it as none discarded.
+    "discarded" to discardedBytes,
     "kind" to KIND, "version" to version, "task" to taskId,
     "metainfo" to metadata.metainfoBytes, "hash" to metadata.infoHash.toBytes(),
     "output" to output, "selected" to selected.sorted().map { it.toLong() },
@@ -114,12 +120,34 @@ internal data class TorrentCheckpoint(
       }
       val receivedBytes = root["received"]?.integer ?: 0L
       val uploadedBytes = root["uploaded"]?.integer ?: 0L
-      require(receivedBytes >= 0 && uploadedBytes >= 0)
+      val discardedBytes = root["discarded"]?.integer ?: 0L
+      require(receivedBytes >= 0 && uploadedBytes >= 0 && discardedBytes >= 0)
       return TorrentCheckpoint(task, metadata, output, selected, verified,
         owned("files"), owned("directories"), receivedBytes, uploadedBytes,
-        trackerConfiguration, trackerRevision)
+        trackerConfiguration, trackerRevision, discardedBytes)
     }
   }
+}
+
+/**
+ * The payload counters a checkpoint of this engine saved, v1 or v2, read without decoding the
+ * rest of it, such as the metainfo a v1 one holds; null for bytes that are not one. The upload
+ * speed is not saved.
+ */
+internal fun checkpointPayload(bytes: ByteArray): TorrentPayloadCounters? {
+  val magic = "KETCH-TORRENT\n".encodeToByteArray()
+  if (bytes.size < magic.size || bytes.size > TorrentV2Checkpoint.MAX_BYTES ||
+    !bytes.copyOfRange(0, magic.size).contentEquals(magic)) return null
+  val root = try {
+    Bencode.parse(bytes.copyOfRange(magic.size, bytes.size), TorrentV2Checkpoint.MAX_BYTES,
+      1_000_000)
+  } catch (_: IllegalArgumentException) {
+    return null
+  }
+  if (root["kind"]?.text() != "ketch-kotlin-torrent") return null
+  fun count(key: String) = root[key]?.integer?.coerceAtLeast(0) ?: 0L
+  return TorrentPayloadCounters(count("received"), count("uploaded"), uploadSpeed = null,
+    discarded = count("discarded"))
 }
 
 /** Stable OS file identity, read without following a symlink. Null means ownership is unprovable. */

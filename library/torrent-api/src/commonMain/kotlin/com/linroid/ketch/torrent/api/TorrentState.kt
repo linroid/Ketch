@@ -16,8 +16,11 @@ enum class TorrentActivity {
 }
 
 /**
- * Aggregate counters. Payload excludes padding and protocol overhead; retries/discards are
- * separate.
+ * Aggregate counters. Payload excludes padding and protocol overhead.
+ * [receivedPayloadBytes], [uploadedPayloadBytes] and [discardedPayloadBytes] add up every session
+ * of the task, the ones before a restart included. [discardedPayloadBytes] is the part of
+ * [receivedPayloadBytes] thrown away rather than verified: duplicate or late blocks, pieces that
+ * fail their hash check, partial pieces given up, and web seed payload no verified piece kept.
  * [selectedVerifiedBytes] can decrease after selection changes or a failed recheck. Completion is
  * scoped to the snapshot's selection generation. Ratio is undefined when downloaded payload is
  * zero. A counter the backend does not track is `null`, never an invented zero.

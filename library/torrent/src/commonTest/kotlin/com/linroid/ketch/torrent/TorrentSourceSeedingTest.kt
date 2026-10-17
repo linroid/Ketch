@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.api.TorrentCapability
@@ -30,6 +31,7 @@ import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -263,6 +265,96 @@ class TorrentSourceSeedingTest {
           assertFalse(source.takeDeferredSharing("seeder"))
           source.assertNoLeaks()
         } finally { source.close() }
+      }
+    }
+  }
+
+  /** Each state [source]'s seeding sessions save, decoded, with the task's ID. */
+  private fun savedStates(
+    source: TorrentDownloadSource,
+  ): Channel<Pair<String, TorrentSourceState>> {
+    val saved = Channel<Pair<String, TorrentSourceState>>(Channel.UNLIMITED)
+    source.saveSessionStates { taskId, state -> saved.send(taskId to source.decodeState(state)) }
+    return saved
+  }
+
+  @Test
+  fun lentSeeder_savesItsCheckpointWhileItSeedsAndAsItStops() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION)).also {
+          it.engineFactory = { engine }
+          it.seedingSaveIntervalMs = 20
+        }
+        val saved = savedStates(source)
+        try {
+          val resolved = source.resolveMetainfo(v1Metainfo("seeder"))
+          val hash = resolved.metadata.getValue("infoHash")
+          val session = FakeTorrentSession(hash).apply { savedResumeData = byteArrayOf(1) }
+          engine.addTorrentResult = session
+          val seeds = launch {
+            eventually { session.resumed }
+            session.seed()
+          }
+          source.download(context("seeder", resolved, "unused-seeder"), null)
+          seeds.join()
+          // The run saved its own state; from here on only the seeder saves what it uploads.
+          session.savedResumeData = byteArrayOf(2)
+          while (true) {
+            val (taskId, state) = saved.receive()
+            assertEquals("seeder", taskId)
+            assertEquals(hash, state.infoHash)
+            if (state.resumeData == encodeBase64(byteArrayOf(2))) break
+          }
+          source.stopSeeding("seeder")
+          // The last one carries what it saved as it stopped.
+          var last: TorrentSourceState? = null
+          while (true) last = saved.tryReceive().getOrNull()?.second ?: break
+          assertEquals(encodeBase64(byteArrayOf(2)), assertNotNull(last).resumeData)
+          assertTrue(session.paused)
+          // Stopped, it saves nothing more.
+          session.savedResumeData = byteArrayOf(3)
+          delay(100)
+          val later = generateSequence { saved.tryReceive().getOrNull() }.toList()
+          assertTrue(later.none { it.second.resumeData == encodeBase64(byteArrayOf(3)) })
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun restoredSeeder_savesItsCheckpointBeforeTheEngineCloses() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        val saved = savedStates(source)
+        val metainfo = v1Metainfo("data")
+        val hash = TorrentMetadata.fromBencode(metainfo).infoHash.hex
+        val ids = TorrentFileTable.parse(metainfo, TorrentConfig()).ids
+        val state = TorrentSourceState(hash, 4, "", ids, "unused-data", encodeBase64(metainfo),
+          version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+        val session = FakeTorrentSession(hash).apply { savedResumeData = byteArrayOf(7) }
+        engine.addTorrentResult = session
+        val seeds = launch {
+          eventually { session.resumed }
+          session.seed()
+        }
+        assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
+          "http://fixture/data.torrent", state.saved(), null, "unused-data", ids)))
+        seeds.join()
+        source.close()
+        source.awaitClosed()
+        val (taskId, last) = saved.receive()
+        assertEquals("seeder", taskId)
+        // The state it was restored from, with the checkpoint it saved last.
+        assertEquals(state.copy(resumeData = encodeBase64(byteArrayOf(7))), last)
+        assertTrue(engine.closed)
       }
     }
   }

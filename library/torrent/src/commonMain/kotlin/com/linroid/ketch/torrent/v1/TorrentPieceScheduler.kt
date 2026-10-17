@@ -37,6 +37,12 @@ internal class TorrentPieceScheduler(
   private val pieceSize: (Int) -> Int,
   private val budget: TorrentBufferBudget,
   private val nowMs: () -> Long = monotonicClock(),
+  /**
+   * Payload handed to [received] that is thrown away rather than verified: a block not needed,
+   * a piece that fails its hash check or whose commit does not finish, and the blocks of a
+   * partial piece that closes. Called under the lock.
+   */
+  private val onDiscard: (Long) -> Unit = {},
 ) {
   private val mutex = Mutex()
   private var wanted = wanted.copyOf()
@@ -163,6 +169,13 @@ internal class TorrentPieceScheduler(
 
     /** Peers' requests outstanding on it. */
     val outstanding: Int get() = blocks - free - received
+
+    /** The bytes of the blocks it holds. */
+    fun receivedBytes(): Long {
+      var bytes = 0L
+      for (block in 0 until blocks) if (owner[block] == RECEIVED) bytes += length(block)
+      return bytes
+    }
   }
 
   init {
@@ -332,14 +345,18 @@ internal class TorrentPieceScheduler(
    */
   suspend fun received(peer: Int, index: Int, begin: Int, data: ByteArray): Arrival =
     mutex.withLock {
-      val piece = openPieces.getOrNull(index) ?: return@withLock Arrival.Unneeded
-      if (piece.committing || begin % BLOCK != 0) return@withLock Arrival.Unneeded
+      fun unneeded(): Arrival {
+        onDiscard(data.size.toLong())
+        return Arrival.Unneeded
+      }
+      val piece = openPieces.getOrNull(index) ?: return@withLock unneeded()
+      if (piece.committing || begin % BLOCK != 0) return@withLock unneeded()
       val block = begin / BLOCK
       if (block >= piece.blocks || data.size != piece.length(block)) {
-        return@withLock Arrival.Unneeded
+        return@withLock unneeded()
       }
       val owner = piece.owner[block]
-      if (owner == RECEIVED) return@withLock Arrival.Unneeded
+      if (owner == RECEIVED) return@withLock unneeded()
       data.copyInto(piece.bytes, begin)
       piece.owner[block] = RECEIVED
       piece.received++
@@ -366,7 +383,7 @@ internal class TorrentPieceScheduler(
     val piece = openPieces.getOrNull(index)?.takeIf { it.committing } ?: return@withLock false
     when (outcome) {
       CommitOutcome.VERIFIED -> {
-        close(piece)
+        close(piece, discard = false)
         markVerified(index)
         false
       }
@@ -376,6 +393,8 @@ internal class TorrentPieceScheduler(
       }
       CommitOutcome.CORRUPT, null -> {
         val alone = outcome != null && piece.contributors.singleOrNull() == peer
+        // Every block of it came; all of them are fetched again.
+        onDiscard(piece.bytes.size.toLong())
         piece.owner.fill(FREE)
         piece.duplicates = null
         piece.free = piece.blocks
@@ -567,9 +586,12 @@ internal class TorrentPieceScheduler(
     }
   }
 
-  /** The swarm stopped: every buffer still held goes back to the budget. */
+  /**
+   * The swarm stopped: every buffer still held goes back to the budget. A piece being committed
+   * is left to its commit, which may still verify it.
+   */
   suspend fun close(): Unit = mutex.withLock {
-    for (piece in open.values.toList()) close(piece)
+    for (piece in open.values.toList()) close(piece, discard = !piece.committing)
     for ((peer, run) in claims.toList()) run.forEach { releaseClaim(peer, it) }
     claims.clear()
     cancels.clear()
@@ -767,8 +789,12 @@ internal class TorrentPieceScheduler(
     searches.remove(peer)
   }
 
-  /** Closes [piece], canceling every request outstanding on it, and frees its buffer. */
-  private fun close(piece: OpenPiece) {
+  /**
+   * Closes [piece], canceling every request outstanding on it, and frees its buffer; the blocks
+   * it holds are discarded, unless they were not ([discard] false), as when it verified.
+   */
+  private fun close(piece: OpenPiece, discard: Boolean = true) {
+    if (discard) piece.receivedBytes().takeIf { it > 0 }?.let(onDiscard)
     for (block in 0 until piece.blocks) {
       val owner = piece.owner[block]
       if (owner >= 0) cancel(owner, piece.request(block))

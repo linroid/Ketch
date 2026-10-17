@@ -11,6 +11,7 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
 import com.linroid.ketch.core.task.ControlRevision
@@ -178,6 +179,45 @@ class SourceExtensionTest {
       runCurrent()
       assertEquals(listOf(setOf("0")), source.selections)
       assertIs<DownloadState.Completed>(task.state.value)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun saveSourceState_savesACompletedTasksStateOfItsSourceOnly() = runTest {
+    val source = ExtendedSource()
+    val store = RecordingTaskStore()
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val ketch = Ketch(
+      httpEngine = FakeHttpEngine(),
+      taskStore = store,
+      config = DownloadConfig(retryCount = 0, saveIntervalMs = 60_000),
+      additionalSources = listOf(source),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+    )
+    try {
+      val task = completedTask(ketch, source)
+      val host = assertNotNull(source.host)
+      val before = assertNotNull(store.load(task.taskId))
+
+      val seeded = SourceState(source.type, "{}")
+      host.saveSourceState(task, seeded)
+      val after = assertNotNull(store.load(task.taskId))
+      assertEquals(seeded, after.sourceState)
+      assertEquals(before.copy(sourceState = seeded, updatedAt = after.updatedAt), after)
+
+      // Another source's state never replaces it.
+      host.saveSourceState(task, SourceState("other", "{}"))
+      assertEquals(seeded, store.load(task.taskId)?.sourceState)
+
+      // Nor does a session's once the task runs again: its run saves its own.
+      task.selectFiles(setOf("0", "1", "2"))
+      runCurrent()
+      assertIs<DownloadState.Downloading>(task.state.value)
+      val running = store.load(task.taskId)?.sourceState
+      host.saveSourceState(task, SourceState(source.type, "{\"late\":true}"))
+      assertEquals(running, store.load(task.taskId)?.sourceState)
     } finally {
       ketch.close()
     }

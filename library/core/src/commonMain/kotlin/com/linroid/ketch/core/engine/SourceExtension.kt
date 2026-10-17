@@ -114,4 +114,14 @@ interface SourceHost {
     sharing: Boolean,
     onlyIf: () -> Boolean = { true },
   )
+
+  /**
+   * Saves [state] as the source state of the completed [task] ([TaskRecord.sourceState]), as
+   * Ketch saves what [DownloadSource.store] returns while a download runs: for a session the
+   * extension runs outside a download, such as one sharing the finished files, whose state keeps
+   * changing. Nothing is saved for a task that is no longer completed, as a run of it saves its
+   * own, nor for the state of another source. It never waits for the task's other control
+   * changes, so it may be called from one, such as a command's `afterSave`.
+   */
+  suspend fun saveSourceState(task: DownloadTask, state: SourceState)
 }

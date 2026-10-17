@@ -72,6 +72,10 @@ run [`ketch server`](#seeding-and-uploading).
 
 Progress counts verified bytes of the files you chose. The network speed also counts bytes that
 are received but not kept, such as retries and the parts of pieces that overlap a skipped file.
+Ketch counts those as discarded: blocks that came twice or after they were canceled, pieces that
+fail their hash check, partial pieces it gives up, such as when their only peer leaves, and what a
+web seed sent before a request failed. Received, uploaded and discarded totals last across
+restarts, seeding included: a seeding task saves them about every minute and as it stops.
 
 ### Opening `.torrent` files in the apps
 
@@ -571,7 +575,10 @@ It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp
 which describe the backend, not its current settings, and `seeding` while the configured policy is
 `SEED_AFTER_COMPLETION`, also while uploads are paused), `snapshot(taskId)`, sorted file
 pages (`files`), and `select` and `setSeeding` commands guarded by a revision and an idempotency
-key. Follow a task's snapshots with `ketch.subscribe(TorrentInterest(taskId))`. `RemoteKetch`
+key. A snapshot's `counters` add up every session of the task: `receivedPayloadBytes`,
+`uploadedPayloadBytes` and `discardedPayloadBytes`, the part of the received payload thrown away
+rather than verified. While no session runs they are the totals the task saved last. Follow a
+task's snapshots with `ketch.subscribe(TorrentInterest(taskId))`. `RemoteKetch`
 returns a controller that works over `/api/torrents` with servers listing `torrent.control`. See the
 [control contract](design/torrent-control-contract.md#version-1-runtime).
 

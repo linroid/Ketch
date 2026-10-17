@@ -119,7 +119,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
   (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
   `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
-  `selectFiles`/`setSharing`, `showSharing` and `saveSharingIntent`),
+  `selectFiles`/`setSharing`, `showSharing`, `saveSharingIntent` and `saveSourceState`, which
+  saves a completed task's source state for a session outside a download, such as a seeder's),
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
   `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`, `HttpExchange`,
@@ -759,6 +760,25 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   stopped keeps it.
   `TorrentDownloadSource(..., restoreSeeding = false)`, as `ketch mcp --standalone` builds it,
   never restores, never bumps `sharingResumes` and never records deferred intents
+- Payload counters (`TorrentCounters`): received, uploaded and, of what was received,
+  `discardedPayloadBytes`, thrown away rather than verified: duplicate, late, canceled or stale
+  blocks, pieces that fail their hash check, are no longer wanted or fail to store, partial pieces
+  given up (evicted, deselected, verified by a web seed, their last peer gone, the swarm
+  stopping), and what a web seed run brought that no verified piece keeps (`WebSeedWorker`'s
+  `discardPayload`, at each run's end). v1 counts them through `TorrentPieceScheduler`'s
+  `onDiscard` and `TorrentSwarm.onDiscarded`, v2 through `TorrentV2PieceScheduler.create`'s
+  `onDiscard` into `TorrentV2PieceStore.recordDiscarded`. Both checkpoints save them
+  (`discarded`, 0 in older ones), and restoring raises each counter to at least what was saved.
+  Seeding sessions save their checkpoint into the task's record, as no download run does:
+  `TorrentControls` hands the source `SourceHost.saveSourceState`
+  (`TorrentControlSource.saveSessionStates`, completed tasks of the source only, never while a
+  run is active), which the source calls about every minute while a task seeds (its seed
+  watcher), as a seeder stops (`stopSession`: Stop seeding, the watcher, a waiting download), and
+  as the source closes: `close()` lets its seeders save, within 5 s, before it closes the engine
+  (`awaitClosed`). A task's state from before (a lent seeder's last run, or the one
+  `startSeeding` restored) is what each save updates. Without a session, `countersOf` reports the
+  record's checkpoint (`TorrentControlSource.savedPayload`; `checkpointPayload` reads only the
+  counters)
 - Paused uploads, orthogonal to the upload policy (the phone apps' Wi-Fi gate):
   `TorrentDownloadSource(uploadsPaused = ...)` (so hosts start paused before `Ketch.start()`
   restores seeding) and `setUploadsPaused(paused)` (applied under `engineMutex` like

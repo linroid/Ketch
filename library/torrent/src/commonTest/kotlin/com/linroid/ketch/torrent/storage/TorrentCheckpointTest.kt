@@ -44,6 +44,36 @@ class TorrentCheckpointTest {
   }
 
   @Test
+  fun payloadCounters_roundTripAndReadWithoutTheMetainfo() {
+    val checkpoint = TorrentCheckpoint("test", metadata, "/tmp/pack", setOf(0),
+      BooleanArray(metadata.pieceHashes.size / 20), emptyList(), emptyList(),
+      receivedBytes = 300, uploadedBytes = 200, discardedBytes = 100)
+    val encoded = checkpoint.encode()
+    val decoded = assertNotNull(TorrentCheckpoint.decode(encoded))
+    assertEquals(300L, decoded.receivedBytes)
+    assertEquals(200L, decoded.uploadedBytes)
+    assertEquals(100L, decoded.discardedBytes)
+    val counters = assertNotNull(checkpointPayload(encoded))
+    assertEquals(300L, counters.received)
+    assertEquals(200L, counters.uploaded)
+    assertEquals(100L, counters.discarded)
+    // A checkpoint older builds wrote has no discarded payload.
+    val prefix = "KETCH-TORRENT\n".encodeToByteArray()
+    @Suppress("UNCHECKED_CAST")
+    val fields = Bencode.parse(encoded.copyOfRange(prefix.size, encoded.size)).legacyValue()
+      as Map<String, Any>
+    val older = prefix + Bencode.encode(fields - "discarded")
+    assertEquals(0L, assertNotNull(TorrentCheckpoint.decode(older)).discardedBytes)
+    assertEquals(0L, assertNotNull(checkpointPayload(older)).discarded)
+    assertFailsWith<IllegalArgumentException> {
+      TorrentCheckpoint.decode(prefix + Bencode.encode(fields + ("discarded" to -1L)))
+    }
+    // Native resume data, and bytes that are no checkpoint, hold no counters.
+    assertNull(checkpointPayload("d8:resumable4:yes!e".encodeToByteArray()))
+    assertNull(checkpointPayload(prefix + "not bencode".encodeToByteArray()))
+  }
+
+  @Test
   fun restoringManyOwnedFilesBuildsOutputPathsOnce() = runTest {
     val parsed = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
       "name" to "pack", "piece length" to 1L, "pieces" to ByteArray(0),

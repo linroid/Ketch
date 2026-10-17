@@ -71,6 +71,7 @@ internal class TorrentV2PieceStore(
   // Counted per block without the store lock; checkpoints and restore read and write them.
   private val receivedCounter = AtomicLong(0)
   private val uploadedCounter = AtomicLong(0)
+  private val discardedCounter = AtomicLong(0)
   private var root: Path? = null
   private var creationLog: TorrentV2CreationLog? = null
   // The selection a legacy creation log is bound to; null once it is bound without one.
@@ -482,6 +483,7 @@ internal class TorrentV2PieceStore(
     require(uploadedBytes == null || uploadedBytes >= uploadedCounter.load())
     val received = receivedBytes ?: receivedCounter.load()
     val uploaded = uploadedBytes ?: uploadedCounter.load()
+    val discarded = discardedCounter.load()
     val destination = checkNotNull(root)
     val records = owned.map { (path, claim) ->
       val components = if (path == destination) emptyList() else
@@ -490,7 +492,7 @@ internal class TorrentV2PieceStore(
     }
     val checkpoint = TorrentV2Checkpoint.create(document, taskId, destination.toString(), selected,
       records, pieceBitfield(verified).toByteString(), layoutGeneration, selectionGeneration,
-      received, uploaded)
+      received, uploaded, discarded)
     raise(receivedCounter, received)
     raise(uploadedCounter, uploaded)
     return checkpoint
@@ -518,8 +520,10 @@ internal class TorrentV2PieceStore(
     selectionGeneration = checkpoint.selectionGeneration +
       if (checkpoint.selected == selected) 0 else 1
     restoredSelection = checkpoint.selected
-    receivedCounter.store(checkpoint.receivedBytes)
-    uploadedCounter.store(checkpoint.uploadedBytes)
+    // Never below what was counted: the saved totals may be older than this store's.
+    raise(receivedCounter, checkpoint.receivedBytes)
+    raise(uploadedCounter, checkpoint.uploadedBytes)
+    raise(discardedCounter, checkpoint.discardedBytes)
     // Never adopt verifiedHint: current payloads must pass commit or recheck before publication.
     verified.fill(false)
     progress.fill(0)
@@ -547,6 +551,19 @@ internal class TorrentV2PieceStore(
   /** Counts payload written to peers; never takes the store lock. */
   fun recordUploaded(bytes: Int) = add(uploadedCounter, bytes)
 
+  /**
+   * Counts payload [recordReceived] counted that was thrown away rather than verified; never
+   * takes the store lock.
+   */
+  fun recordDiscarded(bytes: Long) {
+    require(bytes >= 0)
+    while (true) {
+      val current = discardedCounter.load()
+      require(current <= Long.MAX_VALUE - bytes)
+      if (discardedCounter.compareAndSet(current, current + bytes)) return
+    }
+  }
+
   private fun add(counter: AtomicLong, bytes: Int) {
     require(bytes >= 0)
     while (true) {
@@ -559,6 +576,8 @@ internal class TorrentV2PieceStore(
   fun receivedBytes(): Long = receivedCounter.load()
 
   fun uploadedBytes(): Long = uploadedCounter.load()
+
+  fun discardedBytes(): Long = discardedCounter.load()
 
   /** Raises [counter] to at least [value]; a concurrent increment is never lost. */
   private fun raise(counter: AtomicLong, value: Long) {

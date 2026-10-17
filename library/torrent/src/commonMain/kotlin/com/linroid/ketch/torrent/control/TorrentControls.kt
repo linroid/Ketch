@@ -64,6 +64,13 @@ internal class TorrentControls(
     },
   )
 
+  init {
+    // A seeding session's checkpoint, with what it uploaded, goes into its task's record.
+    source.saveSessionStates { taskId, state ->
+      host.tasks.value.firstOrNull { it.taskId == taskId }?.let { host.saveSourceState(it, state) }
+    }
+  }
+
   @Suppress("UNCHECKED_CAST")
   override fun <T : Any> controller(key: ControlKey<T>): T? =
     if (key === TorrentController.Key) controller as T else null

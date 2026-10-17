@@ -48,6 +48,7 @@ import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceResolver
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.engine.decodeState
@@ -562,6 +563,18 @@ class Ketch(
           )
         }
         log.d { "Saved sharing intent of taskId=${handle.taskId}: $sharing" }
+      }
+    }
+
+    // Never under the control lock: a command's afterSave holds it while it stops seeding,
+    // which saves the seeder's state. The record update alone orders it against a run starting.
+    override suspend fun saveSourceState(task: DownloadTask, state: SourceState) {
+      val handle = handleOf(task) ?: return
+      fun saves(record: TaskRecord) =
+        record.state == TaskState.COMPLETED && record.sourceType == state.sourceType
+      if (!saves(handle.record.value)) return
+      handle.record.update {
+        if (saves(it)) it.copy(sourceState = state, updatedAt = Clock.System.now()) else it
       }
     }
   }

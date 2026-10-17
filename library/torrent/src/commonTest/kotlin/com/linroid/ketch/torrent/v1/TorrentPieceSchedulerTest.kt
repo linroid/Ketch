@@ -68,6 +68,47 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun discardedPayload_countsWhatNoVerifiedPieceKeeps() = runTest {
+    val budget = TorrentBufferBudget(2 * piece)
+    var discarded = 0L
+    val scheduler = TorrentPieceScheduler(all(2), BooleanArray(2), { piece }, budget, { 0 },
+      onDiscard = { discarded += it })
+    scheduler.availability(1, all(2))
+    scheduler.availability(2, all(2))
+    val first = scheduler.request(1, max = 4).requests
+    assertEquals(List(4) { 0 }, first.map { it.index })
+    scheduler.deliver(1, first.take(3))
+    // A second copy of a block it holds, and a block of a piece nobody opened.
+    assertIs<TorrentPieceScheduler.Arrival.Unneeded>(scheduler.received(1, 0, 0, data(0, 0)))
+    assertIs<TorrentPieceScheduler.Arrival.Unneeded>(scheduler.received(1, 1, 0, data(1, 0)))
+    assertEquals(2L * block, discarded)
+    // A piece that fails its hash check is fetched again, all of it.
+    assertIs<TorrentPieceScheduler.Arrival.Complete>(scheduler.deliver(1, first.drop(3)))
+    scheduler.finish(1, 0, CommitOutcome.CORRUPT)
+    assertEquals(2L * block + piece, discarded)
+    // One that verifies keeps what it received.
+    val again = scheduler.request(2, max = 4).requests
+    assertEquals(List(4) { 0 }, again.map { it.index })
+    assertIs<TorrentPieceScheduler.Arrival.Complete>(scheduler.deliver(2, again))
+    scheduler.finish(2, 0, CommitOutcome.VERIFIED)
+    assertEquals(2L * block + piece, discarded)
+    // A partial piece no connected peer has gives up the blocks it holds.
+    val partial = scheduler.request(2, max = 1).requests
+    assertEquals(1 to 0, partial.single().let { it.index to it.begin })
+    scheduler.deliver(2, partial)
+    scheduler.remove(1)
+    assertEquals(2L * block + piece, discarded)
+    scheduler.remove(2)
+    assertEquals(3L * block + piece, discarded)
+    // So does one the stopping swarm still assembles.
+    scheduler.availability(3, all(2))
+    scheduler.deliver(3, scheduler.request(3, max = 1).requests)
+    scheduler.close()
+    assertEquals(4L * block + piece, discarded)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun requestsRunAcrossPieceEnds() = runTest {
     val budget = TorrentBufferBudget(4 * piece)
     val scheduler = scheduler(pieces = 4, budget)

@@ -786,16 +786,21 @@ internal class TorrentPieceStore(
   }
 
   /** Flushes a snapshot file before returning bytes for publication through TaskStore. */
-  suspend fun persistCheckpoint(receivedBytes: Long = 0, uploadedBytes: Long = 0): ByteArray =
-    mutex.withLock {
-      persistSnapshot(receivedBytes, uploadedBytes, trackerConfiguration, trackerRevision)
-    }
+  suspend fun persistCheckpoint(
+    receivedBytes: Long = 0,
+    uploadedBytes: Long = 0,
+    discardedBytes: Long = 0,
+  ): ByteArray = mutex.withLock {
+    persistSnapshot(receivedBytes, uploadedBytes, discardedBytes, trackerConfiguration,
+      trackerRevision)
+  }
 
   /** The caller retains admission for the configuration while the store uses it. */
   suspend fun replaceTrackerConfiguration(
     configuration: TrackerConfiguration,
     receivedBytes: Long = 0,
     uploadedBytes: Long = 0,
+    discardedBytes: Long = 0,
     expectedRevision: Long? = null,
   ): ByteArray = mutex.withLock {
     require(expectedRevision == null || expectedRevision >= 0)
@@ -803,16 +808,18 @@ internal class TorrentPieceStore(
       throw TrackerRevisionConflict(expectedRevision, trackerRevision)
     }
     check(trackerRevision < Long.MAX_VALUE) { "Tracker configuration revision exhausted" }
-    persistSnapshot(receivedBytes, uploadedBytes, configuration, trackerRevision + 1)
+    persistSnapshot(receivedBytes, uploadedBytes, discardedBytes, configuration,
+      trackerRevision + 1)
   }
 
   private suspend fun persistSnapshot(
     receivedBytes: Long,
     uploadedBytes: Long,
+    discardedBytes: Long,
     configuration: TrackerConfiguration?,
     revision: Long,
   ): ByteArray {
-    require(receivedBytes >= 0 && uploadedBytes >= 0)
+    require(receivedBytes >= 0 && uploadedBytes >= 0 && discardedBytes >= 0)
     check(initialized)
     return storageOperation {
       if (journal.needsCompaction) {
@@ -830,7 +837,8 @@ internal class TorrentPieceStore(
       }
       val temp = sidecar / ("checkpoint-" + InfoHash.fromBytes(torrentRandomBytes(20)).hex + ".tmp")
       val data = snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes,
-        trackerConfiguration = configuration, trackerRevision = revision).encode()
+        discardedBytes = discardedBytes, trackerConfiguration = configuration,
+        trackerRevision = revision).encode()
       try {
         fileSystem.openReadWrite(temp, mustCreate = true).use { handle ->
           recordOwned(temp, directory = false)
@@ -845,7 +853,8 @@ internal class TorrentPieceStore(
         ownedFiles[checkpointPath] = identity
         trackerConfiguration = configuration
         trackerRevision = revision
-        snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes).encode()
+        snapshot().copy(receivedBytes = receivedBytes, uploadedBytes = uploadedBytes,
+          discardedBytes = discardedBytes).encode()
       } catch (failure: Throwable) {
         // Blocking cleanup stays inside the admitted I/O operation, even on cancellation.
         // After a successful rename the temporary path is no longer in ownedFiles.

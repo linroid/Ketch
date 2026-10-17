@@ -302,7 +302,8 @@ internal class TorrentV2DownloadSession private constructor(
   }
 
   override suspend fun payloadCounters(): TorrentPayloadCounters =
-    TorrentPayloadCounters(store.receivedBytes(), store.uploadedBytes(), uploadSpeed())
+    TorrentPayloadCounters(store.receivedBytes(), store.uploadedBytes(), uploadSpeed(),
+      store.discardedBytes())
 
   private class UploadSample(val atMs: Long, val bytes: Long, val speed: Long)
   private val clock = monotonicClock()

@@ -32,6 +32,7 @@ import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentStallReason
+import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -91,6 +92,19 @@ class KetchTorrentControllerTest {
 
     override suspend fun liveTorrent(taskId: String): LiveTorrent? = live[taskId]
 
+    /** Saved counters by the source state data that holds them. */
+    val payloads = mutableMapOf<String, TorrentPayloadCounters>()
+
+    override suspend fun savedPayload(sourceState: SourceState?): TorrentPayloadCounters? =
+      sourceState?.let { payloads[it.data] }
+
+    /** Where the controls save seeding states, once attached. */
+    var saveState: (suspend (taskId: String, state: SourceState) -> Unit)? = null
+
+    override fun saveSessionStates(save: suspend (taskId: String, state: SourceState) -> Unit) {
+      saveState = save
+    }
+
     override suspend fun seedingAvailability(taskId: String): SeedingOutcome? = availability
 
     override suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
@@ -99,8 +113,12 @@ class KetchTorrentControllerTest {
       return SeedingOutcome.SEEDING
     }
 
+    /** What [stopSeeding] saves, as a seeder saves its checkpoint as it stops. */
+    var stopState: SourceState? = null
+
     override suspend fun stopSeeding(taskId: String) {
       stopped += taskId
+      stopState?.let { assertNotNull(saveState)(taskId, it) }
       seeding.update { it - taskId }
     }
   }
@@ -637,6 +655,48 @@ class KetchTorrentControllerTest {
   }
 
   @Test
+  fun snapshot_withoutSession_reportsTheCountersTheSeederSaved() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    try {
+      val task = completedTask(ketch, source)
+      source.live[task.taskId] = LiveTorrent(TorrentActivity.SEEDING, 100, 2048, 512,
+        discardedPayloadBytes = 7)
+      assertEquals(7, assertNotNull(ketch.torrents.snapshot(task.taskId)?.counters)
+        .discardedPayloadBytes)
+      // The seeder saves its checkpoint into the task's record, then stops.
+      val state = SourceState(source.type, "seeded")
+      source.payloads[state.data] = TorrentPayloadCounters(100, 4096, null, discarded = 9)
+      assertNotNull(source.saveState)(task.taskId, state)
+      assertEquals(state, task.saved.sourceState)
+      source.live.remove(task.taskId)
+      val counters = assertNotNull(ketch.torrents.snapshot(task.taskId)?.counters)
+      assertEquals(100, counters.receivedPayloadBytes)
+      assertEquals(4096, counters.uploadedPayloadBytes)
+      assertEquals(9, counters.discardedPayloadBytes)
+      assertNull(counters.uploadBytesPerSecond)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun saveSourceState_leavesATaskThatIsNotCompletedAlone() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    try {
+      val task = pausedTask(ketch)
+      val before = task.saved.sourceState
+      assertNotNull(source.saveState)(task.taskId, SourceState(source.type, "late"))
+      assertEquals(before, task.saved.sourceState)
+      // Nor a task it does not know.
+      assertNotNull(source.saveState)("missing", SourceState(source.type, "late"))
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun snapshot_stalledDownload_saysWhy() = runTest {
     val source = ControlledSource()
     val ketch = ketch(source)
@@ -812,6 +872,32 @@ class KetchTorrentControllerTest {
       assertEquals(on, controller.setSeeding(task.taskId, true, context("on", on.revision)))
       runCurrent()
       assertEquals(1, source.started.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun setSeeding_offSavesTheSeedersState_withoutWaitingForItsOwnCommand() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.SEEDING.wireName
+    val ketch = ketch(source)
+    try {
+      ketch.start()
+      val task = completedTask(ketch, source)
+      val controller = ketch.torrents
+      val on = controller.setSeeding(
+        task.taskId, true, context("on", controller.revisionOf(task.taskId)),
+      )
+      runCurrent()
+      // The command stops the seeder while it holds the task's control, and the seeder saves.
+      val state = SourceState(source.type, "stopped")
+      source.stopState = state
+      val off = controller.setSeeding(task.taskId, false, context("off", on.revision))
+      runCurrent()
+      assertEquals(false, off.seeding)
+      assertEquals(state, task.saved.sourceState)
+      assertEquals(false, task.saved.control?.sharing)
     } finally {
       ketch.close()
     }

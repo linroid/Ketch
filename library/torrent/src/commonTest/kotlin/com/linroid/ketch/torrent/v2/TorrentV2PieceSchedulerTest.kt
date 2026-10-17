@@ -741,6 +741,63 @@ class TorrentV2PieceSchedulerTest {
   }
 
   @Test
+  fun discardedPayload_countsLostCopiesCorruptPiecesAndEvictions() = runTest {
+    var now = 0L
+    var discarded = 0L
+    val buffers = TorrentBufferBudget(200_000)
+    val state = TorrentBufferBudget(2_000_000)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(layout, emptySet(),
+      BooleanArray(2), buffers, state, nowMs = { now }, onDiscard = { discarded += it }))
+    val slow = Peer(buffers, layout)
+    val fast = Peer(buffers, layout)
+    val path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-scheduler-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val store = TorrentV2PieceStore(document, path, emptySet(), "test", buffers, Semaphore(1))
+    try {
+      store.initialize()
+      slow.ready()
+      fast.ready()
+      assertTrue(scheduler.begin(1))
+      val plan = assertNotNull(scheduler.planNext(slow.exchange, lateAfterMs = 1_000) { true })
+      slow.send(scheduler, plan)
+      now = 1_500
+      fast.send(scheduler, assertNotNull(
+        scheduler.planDuplicate(fast.exchange, endgame = false) { true }))
+      // The copy that comes first is kept, wrong as it is; the other is thrown away.
+      for (peer in listOf(fast, slow)) {
+        assertTrue(scheduler.receive(peer.exchange, assertIs<PeerBlockExchange.Response.Block>(
+          peer.receive(PeerMessage.Piece(1, 0, byteArrayOf(8))))))
+      }
+      assertEquals(1L, discarded)
+      // The piece fails its hash check: every block of it is fetched again.
+      TorrentV2CommitWorker.run(store) { worker ->
+        assertEquals(1, scheduler.submitReady(worker))
+        val completion = assertIs<TorrentV2CommitWorker.Completion.Committed>(
+          worker.completions.receive())
+        assertFalse(completion.verified)
+        assertTrue(scheduler.completed(completion))
+      }
+      assertEquals(2L, discarded)
+      // A partial piece nobody has any more gives up the blocks it holds.
+      assertTrue(scheduler.begin(0))
+      val ticket = assertNotNull(scheduler.requestNext(slow.exchange))
+      val request = ticket.request
+      assertTrue(scheduler.receive(slow.exchange, assertIs<PeerBlockExchange.Response.Block>(
+        slow.receive(PeerMessage.Piece(0, request.begin,
+          bytes.copyOfRange(request.begin, request.begin + request.length))))))
+      assertEquals(1, scheduler.evictUnavailable { false })
+      assertEquals(2L + request.length, discarded)
+    } finally {
+      scheduler.removePeer(slow.exchange)
+      scheduler.removePeer(fast.exchange)
+      scheduler.close()
+      store.cleanup()
+    }
+    assertEquals(0, buffers.allocated)
+    assertEquals(0, state.allocated)
+  }
+
+  @Test
   fun endgame_duplicatesOutstandingBlocksAtOnce_andARejectedFirstRequestLeavesItToTheCopy() =
     runTest {
       val buffers = TorrentBufferBudget(200_000)

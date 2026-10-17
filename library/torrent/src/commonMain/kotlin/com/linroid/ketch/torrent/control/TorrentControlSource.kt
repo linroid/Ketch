@@ -8,6 +8,7 @@ import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -64,6 +65,20 @@ internal interface TorrentControlSource {
   suspend fun liveTorrent(taskId: String): LiveTorrent?
 
   /**
+   * The payload counters of the checkpoint in [sourceState], what the task's sessions counted
+   * until it was saved; `null` when it holds none, such as before a session started.
+   */
+  suspend fun savedPayload(sourceState: SourceState?): TorrentPayloadCounters? = null
+
+  /**
+   * Where the source saves the state of a task's session that runs outside a download, such as
+   * one seeding, with its latest checkpoint: no download run saves it, so its payload counters
+   * would otherwise go back to what the task completed with. [TorrentControls] sets it once;
+   * until then such states are not saved.
+   */
+  fun saveSessionStates(save: suspend (taskId: String, state: SourceState) -> Unit) {}
+
+  /**
    * Why [startSeeding] would not share the task now, or `null` when it could start. Has no side
    * effects.
    */
@@ -105,6 +120,8 @@ private val NO_SHARING_RESUMES: StateFlow<Long> = MutableStateFlow(0L)
  *   tracked
  * @property uploadBytesPerSecond the current upload speed, or `null` when not tracked
  * @property stall why the download makes no progress, while it downloads and does not
+ * @property discardedPayloadBytes the part of [receivedPayloadBytes] thrown away rather than
+ *   verified, or `null` when not tracked
  */
 internal class LiveTorrent(
   val activity: TorrentActivity,
@@ -112,6 +129,7 @@ internal class LiveTorrent(
   val uploadedPayloadBytes: Long?,
   val uploadBytesPerSecond: Long?,
   val stall: TorrentStall? = null,
+  val discardedPayloadBytes: Long? = null,
 )
 
 /**

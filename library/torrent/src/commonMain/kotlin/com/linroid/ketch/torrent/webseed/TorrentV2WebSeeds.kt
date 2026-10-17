@@ -171,7 +171,7 @@ internal class TorrentV2WebSeeds private constructor(
   private fun CoroutineScope.launchSeed(seed: Int) = launch {
     try {
       WebSeedWorker(urls[seed], Pieces(seed), http, stats, logLabel, reporter, retryMs,
-        downloadPayload = downloadPayload).run()
+        downloadPayload = downloadPayload, discardPayload = store::recordDiscarded).run()
     } catch (e: TorrentStorageException) {
       events.trySend(Event.Failed(e))
     }

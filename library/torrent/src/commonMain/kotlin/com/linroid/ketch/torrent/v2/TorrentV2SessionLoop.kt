@@ -254,7 +254,8 @@ internal object TorrentV2SessionLoop {
     val diagnostics = swarm?.let { PeerDiagnostics(listener = it.runtime.peerOutcomes) }
     try {
       val pieces = checkNotNull(TorrentV2PieceScheduler.create(layout, selectedIds,
-        store.verifiedPieces(), buffers, state, maxActive, nowMs)) {
+        store.verifiedPieces(), buffers, state, maxActive, nowMs,
+        onDiscard = store::recordDiscarded)) {
         "Piece scheduler budget exhausted"
       }
       scheduler = pieces

@@ -20,6 +20,7 @@ import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.decodeState
+import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentReachability
@@ -36,6 +37,7 @@ import com.linroid.ketch.torrent.engine.MAGNET_LOOKUP_TIME
 import com.linroid.ketch.torrent.engine.KotlinTorrentSession
 import com.linroid.ketch.torrent.engine.TorrentActiveSlots
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
+import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import com.linroid.ketch.torrent.engine.TorrentEngine
 import com.linroid.ketch.torrent.engine.TorrentSession
 import com.linroid.ketch.torrent.engine.TorrentSessionRegistry
@@ -54,6 +56,7 @@ import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.TorrentStorageException
 import com.linroid.ketch.torrent.storage.TorrentV2Checkpoint
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
+import com.linroid.ketch.torrent.storage.checkpointPayload
 import com.linroid.ketch.torrent.storage.torrentSystemFileSystem
 import com.linroid.ketch.torrent.tracker.TrackerLists
 import com.linroid.ketch.torrent.tracker.bundledTrackers
@@ -76,6 +79,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -159,6 +163,9 @@ class TorrentDownloadSource(
   /** Test hook: how long one magnet metadata lookup runs before the next starts. */
   internal var magnetLookupTime: Duration = MAGNET_LOOKUP_TIME
 
+  /** Test hook: how often a seeding session saves its state into its task's record. */
+  internal var seedingSaveIntervalMs: Long = SEEDING_SAVE_INTERVAL_MS
+
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
     // May map ports and join the LAN's discovery group; TorrentConfig.portMapping and
@@ -190,6 +197,17 @@ class TorrentDownloadSource(
   private val states = linkedMapOf<String, TorrentSourceState>()
   // Guarded by stateMutex: what stops each seeding session's lent slot coming back.
   private val seedWatchers = mutableMapOf<String, Job>()
+  // The state each seeding session saves its checkpoint into, by task ([saveSeedingState]): set
+  // once it seeds, removed once it stops or a run of the task takes it over.
+  private val seedStates = MutableStateFlow<Map<String, TorrentSourceState>>(emptyMap())
+  // Where seeding sessions save their state: the task records, once attached.
+  private val sessionStates =
+    AtomicReference<(suspend (taskId: String, state: SourceState) -> Unit)?>(null)
+  // The payload counters of recent saved states, newest first, matched by identity.
+  private val savedPayloads =
+    MutableStateFlow<List<Pair<SourceState, TorrentPayloadCounters?>>>(emptyList())
+  // Seeders saving their state as the source closes, before the engine stops them.
+  private val shutdown = AtomicReference<Job?>(null)
   private val fileTables = TorrentFileTables()
   private val seeding = MutableStateFlow<Set<String>>(emptySet())
   // Tasks waiting in withActiveSlot for one of the engine's slots.
@@ -227,6 +245,12 @@ class TorrentDownloadSource(
       source.torrentFiles(sourceState, resolved)
 
     override suspend fun liveTorrent(taskId: String) = source.liveTorrent(taskId)
+
+    override suspend fun savedPayload(sourceState: SourceState?) =
+      source.savedPayload(sourceState)
+
+    override fun saveSessionStates(save: suspend (taskId: String, state: SourceState) -> Unit) =
+      source.saveSessionStates(save)
 
     override suspend fun seedingAvailability(taskId: String) = source.seedingAvailability(taskId)
 
@@ -360,9 +384,35 @@ class TorrentDownloadSource(
       slots.close()
       scope.cancel()
       seeding.value = emptySet()
-      engine.exchange(null)?.close()
+      val running = engine.exchange(null)
+      val seeders = seedStates.getAndUpdate { emptyMap() }
+      if (running == null || seeders.isEmpty()) {
+        running?.close()
+      } else {
+        // Seeders save what they uploaded before the engine stops them, as no download run
+        // saves it; within a bound, so a session that cannot save never keeps the engine open.
+        shutdown.store(CoroutineScope(TorrentDispatchers.disk).launch {
+          try {
+            withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
+              for ((taskId, base) in seeders) {
+                tasks.session(taskId)?.let { saveSeedingState(taskId, it, base) }
+              }
+            }
+          } finally {
+            running.close()
+          }
+        })
+      }
       if (httpDelegate.isInitialized()) http.close()
     }
+  }
+
+  /**
+   * Waits until [close] stopped the engine, which it does once the seeding sessions saved their
+   * state; at once when it stopped it as it closed.
+   */
+  internal suspend fun awaitClosed() {
+    shutdown.load()?.join()
   }
 
   /** The configuration of the next engine: the config with what the setters changed since. */
@@ -674,7 +724,58 @@ class TorrentDownloadSource(
     }
     val counters = session.payloadCounters()
     return LiveTorrent(activity, counters.received, counters.uploaded, counters.uploadSpeed,
-      stall = session.stall.value.takeIf { activity == TorrentActivity.DOWNLOADING })
+      stall = session.stall.value.takeIf { activity == TorrentActivity.DOWNLOADING },
+      discardedPayloadBytes = counters.discarded)
+  }
+
+  /**
+   * What [TorrentControlSource.savedPayload] reports: the counters of the checkpoint in
+   * [sourceState], read once per saved state.
+   */
+  internal suspend fun savedPayload(sourceState: SourceState?): TorrentPayloadCounters? {
+    if (sourceState == null) return null
+    savedPayloads.value.firstOrNull { it.first === sourceState }?.let { return it.second }
+    val counters = withContext(TorrentDispatchers.engine) {
+      try {
+        decodeState(sourceState).resumeData.takeIf { it.isNotEmpty() }
+          ?.let { checkpointPayload(decodeBase64(it)) }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.d { "Saved torrent state has no readable checkpoint: ${e.describeCauses()}" }
+        null
+      }
+    }
+    savedPayloads.update { (listOf(sourceState to counters) + it).take(MAX_SAVED_PAYLOADS) }
+    return counters
+  }
+
+  /** What [TorrentControlSource.saveSessionStates] sets. */
+  internal fun saveSessionStates(save: suspend (taskId: String, state: SourceState) -> Unit) {
+    sessionStates.store(save)
+  }
+
+  /**
+   * Saves the latest checkpoint of [taskId]'s seeding [session], as [base] with its resume data,
+   * into the task's record through [sessionStates]: no download run saves it, so the payload
+   * counters, what it uploaded above all, would otherwise go back to what the task completed
+   * with after a restart. A failure is logged, and the record keeps its last state.
+   */
+  private suspend fun saveSeedingState(
+    taskId: String,
+    session: TorrentSession,
+    base: TorrentSourceState,
+  ) {
+    val save = sessionStates.load() ?: return
+    try {
+      val saved = session.saveResumeData() ?: return
+      save(taskId, encodeState(base.copy(resumeData = encodeBase64(saved))))
+      log.d { "Torrent taskId=$taskId saved its seeding state" }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Torrent taskId=$taskId could not save its seeding state: ${e.describeCauses()}" }
+    }
   }
 
   internal suspend fun seedingAvailability(taskId: String): SeedingOutcome? = when {
@@ -752,6 +853,7 @@ class TorrentDownloadSource(
         else -> if (pausedUploads.load()) SeedingOutcome.UPLOADS_PAUSED else SeedingOutcome.FAILED
       }
       if (outcome == SeedingOutcome.SEEDING) {
+        seedStates.update { it + (taskId to plan.state) }
         markSeeding(taskId)
         watchSeeder(taskId, session)
         log.i { "Torrent taskId=$taskId seeds again" }
@@ -781,8 +883,15 @@ class TorrentDownloadSource(
     }
   }
 
-  /** A completed task's seed-only session: its identity and how to open it. */
-  private class SeedPlan(val hash: String, val open: suspend () -> TorrentSession)
+  /**
+   * A completed task's seed-only session: its identity, the state it saves its checkpoint into,
+   * and how to open it.
+   */
+  private class SeedPlan(
+    val hash: String,
+    val state: TorrentSourceState,
+    val open: suspend () -> TorrentSession,
+  )
 
   private suspend fun seedPlan(task: SeedingTask): SeedPlan {
     val state = decodeState(task.sourceState)
@@ -806,7 +915,7 @@ class TorrentDownloadSource(
         maxFiles = config.maxFilesPerTorrent)
       val hash = document.info.hash.hex
       require(hash == state.infoHash) { "Saved torrent changed" }
-      return SeedPlan(hash) {
+      return SeedPlan(hash, state) {
         (getEngine() as KotlinTorrentEngine).addV2Task(TorrentV2TaskSpec(task.taskId, document,
           output, selected, checkpointEncoded = resumeData,
           trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
@@ -819,7 +928,7 @@ class TorrentDownloadSource(
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
     val hash = metadata.infoHash.hex
     require(hash == state.infoHash) { "Saved torrent changed" }
-    return SeedPlan(hash) {
+    return SeedPlan(hash, state) {
       getEngine().addTask(TorrentTaskSpec(task.taskId, metadata, output,
         selected.mapTo(LinkedHashSet()) { it.toInt() }, magnet, resumeData?.let(::decodeBase64),
         privacy = privacy, seedOnly = true, connections = task.connections))
@@ -872,6 +981,10 @@ class TorrentDownloadSource(
       states[taskId]?.let {
         states[taskId] = it.copy(selectedFileIds = fileIds, totalBytes = session.totalBytes)
       }
+    }
+    seedStates.update { seeds ->
+      val base = seeds[taskId] ?: return@update seeds
+      seeds + (taskId to base.copy(selectedFileIds = fileIds, totalBytes = session.totalBytes))
     }
     log.i { "Torrent taskId=$taskId seeding selection applied: files=${fileIds.size}, live=$live" }
     return live
@@ -1264,6 +1377,8 @@ class TorrentDownloadSource(
       unmarkSeeding(taskId)
       seedWatchers.remove(taskId)
     }?.cancel()
+    // The run saves the session's state from now on.
+    seedStates.update { it - taskId }
     val owned = slots.reclaim(taskId)
     if (owned && existing.infoHash == hash && existing.state.value in ADOPTABLE) {
       log.i { "Torrent taskId=$taskId takes over its running session" }
@@ -1294,6 +1409,9 @@ class TorrentDownloadSource(
       else "Torrent taskId=$taskId stops seeding for a waiting download"
     }
     if (lent) {
+      // The state the run saved last, which the seeder saves its checkpoint into from now on.
+      val base = stateMutex.withLock { states[taskId] }
+      if (base != null) seedStates.update { it + (taskId to base) }
       // Marked before the watcher starts, which unmarks it once it stops seeding.
       markSeeding(taskId)
       watchSeeder(taskId, session)
@@ -1310,7 +1428,18 @@ class TorrentDownloadSource(
   private suspend fun watchSeeder(taskId: String, session: TorrentSession) {
     val watcher = scope.launch(start = CoroutineStart.LAZY) {
       val self = coroutineContext.job
-      session.state.first { it != TorrentSessionState.SEEDING }
+      // What it uploads is saved about every minute, so a crash loses little of it.
+      val saver = launch {
+        while (true) {
+          delay(seedingSaveIntervalMs)
+          seedStates.value[taskId]?.let { saveSeedingState(taskId, session, it) }
+        }
+      }
+      try {
+        session.state.first { it != TorrentSessionState.SEEDING }
+      } finally {
+        saver.cancel()
+      }
       stateMutex.withLock { if (seedWatchers[taskId] === self) unmarkSeeding(taskId) }
       session.state.first {
         it == TorrentSessionState.STOPPED || it == TorrentSessionState.FINISHED
@@ -1524,14 +1653,19 @@ class TorrentDownloadSource(
       states[taskId] = state
     }
 
-  /** Stops a session whose download already returned, such as one still seeding. */
+  /**
+   * Stops a session whose download already returned, such as one still seeding, saving a
+   * seeder's state first.
+   */
   private suspend fun stopSession(taskId: String) {
     stateMutex.withLock {
       unmarkSeeding(taskId)
       seedWatchers.remove(taskId)
     }?.cancel()
+    val base = seedStates.getAndUpdate { it - taskId }[taskId]
     val session = tasks.session(taskId) ?: return
     try {
+      base?.let { saveSeedingState(taskId, session, it) }
       engine.load()?.removeTorrent(session.infoHash)
     } finally {
       tasks.release(taskId)
@@ -1541,6 +1675,8 @@ class TorrentDownloadSource(
   /** Stops a session that outlived its download, such as one still seeding. */
   internal suspend fun release(taskId: String) {
     deferredSharing.update { it - taskId }
+    // The task is going away: its record takes no more state.
+    seedStates.update { it - taskId }
     val owned = slots.reclaim(taskId)
     try {
       stopSession(taskId)
@@ -1697,6 +1833,15 @@ private const val SPEED_SAMPLE_MS = 1_000L
 
 /** How long a run waits for its task's previous session to stop before it fails. */
 private const val RELEASE_TIMEOUT_MS = 10_000L
+
+/** How often a seeding session saves its state, with what it uploaded, into its task's record. */
+private const val SEEDING_SAVE_INTERVAL_MS = 60_000L
+
+/** How long the seeding sessions may take to save their state as the source closes. */
+private const val SHUTDOWN_SAVE_MS = 5_000L
+
+/** Saved states whose payload counters [TorrentDownloadSource.savedPayload] remembers. */
+private const val MAX_SAVED_PAYLOADS = 64
 
 /** Session states a run takes over instead of starting its own session. */
 private val ADOPTABLE = setOf(TorrentSessionState.CHECKING_FILES,

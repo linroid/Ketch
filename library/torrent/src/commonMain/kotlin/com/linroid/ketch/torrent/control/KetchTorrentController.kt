@@ -34,6 +34,7 @@ import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelChildren
@@ -500,7 +501,10 @@ internal class KetchTorrentController(
     val state = task.state.value
     val files = filesOf(task)
     val live = source.liveTorrent(task.taskId)
-    val counters = files?.let { countersOf(task, it, state, task.segments.value, live) }
+    // Without a session, what the last one saved; it counted until then.
+    val saved = if (live?.receivedPayloadBytes != null) null else
+      source.savedPayload(record.sourceState)
+    val counters = files?.let { countersOf(task, it, state, task.segments.value, live, saved) }
     val control = record.control ?: TaskControl()
     return Content(
       activity = activityOf(state, task.queuePosition.value, files != null, live),
@@ -518,6 +522,7 @@ internal class KetchTorrentController(
     state: DownloadState,
     segments: List<Segment>,
     live: LiveTorrent?,
+    saved: TorrentPayloadCounters?,
   ): TorrentCounters {
     val selected = selectedIds(task, files)
     val total = files.sumOf { it.size.coerceAtLeast(0) }
@@ -531,8 +536,9 @@ internal class KetchTorrentController(
       totalPayloadBytes = total,
       wantedBytes = wanted,
       selectedVerifiedBytes = verified,
-      receivedPayloadBytes = live?.receivedPayloadBytes,
-      uploadedPayloadBytes = live?.uploadedPayloadBytes,
+      receivedPayloadBytes = live?.receivedPayloadBytes ?: saved?.received,
+      uploadedPayloadBytes = live?.uploadedPayloadBytes ?: saved?.uploaded,
+      discardedPayloadBytes = live?.discardedPayloadBytes ?: saved?.discarded,
       downloadBytesPerSecond = (state as? DownloadState.Downloading)?.progress?.bytesPerSecond,
       uploadBytesPerSecond = live?.uploadBytesPerSecond,
     )

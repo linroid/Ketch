@@ -66,11 +66,16 @@ internal interface TorrentSession {
   suspend fun saveResumeData(): ByteArray?
 }
 
-/** What a session received and uploaded; [uploadSpeed] is null where it is not tracked. */
+/**
+ * What a session received and uploaded; [uploadSpeed] is null where it is not tracked. Of what
+ * it [received], [discarded] was thrown away rather than verified: duplicate or late blocks,
+ * pieces that failed their hash check, and partial pieces given up.
+ */
 internal data class TorrentPayloadCounters(
   val received: Long,
   val uploaded: Long,
   val uploadSpeed: Long?,
+  val discarded: Long = 0,
 )
 
 /** A seed-only start found a completed torrent's files changed on disk, so it did not seed. */

@@ -66,7 +66,8 @@ internal class TorrentCheckpointFile(
         require(checkpoint.layoutGeneration >= previous.layoutGeneration &&
           checkpoint.selectionGeneration >= previous.selectionGeneration &&
           checkpoint.receivedBytes >= previous.receivedBytes &&
-          checkpoint.uploadedBytes >= previous.uploadedBytes) { "Checkpoint counters regressed" }
+          checkpoint.uploadedBytes >= previous.uploadedBytes &&
+          checkpoint.discardedBytes >= previous.discardedBytes) { "Checkpoint counters regressed" }
         require(checkpoint.selected == previous.selected ||
           checkpoint.selectionGeneration > previous.selectionGeneration) {
           "Selection changed without a new generation"

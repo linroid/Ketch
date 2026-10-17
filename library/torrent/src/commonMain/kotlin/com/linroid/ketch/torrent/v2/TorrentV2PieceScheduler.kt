@@ -31,6 +31,7 @@ internal class TorrentV2PieceScheduler private constructor(
   private val maxActive: Int,
   private val lease: TorrentBufferBudget.Lease,
   private val nowMs: () -> Long,
+  private val onDiscard: (Long) -> Unit,
 ) {
   class RequestPlan internal constructor(
     val peer: PeerBlockExchange,
@@ -144,7 +145,7 @@ internal class TorrentV2PieceScheduler private constructor(
     var count = 0
     for (index in unwanted) {
       if (index in requested) continue
-      checkNotNull(assemblies.remove(index)).close()
+      discard(checkNotNull(assemblies.remove(index)))
       refreshBusy(index)
       count++
     }
@@ -568,13 +569,13 @@ internal class TorrentV2PieceScheduler private constructor(
     }
     val assignment = if (closed) null else assignmentOf(peer, ticket)
     if (assignment == null) {
-      if (response is PeerBlockExchange.Response.Block) response.close()
+      if (response is PeerBlockExchange.Response.Block) discard(response)
       return false
     }
     release(assignment)
     if (response is PeerBlockExchange.Response.Block) {
       if (assignment.lost) {
-        response.close()
+        discard(response)
         return true
       }
       val assembly = assemblies[ticket.request.index]
@@ -582,11 +583,24 @@ internal class TorrentV2PieceScheduler private constructor(
         response.close()
         error("Assigned piece has no assembly")
       }
-      assembly.accept(response)
+      // A second copy of a block it holds is ignored.
+      if (!assembly.accept(response)) onDiscard(ticket.request.length.toLong())
       // Still out with another peer: no longer needed there.
       assignments[ticket.request]?.let(::lose)
     }
     return true
+  }
+
+  /** A block nobody needs: stale, or another copy of which came first. */
+  private fun discard(block: PeerBlockExchange.Response.Block) {
+    onDiscard(block.ticket.request.length.toLong())
+    block.close()
+  }
+
+  /** Closes [assembly], whose blocks are thrown away. */
+  private fun discard(assembly: TorrentV2PieceAssembly) {
+    assembly.receivedBytes.takeIf { it > 0 }?.let(onDiscard)
+    assembly.close()
   }
 
   /** Session actors call this after the peer actor has closed and joined its pipeline/reader. */
@@ -609,7 +623,7 @@ internal class TorrentV2PieceScheduler private constructor(
     // Scan assignments once rather than once per active piece.
     for (request in assignments.keys) discarded.remove(request.index)
     for (index in discarded) {
-      checkNotNull(assemblies.remove(index)).close()
+      discard(checkNotNull(assemblies.remove(index)))
       refreshBusy(index)
     }
     if (discarded.isNotEmpty()) version++
@@ -647,11 +661,13 @@ internal class TorrentV2PieceScheduler private constructor(
     val index = commits.remove(completion.ticket) ?: return false
     refreshBusy(index)
     version++
-    if (completion is TorrentV2CommitWorker.Completion.Committed && completion.verified &&
-      !verified[index]) {
+    val stored = completion is TorrentV2CommitWorker.Completion.Committed && completion.verified
+    if (stored && !verified[index]) {
       verified[index] = true
       if (wanted[index]) remaining--
     }
+    // A corrupt, failed or dropped piece's blocks were all received, and are fetched again.
+    if (!stored) onDiscard(layout.v2Piece(index.toLong()).length)
     return true
   }
 
@@ -673,7 +689,7 @@ internal class TorrentV2PieceScheduler private constructor(
   fun close() {
     if (closed) return
     closed = true
-    assemblies.values.forEach { it.close() }
+    assemblies.values.forEach(::discard)
     assemblies.clear()
     assignments.clear()
     copies.clear()
@@ -716,6 +732,12 @@ internal class TorrentV2PieceScheduler private constructor(
       state: TorrentBufferBudget,
       maxActive: Int = 2,
       nowMs: () -> Long = monotonicClock(),
+      /**
+       * Payload delivered to [receive] that is thrown away rather than verified: stale or
+       * duplicate blocks, pieces that fail their hash check, fail to store or are no longer
+       * wanted, and the blocks of partial pieces closed.
+       */
+      onDiscard: (Long) -> Unit = {},
     ): TorrentV2PieceScheduler? {
       require(layout.pieceCount in 0..1_000_000 && layout.pieceLength <= 16 * 1024 * 1024)
       require(verified.size.toLong() == layout.pieceCount && maxActive in 1..1024)
@@ -734,7 +756,7 @@ internal class TorrentV2PieceScheduler private constructor(
         }
         val wanted = wantedPieces(layout, selectedIds, verified.size)
         return TorrentV2PieceScheduler(layout, wanted, verified.copyOf(), buffers, maxActive, lease,
-          nowMs)
+          nowMs, onDiscard)
       } catch (error: Throwable) {
         lease.close()
         throw error
