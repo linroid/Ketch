@@ -340,6 +340,34 @@ class PortMappingTest {
     }
 
   @Test
+  fun mapper_upnpRenewalRefused_stillRemovesTheHeldMapping() = gateways { network, scope ->
+    val igd = Igd()
+    val ssdp = upnpGateway(network, scope, igd)
+    val silent = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+    val mapped = MutableStateFlow<Int?>(-1)
+    var udp: Int? = null
+    val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { udp },
+      onMapped = { mapped.value = it },
+      natPmp = NatPmpClient(network, silent.local.port, retryMs = listOf(50)),
+      upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", ssdp), searchMs = 300),
+      networks = { listOf(loopbackNetwork) },
+      udpCheckMs = 100)
+    try {
+      mapper.start()
+      assertEquals(6881, mapped.first { it != -1 })
+      // The renewal DHT's port starts finds 6881 refused, as when another device took it.
+      igd.taken += 6881
+      udp = 6881
+      assertEquals(6888, mapped.first { it == 6888 })
+      mapper.stop(timeoutMs = stopMs)
+      // The router still held TCP 6881, so it is removed rather than left to its lease.
+      assertTrue("DeletePortMapping TCP 6881" in igd.actions.value, "${igd.actions.value}")
+    } finally {
+      silent.close()
+    }
+  }
+
+  @Test
   fun mapper_natPmpUdpOnAnotherPort_isRemoved() = gateways { network, scope ->
     val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
     val port = natPmpGateway(network, scope, udpOffset = 5, requests = requests)

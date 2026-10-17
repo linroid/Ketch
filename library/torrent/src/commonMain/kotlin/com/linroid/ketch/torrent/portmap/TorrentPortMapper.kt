@@ -367,7 +367,7 @@ internal class TorrentPortMapper(
       try {
         for ((protocol, internal) in listOfNotNull(MappedProtocol.TCP to target.tcp,
           target.udp?.let { MappedProtocol.UDP to it })) {
-          val request = requesting(upnpGateway, protocol, internal, external)
+          val added = requesting(upnpGateway, protocol, internal, external)
           try {
             try {
               upnp.addPortMapping(gateway, protocol, external, internal, client, lease)
@@ -379,7 +379,8 @@ internal class TorrentPortMapper(
             }
           } catch (e: UpnpException) {
             // Refused: the gateway made nothing to remove, and the port may be another device's.
-            requested.removeAll { it.matches(upnpGateway, request) }
+            // A renewal refused keeps its entry, as the gateway still holds what it granted.
+            added?.let { requested -= it }
             throw e
           }
           mappings += PortMapping(protocol, internal, external, lease)
@@ -408,18 +409,19 @@ internal class TorrentPortMapper(
     null
   }
 
-  /** Notes that [gateway] may forward [internal] on [external] from now on; call before asking. */
+  /**
+   * Notes that [gateway] may forward [internal] on [external] from now on; call before asking.
+   * Returns the entry when this request added it, or null when one held already, as on renewal.
+   */
   private fun requesting(
     gateway: Gateway,
     protocol: MappedProtocol,
     internal: Int,
     external: Int,
-  ): PortMapping {
+  ): Requested? {
     val mapping = PortMapping(protocol, internal, external, LIFETIME_SECONDS)
-    if (requested.none { it.matches(gateway, mapping) }) {
-      requested += Requested(gateway, mapping, asking)
-    }
-    return mapping
+    if (requested.any { it.matches(gateway, mapping) }) return null
+    return Requested(gateway, mapping, asking).also { requested += it }
   }
 
   /** Removes [mapping] from [gateway] now. */
