@@ -741,8 +741,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selection; a recheck heals a piece from its sidecar. v2 and hybrid create or recheck newly
   selected files, refuse one whose path holds a file they did not create, keep deselected
   verified pieces readable, and bind their creation log without the selection once it changes.
-  A seeding task whose selection grows downloads again and seeds once more. Trackers hear
-  `completed` only once every file is selected and complete; admission charges every file
+  A seeding task whose selection grows downloads again and seeds once more, the run that takes
+  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`; a lent seeder
+  holds none). Trackers hear `completed` only once every file is selected and complete;
+  admission charges every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
   `TorrentSnapshot.seeding` whether the task is meant to seed (`KetchTorrentController`: the
   saved intent, a seeding session or the `SEEDING` activity), and `TorrentController.setSeeding`

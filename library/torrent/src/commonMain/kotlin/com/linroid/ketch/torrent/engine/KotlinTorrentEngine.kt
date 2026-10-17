@@ -888,7 +888,7 @@ internal class KotlinTorrentEngine(
         uploadPolicy = { uploadPolicy.load() },
         checkpoint = checkpoint, peerId = peerId,
         discover = { peers, owner -> discover(spec, peers, owner, trackerState) },
-        downloadThrottle = { downloadRate.acquire(it); spec.throttle(it) },
+        downloadThrottle = { downloadRate.acquire(it) }, taskThrottle = spec.throttle,
         engineUploadRate = uploadRate,
         trackerConfigurationBudget = exchangeBudgets.sessions,
         privacy = spec.privacy,

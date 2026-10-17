@@ -1216,6 +1216,8 @@ class TorrentDownloadSource(
           // The new session runs the selection read at the start of this run.
           context.acknowledgeSelection(initialRevision)
         }
+        // Payload pays this run's task limits, also on a session an earlier run opened.
+        running.setTaskThrottle(context.throttle)
         // An adopted session applies the current selection first, whatever it ran with.
         keepSeeding = track(context, running, table, state.selectedFileIds,
           applied = if (adopted == null) initialRevision else -1, resume = adopted == null)
@@ -1233,7 +1235,11 @@ class TorrentDownloadSource(
               if (!keepSeeding) owned?.pause()
               store(context)
               // Seeding is optional: a download waiting for this slot takes precedence.
-              if (keepSeeding && owned != null) lent = lendSlot(taskId, owned)
+              if (keepSeeding && owned != null) {
+                // This run's limits end with it; a run that takes the seeder over sets its own.
+                owned.setTaskThrottle(NO_THROTTLE)
+                lent = lendSlot(taskId, owned)
+              }
               // A pause may stop this seeder before the completion can save its intent.
               if (lent) deferSharing(taskId, seeded = true)
             } finally {
@@ -1701,6 +1707,9 @@ private const val RELEASE_TIMEOUT_MS = 10_000L
 /** Session states a run takes over instead of starting its own session. */
 private val ADOPTABLE = setOf(TorrentSessionState.CHECKING_FILES,
   TorrentSessionState.DOWNLOADING, TorrentSessionState.SEEDING)
+
+/** The task limits of a seeder no run follows: none. */
+private val NO_THROTTLE: suspend (Int) -> Unit = {}
 
 /** How long the first engine start waits for the saved tracker list copy to be read. */
 private const val TRACKER_LIST_RESTORE_MS = 5_000L

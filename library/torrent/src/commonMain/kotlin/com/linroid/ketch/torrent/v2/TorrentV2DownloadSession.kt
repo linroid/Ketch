@@ -200,7 +200,8 @@ internal class TorrentV2DownloadSession private constructor(
   private val memory = runtime.state
   private val maxPeers = options.maxPeers
   private val globalRate = runtime.downloadRate
-  private val throttle = options.throttle
+  /** The task's limits, which payload pays after the engine's and this owner's. */
+  private val taskThrottle = AtomicReference(options.throttle)
   private val discover = options.discovery
   private val privacy = options.privacy
   private val waitForPeers = options.waitForPeers
@@ -367,6 +368,8 @@ internal class TorrentV2DownloadSession private constructor(
   private val controls = AtomicReference<SendChannel<TorrentV2SessionLoop.Control>?>(null)
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = downloadRate.set(bytesPerSecond)
+
+  override fun setTaskThrottle(throttle: suspend (Int) -> Unit) = taskThrottle.store(throttle)
 
   /** This owner's upload bucket, applied after the engine's; zero means unlimited. */
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
@@ -600,7 +603,7 @@ internal class TorrentV2DownloadSession private constructor(
         charging = async(start = CoroutineStart.UNDISPATCHED) {
           // Charge each requested block before it can arrive, including retries/corrupt payload.
           // A pending limiter must not block peer control traffic, progress, or checkpoints.
-          throttle(missing)
+          taskThrottle.load()(missing)
           credits.update { it + missing }
         }
       }
@@ -637,7 +640,7 @@ internal class TorrentV2DownloadSession private constructor(
       val start = clock()
       globalRate.acquire(bytes)
       downloadRate.acquire(bytes)
-      throttle(bytes)
+      taskThrottle.load()(bytes)
       webSeedThrottled.addAndFetch(clock() - start)
       store.recordReceived(bytes)
     }

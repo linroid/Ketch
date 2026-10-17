@@ -53,6 +53,14 @@ internal interface TorrentSession {
   fun setDownloadRateLimit(bytesPerSecond: Long)
 
   /**
+   * Replaces the task's limits, which payload pays after the engine's and this torrent's: the
+   * [throttle][com.linroid.ketch.core.engine.DownloadContext.throttle] of the run that follows
+   * the session now, such as a run that takes over a seeding session an earlier run opened.
+   * Payload already waiting keeps the limits it waits for.
+   */
+  fun setTaskThrottle(throttle: suspend (Int) -> Unit) {}
+
+  /**
    * Sets this torrent's upload rate limit (bytes/sec, 0=unlimited), applied after the engine's
    * shared one. Sessions that never upload ignore it.
    */
