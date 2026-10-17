@@ -142,7 +142,7 @@ curl -X POST http://localhost:8642/api/tasks \
 | `POST /api/resolve` | Probe a URL (`{"url": ..., "properties": {...}}`): size, file name, resume support, a torrent's files. A URL no source handles answers `415 unsupported`, as does one its source lacks something for, such as a usable proxy (the message says why); one its source refuses `422` with the error, whose `detail` says why, and `"error": "source_error"` |
 | `POST /api/resolve/content?fileName=` | Probe file content sent as the request body, such as a `.torrent` file (up to 16 MiB); refusals answer as for a URL |
 | `GET /api/tasks` | List the tasks |
-| `POST /api/tasks` | Add a download; the body is a `DownloadRequest` |
+| `POST /api/tasks` | Add a download; the body is a `DownloadRequest`. A URL no source handles answers `415 unsupported`, as `POST /api/resolve` does; other invalid requests, such as file IDs its `resolvedSource` does not list, `400` |
 | `GET /api/tasks/{id}` | One task |
 | `POST /api/tasks/{id}/pause`, `/resume`, `/cancel` | Control a task |
 | `PUT /api/tasks/{id}/speed-limit`, `/priority`, `/connections` | Change a task while it runs; `connections` 0 means Auto |

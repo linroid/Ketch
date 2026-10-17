@@ -20,6 +20,7 @@ import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
@@ -248,8 +249,9 @@ class Ketch(
    * The task may be queued if the maximum number of concurrent
    * downloads has been reached.
    *
-   * @throws IllegalArgumentException if a header in [DownloadRequest.headers] cannot be sent
-   *   (see [RequestHeaders.requireValid]), or the request selects files its
+   * @throws IllegalArgumentException if no download source handles the link, caused by a
+   *   [NoDownloadSourceException]; if a header in [DownloadRequest.headers] cannot be sent
+   *   (see [RequestHeaders.requireValid]); or if the request selects files its
    *   [DownloadRequest.resolvedSource] does not list, or several variants of one offering a
    *   single choice
    */
@@ -259,10 +261,17 @@ class Ketch(
     // resolved request starts with the source of its type, as a source that only takes content
     // resolves to a link it need not handle.
     val resolved = request.resolvedSource
-    require(
-      if (resolved != null) sourceResolver.hasType(resolved.sourceType, resolved.url)
-      else sourceResolver.canHandle(request.url)
-    ) { "No download source handles this link: ${redactUrl(request.url)}" }
+    val handled = if (resolved != null) {
+      sourceResolver.hasType(resolved.sourceType, resolved.url)
+    } else {
+      sourceResolver.canHandle(request.url)
+    }
+    if (!handled) {
+      throw IllegalArgumentException(
+        "No download source handles this link: ${redactUrl(request.url)}",
+        NoDownloadSourceException(),
+      )
+    }
     requireProxySupport(request.proxy)
     requireChecksumSupport(request)
     require(

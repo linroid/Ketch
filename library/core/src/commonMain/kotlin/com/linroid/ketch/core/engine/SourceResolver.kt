@@ -83,7 +83,8 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
       log.d { "Resolved source '${source.type}' for ${input.describe()}" }
       return source
     }
-    log.e { "No source found for ${input.describe()}" }
+    // An input no source takes is refused to its caller, which says so: nothing went wrong here.
+    log.d { "No source found for ${input.describe()}" }
     throw KetchError.Unsupported(NoDownloadSourceException())
   }
 

@@ -902,7 +902,7 @@ internal class DownloadExecution(
           retryCount = 0
         }
         if (!error.isRetryable || !policy.allows(retryCount)) {
-          // DownloadCoordinator logs the failure itself, with its stack trace.
+          // DownloadCoordinator logs the failure itself, an unknown one with its stack trace.
           log.i {
             if (error.isRetryable) "Giving up on taskId=$taskId after $retryCount retries"
             else "Not retrying taskId=$taskId: ${error::class.simpleName} is not retryable"

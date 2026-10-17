@@ -183,6 +183,24 @@ class DownloadRoutesTest {
     }
 
   @Test
+  fun post_urlNoSourceHandles_returnsUnsupported() = testApplication {
+    val ketch = createKetch()
+    application {
+      with(createTestServer(ketch = ketch)) { configureServer() }
+    }
+    val response = client.post("/api/tasks") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"url":"gopher://example.com/file","destination":"/tmp/downloads/"}""")
+    }
+    assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+    val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    // As the resolve routes answer it, which released clients read as "no source".
+    assertEquals("unsupported", error.error)
+    assertEquals("No download source handles this URL", error.message)
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
   fun post_fileItsResolutionDoesNotList_returns400NamingIt() = testApplication {
     val ketch = createKetch()
     application {

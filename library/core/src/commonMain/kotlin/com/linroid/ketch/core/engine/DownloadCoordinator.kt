@@ -414,7 +414,14 @@ internal class DownloadCoordinator(
   }
 
   private suspend fun fail(handle: TaskHandle, error: KetchError) {
-    log.e(error) { "Download failed for taskId=${handle.taskId}: ${error.describeCauses()}" }
+    val taskId = handle.taskId
+    // An expected failure, such as a source's refusal or a server's error, says why in one line;
+    // an unknown one, or one of the disk, keeps its stack trace for a bug report.
+    if (error is KetchError.Unknown || error is KetchError.Disk) {
+      log.e(error) { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
+    } else {
+      log.w { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
+    }
     handle.record.update {
       it.copy(
         state = TaskState.FAILED,

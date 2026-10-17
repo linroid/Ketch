@@ -3,6 +3,7 @@ package com.linroid.ketch.server.api
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.endpoints.Api
@@ -38,7 +39,17 @@ internal fun Route.downloadRoutes(ketch: KetchApi, destinations: DestinationGuar
   post<Api.Tasks> {
     val received = call.receiveJson<DownloadRequest>(MAX_TASK_BODY_BYTES)
     log.d { "POST /api/tasks url=${redactUrl(received.url)}" }
-    val task = ketch.download(destinations.newDownload(received))
+    val task = try {
+      ketch.download(destinations.newDownload(received))
+    } catch (e: IllegalArgumentException) {
+      if (e.cause !is NoDownloadSourceException) throw e
+      // Answered as the resolve routes answer it; other refusals of the request stay 400.
+      call.respond(
+        HttpStatusCode.UnsupportedMediaType,
+        ErrorResponse("unsupported", "No download source handles this URL"),
+      )
+      return@post
+    }
     call.respond(
       HttpStatusCode.Created,
       TaskMapper.toSnapshot(task),

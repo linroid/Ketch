@@ -1696,6 +1696,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   task views carry it in `request` and the verified one in `Completed.checksum`; a mismatch is a
   `checksum_mismatch` error. `RemoteKetch.download` refuses a checksum for servers without
   `KetchFeatures.CHECKSUM`
+- `POST /api/tasks` answers a link no source handles with 415 `unsupported` ("No download source
+  handles this URL"), as the resolve routes do, telling it by the `NoDownloadSourceException`
+  cause of `Ketch.download`'s `IllegalArgumentException`; other refusals stay 400 `bad_request`
 - `PUT /api/config` keeps the server's value of every field the body leaves out (merged over
   the current config), as clients older than category folders or idle timeouts send it
 - JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
@@ -2103,7 +2106,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
-  problems), error (fatal)
+  problems), error (fatal). A failed download is a warning with its cause chain, an error with
+  its stack trace only when it is `KetchError.Unknown` or `Disk`; an input no source takes is
+  logged at debug, as its caller is told
 - Include `taskId=` in every task-scoped message; torrent engine code also uses `logHash()`
 - Never log credentials: pass URLs through `redactUrl()`, tracker URLs through
   `trackerLabel()`, and describe tracker errors with `describeWithoutUrls()`
