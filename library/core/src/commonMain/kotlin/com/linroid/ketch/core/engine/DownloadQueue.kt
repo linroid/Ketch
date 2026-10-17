@@ -329,9 +329,10 @@ internal class DownloadQueue(
     entry: QueueEntry,
     host: String?,
   ) {
-    // A preempted task waits paused; it becomes Queued again as it takes a slot.
-    if (entry.handle.mutableState.value is DownloadState.Paused) {
-      entry.handle.mutableState.value = DownloadState.Queued
+    // A preempted task waits paused; it becomes Queued again as it takes a slot. In one step, as
+    // a cancel, which never waits for the queue, may show it canceled from another thread.
+    entry.handle.mutableState.update { state ->
+      if (state is DownloadState.Paused) DownloadState.Queued else state
     }
     activeEntries[entry.taskId] = entry
     if (host != null) {

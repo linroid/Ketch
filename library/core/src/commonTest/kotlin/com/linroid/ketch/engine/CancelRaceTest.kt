@@ -12,6 +12,7 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
+import com.linroid.ketch.core.engine.DownloadQueue
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.task.AtomicSaver
@@ -19,6 +20,7 @@ import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -380,13 +382,51 @@ class CancelRaceTest {
     }
   }
 
-  private fun handle(request: DownloadRequest): TaskHandle {
+  @Test
+  fun promote_preemptedTaskCanceledAsItTakesTheSlot_staysCanceled() = runTest {
+    val source = SelectableSource()
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val coordinator = DownloadCoordinator(
+      SourceResolver(listOf(source)),
+      { DownloadConfig(retryCount = 0, saveIntervalMs = 60_000) },
+      DefaultFileNameResolver(),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
+    )
+    val queue = DownloadQueue(1, 0, coordinator)
+    val state = RacedStateFlow<DownloadState>(MutableStateFlow(DownloadState.Queued))
+    val preempted = handle(request("0"), "preempted", state)
+    val urgent = handle(request("1", priority = DownloadPriority.URGENT), "urgent")
+    try {
+      queue.enqueue(preempted)
+      runCurrent()
+      queue.enqueue(urgent)
+      runCurrent()
+      assertIs<DownloadState.Paused>(preempted.mutableState.value)
+      val runs = source.runs.value.size
+
+      // A cancel on another thread lands right after the queue reads the task paused.
+      state.afterNextRead = { it.value = DownloadState.Canceled }
+      queue.onTaskCompleted(urgent.taskId)
+      runCurrent()
+
+      assertIs<DownloadState.Canceled>(preempted.mutableState.value)
+      assertEquals(runs, source.runs.value.size)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  private fun handle(
+    request: DownloadRequest,
+    taskId: String = "canceling",
+    state: MutableStateFlow<DownloadState> = MutableStateFlow(DownloadState.Queued),
+  ): TaskHandle {
     val now = Clock.System.now()
     return object : TaskHandle {
-      override val taskId = "canceling"
+      override val taskId = taskId
       override val request get() = record.value.request
       override val createdAt = now
-      override val mutableState = MutableStateFlow<DownloadState>(DownloadState.Queued)
+      override val mutableState = state
       override val mutableSegments = MutableStateFlow<List<Segment>>(emptyList())
       override val mutableQueuePosition = MutableStateFlow<Int?>(null)
       override val controlLock = Mutex()
@@ -394,5 +434,29 @@ class CancelRaceTest {
         TaskRecord(taskId, request, state = TaskState.QUEUED, createdAt = now, updatedAt = now)
       ) {}
     }
+  }
+
+  /**
+   * A state flow that runs [afterNextRead] once, right after a read takes its value, as a write
+   * from another thread can land between a read and the write that follows it.
+   */
+  @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
+  private class RacedStateFlow<T>(
+    private val inner: MutableStateFlow<T>,
+  ) : MutableStateFlow<T> by inner {
+    var afterNextRead: ((MutableStateFlow<T>) -> Unit)? = null
+
+    override var value: T
+      get() {
+        val read = inner.value
+        afterNextRead?.let { race ->
+          afterNextRead = null
+          race(inner)
+        }
+        return read
+      }
+      set(value) {
+        inner.value = value
+      }
   }
 }
