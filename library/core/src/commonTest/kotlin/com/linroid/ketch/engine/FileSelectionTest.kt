@@ -531,6 +531,15 @@ class FileSelectionTest {
     return frames
   }
 
+  /** Every state [task] shows from now on, in order. */
+  private fun TestScope.statesOf(task: DownloadTask): List<DownloadState> {
+    val states = mutableListOf<DownloadState>()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      task.state.collect { states += it }
+    }
+    return states
+  }
+
   /** The size [state] shows, if it shows one. */
   private fun sizeOf(state: DownloadState): Long? = when (state) {
     is DownloadState.Completed -> state.totalBytes
@@ -644,14 +653,85 @@ class FileSelectionTest {
       source.runs.value.single().finish.complete(Unit)
       runCurrent()
       val completed = assertIs<DownloadState.Completed>(task.state.value)
+      val states = statesOf(task)
       store.onSave = { check(it.request.selectedFileIds.size != 2) { "Disk full" } }
 
       assertFailsWith<IllegalStateException> { task.selectFiles(setOf("0", "1")) }
       runCurrent()
 
       assertEquals(completed, task.state.value)
+      // Never queued then completed again, which followers such as hooks take for a new finish.
+      assertTrue(states.all { it is DownloadState.Completed }, "$states")
       assertEquals(TaskState.COMPLETED, store.load(task.taskId)?.state)
       assertEquals(1, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_awaitingTaskSaveFails_keepsWaitingThroughout() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request().copy(awaitFileSelection = true))
+      runCurrent()
+      val waiting = assertIs<DownloadState.Paused>(task.state.value)
+      assertEquals(PauseReason.AwaitingFileSelection, waiting.reason)
+      val states = statesOf(task)
+      store.onSave = { check(it.request.selectedFileIds.isEmpty()) { "Disk full" } }
+
+      assertFailsWith<IllegalStateException> { task.selectFiles(setOf("1")) }
+      runCurrent()
+
+      assertEquals(waiting, task.state.value)
+      assertTrue(
+        states.all { it is DownloadState.Paused && it.reason == PauseReason.AwaitingFileSelection },
+        "$states",
+      )
+      assertTrue(source.runs.value.isEmpty())
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_completedExpand_ignoresCancelWhileSaving() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+      val states = statesOf(task)
+      val saving = CompletableDeferred<Unit>()
+      val release = CompletableDeferred<Unit>()
+      store.onSave = {
+        if (it.request.selectedFileIds.size == 2 && !release.isCompleted) {
+          saving.complete(Unit)
+          release.await()
+        }
+      }
+      val selecting = launch { task.selectFiles(setOf("0", "1")) }
+      runCurrent()
+      assertTrue(saving.isCompleted)
+
+      val canceling = launch { task.cancel() }
+      runCurrent()
+      release.complete(Unit)
+      selecting.join()
+      canceling.join()
+      runCurrent()
+
+      // A completed task ignores cancel, also while its reopening selection is saved.
+      assertTrue(states.none { it is DownloadState.Canceled }, "$states")
+      assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(2, source.runs.value.size)
+      source.runs.value.last().finish.complete(Unit)
+      runCurrent()
     } finally {
       ketch.close()
     }

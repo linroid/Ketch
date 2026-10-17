@@ -697,7 +697,7 @@ class Ketch(
       taskId,
       shown = { report -> if (delivered) plan.shown(report) else report },
     ) {
-      val undo = handle.show(plan, starts = reopen || awaiting, segmentsOf(record))
+      val undo = handle.show(plan, segmentsOf(record))
       try {
         handle.record.update { r ->
           r.copy(
@@ -745,6 +745,7 @@ class Ketch(
         // Shown before the save if it downloads, else as the hold ended if it dropped a report.
         delivery == SelectionDelivery.DELIVERED -> Unit
         reopen || awaiting -> {
+          // Completed or waiting until here; the queue shows it queued as it takes it.
           queue.dequeue(taskId)
           queue.enqueue(handle, preferResume = true)
         }
@@ -867,26 +868,20 @@ class Ketch(
 
   /**
    * Shows [plan] before the save that publishes it: a downloading task its progress and size, a
-   * task that starts once saved ([starts]: one that reopens or waits for its files) as queued, a
    * completed task its size, and a paused one the progress of [segments], the segments saved
-   * with it. Other states show no size. Returns what takes the shown state back should the save
-   * fail, or `null` when nothing was shown.
+   * with it. Other states show no size. The state keeps its kind, also for a task that starts
+   * once saved (one that reopens or waits for its files), which the queue shows queued after the
+   * save: taking it back after a failed save never shows it finishing or waiting again, and a
+   * completed task ignores cancel and pause until saved, as it did before. Returns what takes the
+   * shown state back should the save fail, or `null` when nothing was shown.
    */
-  private fun TaskHandle.show(
-    plan: SelectionPlan,
-    starts: Boolean,
-    segments: List<Segment>?,
-  ): (() -> Unit)? {
+  private fun TaskHandle.show(plan: SelectionPlan, segments: List<Segment>?): (() -> Unit)? {
     while (true) {
       val current = mutableState.value
-      val shown = when {
-        current is DownloadState.Downloading ->
-          current.copy(progress = plan.shown(current.progress))
-        starts && (current is DownloadState.Completed || current is DownloadState.Paused) ->
-          DownloadState.Queued
-        starts -> return null
-        current is DownloadState.Completed -> current.copy(totalBytes = plan.totalBytes)
-        current is DownloadState.Paused -> {
+      val shown = when (current) {
+        is DownloadState.Downloading -> current.copy(progress = plan.shown(current.progress))
+        is DownloadState.Completed -> current.copy(totalBytes = plan.totalBytes)
+        is DownloadState.Paused -> {
           val downloaded = segments?.sumOf { it.downloadedBytes } ?: 0L
           current.copy(progress = DownloadProgress(downloaded, plan.totalBytes))
         }
