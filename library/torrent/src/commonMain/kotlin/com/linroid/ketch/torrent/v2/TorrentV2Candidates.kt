@@ -216,6 +216,9 @@ internal class TorrentV2Candidates(
     }
     val entry = entries[endpoint] ?: return
     if (entry.status != Status.CONNECTED && entry.status != Status.DIALING) return
+    // A dial closed here reached the peer, which the session refused after its handshake: a
+    // source naming it during that dial was no news.
+    entry.namedWhileDialing = false
     if (delivered) entry.delivered = true
     val lasted = entry.status == Status.CONNECTED &&
       nowMs() - entry.connectedAt >= PeerRedial.LASTING_MS
