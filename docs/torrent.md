@@ -121,8 +121,10 @@ What happens next depends on the task's state:
 - **Downloading**: the torrent switches without reconnecting to its peers. Newly chosen files are
   created and downloaded. Files you deselect stop downloading but stay on disk as they are, with
   their verified pieces.
-- **Paused, queued, scheduled or failed**: the new selection applies when the task starts. A
-  file you choose again shows the verified pieces it kept at once.
+- **Paused, queued, scheduled or failed**: the new selection applies when the task starts. On a
+  paused task, a file you deselected after it last started and choose again shows at once the
+  pieces that run verified; otherwise a file shows its pieces once the task starts and checks
+  its files.
 - **Completed**: adding files downloads them into the same folder (Queued, Downloading, then
   Completed again), taking over the task's seeding if it seeds. Removing files only changes the
   task's size, and seeding shares the smaller selection from then on, also when the task was
