@@ -129,6 +129,15 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun lonelyPeer_isDialedEveryMinuteOnceTheDownloadStalls() = swarmTest(stall = true) { rig ->
+    rig.dialedPeerSendsAPieceAndDrops()
+    // Its own dials come 5, 20, 50 and 110 s after it dropped, then two and five minutes apart.
+    // Without a peer, the stalled swarm also dials it every minute from 60 s on.
+    val reached = rig.reachAgain(upAt = 250_000, step = 10_000)
+    assertTrue(reached - 250_000 <= 60_000, "Reached ${reached - 250_000} ms after it came back")
+  }
+
+  @Test
   fun lonelyStall_stillForgetsAPeerItGaveUpOn() = swarmTest(stall = true) { rig ->
     // It refuses from the start: dialed at 0, 10, 30 and 60 s on 10 s steps, then given up.
     rig.down.store(true)

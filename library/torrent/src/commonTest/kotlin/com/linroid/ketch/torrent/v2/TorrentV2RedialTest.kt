@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.v2
 
 import com.linroid.ketch.torrent.TorrentV2Fixture
+import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.peer.PeerMessage
@@ -9,6 +10,7 @@ import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.v2.peer.PeerV2Dialer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -19,15 +21,28 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * A v2 swarm dials a peer that sent payload again after it drops, longer than one that never
- * did, whether it dialed us or its connection replaced ours.
+ * did: a peer we dialed, one that dialed us, or one whose connection replaced ours. Without a
+ * peer, a stalled download dials every peer it knows every minute.
  */
 class TorrentV2RedialTest {
   // Pieces of 32 KiB: a spans pieces 0 and 1, b is piece 2, c is piece 3.
   private val fixture = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5, "c" to 20_000))
   private val endpoint = PeerEndpoint("192.0.2.5", 6881)
+
+  @Test
+  fun droppedPeerThatSentPayload_isDialedAgainAfterItsFourthDial() = swarm {
+    discovered.send(TorrentV2Discovered(endpoint, PeerTopic.V2, PeerOrigin.TRACKER))
+    val peer = connect(5, dialed = dial.receive())
+    deliver(peer, piece = 2)
+    drop(peer)
+    // One that never sent payload is given up after its fourth dial; this one is dialed a fifth
+    // time a minute later.
+    expectDials(endpoint, 5_000L, 15_000L, 30_000L, 60_000L)
+  }
 
   @Test
   fun peerThatDialedUsAndSentPayload_isDialedWhereItListensLater() = swarm {
@@ -56,6 +71,35 @@ class TorrentV2RedialTest {
     // Where we dialed it counts the payload the replaced connection brought.
     expectDials(endpoint, 5_000L, 15_000L, 30_000L, 60_000L)
   }
+
+  @Test
+  fun lonelyPeer_isDialedEveryMinuteOnceTheDownloadStalls() =
+    swarm(stall = MutableStateFlow<TorrentStall?>(null)) {
+      discovered.send(TorrentV2Discovered(endpoint, PeerTopic.V2, PeerOrigin.TRACKER))
+      val peer = connect(5, dialed = dial.receive())
+      deliver(peer, piece = 2)
+      drop(peer)
+      // Its own dials come 5, 20, 50 and 110 s after it dropped, then two and five minutes
+      // apart; without a peer, the stalled download also dials it every minute from 60 s on.
+      val upAt = 250_000L
+      var elapsed = 0L
+      var reached: Long? = null
+      while (reached == null && elapsed < upAt + 300_000) {
+        skip(10_000)
+        elapsed += 10_000
+        val target = withTimeoutOrNull(150) { dial.receive() } ?: continue
+        assertEquals(endpoint, target.endpoint)
+        if (elapsed < upAt) {
+          failures.send(PeerV2Dialer.Failure(target, IOException("Connection refused")))
+          delay(100)
+        } else {
+          connect(5, dialed = target)
+          reached = elapsed
+        }
+      }
+      val after = assertNotNull(reached, "The peer was never dialed again") - upAt
+      assertTrue(after <= 60_000, "Reached $after ms after it came back")
+    }
 
   /** The peer has only [piece] and sends it; returns once it is verified. */
   private suspend fun TorrentV2SwarmRig.deliver(peer: TorrentV2RemotePeer, piece: Int) {
@@ -95,12 +139,13 @@ class TorrentV2RedialTest {
   /** Runs [test] in a loop that has pieces 0 and 1 and downloads the rest from its peers. */
   private fun swarm(
     listenPort: Int = 0,
+    stall: MutableStateFlow<TorrentStall?>? = null,
     test: suspend TorrentV2SwarmRig.() -> Unit,
   ) = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(30_000) {
         val rig = TorrentV2SwarmRig(fixture, onCompleted = { error("Never completes") },
-          listenPort = listenPort)
+          listenPort = listenPort, stall = stall)
         try {
           rig.store.initialize()
           fixture.seed(rig.store, listOf(0, 1))
