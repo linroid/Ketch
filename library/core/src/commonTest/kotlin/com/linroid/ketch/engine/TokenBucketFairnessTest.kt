@@ -14,7 +14,10 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** Runs on virtual time: the bucket reads the test scheduler's clock. */
+/**
+ * Runs on virtual time: the bucket reads the test scheduler's clock. Kept to a few thousand turns
+ * a test, as JS runs each test within a 2 s timeout.
+ */
 class TokenBucketFairnessTest {
   @Test
   fun acquire_ownersShareTheRateEquallyWhateverTheirCallers() = runTest {
@@ -24,11 +27,11 @@ class TokenBucketFairnessTest {
     repeat(10) { backgroundScope.charge(bucket, "many", BLOCK, many) }
     backgroundScope.charge(bucket, "one", BLOCK, one)
 
-    advanceTimeBy(20.seconds)
+    advanceTimeBy(10.seconds)
 
-    // One shared 800 kB/s limit once gave the task waiting with one caller 1/11 of it.
+    // One shared limit once gave the task waiting with one caller 1/11 of it.
     assertShare(0.5, one.bytes, many.bytes)
-    assertNear(RATE * 20, many.bytes + one.bytes)
+    assertNear(RATE * 10, many.bytes + one.bytes)
   }
 
   @Test
@@ -39,7 +42,7 @@ class TokenBucketFairnessTest {
     repeat(10) { backgroundScope.charge(bucket, "large", BLOCK, large) }
     backgroundScope.charge(bucket, "small", 1024, small)
 
-    advanceTimeBy(20.seconds)
+    advanceTimeBy(10.seconds)
 
     assertShare(0.5, small.bytes, large.bytes)
   }
@@ -52,7 +55,7 @@ class TokenBucketFairnessTest {
       repeat(index * 4 + 1) { backgroundScope.charge(bucket, index, BLOCK, counter) }
     }
 
-    advanceTimeBy(30.seconds)
+    advanceTimeBy(15.seconds)
 
     val total = counters.sumOf { it.bytes }
     for (counter in counters) assertShare(1.0 / 3, counter.bytes, total - counter.bytes)
@@ -68,8 +71,8 @@ class TokenBucketFairnessTest {
     val earlyBefore = early.bytes
 
     backgroundScope.charge(bucket, "late", BLOCK, late)
-    advanceTimeBy(1.seconds)
-    // Within its first second, a newcomer gets half, not what the other had over ten.
+    advanceTimeBy(3.seconds)
+    // At once, a newcomer gets half, not what the other had over ten seconds.
     assertShare(0.5, late.bytes, early.bytes - earlyBefore)
   }
 
@@ -87,7 +90,7 @@ class TokenBucketFairnessTest {
     val steadyBefore = steady.bytes
     val pausedBefore = paused.bytes
     backgroundScope.charge(bucket, "paused", BLOCK, paused)
-    advanceTimeBy(2.seconds)
+    advanceTimeBy(3.seconds)
 
     assertShare(0.5, paused.bytes - pausedBefore, steady.bytes - steadyBefore)
   }
@@ -178,8 +181,9 @@ class TokenBucketFairnessTest {
   }
 
   private fun assertNear(expected: Long, actual: Long) {
-    // Within the burst and one turn per caller of the rate.
-    assertTrue(actual in expected - 300_000..expected + 300_000, "Expected $expected: $actual")
+    // Plus the burst, give or take a turn.
+    val slack = 65_536L + BLOCK
+    assertTrue(actual in expected - slack..expected + slack, "Expected $expected: $actual")
   }
 
   private class Counter {
@@ -187,7 +191,7 @@ class TokenBucketFairnessTest {
   }
 
   private companion object {
-    const val RATE = 800_000L
+    const val RATE = 200_000L
     const val BLOCK = 16_384
   }
 }
