@@ -490,6 +490,8 @@ internal class TorrentSwarm(
       val published = stall ?: return
       val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
       val running = webSeeds.count { it.isActive }
+      // Seeds started again that have yet to show whether their mirror is back.
+      val unproven = webSeeds.indices.count { webSeeds[it].isActive && webSeedWorkers[it].unproven }
       // A piece no connected peer or running web seed has is missing only once every web seed
       // that stopped could not serve it either: the rest wait for a seed started again. One that
       // was down across a relaunch says nothing of what it serves. With nothing connected and no
@@ -512,7 +514,8 @@ internal class TorrentSwarm(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
-        droppedWebSeeds = webSeeds.size - running, payloadBytes = payload,
+        droppedWebSeeds = webSeeds.size - running, unprovenWebSeeds = unproven,
+        payloadBytes = payload,
         unsettledBytes = unsettled, wastedBytes = wasted, throttledMs = throttledMs.load(),
         pieceLength = store.metadata.pieceLength,
       ))

@@ -19,6 +19,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property webSeeds web seeds running now, fetching or not.
  * @property droppedWebSeeds web seeds that stopped, which [StallRecovery.RELAUNCH_WEB_SEEDS] starts
  *   again.
+ * @property unprovenWebSeeds web seeds started again that run and have neither verified nor
+ *   refused a piece since: until they do, they offer every piece, those missing before included.
  * @property payloadBytes payload received so far, from peers and web seeds.
  * @property unsettledBytes of that payload, what may still be thrown away: web seed bytes of
  *   pieces not stored yet. Swarms read it after [payloadBytes] and before [wastedBytes], as web
@@ -38,6 +40,7 @@ internal data class StallSignals(
   val lateBlocks: Int,
   val webSeeds: Int,
   val droppedWebSeeds: Int,
+  val unprovenWebSeeds: Int,
   val payloadBytes: Long,
   val unsettledBytes: Long,
   val wastedBytes: Long,
@@ -71,9 +74,10 @@ internal enum class StallRecovery {
  * each at most once per its own cooldown, announcing to trackers less often each time it does not
  * help. Pieces missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS]
  * once the last one goes, so a peer that reconnects at once does not flip the reason, and those
- * missing when dropped web seeds start again stay missing for as long, while the seeds ask for
- * them once more, unless more peers connect meanwhile. Web seeds never decide the reason
- * otherwise: a stall stores nothing from them.
+ * missing when dropped web seeds start again stay missing while a seed started again runs without
+ * having verified or refused a piece (at least [SOURCE_GRACE_MS], at most [RELAUNCH_MS]), as it
+ * offers every piece until then, unless more peers connect meanwhile or a piece verifies. Web seeds
+ * never decide the reason otherwise: a stall stores nothing from them.
  *
  * Not thread-safe: one swarm loop calls it.
  */
@@ -133,6 +137,9 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     reannounceEveryMs = REANNOUNCE_MS
     // Payload before a verified piece is never taken back.
     credits.clear()
+    // What was missing when web seeds started again may be no more: a piece came, or the
+    // selection changed.
+    relaunchedAt = Long.MIN_VALUE / 2
   }
 
   /** Checks the swarm, about once a second; returns the recoveries due now. */
@@ -163,9 +170,13 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       missing = sourcedMissing
       missingFiles = sourcedFiles
     }
-    // Web seeds started again offer every piece until they find again what they cannot serve; a
-    // peer that connected since may have those pieces, so it has its say at once.
-    if (missing == 0 && now - relaunchedAt < SOURCE_GRACE_MS && signals.peers <= relaunchPeers) {
+    // Web seeds started again offer every piece until they verify or refuse one, so what was
+    // missing stays missing meanwhile; a peer that connected since may have those pieces, so it
+    // has its say at once.
+    val sinceRelaunch = now - relaunchedAt
+    val unproven = sinceRelaunch < SOURCE_GRACE_MS || signals.unprovenWebSeeds > 0
+    if (missing == 0 && sinceRelaunch < RELAUNCH_MS && unproven &&
+      signals.peers <= relaunchPeers) {
       missing = relaunchMissing
       missingFiles = relaunchFiles
     }
@@ -312,13 +323,16 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     const val REVIVE_MS = 300_000L
     const val LONELY_REVIVE_MS = 60_000L
 
-    /** How long a stall lasts before dropped web seeds start again, and how often they do. */
+    /**
+     * How long a stall lasts before dropped web seeds start again, and how often they do: also the
+     * longest what was missing then stays missing while they ask again.
+     */
     const val RELAUNCH_AFTER_MS = 120_000L
     const val RELAUNCH_MS = 600_000L
 
     /**
-     * How long pieces missing while something was connected stay missing once nothing is, or once
-     * dropped web seeds start again and no more peers connect.
+     * How long pieces missing while something was connected stay missing once nothing is, and the
+     * least they do once dropped web seeds start again and no more peers connect.
      */
     const val SOURCE_GRACE_MS = 10_000L
 

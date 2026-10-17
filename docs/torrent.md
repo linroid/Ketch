@@ -820,9 +820,10 @@ the most telling order:
   fails. The download waits for a peer that has them; skipping those files lets the rest finish.
   A torrent whose files changed at its only web seed stops here, also once that seed was
   dropped. Pieces missing while a peer was connected stay missing for 10 seconds after the last
-  one leaves, so a peer that reconnects at once does not change the reason, and so do those
-  missing when dropped web seeds start again, while they ask once more, unless more peers connect
-  meanwhile.
+  one leaves, so a peer that reconnects at once does not change the reason. Those missing when
+  dropped web seeds start again stay missing while one of those seeds runs without having served
+  or refused a piece yet (at least 10 seconds, at most 10 minutes), as it offers every piece until
+  then, unless more peers connect meanwhile: a dead mirror retried for minutes does not hide them.
 - **No peers**: no peer is connected, and no wanted piece is missing. A stalled download stores
   nothing from its web seeds either, so whether they are fetching or waiting to retry never
   changes the reason.

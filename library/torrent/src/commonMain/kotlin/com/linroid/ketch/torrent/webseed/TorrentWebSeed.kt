@@ -268,6 +268,12 @@ internal class WebSeedWorker<P : WebSeedPiece>(
    */
   val downAcrossRelaunch: Boolean get() = gone.load()
 
+  /**
+   * Whether this seed was dropped and has neither verified nor refused a piece since: started
+   * again, it has yet to show whether its mirror is back, while it offers every piece.
+   */
+  val unproven: Boolean get() = quiet.load()
+
   /** Fetches until the transfer cancels it or it is dropped; never twice at once. */
   suspend fun run() {
     // Failed runs in a row, which set the backoff, and of those the ones that drop the seed: all

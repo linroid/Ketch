@@ -152,6 +152,9 @@ internal class TorrentV2WebSeeds private constructor(
   /** Whether [seed] is down across a relaunch ([WebSeedWorker.downAcrossRelaunch]). */
   fun downAcrossRelaunch(seed: Int): Boolean = workers[seed].downAcrossRelaunch
 
+  /** Whether [seed] has yet to show its mirror is back ([WebSeedWorker.unproven]). */
+  fun unproven(seed: Int): Boolean = workers[seed].unproven
+
   sealed interface Event {
     /** [seed] waits for a piece. */
     class Idle(val seed: Int) : Event

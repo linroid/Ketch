@@ -39,6 +39,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -646,6 +647,78 @@ class TorrentWebSeedTest {
           }
           assertContentEquals(stale,
             torrentFileSystem.read(output / "stale.bin") { readByteArray() })
+        }
+      }
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun relaunchedSeed_keepsWhatWasMissingUntilItAnswers() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        val goodUrl = "http://mirror.test/pub/set/good.bin"
+        // The only source lacks stale.bin, the one file wanted, until it is fixed; once it is
+        // started again it answers only when the test lets it, and no peer connects.
+        val lacking = MirrorEngine(mapOf(goodUrl to good))
+        val fixed = MirrorEngine(mapOf(staleUrl to stale, goodUrl to good))
+        val holding = AtomicBoolean(false)
+        val asked = CompletableDeferred<Unit>()
+        val answer = CompletableDeferred<Unit>()
+        val mirror = object : HttpEngine by lacking {
+          override suspend fun download(
+            url: String,
+            range: LongRange?,
+            headers: Map<String, String>,
+            onData: suspend (ByteArray) -> Unit,
+          ) {
+            if (!holding.load()) return lacking.download(url, range, headers, onData)
+            asked.complete(Unit)
+            answer.await()
+            fixed.download(url, range, headers, onData)
+          }
+        }
+        withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>()
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              while (lacking.requests.none { it.first == staleUrl }) delay(20)
+              delay(500)
+              clock = 40_000
+              val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+              assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
+              // Two minutes into the stall the seed starts again and asks once more: it offers
+              // every piece, but has yet to show it has stale.bin, so it stays missing as long as
+              // the answer takes.
+              holding.store(true)
+              clock = 130_000
+              asked.await()
+              for (time in listOf(145_000L, 400_000L)) {
+                clock = time
+                delay(500)
+                val waiting = assertNotNull(stall.value)
+                assertEquals(TorrentStallReason.MISSING_PIECES, waiting.reason)
+                assertEquals(1, waiting.missingPieces)
+                assertEquals(listOf("0"), waiting.missingFileIds)
+              }
+              // The mirror has it now: the download finishes.
+              answer.complete(Unit)
+              while (!store.completed()) delay(20)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
         }
       }
     }

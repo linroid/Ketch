@@ -25,10 +25,11 @@ class TorrentStallWatchdogTest {
     lateBlocks: Int = 0,
     webSeeds: Int = 0,
     droppedWebSeeds: Int = 0,
+    unprovenWebSeeds: Int = 0,
     downloading: Boolean = true,
   ) = StallSignals(downloading, peers, unchokingPeers, missingPieces, missingFileIds, lateBlocks,
-    webSeeds, droppedWebSeeds, payloadBytes, unsettledBytes, wastedBytes, throttledMs,
-    pieceLength = 262_144)
+    webSeeds, droppedWebSeeds, unprovenWebSeeds, payloadBytes, unsettledBytes, wastedBytes,
+    throttledMs, pieceLength = 262_144)
 
   /** Checks once a second up to [until], as a swarm does. */
   private fun runTo(until: Long, signals: (Long) -> StallSignals): Set<StallRecovery> {
@@ -227,15 +228,62 @@ class TorrentStallWatchdogTest {
       signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
     }
     assertTrue(StallRecovery.RELAUNCH_WEB_SEEDS in due)
-    // Started again, a seed offers every piece until it finds again that it cannot serve them.
-    runTo(125_000) { signals(webSeeds = 1) }
+    // Started again, a seed offers every piece until it finds again that it cannot serve them,
+    // however long that takes, as for a mirror whose requests time out.
+    runTo(300_000) { signals(webSeeds = 1, unprovenWebSeeds = 1) }
     val stall = assertNotNull(watchdog.stall)
     assertEquals(TorrentStallReason.MISSING_PIECES, stall.reason)
     assertEquals(2, stall.missingPieces)
     assertEquals(listOf("7"), stall.missingFileIds)
-    // Ten seconds on, it has not refused them again: the download waits for a source.
-    runTo(131_000) { signals(webSeeds = 1) }
+    // It answered, refusing other pieces: what the swarm says now stands.
+    runTo(301_000) { signals(webSeeds = 1) }
     assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+    assertEquals(0, watchdog.stall?.missingPieces)
+  }
+
+  @Test
+  fun relaunchedWebSeedsAnsweringAtOnce_stillKeepWhatWasMissingAFewSeconds() {
+    runTo(121_000) {
+      signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
+    }
+    // Started again two minutes into the stall, they answer at once, but the earlier pieces stay
+    // missing a few seconds all the same.
+    runTo(129_000) { signals(webSeeds = 1) }
+    assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
+    runTo(130_000) { signals(webSeeds = 1) }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+  }
+
+  @Test
+  fun relaunchedWebSeedsNeverAnswering_keepWhatWasMissingUntilTheyWouldStartAgain() {
+    runTo(121_000) {
+      signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
+    }
+    // Started again two minutes into the stall, they never answer: the earlier pieces stay missing
+    // until seeds would start again.
+    runTo(119_000 + TorrentStallWatchdog.RELAUNCH_MS) {
+      signals(webSeeds = 1, unprovenWebSeeds = 1)
+    }
+    assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
+    runTo(120_000 + TorrentStallWatchdog.RELAUNCH_MS) {
+      signals(webSeeds = 1, unprovenWebSeeds = 1)
+    }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+  }
+
+  @Test
+  fun selectionChange_endsWhatARelaunchKeptMissing() {
+    runTo(121_000) {
+      signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
+    }
+    runTo(125_000) { signals(webSeeds = 1, unprovenWebSeeds = 1) }
+    assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
+    // File 7 is skipped: the selection changed, and nothing it wants is missing.
+    watchdog.progressed()
+    runTo(160_000) { signals(webSeeds = 1, unprovenWebSeeds = 1) }
+    val stall = assertNotNull(watchdog.stall)
+    assertEquals(TorrentStallReason.NO_PEERS, stall.reason)
+    assertEquals(0, stall.missingPieces)
   }
 
   @Test
@@ -245,10 +293,10 @@ class TorrentStallWatchdogTest {
       signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
     }
     assertTrue(StallRecovery.RELAUNCH_WEB_SEEDS in due)
-    runTo(123_000) { signals(webSeeds = 1) }
+    runTo(123_000) { signals(webSeeds = 1, unprovenWebSeeds = 1) }
     assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
     // A peer with those pieces connects while the seed asks again: nothing is missing now.
-    runTo(124_000) { signals(peers = 1, webSeeds = 1) }
+    runTo(124_000) { signals(peers = 1, webSeeds = 1, unprovenWebSeeds = 1) }
     val stall = assertNotNull(watchdog.stall)
     assertEquals(TorrentStallReason.CHOKED, stall.reason)
     assertEquals(0, stall.missingPieces)

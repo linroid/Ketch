@@ -875,6 +875,10 @@ internal object TorrentV2SessionLoop {
           lateBlocks = if (downloading) pieces.lateCount() else 0,
           webSeeds = mirrorsRunning,
           droppedWebSeeds = stoppedMirrors.size,
+          // Seeds started again that have yet to show whether their mirror is back.
+          unprovenWebSeeds = mirrors?.let { seeds ->
+            seeds.urls.indices.count { it !in stoppedMirrors && seeds.unproven(it) }
+          } ?: 0,
           payloadBytes = payload,
           unsettledBytes = unsettled,
           wastedBytes = wasted,
