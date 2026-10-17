@@ -7,6 +7,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
+import com.linroid.ketch.core.engine.NoDownloadSourceException
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.resolve
@@ -14,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.serialization.builtins.serializer
 
@@ -95,11 +97,13 @@ class SourceResolverTest {
   }
 
   @Test
-  fun resolve_noMatch_throwsUnsupported() {
+  fun resolve_noMatch_throwsUnsupportedCausedByNoSource() {
     val resolver = SourceResolver(listOf(fakeSource))
-    assertFailsWith<KetchError.Unsupported> {
+    val error = assertFailsWith<KetchError.Unsupported> {
       resolver.resolve("https://example.com/file.zip")
     }
+    // Callers tell it apart from a source's own by its cause.
+    assertIs<NoDownloadSourceException>(error.cause)
   }
 
   @Test
@@ -159,11 +163,12 @@ class SourceResolverTest {
   }
 
   @Test
-  fun resolveContent_noSourceAccepts_throwsUnsupported() {
+  fun resolveContent_noSourceAccepts_throwsUnsupportedCausedByNoSource() {
     val resolver = SourceResolver(listOf(httpSource, fakeSource))
-    assertFailsWith<KetchError.Unsupported> {
+    val error = assertFailsWith<KetchError.Unsupported> {
       resolver.resolve(ResolveInput.Content(byteArrayOf(1), "a.torrent"))
     }
+    assertIs<NoDownloadSourceException>(error.cause)
   }
 
   @Test

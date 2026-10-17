@@ -9,6 +9,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.resolve
+import com.linroid.ketch.core.engine.NoDownloadSourceException
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
@@ -104,17 +105,20 @@ internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard)
 
 /**
  * Responds with what [resolve] found. An input no source takes answers 415 `unsupported` with
- * [unsupported], and a source's refusal, such as a torrent with pieces too large, 422 with the
- * [KetchError] itself, typed like the errors in task snapshots, so clients keep its reason.
+ * [noSource]; one a source takes but lacks something for, such as byte ranges or a usable proxy,
+ * the same with that reason. A source's refusal, such as a torrent with pieces too large, answers
+ * 422 with the [KetchError] itself, typed like the errors in task snapshots, so clients keep its
+ * reason.
  */
 private suspend inline fun ApplicationCall.respondResolved(
-  unsupported: String,
+  noSource: String,
   resolve: () -> ResolvedSource,
 ) {
   val resolved = try {
     resolve()
   } catch (e: KetchError.Unsupported) {
-    respond(HttpStatusCode.UnsupportedMediaType, ErrorResponse("unsupported", unsupported))
+    val message = if (e.cause is NoDownloadSourceException) noSource else e.reason()
+    respond(HttpStatusCode.UnsupportedMediaType, ErrorResponse("unsupported", message))
     return
   } catch (e: KetchError.SourceError) {
     respond(HttpStatusCode.UnprocessableEntity, refusalBody(e))
@@ -131,6 +135,16 @@ private suspend inline fun ApplicationCall.respondResolved(
 private fun refusalBody(error: KetchError.SourceError): JsonObject {
   val typed = ServerJson.encodeToJsonElement(KetchError.serializer(), error).jsonObject
   return JsonObject(typed + ("error" to JsonPrimitive("source_error")))
+}
+
+/**
+ * What a source that lacks something for an input says: its cause's reason, left out when it
+ * quotes a URL, which may carry credentials.
+ */
+private fun KetchError.Unsupported.reason(): String {
+  val reason = cause?.message?.trim()
+    ?.takeIf { it.isNotEmpty() && "://" !in it && !it.contains("magnet:", ignoreCase = true) }
+  return if (reason == null) "Not supported" else "Not supported: $reason"
 }
 
 /** Upper bound for uploaded content ([ResolveInput.Content.MAX_CONTENT_BYTES]). */

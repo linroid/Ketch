@@ -70,7 +70,11 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
     }
   }
 
-  /** The first source that [DownloadSource.canHandle]s [input]. */
+  /**
+   * The first source that [DownloadSource.canHandle]s [input].
+   *
+   * @throws KetchError.Unsupported caused by a [NoDownloadSourceException] when none does
+   */
   fun resolve(input: ResolveInput): DownloadSource<*> {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.canHandle(input) }
@@ -79,7 +83,7 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
       return source
     }
     log.e { "No source found for ${input.describe()}" }
-    throw KetchError.Unsupported()
+    throw KetchError.Unsupported(NoDownloadSourceException())
   }
 
   /** The first source that downloads [url]. */
@@ -106,3 +110,12 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
     throw KetchError.Unsupported()
   }
 }
+
+/**
+ * The cause of the [KetchError.Unsupported] that resolving or downloading an input no
+ * [DownloadSource] takes throws. It tells that apart from the one a source throws when it takes
+ * the input but lacks something it needs, such as byte ranges or a usable proxy, so callers say
+ * that no source handles an input only when none does.
+ */
+class NoDownloadSourceException internal constructor() :
+  Exception("No download source takes this input")

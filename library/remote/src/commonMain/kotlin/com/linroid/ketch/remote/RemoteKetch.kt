@@ -358,13 +358,21 @@ class RemoteKetch internal constructor(
   }
 
   /**
-   * The error a resolve the server refused for its input throws, as [KetchApi.resolve] does: one
-   * no source takes, or a source's own, decoded with its reason. A 422 whose body is no
-   * [KetchError], such as a proxy's page, is a [RemoteApiException].
+   * The error a resolve the server refused for its input throws, as [KetchApi.resolve] does: 415
+   * `unsupported` for one no source takes, or that its source lacks something for, and 422 with a
+   * source's own, decoded with its reason. Other bodies, such as a 415 for a request body that is
+   * not JSON or a proxy's page, are a [RemoteApiException].
    */
   private suspend fun resolveRefusal(response: HttpResponse): Exception? =
     when (response.status) {
-      HttpStatusCode.UnsupportedMediaType -> KetchError.Unsupported()
+      HttpStatusCode.UnsupportedMediaType -> {
+        val body = response.errorResponse()
+        if (body?.error == "unsupported") {
+          KetchError.Unsupported()
+        } else {
+          response.toRemoteApiException(body)
+        }
+      }
       HttpStatusCode.UnprocessableEntity ->
         typedError(response.bodyAsText()) ?: response.toRemoteApiException()
       else -> null

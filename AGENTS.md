@@ -116,7 +116,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`KetchDispatchers.Default`, shared by every instance)
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
-  `SourceResolver`, `SourceState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
+  `SourceResolver` (`NoDownloadSourceException`), `SourceState`, `DownloadContext`,
+  `DownloadQueue`, `DownloadScheduler`,
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
   (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
   `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
@@ -1544,12 +1545,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   per-task speed limit, priority and connections (0 is Auto; older servers answer 400
   `invalid_connections`, which `RemoteDownloadTask` turns into `UnsupportedOperationException`);
   status (with `KetchStatus.features`), config, network interfaces, and resolving URLs or
-  uploaded file content. Both resolve routes (`respondResolved`) answer an input no source takes
-  with 415 `unsupported` and a source's refusal with 422 and the typed `KetchError`, its `detail`
-  saying why, plus `"error": "source_error"`, so clients that read an `ErrorResponse` keep its
-  message; `RemoteKetch.resolve` throws the error again (a 422 without one is a
-  `RemoteApiException`). Older servers answered a URL's refusals with 500, still a
-  `RemoteApiException`
+  uploaded file content. Both resolve routes (`respondResolved`) answer 415 `unsupported` for an
+  input no source takes (the `KetchError.Unsupported` core's `NoDownloadSourceException` causes)
+  and, with its reason, for one a source lacks something for, such as a usable proxy; and a
+  source's refusal with 422 and the typed `KetchError`, its `detail` saying why, plus
+  `"error": "source_error"`, so clients that read an `ErrorResponse` keep its message.
+  `RemoteKetch.resolve` throws `KetchError.Unsupported` for a 415 `unsupported` and the 422's
+  error again; other bodies are a `RemoteApiException`, as older servers' 500 for a URL's refusals
 - Event stream (`StreamRoutes`, `EventHub`; `/api/status` lists `events.stream`): `GET
   /api/stream` opens one SSE stream per client (at most 32, 429 `too_many_streams` beyond; a
   comment every 15 s, which also frees the streams of clients that left). It sends `hello` (the

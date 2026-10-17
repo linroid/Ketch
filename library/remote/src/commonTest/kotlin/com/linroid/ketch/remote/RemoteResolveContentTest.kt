@@ -51,9 +51,9 @@ class RemoteResolveContentTest {
 
   @Test
   fun resolveContent_errorStatuses_mapToTypedErrors() = runTest {
-    suspend fun resolveWith(status: HttpStatusCode) {
+    suspend fun resolveWith(status: HttpStatusCode, body: String = "") {
       val remote = RemoteKetch("remote.example", 8642, null, false, MockEngine {
-        respond("", status)
+        respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
       })
       try {
         remote.resolve(byteArrayOf(1), "a.torrent")
@@ -62,7 +62,8 @@ class RemoteResolveContentTest {
       }
     }
     assertFailsWith<KetchError.Unsupported> {
-      resolveWith(HttpStatusCode.UnsupportedMediaType)
+      resolveWith(HttpStatusCode.UnsupportedMediaType,
+        """{"error":"unsupported","message":"No download source recognizes this content"}""")
     }
     assertFailsWith<IllegalArgumentException> {
       resolveWith(HttpStatusCode.PayloadTooLarge)

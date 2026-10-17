@@ -66,6 +66,20 @@ class RemoteResolveUrlTest {
   }
 
   @Test
+  fun resolveUrl_415ForAnotherReason_throwsRemoteApiException() = runTest {
+    // The server refuses a request body that is not JSON with 415 too.
+    val notJson = assertFailsWith<RemoteApiException> {
+      resolveWith(HttpStatusCode.UnsupportedMediaType,
+        """{"error":"unsupported_media_type","message":"Request body must be application/json"}""")
+    }
+    assertEquals("unsupported_media_type", notJson.errorCode)
+    val unexplained = assertFailsWith<RemoteApiException> {
+      resolveWith(HttpStatusCode.UnsupportedMediaType)
+    }
+    assertEquals(415, unexplained.status)
+  }
+
+  @Test
   fun resolveUrl_olderServerAnswers500_throwsRemoteApiException() = runTest {
     val error = assertFailsWith<RemoteApiException> {
       resolveWith(HttpStatusCode.InternalServerError,

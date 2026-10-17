@@ -142,7 +142,49 @@ class ServerRoutesTest {
       setBody(json.encodeToString(ResolveUrlRequest("gopher://example.com/file")))
     }
     assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
-    assertEquals("unsupported", json.decodeFromString<ErrorResponse>(response.bodyAsText()).error)
+    val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    assertEquals("unsupported", error.error)
+    assertEquals("No download source handles this URL", error.message)
+  }
+
+  /**
+   * Takes every `lack:` URL but lacks something for it, as the HTTP source does for a server
+   * that answers the wrong range or a proxy variable it cannot use; the rest of the URL is why.
+   */
+  private class LackingSource : DownloadSource<Unit> {
+    override val type = "lacking"
+    override val stateSerializer = Unit.serializer()
+    override fun canHandle(input: ResolveInput): Boolean =
+      input is ResolveInput.Url && input.url.startsWith("lack:")
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+      throw KetchError.Unsupported(IllegalStateException((input as ResolveInput.Url).url.drop(5)))
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
+  }
+
+  @Test
+  fun resolve_sourceLacksSomethingForTheUrl_saysWhyNotThatNoSourceHandlesIt() = testApplication {
+    val ketch = Ketch(NoOpHttpEngine(), additionalSources = listOf(LackingSource()))
+    application {
+      with(createTestServer(ketch)) { configureServer() }
+    }
+    suspend fun refusal(url: String): ErrorResponse {
+      val response = client.post("/api/resolve") {
+        contentType(ContentType.Application.Json)
+        setBody(json.encodeToString(ResolveUrlRequest(url)))
+      }
+      assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+      return json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    }
+    try {
+      val range = refusal("lack:Server returned a different range")
+      assertEquals("unsupported", range.error)
+      assertEquals("Not supported: Server returned a different range", range.message)
+      // A reason that quotes a URL is left out.
+      val redirect = refusal("lack:Redirected to https://cdn.example/a?sig=1")
+      assertEquals("Not supported", redirect.message)
+    } finally {
+      ketch.close()
+    }
   }
 
   @Test
