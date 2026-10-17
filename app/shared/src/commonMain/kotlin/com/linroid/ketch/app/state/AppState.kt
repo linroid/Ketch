@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import com.linroid.ketch.api.CountryDatabase
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
@@ -1005,6 +1006,16 @@ class AppState(
     if (TorrentFeatures.CONTROL !in featuresOf(deviceId)) return null
     return instances.value.firstOrNull { it.deviceId == deviceId }?.instance
       ?.controller(TorrentController)
+  }
+
+  /**
+   * The IP to country database of the device [deviceId], which names its connections'
+   * countries; `null` when it has none, as on iOS or a device whose Ketch is older.
+   */
+  fun countryDatabaseOf(deviceId: String): CountryDatabase? {
+    val entry = instances.value.firstOrNull { it.deviceId == deviceId } ?: return null
+    if (entry is RemoteInstance && KetchFeatures.COUNTRIES !in featuresOf(deviceId)) return null
+    return entry.instance.controller(CountryDatabase)
   }
 
   /**

@@ -157,6 +157,8 @@ curl -X POST http://localhost:8642/api/tasks \
 | `GET /api/stream` | The event stream, on servers listing `events.stream`: one SSE stream per client with `hello`, `subscribed`, a `tasks` snapshot, then every task's lifecycle and state changes, plus what its subscription asks for |
 | `PUT /api/stream/{id}/subscription` | Choose what the stream also sends: progress at an interval, the segments of named tasks, and interests such as stats, connections or torrent snapshots |
 | `GET /api/connections?limit=` | A snapshot of the live network connections (HTTP hosts, FTP servers, torrent peers), at most `limit` (1..1024, default 256), on servers listing `net.activeConnections` |
+| `GET /api/countries` | The status of the IP to country database that names connections' `country`, on servers listing `net.countries` |
+| `POST /api/countries/download` | Starts downloading that database (DB-IP Lite, about 5 MB) on the server and answers its status |
 | `GET /api/events`, `/api/events/{id}` | Deprecated: SSE `task_added`, `task_removed`, `state_changed` and `progress` events, for older clients |
 | `GET /api/connections/events?limit=` | Deprecated: SSE `snapshot` events of the live connections, at most 16 streams at once |
 
@@ -246,6 +248,7 @@ interface DownloadSource<S : Any> {
   val managesOwnFileIo: Boolean get() = false        // true: the source writes its own files
   suspend fun planSelection(request: SelectionRequest<S>): SelectionPlan // sources with files
   fun attach(host: SourceHost): SourceExtension? = null // controllers and lifecycle hooks
+  suspend fun stop() {}                              // stops what outlived the downloads
   fun close() {}
 }
 ```
@@ -271,6 +274,10 @@ interface DownloadSource<S : Any> {
    is usually `null`, so ask the server again if you need fresh details.
 7. **Removing.** `cleanup(context, state, deleteFiles)` runs after the download stopped. The
    default deletes the file Ketch opened, which suits a source that writes one file.
+8. **Closing.** When Ketch closes, it pauses every download as in step 5. Once they have
+   stopped, it calls `stop()`, where a source stops what outlived its downloads and returns once
+   it has (the torrent source stops seeding and its sessions announce `stopped`), while the
+   `HttpEngine` still works. Only then does it call `close()` and close the `HttpEngine`.
 
 ### Example: files behind your app's API
 

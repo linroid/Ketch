@@ -75,6 +75,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
   and `resolve(bytes, fileName)` extensions build them),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
+  `CountryDatabase` (its `Key` is a `ControlKey`) and `CountryDatabaseStatus`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
   follows: `Interest.Segments(taskIds)`, `Interest.Stats` (`KetchStats`) and
@@ -133,6 +134,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
   `sanitizeFileName()`, `OutputPathReservations`, `partialPathFor()` and
   `movePartialToFinal()` (`PartialFiles.kt`), `DestinationPathPolicy`, `PathRejectedException`
+- `com.linroid.ketch.core.geo` -- `CountryLookup` (a `CountryDatabase` `Ketch(countries = ...)`
+  names `ActiveConnection.country` with), internal `CountryTable`, and `DbIpCountryDatabase`
+  (jvmAndAndroidMain)
 - `com.linroid.ketch.core.digest` -- `MessageDigest`, `Md5`, `Sha1`, `Sha256`, `Sha512` (pure
   Kotlin, on every engine target) and `ChecksumAlgorithm.newDigest()`, which gives the platform's
   digest where there is one (`platformDigest`, expect/actual: `java.security.MessageDigest` on the
@@ -394,9 +398,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
-  `DOWNLOADING` records, so the next `start()` resumes them. It closes dispatchers it was given
-  only once the cancelled coroutines have finished (from `Dispatchers.Default`), never under
-  them, and never `KetchDispatchers.Default`, whose `close()` does nothing
+  `DOWNLOADING` records, so the next `start()` resumes them, and releases the rest in the
+  background, in order (from `Dispatchers.Default`): once the cancelled executions have finished,
+  with their final `store()` checkpoints and record writes, it awaits each source's
+  `DownloadSource.stop()` (the torrent source's saves its seeders' checkpoints, then stops its
+  engine, whose sessions announce `stopped`), then closes the sources and the `HttpEngine`, and
+  closes dispatchers it was given only once every cancelled coroutine has finished, never under
+  them, and never
+  `KetchDispatchers.Default`, whose `close()` does nothing. `KetchApi.shutdown(timeout)` (5 s by
+  default; `close()` for other implementations) does the same and waits for the sources and the
+  `HttpEngine` to be released, at most `timeout`, leaving the rest to the background: `ketch
+  server`'s and `ketch mcp --standalone`'s shutdown hooks, `ketch <url>` and the desktop app's
+  quit (`InstanceManager.shutdown`) call it, as the process exits next
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
@@ -470,7 +483,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
   seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
   `close` close what a source leaked. Its sampler reads the counters once a second, rates over
-  the last two samples, and runs only while collected; idle repeats are not sent
+  the last two samples, and runs only while collected; idle repeats are not sent. Each
+  connection keeps its last two samples, so a collection starting within a few seconds of
+  another (a one-shot `GET /api/connections` included) measures from them; one with nothing
+  recent to measure from notes the counters and sends its first sample a second later, so an idle
+  connection reads 0 rather than its average since it opened
+- Countries: `ActiveConnection.country` is the ISO code an engine given a `CountryLookup` names
+  for the host, listed as `KetchFeatures.COUNTRIES` (`net.countries`) with
+  `controller(CountryDatabase)`. `DbIpCountryDatabase` (desktop app, Android app, `ketch server`)
+  downloads DB-IP's monthly IP to Country Lite (CC BY 4.0, about 5 MB) only when asked
+  (`download()`, REST `POST /api/countries/download`; `GET /api/countries` is the status) into
+  `dbip-country-lite.csv.gz` of the config directory (Android: `noBackupFilesDir`), and reads it
+  into memory (about 10 MB) at start. Host names resolve through the system, then Cloudflare's
+  DNS over HTTPS when the system only answers with addresses without a country (a proxy's fake-IP
+  198.18.0.0/15). Each device downloads its own: the Connections page's Show countries button asks
+  every shown device lacking one, then shows flags before endpoints and the DB-IP attribution;
+  `RemoteKetch` fails the controller's calls closed against servers without the feature. iOS has
+  no database
 - HTTP: one connection per segment request (the unknown-size stream is one), with the URL's host
   and port until the engine reports more. Sources run each GET under an `HttpExchangeObserver`
   (a coroutine context element, so wrapping engines pass it on unchanged); `KtorHttpEngine`
@@ -525,7 +554,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   run, such as a lent torrent seeder, pay `DownloadContext.globalThrottle`, the global limit
   alone, which holds nothing of the run. Seeders `TorrentControls` restores have no context and
   pay no Ketch limit
-- Token-bucket algorithm (`TokenBucket`) with delegating wrapper
+- Token-bucket algorithm (`TokenBucket`) with delegating wrapper. Waiters queue by owner
+  (`SpeedLimiter.acquire(bytes, owner)`; the global limiter's owner is the task ID) and are served
+  in turns of at most 16 KiB by start-time fair queuing, so tasks share the global limit equally
+  by bytes, however many connections or peers each waits with; an owner that stops waiting gives
+  its turns up. Buckets read a monotonic `TimeSource`, so tests run them on virtual time
 
 ### Download Scheduling (`DownloadScheduler`)
 - `DownloadSchedule.Immediate`, `AtTime(Instant)`, `AfterDelay(Duration)`
@@ -800,8 +833,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`TorrentControlSource.saveSessionStates`, completed tasks of the source only, never while a
   run is active), which the source calls about every minute while a task seeds (its seed
   watcher), as a seeder stops (`stopSession`: Stop seeding, the watcher, a waiting download), and
-  as the source closes: `close()` lets its seeders save, within 5 s, before it closes the engine
-  (`awaitClosed`). A task's state from before (a lent seeder's last run, or the one
+  as Ketch shuts down: `stop()` lets its seeders save, within 5 s, before it stops the engine
+  (`close()` alone saves nothing). A task's state from before (a lent seeder's last run, or the one
   `startSeeding` restored) is what each save updates. Without a session, `countersOf` reports the
   record's checkpoint (`TorrentControlSource.savedPayload`; `checkpointPayload` reads only the
   counters)
@@ -1923,7 +1956,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "TorrentControls", "Connections", "RemoteKetch", "RemoteTask", "RemotePairing",
   "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
-  "ConnectionRoutes", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
+  "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
   "GitHubReleases", "Hooks";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and

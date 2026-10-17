@@ -59,6 +59,8 @@ data class PeerDetails(
  * @property downloadedBytes payload bytes received since it opened
  * @property uploadedBytes payload bytes sent since it opened
  * @property peer torrent peer details
+ * @property country the ISO 3166 code of [host]'s country, such as `DE`, from the instance's
+ *   [CountryDatabase]; `null` without one, or for reserved and unknown addresses
  */
 @Serializable
 data class ActiveConnection(
@@ -77,6 +79,7 @@ data class ActiveConnection(
   val uploadedBytes: Long = 0,
   val openedAt: Instant,
   val peer: PeerDetails? = null,
+  val country: String? = null,
 )
 
 /**

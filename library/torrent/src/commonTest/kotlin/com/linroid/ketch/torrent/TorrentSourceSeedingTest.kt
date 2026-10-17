@@ -326,14 +326,18 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
-  fun restoredSeeder_savesItsCheckpointBeforeTheEngineCloses() = runTest {
+  fun stop_savesTheSeedersCheckpointBeforeTheEngineStops() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(10_000) {
         val engine = FakeTorrentEngine()
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
           .also { it.engineFactory = { engine } }
-        val saved = savedStates(source)
+        // Whether the engine had stopped by each save.
+        val saves = Channel<Pair<TorrentSourceState, Boolean>>(Channel.UNLIMITED)
+        source.saveSessionStates { _, state ->
+          saves.send(source.decodeState(state) to engine.stopped)
+        }
         val metainfo = v1Metainfo("data")
         val hash = TorrentMetadata.fromBencode(metainfo).infoHash.hex
         val ids = TorrentFileTable.parse(metainfo, TorrentConfig()).ids
@@ -345,16 +349,17 @@ class TorrentSourceSeedingTest {
           eventually { session.resumed }
           session.seed()
         }
-        assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
-          "http://fixture/data.torrent", state.saved(), null, "unused-data", ids)))
-        seeds.join()
-        source.close()
-        source.awaitClosed()
-        val (taskId, last) = saved.receive()
-        assertEquals("seeder", taskId)
-        // The state it was restored from, with the checkpoint it saved last.
-        assertEquals(state.copy(resumeData = encodeBase64(byteArrayOf(7))), last)
-        assertTrue(engine.closed)
+        try {
+          assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("seeder",
+            "http://fixture/data.torrent", state.saved(), null, "unused-data", ids)))
+          seeds.join()
+          source.stop()
+          val (last, stopped) = assertNotNull(saves.tryReceive().getOrNull())
+          // The state it was restored from, with the checkpoint it saved last.
+          assertEquals(state.copy(resumeData = encodeBase64(byteArrayOf(7))), last)
+          assertFalse(stopped)
+          assertTrue(engine.stopped)
+        } finally { source.close() }
       }
     }
   }

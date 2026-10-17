@@ -1,6 +1,7 @@
 package com.linroid.ketch.core
 
 import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.CountryDatabase
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -54,6 +55,7 @@ import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.geo.CountryLookup
 import com.linroid.ketch.core.file.requireDownloadDirectory
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
@@ -71,6 +73,7 @@ import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -98,6 +101,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -120,6 +124,8 @@ import kotlin.uuid.Uuid
  * @param additionalSources extra [DownloadSource] implementations
  *   (e.g., FTP, media). HTTP is always included as a fallback. A source may contribute typed
  *   controllers and lifecycle hooks through [DownloadSource.attach].
+ * @param countries names the countries of [com.linroid.ketch.api.ActiveConnection]s, offered through [controller] as
+ *   the [CountryDatabase]; `null` for none
  * @param logger logging backend
  * @param dispatchers dispatchers for task management, network operations and file I/O; by
  *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
@@ -137,6 +143,7 @@ class Ketch(
   additionalSources: List<DownloadSource<*>> = emptyList(),
   logger: Logger = Logger.None,
   internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
+  private val countries: CountryLookup? = null,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -160,6 +167,12 @@ class Ketch(
   /** Set once [start] started the sources' extensions. */
   private val extensionsStarted = AtomicBoolean(false)
 
+  /** Set by the first [close]. */
+  private val closing = AtomicBoolean(false)
+
+  /** Completes once [close] released the sources and the [HttpEngine]. */
+  private val released = CompletableDeferred<Unit>()
+
   private val features: Set<String> = buildSet {
     add(KetchFeatures.AUTO_CONNECTIONS)
     add(KetchFeatures.QUEUE_POSITION)
@@ -169,6 +182,7 @@ class Ketch(
     add(KetchFeatures.TRANSFER_TIMEOUTS)
     add(KetchFeatures.ACTIVE_CONNECTIONS)
     add(KetchFeatures.CHECKSUM)
+    if (countries != null) add(KetchFeatures.COUNTRIES)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)
@@ -183,7 +197,10 @@ class Ketch(
   private val scope = CoroutineScope(SupervisorJob() + dispatchers.main.limitedParallelism(1))
 
   /** Live connections of every task, sampled on [scope] while observed. */
-  private val connectionRegistry = ConnectionRegistry(scope)
+  private val connectionRegistry = ConnectionRegistry(
+    scope,
+    countryOf = { host -> countries?.countryOf(host) },
+  )
 
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
@@ -598,8 +615,11 @@ class Ketch(
     extensions.firstOrNull { it.first == sourceType }?.second
 
   /** The controller the first source extension offering one for [key] contributes. */
-  override fun <T : Any> controller(key: ControlKey<T>): T? =
-    extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? {
+    if (key === CountryDatabase.Key) return countries as T?
+    return extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
+  }
 
   /**
    * Validates, saves and applies a file selection; the caller holds the task's control lock.
@@ -1105,31 +1125,63 @@ class Ketch(
   }.distinctUntilChanged()
 
   /**
-   * Stops every task and releases the engine, then closes [dispatchers] once its coroutines have
-   * finished; [KetchDispatchers.Default] stays open for every other instance.
+   * Stops every task, pausing running ones for [PauseReason.Shutdown], and releases the engine
+   * in the background, in order: once the downloads finished stopping, with their final
+   * checkpoints saved, it [stops][DownloadSource.stop] the sources, then closes them and the
+   * [HttpEngine], and closes [dispatchers] once its coroutines have finished;
+   * [KetchDispatchers.Default] stays open for every other instance. [shutdown] waits for it.
    */
   override fun close() {
+    if (!closing.compareAndSet(false, true)) return
     log.i { "Closing Ketch" }
     val executions = coordinator.close()
     connectionRegistry.closeAll()
     scope.cancel()
-    sourceResolver.close()
-    httpEngine.close()
-    if (!dispatchers.isDefault) {
-      closeDispatchersAfter(listOf(scope.coroutineContext.job, executions))
-    }
+    release(executions)
   }
 
   /**
-   * Closes [dispatchers] once [jobs] have finished: cancelled coroutines still complete on their
-   * dispatcher, and a closed pool throws when they do. Waits on [Dispatchers.Default], as a
-   * Native pool cannot close from one of its own threads.
+   * [Closes][close] this instance and waits at most [timeout] for the sources and the
+   * [HttpEngine] to be released, as a process that exits next must: until then, downloads save
+   * their final checkpoints and sources say goodbye, such as a torrent's `stopped` announces.
+   * What has not finished by then goes on in the background. [timeout] is wall-clock time,
+   * also under a test dispatcher's virtual time.
+   */
+  override suspend fun shutdown(timeout: Duration) {
+    close()
+    val stopped = withContext(Dispatchers.Default) {
+      withTimeoutOrNull(timeout) { released.await() }
+    }
+    if (stopped == null) log.w { "Ketch did not stop within $timeout; the rest goes on" }
+  }
+
+  /**
+   * Releases the sources and the [HttpEngine] once [executions] finished stopping, which still
+   * save their state and pause their tasks while cancelled, then closes [dispatchers] once every
+   * cancelled coroutine has finished: they complete on their dispatcher, and a closed pool throws
+   * when they do. Runs on [Dispatchers.Default], as a Native pool cannot close from one of its
+   * own threads.
    */
   @OptIn(DelicateCoroutinesApi::class)
-  private fun closeDispatchersAfter(jobs: List<Job>) {
+  private fun release(executions: Job) {
     GlobalScope.launch(Dispatchers.Default) {
-      jobs.joinAll()
-      dispatchers.close()
+      try {
+        executions.join()
+        // Before the HTTP engine closes, which a source may still need to stop.
+        sourceResolver.stop()
+      } finally {
+        sourceResolver.close()
+        try {
+          httpEngine.close()
+        } catch (e: Exception) {
+          log.w(e) { "Failed to close the HTTP engine" }
+        }
+        released.complete(Unit)
+      }
+      if (!dispatchers.isDefault) {
+        joinAll(scope.coroutineContext.job, executions)
+        dispatchers.close()
+      }
     }
   }
 }

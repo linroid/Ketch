@@ -278,7 +278,11 @@ default `InMemoryTaskStore` forgets them on exit. The fields that matter for res
   says why: `User`, `Preempted` for an `URGENT` task's victim (still queued; resuming changes
   nothing, pausing makes it a `User` pause), `Shutdown` or `AwaitingFileSelection`.
 - **Close.** `Ketch.close()` pauses every downloading task for `Shutdown` instead of canceling it.
-  Its partial file and `DOWNLOADING` record are kept, so the next `start()` resumes it.
+  Its partial file and `DOWNLOADING` record are kept, so the next `start()` resumes it. Once the
+  executions have saved their final progress and state, each source stops what outlived its
+  downloads (`DownloadSource.stop()`: torrent sessions announce `stopped`), and only then are the
+  sources, the `HttpEngine` and the dispatchers closed. `shutdown(timeout)` waits for that, at most
+  `timeout`, for processes that exit next.
 - **Resume** calls the source with its saved state. For HTTP:
   1. A download of unknown size restarts from byte zero without a probe.
   2. Otherwise the server is probed again. An ETag or Last-Modified mismatch fails the task with
@@ -360,8 +364,10 @@ DownloadContext.throttle(bytes)   (called by the source before writing each chun
 ```
 
 Each chunk takes tokens from the task's bucket and then from the global bucket, so a task runs at
-no more than the lower of the two limits. The `DelegatingSpeedLimiter` wrappers let a limit change
-or disappear while a download runs. Set them with `DownloadConfig.speedLimit` through
+no more than the lower of the two limits. The global bucket serves the tasks waiting for it in
+turns, always the one granted the fewest bytes next, so tasks share it equally however many
+connections or torrent peers each waits with. The `DelegatingSpeedLimiter` wrappers let a limit
+change or disappear while a download runs. Set them with `DownloadConfig.speedLimit` through
 `KetchApi.updateConfig()` (global) or `DownloadTask.setSpeedLimit()` (per task).
 
 ## Daemon server

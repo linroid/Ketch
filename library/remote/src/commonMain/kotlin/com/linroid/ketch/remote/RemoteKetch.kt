@@ -2,6 +2,8 @@ package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.CountryDatabase
+import com.linroid.ketch.api.CountryDatabaseStatus
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
@@ -257,12 +259,42 @@ class RemoteKetch internal constructor(
   )
 
   /**
+   * The server's country database, over `/api/countries`; servers that do not list
+   * [KetchFeatures.COUNTRIES] fail every call with [UnsupportedOperationException].
+   */
+  private val countries = object : CountryDatabase {
+    override suspend fun status(): CountryDatabaseStatus {
+      requireCountries()
+      val response = httpClient.get(Api.Countries())
+      checkSuccess(response)
+      return response.body()
+    }
+
+    override suspend fun download(): CountryDatabaseStatus {
+      requireCountries()
+      val response = httpClient.post(Api.Countries.Download())
+      checkSuccess(response)
+      return response.body()
+    }
+
+    private suspend fun requireCountries() {
+      if (KetchFeatures.COUNTRIES !in features()) {
+        throw UnsupportedOperationException("This device has no country database")
+      }
+    }
+  }
+
+  /**
    * The server's controller for [key]: [TorrentController.Key] returns the server's torrent
-   * controls, which fail closed against servers without them. Other keys return `null`.
+   * controls and [CountryDatabase.Key] its country database, which fail closed against servers
+   * without them. Other keys return `null`.
    */
   @Suppress("UNCHECKED_CAST")
-  override fun <T : Any> controller(key: ControlKey<T>): T? =
-    if (key === TorrentController.Key) torrents as T else null
+  override fun <T : Any> controller(key: ControlKey<T>): T? = when {
+    key === TorrentController.Key -> torrents as T
+    key === CountryDatabase.Key -> countries as T
+    else -> null
+  }
 
   override suspend fun download(
     request: DownloadRequest,

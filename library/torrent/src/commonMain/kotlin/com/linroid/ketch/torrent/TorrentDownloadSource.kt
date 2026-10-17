@@ -188,6 +188,8 @@ class TorrentDownloadSource(
   )
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
+  // Set by the first close(), which closes http.
+  private val released = AtomicBoolean(false)
   private val engineMutex = Mutex()
   private val tasks = TorrentSessionRegistry()
   private val slots = TorrentActiveSlots(config.maxActiveTorrents)
@@ -206,8 +208,6 @@ class TorrentDownloadSource(
   // The payload counters of recent saved states, newest first, matched by identity.
   private val savedPayloads =
     MutableStateFlow<List<Pair<SourceState, TorrentPayloadCounters?>>>(emptyList())
-  // Seeders saving their state as the source closes, before the engine stops them.
-  private val shutdown = AtomicReference<Job?>(null)
   private val fileTables = TorrentFileTables()
   private val seeding = MutableStateFlow<Set<String>>(emptySet())
   // Tasks waiting in withActiveSlot for one of the engine's slots.
@@ -374,45 +374,55 @@ class TorrentDownloadSource(
         throw KetchError.Network(e)
       }
       engine.store(created)
-      if (closed.load()) { engine.exchange(null)?.close(); error("Torrent source is closed") }
+      if (closed.load()) {
+        // Stopped under the mutex, which stop() waits for, so it never returns before this engine
+        // released its listener and port mappings.
+        withContext(NonCancellable) { engine.exchange(null)?.stop() }
+        error("Torrent source is closed")
+      }
       created
     } catch (e: Throwable) { created.close(); throw e }
   }
 
+  /**
+   * Stops the engine and returns once it has: its sessions, such as seeding ones, close and
+   * announce that they stopped while the HTTP engine still runs. No engine starts after it.
+   */
+  override suspend fun stop() {
+    shutDown()
+    saveSeeders()
+    // Taken under the mutex, so an engine that was starting is stopped too.
+    engineMutex.withLock { engine.exchange(null) }?.stop()
+  }
+
+  /**
+   * Saves each seeding session's state before the engine stops them, as no download run saves
+   * it; within [SHUTDOWN_SAVE_MS], so a session that cannot save never holds [stop] up.
+   */
+  private suspend fun saveSeeders() {
+    val seeders = seedStates.getAndUpdate { emptyMap() }
+    if (seeders.isEmpty()) return
+    withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
+      for ((taskId, base) in seeders) {
+        tasks.session(taskId)?.let { saveSeedingState(taskId, it, base) }
+      }
+    }
+  }
+
   override fun close() {
+    shutDown()
+    // Not awaited: an engine stop() already took is gone.
+    engine.exchange(null)?.close()
+    if (released.compareAndSet(false, true) && httpDelegate.isInitialized()) http.close()
+  }
+
+  /** Refuses new engines and work, and cancels the seed watchers; once. */
+  private fun shutDown() {
     if (closed.compareAndSet(false, true)) {
       slots.close()
       scope.cancel()
       seeding.value = emptySet()
-      val running = engine.exchange(null)
-      val seeders = seedStates.getAndUpdate { emptyMap() }
-      if (running == null || seeders.isEmpty()) {
-        running?.close()
-      } else {
-        // Seeders save what they uploaded before the engine stops them, as no download run
-        // saves it; within a bound, so a session that cannot save never keeps the engine open.
-        shutdown.store(CoroutineScope(TorrentDispatchers.disk).launch {
-          try {
-            withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
-              for ((taskId, base) in seeders) {
-                tasks.session(taskId)?.let { saveSeedingState(taskId, it, base) }
-              }
-            }
-          } finally {
-            running.close()
-          }
-        })
-      }
-      if (httpDelegate.isInitialized()) http.close()
     }
-  }
-
-  /**
-   * Waits until [close] stopped the engine, which it does once the seeding sessions saved their
-   * state; at once when it stopped it as it closed.
-   */
-  internal suspend fun awaitClosed() {
-    shutdown.load()?.join()
   }
 
   /** The configuration of the next engine: the config with what the setters changed since. */
@@ -1897,7 +1907,7 @@ private const val RELEASE_TIMEOUT_MS = 10_000L
 /** How often a seeding session saves its state, with what it uploaded, into its task's record. */
 private const val SEEDING_SAVE_INTERVAL_MS = 60_000L
 
-/** How long the seeding sessions may take to save their state as the source closes. */
+/** How long the seeding sessions may take to save their state as the source stops. */
 private const val SHUTDOWN_SAVE_MS = 5_000L
 
 /** Saved states whose payload counters [TorrentDownloadSource.savedPayload] remembers. */

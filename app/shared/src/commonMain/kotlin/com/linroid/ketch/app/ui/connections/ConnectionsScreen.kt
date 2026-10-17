@@ -26,8 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
+import com.linroid.ketch.api.CountryDatabaseStatus
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchTextField
@@ -61,6 +67,7 @@ import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.TrafficDirection
+import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.TableColumn
 import com.linroid.ketch.app.ui.downloads.TablePadding
@@ -76,6 +83,10 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.connections_column_device
 import ketch.app.shared.generated.resources.connections_column_down
 import ketch.app.shared.generated.resources.connections_column_endpoint
+import ketch.app.shared.generated.resources.connections_countries_attribution
+import ketch.app.shared.generated.resources.connections_countries_download
+import ketch.app.shared.generated.resources.connections_countries_failed
+import ketch.app.shared.generated.resources.connections_countries_hint
 import ketch.app.shared.generated.resources.connections_column_open
 import ketch.app.shared.generated.resources.connections_column_peer
 import ketch.app.shared.generated.resources.connections_column_protocol
@@ -108,8 +119,12 @@ import ketch.app.shared.generated.resources.pulse_connection_upload_slot
 import ketch.app.shared.generated.resources.pulse_connections_none
 import ketch.app.shared.generated.resources.pulse_connections_unsupported
 import ketch.app.shared.generated.resources.shell_destination_connections
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Connections page (`⌘7`): every live connection of the shown devices, the fastest
@@ -188,8 +203,121 @@ fun ConnectionsScreen(state: AppState) {
       }
     }
     Footer(grid, listed = all.size)
+    // Every shown device, idle ones too, so their later connections carry countries; read with
+    // their presence, as a remote device lists its database once its status arrives.
+    val shown by state.shownInstances.collectAsState()
+    state.instanceManager.presence.collectAsState().value
+    CountryFooter(state, shown.map { it.deviceId })
   }
 }
+
+/** [row]'s endpoint, after the flag of the country its device names for it. */
+private fun endpointText(row: ConnectionRow): String {
+  val code = row.connection.country ?: return row.endpoint
+  return "${flagOf(code)} ${row.endpoint}"
+}
+
+/** The flag emoji of a two-letter country [code], from its regional indicator symbols. */
+internal fun flagOf(code: String): String = buildString {
+  for (letter in code.uppercase()) {
+    if (letter !in 'A'..'Z') return code
+    appendCodePoint(0x1F1E6 + (letter - 'A'))
+  }
+}
+
+private fun StringBuilder.appendCodePoint(point: Int) {
+  append(Char(0xD800 + ((point - 0x10000) shr 10)))
+  append(Char(0xDC00 + ((point - 0x10000) and 0x3FF)))
+}
+
+/**
+ * The button that has the shown devices download their country databases, which name the
+ * endpoints' countries, or the databases' attribution, which their licence asks for, once they
+ * are loaded. Each device downloads its own, as it names its own connections' countries.
+ */
+@Composable
+private fun CountryFooter(state: AppState, deviceIds: List<String>) {
+  val databases = deviceIds.mapNotNull { id -> state.countryDatabaseOf(id)?.let { id to it } }
+  if (databases.isEmpty()) return
+  var statuses by remember { mutableStateOf<Map<String, CountryDatabaseStatus>>(emptyMap()) }
+  var requests by remember { mutableIntStateOf(0) }
+  val scope = rememberCoroutineScope()
+  LaunchedEffect(deviceIds, requests) {
+    while (true) {
+      statuses = databases.mapNotNull { (id, database) ->
+        try {
+          id to database.status()
+        } catch (e: CancellationException) {
+          throw e
+        } catch (_: Exception) {
+          null
+        }
+      }.toMap()
+      if (statuses.values.none { it.state == CountryDatabaseStatus.State.DOWNLOADING }) break
+      delay(STATUS_POLL)
+    }
+  }
+  val all = statuses.values
+  val downloading = all.any { it.state == CountryDatabaseStatus.State.DOWNLOADING }
+  val failed = all.firstNotNullOfOrNull { status ->
+    status.error.takeIf { status.state == CountryDatabaseStatus.State.FAILED }
+  }
+  val missing = all.any { it.state in NotLoaded }
+  if (all.isEmpty()) return
+  val spacing = KetchTheme.spacing
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = KetchTheme.density.pagePadding, vertical = spacing.s2),
+  ) {
+    val note = when {
+      failed != null && !downloading ->
+        stringResource(Res.string.connections_countries_failed, failed)
+      missing || downloading -> stringResource(Res.string.connections_countries_hint)
+      else -> stringResource(Res.string.connections_countries_attribution)
+    }
+    Text(
+      text = note,
+      style = KetchTheme.typography.caption,
+      color = KetchTheme.colors.textTertiary,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.weight(1f),
+    )
+    if (missing || downloading) {
+      KetchButton(
+        text = stringResource(Res.string.connections_countries_download),
+        onClick = {
+          scope.launch {
+            for ((id, database) in databases) {
+              if (statuses[id]?.state !in NotLoaded) continue
+              try {
+                database.download()
+              } catch (e: CancellationException) {
+                throw e
+              } catch (_: Exception) {
+                // The device answers with its status on the next poll.
+              }
+            }
+            requests++
+          }
+        },
+        variant = KetchButtonVariant.Ghost,
+        size = KetchButtonSize.Small,
+        loading = downloading,
+        enabled = !downloading,
+      )
+    }
+  }
+}
+
+private val STATUS_POLL = 1.seconds
+
+/** The states in which a device's database still needs downloading. */
+private val NotLoaded =
+  setOf(CountryDatabaseStatus.State.MISSING, CountryDatabaseStatus.State.FAILED)
 
 /** "Connections" and how many are open, with their speeds. */
 @Composable
@@ -443,7 +571,7 @@ private fun TableRow(
     ) {
       TrafficSwatch(row, Modifier.width(LeadWidth))
       Text(
-        text = row.endpoint,
+        text = endpointText(row),
         style = type.monoS,
         color = colors.textPrimary,
         maxLines = 1,
@@ -653,7 +781,7 @@ private fun ListRow(row: ConnectionRow, showDevices: Boolean, onShow: (Connectio
       TrafficSwatch(row, Modifier.width(LeadWidth))
       Column(Modifier.weight(1f)) {
         Text(
-          text = row.endpoint,
+          text = endpointText(row),
           style = type.monoS,
           color = colors.textPrimary,
           maxLines = 1,

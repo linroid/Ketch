@@ -44,6 +44,15 @@ interface DownloadSource<S : Any> {
    */
   fun attach(host: SourceHost): SourceExtension? = null
 
+  /**
+   * Stops what this source runs apart from its downloads, such as seeding torrents and the peers
+   * and trackers behind them, and returns once it has. Ketch calls it while it closes, after
+   * every download stopped and saved its state and before it closes the [HttpEngine], so a
+   * source can still say goodbye over the network, as a torrent's `stopped` announce does;
+   * [close] follows. Must be safe to call twice.
+   */
+  suspend fun stop() {}
+
   /** Releases what this source owns, once Ketch closes. Must be safe to call twice. */
   fun close() {}
 
