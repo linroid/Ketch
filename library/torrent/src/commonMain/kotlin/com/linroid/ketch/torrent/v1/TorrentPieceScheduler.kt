@@ -91,7 +91,7 @@ internal class TorrentPieceScheduler(
   private var verifiedCount = 0
   /** Raised whenever a piece may have become openable, or a buffer freed. */
   private var openings = 0L
-  /** Raised for every block a peer comes to owe: the order owners were asked in. */
+  /** Raised for every block a peer is asked for, owed or copied: the order peers were asked in. */
   private var asks = 0L
   /** When idle partial pieces were last looked for. */
   private var sweptAt = 0L
@@ -165,7 +165,7 @@ internal class TorrentPieceScheduler(
     val owner = IntArray(blocks) { FREE }
     /** Per block asked for: when its first requester is late, so another may ask too. */
     val dueAt = LongArray(blocks)
-    /** Per block asked for: the [asks] count when the peer that owes it came to owe it. */
+    /** Per block asked for: the [asks] count when the peer that owes it was asked for it. */
     val askedAt = LongArray(blocks)
     /** Second requesters of blocks duplicated in the endgame. */
     var duplicates: MutableMap<Int, Copy>? = null
