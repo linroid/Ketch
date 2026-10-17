@@ -2066,7 +2066,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - HTTP threads (`library:ktor`, `HttpDispatcher.kt`): the clients `KtorHttpEngine` builds run on
   `ketch-http-N` daemon threads, started only when every one is busy and ended after 30 s idle:
   OkHttp (`httpDispatcher`), which reads each response body there while it streams, at most 256
-  at once (every JVM HTTPS request goes through it); CIO, whose selector, connections and name lookups run there, at most 8 per client
+  at once (every JVM HTTPS request goes through it), and whose call dispatcher
+  (`OkHttpTransports.kt`) lets as many requests wait for their headers, to one host too (its
+  defaults, 64 and 5 per host, held a download's sixth segment request back); CIO, whose
+  selector, connections and name lookups run there, at most 8 per client
   (`cioDispatcher()`, a slice of its own, as each client's selector keeps a thread of it), as a
   burst of its short tasks would otherwise start a thread each. Our apps cap the app-wide
   `Dispatchers.IO` at 16 (`kotlinx.coroutines.io.parallelism`) and idle workers at 10 s: the desktop

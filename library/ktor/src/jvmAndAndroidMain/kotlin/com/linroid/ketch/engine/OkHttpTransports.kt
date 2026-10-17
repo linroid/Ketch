@@ -5,6 +5,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import okhttp3.ConnectionPool
 import okhttp3.Credentials
+import okhttp3.Dispatcher
 import okhttp3.Dns
 import okhttp3.Protocol
 import java.net.InetAddress
@@ -50,6 +51,7 @@ internal fun okHttpClient(
   engine {
     dispatcher = httpDispatcher
     config {
+      dispatcher(callDispatcher())
       connectionPool(ConnectionPool())
       if (http1Only) protocols(listOf(Protocol.HTTP_1_1))
       when (route) {
@@ -98,5 +100,21 @@ internal fun okHttpClient(
     requestTimeoutMillis = Long.MAX_VALUE
   }
 }
+
+/**
+ * OkHttp's call dispatcher, which counts a request from its start until its response headers
+ * arrive, holding back those past its limits. Its defaults, 64 at once and 5 per host, made a
+ * download's sixth segment request wait for an earlier one's headers, and announces wait behind
+ * those to trackers that never answer. Ketch chooses how many connections it opens, per download
+ * and per host, so both limits are [MAX_CALLS]. Each client gets its own, as closing a client
+ * shuts its dispatcher's threads down.
+ */
+private fun callDispatcher(): Dispatcher = Dispatcher().apply {
+  maxRequests = MAX_CALLS
+  maxRequestsPerHost = MAX_CALLS
+}
+
+/** As many requests as response bodies stream at once ([httpDispatcher]). */
+private const val MAX_CALLS = 256
 
 private const val PROXY_AUTHORIZATION = "Proxy-Authorization"
