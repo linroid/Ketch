@@ -840,17 +840,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more, the run that takes
   the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). One that
-  shrinks before its restored seeder opens, or while it checks its files, has it check and seed
-  the smaller selection, so a dropped file, deleted maybe, no longer stops it: `startSeeding`
-  opens it with the task's latest smaller selection (`SeedingTask.selection`),
-  `changeSeedingSelection` also changes a seeder that checks, which checks again, and the
-  selection is read again before the check and once it seeds, after each change until it holds,
-  so a newer one applied meanwhile is never undone. A v2 or hybrid seeder missing a selected
-  file fails as it opens, before any check (its checkpoint's ownership no longer holds), and
-  keeps its intent: a drop saved after that takes effect the next time seeding is restored.
-  A lent seeder
-  pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again,
-  and its discovery keeps only the spec fields it reads, so no finished run stays reachable.
+  shrinks before its restored seeder reads the task's selection as it starts, or while it checks
+  its files, has it check and seed the smaller selection, so a dropped file, deleted maybe, no
+  longer stops it: `startSeeding` opens it with the task's latest smaller selection
+  (`SeedingTask.selection`), `changeSeedingSelection` also changes a seeder that checks, which
+  checks again, and the selection is read again before the check and once it seeds, after each
+  change until it holds, so a newer one applied meanwhile is never undone. A v2 or hybrid seeder
+  missing a selected file fails as it opens, before any check (its checkpoint's ownership no
+  longer holds), and keeps its intent: a drop saved between that read and the check takes effect
+  the next time seeding is restored. A lent seeder pays the global limit alone
+  (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
+  the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
