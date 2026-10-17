@@ -16,6 +16,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
@@ -246,8 +247,24 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   /** Name typed for the file; blank lets the source decide. */
   var fileName: String by mutableStateOf("")
 
-  /** Ids of the torrent files to download; `null` until the file list arrives. */
-  var selectedFiles: Set<String>? by mutableStateOf(null)
+  /** Whether the row downloads one of its files, as a Metalink listing several does. */
+  val singleChoice: Boolean get() = resolved?.selectionMode == FileSelectionMode.SINGLE
+
+  /**
+   * Ids of the files to download; `null` until the file list arrives. A [singleChoice] keeps one,
+   * the one just checked.
+   */
+  var selectedFiles: Set<String>?
+    get() = chosenFiles
+    set(value) {
+      chosenFiles = if (singleChoice && value != null && value.size > 1) {
+        setOf((value - chosenFiles.orEmpty()).firstOrNull() ?: value.first())
+      } else {
+        value
+      }
+    }
+
+  private var chosenFiles: Set<String>? by mutableStateOf(null)
 
   internal var job: Job? = null
   internal var wanted: Boolean = false
@@ -264,10 +281,13 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   /** Whether the row is a magnet link. */
   val isMagnet: Boolean get() = (source as? IntakeSource.Link)?.kind == LinkKind.Magnet
 
-  /** Whether the row is a torrent: a magnet, a `.torrent` link or file. */
+  /** Whether the row is a torrent: a magnet, a `.torrent` link or file; not a Metalink file. */
   val isTorrent: Boolean
     get() = when (val current = source) {
-      is IntakeSource.File -> true
+      // A Metalink file is not a torrent: it downloads over HTTP, into any folder.
+      is IntakeSource.File ->
+        current.file.name.endsWith(".torrent", ignoreCase = true) ||
+          resolved?.sourceType == TORRENT_SOURCE
       is IntakeSource.Link -> current.kind.isTorrent || resolved?.sourceType == TORRENT_SOURCE
       is IntakeSource.Range -> false
     }
@@ -338,7 +358,9 @@ class IntakeEntry internal constructor(source: IntakeSource) {
     get() = when {
       duplicate != null && !downloadAgain -> false
       blockingProblem != null -> false
-      isTorrent && status !is IntakeStatus.Ready && !addAnyway -> false
+      // A file has no link to add until its content is read.
+      (isTorrent || source is IntakeSource.File) && status !is IntakeStatus.Ready &&
+        !addAnyway -> false
       files.isNotEmpty() && selectedFiles?.isEmpty() == true -> false
       else -> true
     }
@@ -1247,15 +1269,15 @@ class IntakeSession internal constructor(
   }
 
   /**
-   * Adds [files]: `.torrent` files as rows checked from their content, and lists of links such
-   * as `.txt` or `.csv` files to the input.
+   * Adds [files]: `.torrent` and Metalink files as rows checked from their content, and lists of
+   * links such as `.txt` or `.csv` files to the input.
    */
   fun addFiles(files: List<DroppedFile>) {
     if (mode != IntakeMode.Add) {
       notice = Res.string.intake_notice_close_first.text()
       return
     }
-    val torrents = files.filter { it.name.endsWith(".torrent", ignoreCase = true) }
+    val torrents = files.filter { isContentFile(it.name) }
     torrents.forEach(::addFile)
     val lists = files.filter { LinkParser.isLinkList(it.name) }
     if (torrents.isEmpty() && lists.isEmpty() && files.isNotEmpty()) {
@@ -1284,7 +1306,7 @@ class IntakeSession internal constructor(
     }
   }
 
-  /** Adds one `.torrent` [file] as a row, unless it is a row already. */
+  /** Adds one `.torrent` or Metalink [file] as a row, unless it is a row already. */
   fun addFile(file: DroppedFile) {
     if (mode != IntakeMode.Add) return
     if (fileEntries.any { (it.source as IntakeSource.File).file === file }) return
@@ -2234,6 +2256,12 @@ private val WORD = Regex("\\S+")
 private val SPACES = Regex("[ \\t]{2,}")
 private const val CONTENT_SCHEME = "content://"
 private const val TORRENT_SOURCE = "torrent"
+
+/** Whether a file named [name] is resolved from its content: a `.torrent` or a Metalink. */
+internal fun isContentFile(name: String): Boolean =
+  CONTENT_FILE_EXTENSIONS.any { name.endsWith(it, ignoreCase = true) }
+
+private val CONTENT_FILE_EXTENSIONS = listOf(".torrent", ".meta4", ".metalink")
 private const val MAX_RECENT_FOLDERS = 5
 private const val TINY_TEXT_BYTES = 1024L
 private const val HASH_RADIX = 36

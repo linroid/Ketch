@@ -430,6 +430,8 @@ order before HTTP; the first source whose `canHandle` accepts the URL is used:
 - `HlsDownloadSource(httpEngine)` from `library:hls` and `DashDownloadSource(httpEngine)` from
   `library:dash`, for [finite streaming media](media.md). Pass them the engine you give `Ketch`.
   Register them before HTTP, which `additionalSources` does.
+- `MetalinkDownloadSource(httpEngine)` from `library:metalink`, which downloads what a
+  [Metalink](metalink.md) lists from all its mirrors at once. Pass it the engine you give `Ketch`.
 - Your own `DownloadSource` (see [writing a download source](developers.md#write-your-own-download-source)).
 
 ### Dispatchers
