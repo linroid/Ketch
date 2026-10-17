@@ -418,6 +418,8 @@ class Ketch(
       val taskId = handle.taskId
       scheduler.cancel(taskId)
       coordinator.cancel(handle, deletePartialFile = true)
+      // A reschedule may have launched a wait as the cancel landed; none launches from now on.
+      scheduler.cancel(taskId)
       queue.dequeue(taskId)
     }
 
@@ -426,6 +428,7 @@ class Ketch(
       log.i { "Removing task: taskId=$taskId, deleteFiles=$deleteFiles" }
       scheduler.cancel(taskId)
       coordinator.cancel(handle, deletePartialFile = deleteFiles)
+      scheduler.cancel(taskId)
       queue.dequeue(taskId)
       try {
         coordinator.cleanup(handle, deleteFiles)

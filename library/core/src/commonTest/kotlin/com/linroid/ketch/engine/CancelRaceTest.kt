@@ -3,7 +3,9 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -29,6 +32,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * A cancel or remove never waits for the queue, so it can land while the queue starts the task.
@@ -205,6 +209,74 @@ class CancelRaceTest {
 
       assertIs<DownloadState.Canceled>(waiting.state.value)
       assertEquals(TaskState.CANCELED, store.load(waiting.taskId)?.state)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  /**
+   * Reschedules the running task and lets [stop] cancel or remove it while the reschedule's pause
+   * joins the stopping run, holding the reschedule's own save until the stop shows it canceled.
+   */
+  private suspend fun TestScope.rescheduleWhile(
+    source: SelectableSource,
+    store: RecordingTaskStore,
+    task: DownloadTask,
+    stop: suspend () -> Unit,
+  ) {
+    // The stopping run's last save waits, so the stop lands during the pause's join.
+    val stopping = CompletableDeferred<Unit>()
+    source.saveGate = stopping
+    val gate = SaveGate(store) { it.state == TaskState.SCHEDULED }
+    val rescheduling = launch { task.reschedule(DownloadSchedule.AfterDelay(1.minutes)) }
+    runCurrent()
+    val stopped = launch { stop() }
+    runCurrent()
+    stopping.complete(Unit)
+    runCurrent()
+    gate.release.complete(Unit)
+    rescheduling.join()
+    stopped.join()
+    advanceTimeBy(2.minutes)
+    runCurrent()
+  }
+
+  @Test
+  fun reschedule_canceledDuringItsPause_staysCanceled() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      assertIs<DownloadState.Downloading>(task.state.value)
+
+      rescheduleWhile(source, store, task) { task.cancel() }
+
+      assertIs<DownloadState.Canceled>(task.state.value)
+      assertEquals(TaskState.CANCELED, store.load(task.taskId)?.state)
+      assertEquals(1, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun reschedule_removedDuringItsPause_neverRunsAgain() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      assertIs<DownloadState.Downloading>(task.state.value)
+
+      rescheduleWhile(source, store, task) { task.remove(deleteFiles = false) }
+
+      assertEquals(1, source.runs.value.size)
+      assertIs<DownloadState.Canceled>(task.state.value)
+      assertTrue(ketch.tasks.value.none { it.taskId == task.taskId })
+      assertNull(store.load(task.taskId))
     } finally {
       ketch.close()
     }

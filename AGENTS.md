@@ -469,8 +469,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and launch under the coordinator's lock and refuse a canceled task: `cancel` marks it there
   (`canceling`) until it shows `Canceled`, so a cancel or remove landing while the queue starts a
   task either finds the execution and stops it or keeps it from starting, and its slot is freed.
-  The queue's and a pause's saves keep a `CANCELED` record, and no state write or progress
-  report leaves `Canceled`
+  The queue's, a pause's and a reschedule's writes keep a `CANCELED` record and a `Canceled`
+  state, a canceled task waits for no schedule, and no progress report replaces `Canceled`
 - `remove` deletes the record under its `AtomicSaver`'s lock and closes it (`close`): a write
   after it, such as a late source save or a setting, saves nothing, so a removed task never comes
   back after a restart; the task leaves `tasks` right after

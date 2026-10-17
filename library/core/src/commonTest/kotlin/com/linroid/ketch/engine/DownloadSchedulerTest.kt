@@ -356,6 +356,20 @@ class DownloadSchedulerTest {
   }
 
   @Test
+  fun reschedule_canceledTask_keepsItCanceledAndWaitsForNothing() = runTest {
+    val (_, manager) = createTestComponents(backgroundScope)
+    val handle = createHandle("task-1")
+    handle.mutableState.value = DownloadState.Canceled
+    handle.record.update { it.copy(state = TaskState.CANCELED) }
+
+    manager.reschedule(handle, DownloadSchedule.AfterDelay(10.seconds), emptyList())
+
+    assertIs<DownloadState.Canceled>(handle.mutableState.value)
+    assertEquals(TaskState.CANCELED, handle.record.value.state)
+    assertFalse(manager.isScheduled("task-1"))
+  }
+
+  @Test
   fun reschedule_cancelsOldScheduleJob() = runTest {
     withContext(Dispatchers.Default) {
       val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -34,23 +35,16 @@ internal class DownloadScheduler(
       "Scheduling download: taskId=$taskId, schedule=$schedule, " +
         "conditions=${conditions.size}"
     }
-
-    mutex.withLock {
-      val job = scope.launch {
-        waitForSchedule(taskId, schedule)
-        waitForConditions(taskId, conditions)
-
-        log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
-        // A task rescheduled after it had started is restored here after a restart;
-        // resuming keeps its progress and falls back to a fresh start without segments.
-        queue.enqueue(handle, preferResume = true)
-
-        mutex.withLock { scheduledJobs.remove(taskId) }
-      }
-      scheduledJobs[taskId] = job
-    }
+    // A task rescheduled after it had started is restored here after a restart; resuming keeps
+    // its progress and falls back to a fresh start without segments.
+    launchWhenDue(handle, schedule, conditions)
   }
 
+  /**
+   * Waits for [schedule] and [conditions] again, then enqueues the task. A cancel or remove
+   * landing meanwhile, as while the caller paused the task, keeps it canceled: its record and
+   * state stay so and nothing waits to enqueue it.
+   */
   suspend fun reschedule(
     handle: TaskHandle,
     schedule: DownloadSchedule,
@@ -63,28 +57,52 @@ internal class DownloadScheduler(
 
     // Persist so a restart restores the new schedule. Conditions are kept in memory only.
     handle.record.update {
-      it.copy(
-        request = it.request.copy(schedule = schedule, conditions = conditions),
-        state = TaskState.SCHEDULED,
-        updatedAt = Clock.System.now(),
-      )
+      if (it.state == TaskState.CANCELED) {
+        it
+      } else {
+        it.copy(
+          request = it.request.copy(schedule = schedule, conditions = conditions),
+          state = TaskState.SCHEDULED,
+          updatedAt = Clock.System.now(),
+        )
+      }
     }
-    handle.mutableState.value = DownloadState.Scheduled(schedule)
+    handle.mutableState.update { state ->
+      if (state is DownloadState.Canceled) state else DownloadState.Scheduled(schedule)
+    }
     log.i {
       "Rescheduling download: taskId=$taskId, schedule=$schedule, " +
         "conditions=${conditions.size}"
     }
+    launchWhenDue(handle, schedule, conditions)
+  }
 
+  /**
+   * Enqueues the task, resuming its progress, once [schedule] and [conditions] are met. A canceled
+   * task is never enqueued: nothing waits for one canceled already, and one canceled while it
+   * waits is checked again. A cancel shown after the check here then [cancel]s the wait.
+   */
+  private suspend fun launchWhenDue(
+    handle: TaskHandle,
+    schedule: DownloadSchedule,
+    conditions: List<DownloadCondition>,
+  ) {
+    val taskId = handle.taskId
     mutex.withLock {
+      if (handle.mutableState.value is DownloadState.Canceled) {
+        log.d { "Not scheduling canceled taskId=$taskId" }
+        return
+      }
       val job = scope.launch {
         waitForSchedule(taskId, schedule)
         waitForConditions(taskId, conditions)
 
-        log.i {
-          "Reschedule conditions met for taskId=$taskId, enqueuing " +
-            "with preferResume=true"
+        if (handle.mutableState.value is DownloadState.Canceled) {
+          log.d { "Not enqueuing canceled taskId=$taskId" }
+        } else {
+          log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
+          queue.enqueue(handle, preferResume = true)
         }
-        queue.enqueue(handle, preferResume = true)
 
         mutex.withLock { scheduledJobs.remove(taskId) }
       }
