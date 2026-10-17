@@ -199,7 +199,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
   `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
   (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`,
-  `PeerDiagnostics` and `TorrentChoker`
+  `PeerDiagnostics`, `PeerRedial` (when swarms dial an endpoint again), `PeerIdentity` and
+  `keepsOutgoing` (duplicate connections) and `TorrentChoker`
 - `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `SwarmHolepunch`,
   `TorrentPieceScheduler`, `TorrentPeerDownloader`, `TorrentUploadCache`
 - `com.linroid.ketch.torrent.v2` -- v2 and hybrid sessions: `TorrentV2DownloadSession`,
@@ -520,6 +521,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `KetchApi.updateConfig()`
 - Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`;
   it caps the task in addition to the global limit (the lower rate wins)
+- Sources pay both through `DownloadContext.throttle`; transfers a source keeps running after its
+  run, such as a lent torrent seeder, pay `DownloadContext.globalThrottle`, the global limit
+  alone, which holds nothing of the run. Seeders `TorrentControls` restores have no context and
+  pay no Ketch limit
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
 ### Download Scheduling (`DownloadScheduler`)
@@ -678,14 +683,21 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   outside the endgame. A run is the first free wanted piece and the free wanted pieces after it,
   at most `WEB_SEED_RUN_PIECES` (16) and `WEB_SEED_RUN_BYTES` (4 MiB), no more than its share of
   the free pieces split between every peer and seed (the swarm joins every seed before any
-  claims), and later pieces only take buffers that leave half the budget free; an endgame
+  claims, once it wants pieces: one that only seeds never starts them, and a v2 transfer logs
+  its seeds at the first run it hands out), and later pieces only take buffers that leave half the
+  budget free; an endgame
   duplicate is a single piece. `WebSeedLayout` maps a piece to one range request per file it spans
   (multi-file: URL + name + path, segments percent-encoded); the worker joins a run's spans that
   follow each other in a file into one request, and commits and gives back each piece as its last
   byte arrives (`WebSeedPieces.release(piece, verified)`), so a corrupt piece or a dropped
   response keeps the pieces before it and gives the rest back. Pieces are SHA-1 checked like
-  peers'; a failed run backs the seed off (`webSeedRetryMs`, doubling to 60 s) and five in a row
-  drop it.
+  peers'; a failed run backs the seed off (`webSeedRetryMs`, doubling to 60 s), one that may pass
+  first halving the requests it sends at once (`PARALLEL_REQUESTS`, 4, down to 1; one more after
+  each run that works), and five more in a row drop it. One `WebSeedWorker` serves its seed for
+  the whole transfer, so a seed a stall starts again keeps what it learned: it is asked once more
+  for every piece it could not serve, as its mirror may have fixed them, and a piece it sent
+  corrupt before is given up again after one more corrupt copy. What each seed could not serve
+  stays known for stall reports (`SwarmWebSeedPieces.unservable`, `TorrentV2WebSeeds.refuses`).
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
   with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
   `TorrentV2Document.webSeeds` (v2 magnets keep `ws` in the metainfo `TorrentV2MetadataExchange`
@@ -715,13 +727,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   The peers that sent a found torrent's metadata (`AnsweringPeers`) are kept by wire tag
   (`MetadataLookupPeers`, 32 torrents of 64 peers) and offered first, once, to its download's
   discovery (v1, and v2 as `PeerOrigin.EXPLICIT` in the swarm they answered in)
-- Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or
-  no verified piece for four pieces' worth of time at its rate (1 to 10 minutes; time waiting on
-  speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no
-  connected peer or web seed has and their files, no peers, all choking, slow peers) the session
-  publishes (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm
-  summary). After a minute it reannounces to trackers (5, 10, up to 30 minutes apart), revives
-  peers it gave up on, and after two minutes relaunches dropped web seeds. The inspector says why
+- Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or no
+  verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
+  back after a gap once none of it can be thrown away, once until the next piece; time waiting on
+  speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
+  peer or web seed has and their files, with nothing connected those every web seed could not serve,
+  kept 10 s after the last source leaves; no peers, all choking, slow peers) the session publishes
+  (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
+  seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may
+  be until its piece is stored (`WebSeedStats.unsettled`, `StallSignals`); a gap is told from any
+  payload, so payload thrown away never makes the next look back after one. After a minute it
+  reannounces to trackers (5, 10, up to 30 minutes apart), revives peers it gave up on, and after
+  two minutes relaunches dropped web seeds. The inspector says why
   (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
   its queue's time at its rate, 4 to 30 s) is asked of another peer with room, and the endgame
   starts once every unopened piece is one no source has. V2 and hybrid owners do the same
@@ -733,7 +750,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentV2WebSeeds.relaunch`, `TorrentV2DiscoverySink.reannounceRequests`)
 - Verified selected-file storage, ownership journal, restart rehash, live limits, and upload and
   seeding (`[torrent] upload`, while downloading by default in the apps, the CLI and the server;
-  the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so)
+  the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so). A run
+  publishes its session's progress only once the session checked its files (`DOWNLOADING`,
+  `SEEDING` or `FINISHED`) and, when it took over a seeder, applied the run's selection; until
+  then the task shows each file's progress as Ketch restored or planned it, or as the session
+  last reported it, over the files the run follows now, so a recheck never shows 0 and a
+  selection taken during one, or a run Ketch repeats for a selection, shows its own files and size
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
   verified pieces when they are deselected, copies verified spans of boundary pieces from the
@@ -742,8 +764,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selection; a recheck heals a piece from its sidecar. v2 and hybrid create or recheck newly
   selected files, refuse one whose path holds a file they did not create, keep deselected
   verified pieces readable, and bind their creation log without the selection once it changes.
-  A seeding task whose selection grows downloads again and seeds once more. Trackers hear
-  `completed` only once every file is selected and complete; admission charges every file
+  A seeding task whose selection grows downloads again and seeds once more, the run that takes
+  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). A lent seeder
+  pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again,
+  and its discovery keeps only the spec fields it reads, so no finished run stays reachable.
+  Trackers hear `completed` only once every file is selected and complete; admission charges
+  every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
   `TorrentSnapshot.seeding` whether the task is meant to seed (`KetchTorrentController`: the
   saved intent, a seeding session or the `SEEDING` activity), and `TorrentController.setSeeding`
@@ -802,6 +828,38 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   router's while it maps our port, and the one the DHT voted (behind a second NAT the router's
   is private); an IPv4-mapped IPv6 peer (`::ffff:a.b.c.d`) is read as the
   IPv4 one (`numericHost`), so no peer is dialed under two hosts
+- Dialing again (`PeerRedial`, in `TorrentSwarm` and `TorrentV2Candidates`): while a torrent
+  downloads, an endpoint whose dial failed or whose connection closed is dialed again after 5, 15
+  and 30 s, then 1, 2 and 5 minutes, and every 5 minutes on. One that never brought payload is
+  retried `RETRIES` (3) times, four dials in all, then given up until found again 5 minutes later or
+  revived; one that brought payload is retried `DELIVERED_RETRIES` (10) times, about half an hour,
+  then given up the same way, so peers gone for good never fill the swarm's dials or its book (at
+  most 4096 endpoints, each counted once, queued or not). A connection that brings payload, or stays
+  up `LASTING_MS` (5 minutes), counts as its endpoint's first dial when it closes. Payload over a
+  connection the peer opened counts for where it listens (BEP 10 `p`), and payload over a connection
+  that another to the same peer replaced counts for the one kept, dialed again where we dialed the
+  peer (v1 `PeerResult.alias`/`inherited`, v2 `Member.inherited`). A source naming a peer that
+  brought payload again has it dialed `FOUND_AGAIN_MS` (30 s) after its last dial, at most once
+  every `FOUND_AGAIN_EVERY_MS` (5 minutes), as the DHT names the same peers every minute. A revive
+  dials every waiting or given-up endpoint at once and keeps its count; its dial of an endpoint
+  given up on leaves when that was (`PeerRedial.spent`), so a source naming it 5 minutes on still
+  starts it over during a stall, which revives every minute without a single peer
+  (`LONELY_REVIVE_MS`, others every five). v1 never forgets an endpoint for time alone, as a source
+  may name a peer only once (`x.pe`, the peers that sent the metadata): the longest known one given
+  up on makes room for a new one (`GIVEN_UP_MS` is when one named again starts over). A complete
+  swarm dials nobody back
+- One connection per peer, in v1 and v2 swarms (`PeerIdentity`): peers are told apart by the ID they
+  claim and their host, where loopback, private, link-local and unique local hosts count as one
+  (`localTorrentAddress`), as one client there is reached at several addresses (loopback from
+  `x.pe`, its LAN address from LSD); a public host claiming another's ID is another peer. Of two
+  connections of one direction the first stays; of opposite directions both ends keep the one the
+  side with the lower listen port dialed, else the higher peer ID's (`keepsOutgoing`, as libtorrent
+  decides), and a v1 worker it replaces ends at its next pass. The port each end compares is the one
+  the other reaches it on (`TorrentAdvertisedPort.portFor`, also the BEP 10 `p` it sends): the
+  listen port for a peer at a local address, which dials the address local discovery announces, else
+  the port a router maps, so both ends agree while a router maps another. The endpoint of the
+  connection closed is given up until found again 5 minutes after the close (v1
+  `DuplicatePeerException`, `TorrentV2Candidates.duplicate`)
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
   built directly in tests never reach the router): `TorrentPortMapper` maps through every NAT

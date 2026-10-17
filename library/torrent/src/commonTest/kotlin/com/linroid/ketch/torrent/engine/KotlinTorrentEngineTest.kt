@@ -14,6 +14,7 @@ import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerWire
@@ -310,6 +311,52 @@ class KotlinTorrentEngineTest {
             var message = wire.read()
             while (message !is PeerMessage.Piece) message = wire.read()
             assertContentEquals(bytes, message.bytes)
+          } finally { connection.close() }
+        } finally {
+          engine.stop()
+          remote.close()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun localPeer_isToldOurListenPortWhileARouterMapsAnother() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val bytes = byteArrayOf(8, 9, 10, 11)
+        val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+          "name" to "seed", "length" to 4L, "piece length" to 4L, "pieces" to sha1Digest(bytes)
+        ))))
+        val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+          "ketch-mapped-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+        FileSystem.SYSTEM.createDirectories(root)
+        FileSystem.SYSTEM.write(root / "seed") { write(bytes) }
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION), listenHost = "127.0.0.1")
+        val remote = createTorrentNetwork()
+        try {
+          engine.start()
+          // The router forwards another port to ours, which trackers and the DHT are told.
+          val mapped = if (engine.listenPort == 60_000) 60_001 else 60_000
+          engine.advertisedPort.setMapped(mapped)
+          val session = engine.addTask(TorrentTaskSpec("seed-task", metadata,
+            (root / "seed").toString(), emptySet()))
+          session.resume()
+          session.state.first {
+            it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+          }
+          val connection = remote.connect(PeerEndpoint("127.0.0.1", engine.listenPort))
+          try {
+            val wire = PeerWire(connection, metadata)
+            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
+            var message = wire.read()
+            while (message !is PeerMessage.Extended || message.id != 0) message = wire.read()
+            val extensions = PeerExtensions()
+            extensions.receive(message.payload, 4096)
+            // A peer on this machine reaches the port we listen on, not the router's.
+            assertEquals(engine.listenPort, extensions.listenPort)
           } finally { connection.close() }
         } finally {
           engine.stop()

@@ -291,12 +291,16 @@ internal class TorrentPieceScheduler(
    */
   class Health(val missingCount: Int, val missing: IntArray, val lateBlocks: Int)
 
-  /** The swarm's [Health] now, naming at most [limit] missing pieces. */
-  suspend fun health(limit: Int): Health = mutex.withLock {
+  /**
+   * The swarm's [Health] now, naming at most [limit] missing pieces; with [among], only those of
+   * its pieces can be missing.
+   */
+  suspend fun health(limit: Int, among: Set<Int>? = null): Health = mutex.withLock {
     val now = nowMs()
     val missing = ArrayList<Int>()
     var count = 0
-    for (index in 0 until pieceCount) {
+    for (index in among?.sorted() ?: (0 until pieceCount)) {
+      if (index !in 0 until pieceCount) continue
       if (wanted[index] && !verified[index] && seedOwned[index] == 0 && rarity[index] == 0) {
         count++
         if (missing.size < limit) missing += index

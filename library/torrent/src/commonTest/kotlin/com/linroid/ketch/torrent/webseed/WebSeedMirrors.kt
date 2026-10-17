@@ -1,11 +1,20 @@
 package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 
 /**
  * Serves [files] by URL with Range support; [corrupt] flips bytes, [missing] answers 404. The
@@ -87,4 +96,124 @@ internal fun mirrorHosts(vararg engines: HttpEngine): HttpEngine = object : Http
   }
 
   override fun close() = Unit
+}
+
+/**
+ * Answers through [engine], except while [down] says the mirror is down: then every request fails
+ * with a network error, counted in [refused].
+ */
+@OptIn(ExperimentalAtomicApi::class)
+internal class Outage(
+  private val engine: HttpEngine,
+  private val down: () -> Boolean,
+) : HttpEngine by engine {
+  private val refusals = AtomicInt(0)
+  val refused: Int get() = refusals.load()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    if (down()) {
+      refusals.incrementAndFetch()
+      throw KetchError.Network()
+    }
+    engine.download(url, range, headers, onData)
+  }
+}
+
+/** Holds every request of [engine] until [open] completes; [asked] once one comes. */
+internal class Gate(private val engine: HttpEngine) : HttpEngine by engine {
+  val open = CompletableDeferred<Unit>()
+  val asked = CompletableDeferred<Unit>()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    asked.complete(Unit)
+    open.await()
+    engine.download(url, range, headers, onData)
+  }
+}
+
+/**
+ * Sends what [engine] answers a part at a time: each part waits until [steps] lets it through;
+ * [asked] once a request comes.
+ */
+internal class Stepped(private val engine: HttpEngine) : HttpEngine by engine {
+  val steps = Channel<Unit>()
+  val asked = CompletableDeferred<Unit>()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    asked.complete(Unit)
+    engine.download(url, range, headers) { part ->
+      steps.receive()
+      onData(part)
+    }
+  }
+}
+
+/**
+ * Refuses a request to [engine] with a network error while another is under way, as some proxies
+ * do, counting them in [refused]; each request it lets through takes a moment.
+ */
+@OptIn(ExperimentalAtomicApi::class)
+internal class OneAtATime(private val engine: HttpEngine) : HttpEngine by engine {
+  private val running = AtomicInt(0)
+  private val refusals = AtomicInt(0)
+  val refused: Int get() = refusals.load()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    if (running.incrementAndFetch() > 1) {
+      running.decrementAndFetch()
+      refusals.incrementAndFetch()
+      throw KetchError.Network()
+    }
+    try {
+      delay(100)
+      engine.download(url, range, headers, onData)
+    } finally {
+      running.decrementAndFetch()
+    }
+  }
+}
+
+/** Runs [block] with the info lines Ketch logs meanwhile, which [block] gets as they come. */
+internal suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) {
+  val lines = Channel<String>(Channel.UNLIMITED)
+  KetchLogger.setLogger(object : Logger {
+    override fun v(message: String) = Unit
+    override fun d(message: String) = Unit
+    override fun i(message: String) {
+      lines.trySend(message)
+    }
+    override fun w(message: String, throwable: Throwable?) = Unit
+    override fun e(message: String, throwable: Throwable?) = Unit
+    override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
+  })
+  try {
+    block(lines)
+  } finally {
+    KetchLogger.setLogger(Logger.None)
+  }
+}
+
+/** The lines logged so far that were not taken yet. */
+internal fun Channel<String>.drain(): List<String> = buildList {
+  while (true) add(tryReceive().getOrNull() ?: break)
 }

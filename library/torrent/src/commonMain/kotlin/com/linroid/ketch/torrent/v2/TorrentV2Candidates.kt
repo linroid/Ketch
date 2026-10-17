@@ -6,6 +6,7 @@ import com.linroid.ketch.torrent.peer.PeerFlagBook
 import com.linroid.ketch.torrent.peer.PeerHandshakeUnansweredException
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerOrigin
+import com.linroid.ketch.torrent.peer.PeerRedial
 import com.linroid.ketch.torrent.peer.PeerSwarmChangedException
 import okio.ByteString
 
@@ -41,11 +42,11 @@ internal data class TorrentV2DialTarget(
 
 /**
  * The endpoints a v2 session may dial, owned by its loop. Endpoints are deduplicated, retried
- * with backoff a bounded number of times while the session is incomplete, and banned after
- * protocol violations; a reset forgets everything but the bans. A peer ID is only what a peer
- * claims, so it is banned only together with the host it came from. Flags peers advertised
- * leave the book only inside dial targets. Restricted sessions (private metainfo or tracker-only
- * privacy) take only tracker peers.
+ * with backoff a bounded number of times while the session is incomplete ([PeerRedial]: more
+ * often those that brought payload), and banned after protocol violations; a reset forgets
+ * everything but the bans. A peer ID is only what a peer claims, so it is banned only together
+ * with the host it came from. Flags peers advertised leave the book only inside dial targets.
+ * Restricted sessions (private metainfo or tracker-only privacy) take only tracker peers.
  */
 internal class TorrentV2Candidates(
   private val hybrid: Boolean,
@@ -66,8 +67,18 @@ internal class TorrentV2Candidates(
     var v2 = false
     /** It refused a hybrid's v2 handshake, so it is dialed in v1 mode from then on. */
     var v1Only = false
+    /** Dials since it last brought payload, or since a connection to it lasted. */
     var attempts = 0
-    var windowStart = 0L
+    /** It brought payload since it was last given up, so it is dialed again for longer. */
+    var delivered = false
+    /** When it was last dialed. */
+    var dialedAt = 0L
+    /** When a connection to it, dialed or learned, last came up. */
+    var connectedAt = 0L
+    /** When a source naming it again last brought its dial forward. */
+    var broughtForwardAt: Long? = null
+    /** When it was given up on; it is dialed again once found after [ATTEMPT_WINDOW_MS]. */
+    var givenUpAt = 0L
     var retryAt = 0L
   }
 
@@ -87,7 +98,12 @@ internal class TorrentV2Candidates(
   /** Endpoints waiting to be dialed now or after a backoff; for logs. */
   val pendingCount: Int get() = queued + waiting.size
 
-  /** Records [endpoint]; offers already known, connected, banned or refused are ignored. */
+  /**
+   * Records [endpoint]; offers already known, connected, banned or refused are ignored, except
+   * that one given up on is dialed again once its window has passed, and one that brought payload
+   * and waits to be dialed again is dialed [PeerRedial.FOUND_AGAIN_MS] after its last dial, at
+   * most once every [PeerRedial.FOUND_AGAIN_EVERY_MS].
+   */
   fun offer(endpoint: PeerEndpoint, topic: PeerTopic, origin: PeerOrigin, flags: Int = 0) {
     // Flags describe the endpoint whatever happens to the offer itself.
     if (origin == PeerOrigin.PEX) this.flags.record(mapOf(endpoint to flags))
@@ -96,11 +112,19 @@ internal class TorrentV2Candidates(
     val existing = entries[endpoint]
     if (existing != null) {
       if (topic == PeerTopic.V2) existing.v2 = true
-      // Found again once its attempt window has passed: it may be tried again.
       if (existing.status == Status.EXHAUSTED &&
-        nowMs() - existing.windowStart >= ATTEMPT_WINDOW_MS) {
+        nowMs() - existing.givenUpAt >= ATTEMPT_WINDOW_MS) {
+        // Found again once its window has passed: it may be tried again.
         existing.attempts = 0
         enqueue(existing)
+      } else if (existing.status == Status.WAITING && existing.delivered) {
+        // A peer we downloaded from may be back.
+        val now = nowMs()
+        PeerRedial.foundAgainAt(now, existing.dialedAt, existing.retryAt,
+          existing.broughtForwardAt)?.let {
+          existing.retryAt = it
+          existing.broughtForwardAt = now
+        }
       }
       return
     }
@@ -125,15 +149,11 @@ internal class TorrentV2Candidates(
       val entry = entries[queue.removeFirst()] ?: continue
       if (entry.status != Status.QUEUED) continue
       if (isOwnAddress(entry.endpoint)) {
-        move(entry, Status.EXHAUSTED)
+        giveUp(entry)
         continue
       }
-      val now = nowMs()
-      if (entry.attempts == 0 || now - entry.windowStart >= ATTEMPT_WINDOW_MS) {
-        entry.attempts = 0
-        entry.windowStart = now
-      }
       entry.attempts++
+      entry.dialedAt = nowMs()
       move(entry, Status.DIALING)
       val v1 = hybrid && (!entry.v2 || entry.v1Only)
       val mode = if (v1) PeerIdentityHandshake.Mode.V1 else PeerIdentityHandshake.Mode.V2
@@ -156,6 +176,7 @@ internal class TorrentV2Candidates(
   /** A connection to [endpoint] is up, dialed or learned as an incoming peer's listen port. */
   fun connected(endpoint: PeerEndpoint) {
     val entry = entries.getOrPut(endpoint) { Entry(endpoint) }
+    entry.connectedAt = nowMs()
     move(entry, Status.CONNECTED)
   }
 
@@ -179,43 +200,75 @@ internal class TorrentV2Candidates(
   }
 
   /**
-   * The connection to a dialed or learned [endpoint] closed. A [complete] session dials it again
-   * only once some source finds it after its attempt window.
+   * The connection to a dialed or learned [endpoint] closed, having [delivered] payload or not,
+   * over it or a connection to the same peer it replaced. A [complete] session dials it again
+   * only once some source finds it after its window.
    */
-  fun closed(endpoint: PeerEndpoint, violation: Boolean, complete: Boolean = false) {
+  fun closed(
+    endpoint: PeerEndpoint,
+    violation: Boolean,
+    complete: Boolean = false,
+    delivered: Boolean = false,
+  ) {
     if (violation) {
       ban(endpoint)
       return
     }
     val entry = entries[endpoint] ?: return
-    if (entry.status == Status.CONNECTED || entry.status == Status.DIALING) retry(entry, complete)
+    if (entry.status != Status.CONNECTED && entry.status != Status.DIALING) return
+    if (delivered) entry.delivered = true
+    val lasted = entry.status == Status.CONNECTED &&
+      nowMs() - entry.connectedAt >= PeerRedial.LASTING_MS
+    // Its dials start over: the connection counts as the first of them.
+    if (delivered || lasted) entry.attempts = 1
+    retry(entry, complete)
   }
 
   /**
-   * An incoming peer from [source] closed. Its source port is ephemeral and never dialed; its
-   * [listen] port, when the peer told us, becomes a candidate unless the session is restricted.
-   * A [complete] session does not dial it back: it is kept as tried until its window passes.
+   * A dial to [endpoint] reached a peer connected under another endpoint already: it is given up
+   * on until some source finds it after its window, or a stalled session revives it.
+   */
+  fun duplicate(endpoint: PeerEndpoint) {
+    val entry = entries[endpoint] ?: return
+    if (entry.status == Status.DIALING) giveUp(entry)
+  }
+
+  /**
+   * An incoming peer from [source] closed. Its source port is never dialed for itself; its
+   * [listen] port, when the peer told us, becomes a candidate unless the session is restricted,
+   * also when it is the source port, as for a peer that dialed us over uTP from the socket it
+   * listens on.
+   * One that [delivered] payload is dialed again as a dialed peer that brought payload is, known
+   * already or not. A [complete] session does not dial it back: it is kept as tried until its
+   * window passes.
    */
   fun incomingClosed(
     source: PeerEndpoint,
     listen: PeerEndpoint?,
     topic: PeerTopic,
     complete: Boolean = false,
+    delivered: Boolean = false,
   ) {
-    if (listen == null || listen == source) return
-    if (!complete) {
+    if (listen == null) return
+    if (!complete && !delivered) {
       offer(listen, topic, PeerOrigin.INCOMING)
       return
     }
-    if (listen.port == 0 || listen in bannedEndpoints) return
+    if (listen.port == 0 || listen in bannedEndpoints || !complete && restricted) return
     val entry = entries[listen] ?: run {
       if (entries.size >= MAX_CANDIDATES) prune()
       if (entries.size >= MAX_CANDIDATES) return
       Entry(listen).also { entries[listen] = it }
     }
+    if (topic == PeerTopic.V2) entry.v2 = true
     if (entry.status == Status.DIALING || entry.status == Status.CONNECTED) return
-    entry.windowStart = nowMs()
-    move(entry, Status.EXHAUSTED)
+    if (complete) {
+      giveUp(entry)
+      return
+    }
+    entry.delivered = true
+    entry.attempts = 1
+    retry(entry, complete = false)
   }
 
   /**
@@ -223,27 +276,19 @@ internal class TorrentV2Candidates(
    * not retried either. Each is tried again only once some source finds it after its window.
    */
   fun completed() {
-    val now = nowMs()
-    for (endpoint in waiting.toList()) {
-      val entry = entries.getValue(endpoint)
-      entry.windowStart = now
-      move(entry, Status.EXHAUSTED)
-    }
+    for (endpoint in waiting.toList()) giveUp(entries.getValue(endpoint))
   }
 
   /**
-   * Dials again every endpoint given up on or backing off, at once and with its attempts
-   * counted from zero, as a stalled session asks; banned endpoints are not among them. Returns
-   * how many.
+   * Dials again at once every endpoint given up on or backing off, as a stalled session asks;
+   * banned endpoints are not among them. Each keeps its count of dials, so one that fails again
+   * waits, or is given up, as it would have been. Returns how many.
    */
   fun revive(): Int {
     val revived = entries.values.filter {
       it.status == Status.EXHAUSTED || it.status == Status.WAITING
     }
-    for (entry in revived) {
-      entry.attempts = 0
-      enqueue(entry)
-    }
+    for (entry in revived) enqueue(entry)
     return revived.size
   }
 
@@ -284,14 +329,27 @@ internal class TorrentV2Candidates(
 
   private fun retry(entry: Entry, complete: Boolean) {
     // A seed retries nobody: the peer may dial us, or a source finds it again later.
-    if (complete) entry.windowStart = nowMs()
-    if (complete || entry.attempts > RETRY_DELAYS_MS.size) {
-      // Kept until its window passes, so the same endpoint is not dialed again meanwhile.
-      move(entry, Status.EXHAUSTED)
+    if (complete) {
+      giveUp(entry)
       return
     }
-    entry.retryAt = nowMs() + RETRY_DELAYS_MS[entry.attempts - 1]
+    val delay = PeerRedial.delayMs(entry.attempts, entry.delivered)
+    if (delay == null) {
+      // A revive's dial of an endpoint given up on leaves when that was (PeerRedial.spent).
+      val revived = PeerRedial.spent(entry.attempts - 1, entry.delivered)
+      // Its dials are spent: found again later, it starts over as any endpoint does.
+      entry.delivered = false
+      giveUp(entry, since = if (revived) entry.givenUpAt else nowMs())
+      return
+    }
+    entry.retryAt = nowMs() + delay
     move(entry, Status.WAITING)
+  }
+
+  /** Kept until its window passes, so the same endpoint is not dialed again meanwhile. */
+  private fun giveUp(entry: Entry, since: Long = nowMs()) {
+    entry.givenUpAt = since
+    move(entry, Status.EXHAUSTED)
   }
 
   private fun promoteDue() {
@@ -326,7 +384,7 @@ internal class TorrentV2Candidates(
   private fun prune() {
     val now = nowMs()
     entries.values.filter {
-      it.status == Status.EXHAUSTED && now - it.windowStart >= ATTEMPT_WINDOW_MS
+      it.status == Status.EXHAUSTED && now - it.givenUpAt >= ATTEMPT_WINDOW_MS
     }.forEach { entries.remove(it.endpoint) }
   }
 
@@ -341,8 +399,7 @@ internal class TorrentV2Candidates(
   companion object {
     const val MAX_CANDIDATES = 4096
     const val MAX_BANS = 1024
-    /** Dialed again after 5, 15 and 30 s, like metadata peers; then not until the window ends. */
-    val RETRY_DELAYS_MS = listOf(5_000L, 15_000L, 30_000L)
+    /** How long an endpoint given up on stays so, unless a stalled session revives it. */
     const val ATTEMPT_WINDOW_MS = 300_000L
 
     /** Session-state charge for a full book: entries, both ban lists and the flag book. */

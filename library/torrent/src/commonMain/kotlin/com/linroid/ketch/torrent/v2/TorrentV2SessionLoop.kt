@@ -19,6 +19,7 @@ import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.peer.PeerAttempt
 import com.linroid.ketch.torrent.peer.PeerAttemptFailure
 import com.linroid.ketch.torrent.peer.PeerDiagnostics
+import com.linroid.ketch.torrent.peer.PeerIdentity
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerOrigin
@@ -27,6 +28,7 @@ import com.linroid.ketch.torrent.peer.PeerStage
 import com.linroid.ketch.torrent.peer.PeerTraffic
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.peer.SWARM_SUMMARY_INTERVAL_MS
+import com.linroid.ketch.torrent.peer.keepsOutgoing
 import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.v2.peer.PeerBlockExchange
@@ -185,19 +187,21 @@ internal object TorrentV2SessionLoop {
     /** The BEP 11 flags peer exchange advertised for a dialed [endpoint]. */
     val flags: Int,
   ) {
-    /** Where the peer listens, when known; always on [host]. */
+    /**
+     * Where the peer listens, when known: on [host], or an address of the same machine or local
+     * network we reached it at too ([PeerIdentity]).
+     */
     var listen: PeerEndpoint? = null
     /** [listen] is an endpoint we dialed, so it returns to the candidates when this closes. */
     var listenDialed = false
+    /** A connection to the same peer that this one replaced brought payload. */
+    var inherited = false
     /** It broke the protocol; it is banned once it closes. */
     var violation = false
-  }
 
-  /**
-   * One peer as far as duplicates go: the ID it claims, on the host it came from. A peer ID is
-   * only a claim, so another host claiming it is another peer and never displaces this one.
-   */
-  private data class PeerKey(val host: String, val peerId: ByteString)
+    /** It brought payload, or the connection it replaced did. */
+    val delivered: Boolean get() = attempt.payload > 0 || inherited
+  }
 
   private class PendingReset(
     val peers: MutableSet<PeerV2Pool.Peer>,
@@ -278,7 +282,7 @@ internal object TorrentV2SessionLoop {
       val extensions = swarm?.let { TorrentV2Extensions(it, checkNotNull(book), nowMs) }
       val hashes = swarm?.let { TorrentV2HashRequests(layout, it) }
       val pieceCount = layout.pieceCount.toInt()
-      val byPeerId = mutableMapOf<PeerKey, PeerV2Pool.Peer>()
+      val byPeerId = mutableMapOf<PeerIdentity, PeerV2Pool.Peer>()
       val stopping = mutableSetOf<PeerV2Pool.Peer>()
       var limit = swarm?.connectionLimit()?.coerceIn(1, maxPeers) ?: maxPeers
       var dialing = 0
@@ -679,17 +683,19 @@ internal object TorrentV2SessionLoop {
           if (dialed != null) book.ban(dialed)
           return
         }
-        val key = PeerKey(host, info.peerId)
+        val key = PeerIdentity.of(host, info.peerId)
         val existing = byPeerId[key]
         var learned: PeerEndpoint? = null
+        var inherited = false
         if (existing != null) {
           val member = members.getValue(existing)
           val existingDialed = (existing.info?.origin as? PeerV2Origin.Outgoing)?.endpoint
           // Two connections of one direction: the first stays. Otherwise both ends keep the same
-          // socket, as libtorrent decides it (see keepOutgoing).
-          val keepNew = (existingDialed != null) != (dialed != null) &&
-            (dialed != null) == keepOutgoing(swarm, checkNotNull(dialed ?: existingDialed),
-              info.peerId)
+          // socket, as libtorrent decides it (see keepsOutgoing).
+          val outgoing = dialed ?: existingDialed
+          val keepNew = outgoing != null && (existingDialed != null) != (dialed != null) &&
+            (dialed != null) == keepsOutgoing(swarm.runtime.listenPortFor(outgoing), outgoing,
+              swarm.runtime.peerId, info.peerId)
           if (!keepNew) {
             // Also when it told us that endpoint itself (BEP 10 `p`): now we know it works.
             if (dialed != null && (member.listen == null ||
@@ -699,7 +705,8 @@ internal object TorrentV2SessionLoop {
               member.listenDialed = true
               book.connected(dialed)
             } else if (dialed != null) {
-              book.closed(dialed, violation = false, complete = complete)
+              // Another address of a peer we reach elsewhere: dialing it again gains nothing.
+              book.duplicate(dialed)
             }
             log.v { "V2 peer of $label closed: already connected" }
             record(rejected = false)
@@ -710,6 +717,8 @@ internal object TorrentV2SessionLoop {
             member.listen = null
             member.listenDialed = false
           }
+          // Where the peer is dialed again once this one closes counts what that one brought.
+          inherited = member.delivered
           byPeerId.remove(key)
           stop(existing)
         }
@@ -720,6 +729,7 @@ internal object TorrentV2SessionLoop {
           attempt = attempt(PeerStage.CONNECTED), flags = flags)
         member.listen = dialed ?: learned
         member.listenDialed = member.listen != null
+        member.inherited = inherited
         members[peer] = member
         byPeerId[key] = peer
         member.listen?.let(book::connected)
@@ -733,7 +743,7 @@ internal object TorrentV2SessionLoop {
         if (book == null) return
         val member = members.remove(peer) ?: return
         diagnostics?.record(member.endpoint, member.attempt, cause, member.incoming, member.flags)
-        val key = PeerKey(member.host, member.peerId)
+        val key = PeerIdentity.of(member.host, member.peerId)
         if (byPeerId[key] === peer) byPeerId.remove(key)
         val violation = cause is IllegalArgumentException || member.violation
         if (violation) {
@@ -746,8 +756,12 @@ internal object TorrentV2SessionLoop {
         if (info != null && origin is PeerV2Origin.Incoming && !member.listenDialed) {
           val topic = if (info.mode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1 else PeerTopic.V2
           // Its source port is ephemeral; only a listen port it told us may be dialed back.
-          if (!violation) book.incomingClosed(origin.remote, listen, topic, complete)
-        } else if (listen != null) book.closed(listen, violation, complete)
+          if (!violation) {
+            book.incomingClosed(origin.remote, listen, topic, complete, member.delivered)
+          }
+        } else if (listen != null) {
+          book.closed(listen, violation, complete, member.delivered)
+        }
         resets.removeAll { reset ->
           reset.peers.remove(peer)
           if (reset.peers.isEmpty()) reset.done.complete(Unit)
@@ -831,10 +845,21 @@ internal object TorrentV2SessionLoop {
         val published = swarm?.stall ?: return
         val stallWatchdog = watchdog ?: return
         val downloading = !complete && !seeding
-        // With nothing connected no piece is missing from what is: it waits for peers.
-        val missing = if (downloading && peers.size + mirrorsRunning > 0) {
-          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::sourced)
-        } else null
+        // Some web seed may serve piece [index]: one that runs, or one that stopped without
+        // finding it could not.
+        fun unrefused(index: Int): Boolean = mirrors == null ||
+          mirrors.urls.indices.any { it !in stoppedMirrors || !mirrors.refuses(it, index) }
+        // With nothing connected, only the pieces every web seed found it could not serve are
+        // known to be missing: the rest wait for peers, or for a seed started again.
+        val connected = peers.size + mirrorsRunning > 0
+        val missing = if (!downloading || !connected && mirrors == null) null else {
+          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES,
+            if (connected) ::sourced else ::unrefused)
+        }
+        // In this order, so no web seed byte looks kept before it is (see StallSignals).
+        val payload = store.receivedBytes() - payloadAtStart
+        val unsettled = mirrors?.unsettledBytes ?: 0
+        val wasted = mirrors?.wastedBytes ?: 0
         val due = stallWatchdog.check(StallSignals(
           downloading = downloading,
           peers = peers.size,
@@ -844,7 +869,9 @@ internal object TorrentV2SessionLoop {
           lateBlocks = if (downloading) pieces.lateCount() else 0,
           webSeeds = mirrorsRunning,
           droppedWebSeeds = stoppedMirrors.size,
-          payloadBytes = store.receivedBytes() - payloadAtStart,
+          payloadBytes = payload,
+          unsettledBytes = unsettled,
+          wastedBytes = wasted,
           throttledMs = throttledMs + swarm.webSeedThrottledMs(),
           pieceLength = layout.pieceLength,
         ))
@@ -1222,33 +1249,5 @@ internal object TorrentV2SessionLoop {
       val ended = failures.tryReceive().getOrNull() ?: return
       diagnostics.record(ended.endpoint, ended.attempt, ended.failure, incoming = true, flags = 0)
     }
-  }
-
-  /**
-   * Of two connections to one peer on one host, exactly one of which we dialed ([outgoing]),
-   * whether we keep that one; the peer, deciding the same way, keeps the same socket. libtorrent
-   * resolves such duplicates by listen port: the side whose listen port is lower keeps the
-   * connection it dialed, so we compare the port we advertise with the one we dialed. With the
-   * ports equal or ours unknown, the connection the higher peer ID dialed stays, as libtorrent
-   * decides duplicates it does not match by address.
-   */
-  private fun keepOutgoing(
-    swarm: TorrentV2Swarm,
-    outgoing: PeerEndpoint,
-    peerId: ByteString,
-  ): Boolean {
-    val ours = swarm.runtime.listenPortFor(outgoing)
-    if (ours != 0 && ours != outgoing.port) return ours < outgoing.port
-    return higherPeerId(swarm.runtime.peerId, peerId)
-  }
-
-  /** True when [local] sorts after [remote] as unsigned bytes. */
-  private fun higherPeerId(local: ByteString, remote: ByteString): Boolean {
-    for (index in 0 until minOf(local.size, remote.size)) {
-      val left = local[index].toInt() and 0xff
-      val right = remote[index].toInt() and 0xff
-      if (left != right) return left > right
-    }
-    return local.size > remote.size
   }
 }

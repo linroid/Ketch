@@ -36,11 +36,13 @@ import com.linroid.ketch.torrent.peer.PeerExchange
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerFlagBook
 import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerIdentity
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerOrigin
 import com.linroid.ketch.torrent.peer.PeerOutcomeReport
 import com.linroid.ketch.torrent.peer.PeerProtocolState
+import com.linroid.ketch.torrent.peer.PeerRedial
 import com.linroid.ketch.torrent.peer.PeerServeCredit
 import com.linroid.ketch.torrent.peer.PeerStage
 import com.linroid.ketch.torrent.peer.PeerTraffic
@@ -53,6 +55,7 @@ import com.linroid.ketch.torrent.peer.TorrentPeerDirectory
 import com.linroid.ketch.torrent.peer.UPLOAD_SLOTS
 import com.linroid.ketch.torrent.peer.allowedFastOffer
 import com.linroid.ketch.torrent.peer.isFastExtension
+import com.linroid.ketch.torrent.peer.keepsOutgoing
 import com.linroid.ketch.torrent.peer.pexFlags
 import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.peer.servesMetadata
@@ -64,6 +67,7 @@ import com.linroid.ketch.torrent.webseed.SwarmWebSeedPieces
 import com.linroid.ketch.torrent.webseed.WEB_SEED_RETRY_MS
 import com.linroid.ketch.torrent.webseed.WebSeedStats
 import com.linroid.ketch.torrent.webseed.WebSeedWorker
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
@@ -88,6 +92,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import okio.IOException
 
 /**
@@ -189,8 +195,14 @@ internal class TorrentSwarm(
     val listen: PeerEndpoint?,
     val attempt: PeerAttempt,
     val flags: Int,
+    /** When the worker started, on the swarm's clock. */
+    val startedAt: Long,
     /** Closed because both sides were seeds. */
     val redundant: Boolean = false,
+    /** Where we dialed the peer of an incoming connection kept over that dial. */
+    val alias: PeerEndpoint? = null,
+    /** A connection to the same peer that this one replaced brought payload. */
+    val inherited: Boolean = false,
   )
 
   private val log = KetchLogger("TorrentSwarm")
@@ -203,6 +215,8 @@ internal class TorrentSwarm(
   private val connected = mutableMapOf<Int, PexContact>()
   // Connected peers that unchoke us, guarded like [connected].
   private val unchoking = mutableSetOf<Int>()
+  // The one connection kept to each peer, guarded like [connected].
+  private val identities = mutableMapOf<PeerIdentity, PeerWorker>()
   // Payload received from peers and web seeds, and time spent waiting on speed limits for it.
   private val payloadReceived = AtomicLong(0)
   private val throttledMs = AtomicLong(0)
@@ -216,7 +230,8 @@ internal class TorrentSwarm(
       (policy == TorrentUploadPolicy.WHILE_DOWNLOADING && !complete)
 
   /**
-   * A closed peer stream fails once every candidate has exhausted its bounded retries. Each of
+   * A closed peer stream fails once no candidate is left to dial: while it downloads, the swarm
+   * dials endpoints again with backoff a bounded number of times ([PeerRedial]). Each of
    * [selections] tells the swarm the store's selection changed; it completes the deferred once
    * the scheduler follows it, keeping every peer connected.
    */
@@ -255,8 +270,18 @@ internal class TorrentSwarm(
       return peerBudget.reserve(peerOverhead)
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
+    // Every endpoint the swarm knows, queued or not, with its dials since it last brought payload
+    // (PeerRedial); at most MAX_CANDIDATES. Those not queued are given up on until a source names
+    // them again GIVEN_UP_MS after their last dial, or a stalled swarm revives them; they are
+    // never forgotten for time alone, as a source may name a peer only once (a magnet's, one
+    // that sent the metadata), but the longest known of them leave to make room for new ones.
     val attempts = linkedMapOf<PeerEndpoint, Int>()
     val attemptedAt = mutableMapOf<PeerEndpoint, Long>()
+    // Endpoints that brought payload since they were last given up, dialed again for longer.
+    val delivered = mutableSetOf<PeerEndpoint>()
+    // When a source naming a peer again last brought its dial forward.
+    val broughtForwardAt = mutableMapOf<PeerEndpoint, Long>()
+    // Endpoints to dial, each one of [attempts].
     val pending = ArrayDeque<PeerEndpoint>()
     val results = Channel<PeerResult>(512)
     val progressEvents = Channel<Unit>(Channel.CONFLATED)
@@ -273,6 +298,62 @@ internal class TorrentSwarm(
     val now = nowMs
     var discoveryClosed = false
     var complete = false
+    // Forgets everything about [endpoint].
+    fun forget(endpoint: PeerEndpoint) {
+      attempts.remove(endpoint)
+      attemptedAt.remove(endpoint)
+      retryAt.remove(endpoint)
+      faulty.remove(endpoint)
+      delivered.remove(endpoint)
+      broughtForwardAt.remove(endpoint)
+    }
+    // Queues [endpoint], which a source named: one found for the first time, or one given up on
+    // GIVEN_UP_MS or longer after its last dial, which starts over. When the swarm knows enough,
+    // the longest known endpoint given up on makes room.
+    fun discover(endpoint: PeerEndpoint): Boolean {
+      if (endpoint in attempts) {
+        if (endpoint in active || endpoint in pending) return false
+        val dialedAt = attemptedAt[endpoint] ?: return false
+        if (now() - dialedAt < GIVEN_UP_MS) return false
+        forget(endpoint)
+      } else if (attempts.size >= MAX_CANDIDATES) {
+        val oldest = attempts.keys.firstOrNull { it !in active && it !in pending } ?: return false
+        forget(oldest)
+      }
+      attempts[endpoint] = 0
+      pending.addLast(endpoint)
+      return true
+    }
+    // Discovery named [endpoint] again: a peer we downloaded from that waits to be dialed again
+    // may be back.
+    fun foundAgain(endpoint: PeerEndpoint) {
+      if (complete || endpoint !in delivered) return
+      val wait = retryAt[endpoint] ?: return
+      val dialedAt = attemptedAt[endpoint] ?: return
+      val due = PeerRedial.foundAgainAt(now(), dialedAt, wait, broughtForwardAt[endpoint])
+        ?: return
+      retryAt[endpoint] = due
+      broughtForwardAt[endpoint] = now()
+    }
+    // A connection to the peer that listens at [endpoint], dialed there or not, ended while we
+    // download: it is dialed again after its delay, or given up on. One that brought payload, over
+    // it or a connection it replaced, or that [lasted], counts as its first dial.
+    fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean, lasted: Boolean) {
+      if (endpoint in faulty || endpoint !in attempts && attempts.size >= MAX_CANDIDATES) return
+      if (broughtPayload) delivered += endpoint
+      val dials = if (broughtPayload || lasted) 1 else attempts[endpoint] ?: 1
+      attempts[endpoint] = dials
+      // Never dialed, it still starts over once given up long enough and named again.
+      attemptedAt.getOrPut(endpoint) { now() }
+      val delay = PeerRedial.delayMs(dials, endpoint in delivered)
+      if (delay == null) {
+        // Its dials are spent: found again later, it starts over as any endpoint does.
+        delivered -= endpoint
+        return
+      }
+      retryAt[endpoint] = now() + delay
+      if (endpoint !in pending) pending.addLast(endpoint)
+    }
     // Hashes of stored pieces a selection made wanted; each wakes the loop when done.
     val rechecked = Channel<Unit>(Channel.CONFLATED)
     val verifiers = mutableListOf<Job>()
@@ -307,11 +388,10 @@ internal class TorrentSwarm(
     // A web seed's storage failure stops the swarm, as a peer's does.
     val webSeedFailures = Channel<TorrentStorageException>(1)
     val webSeedUrls = webSeedHttp?.let { store.metadata.webSeeds }.orEmpty()
-    // Negative IDs never collide with peer workers'. Every seed joins before any claims a run,
-    // so the first runs leave the other seeds their share.
+    // Negative IDs never collide with peer workers'.
     val webSeedPieces = webSeedUrls.mapIndexed { number, url ->
       SwarmWebSeedPieces(-1 - number, url, store, scheduler,
-        onVerified = { progressEvents.trySend(Unit) }).also { it.join() }
+        onVerified = { progressEvents.trySend(Unit) })
     }
     // Payload from web seeds counts and is throttled as peers' does.
     val webSeedPayload: suspend (Int) -> Unit = { size ->
@@ -320,23 +400,28 @@ internal class TorrentSwarm(
       throttledMs.addAndFetch(nowMs() - at)
       payloadReceived.addAndFetch(size.toLong())
     }
-    fun launchWebSeed(number: Int): Job {
-      val pieces = webSeedPieces[number]
-      val worker = WebSeedWorker(webSeedUrls[number], pieces, checkNotNull(webSeedHttp),
-        webSeedStats, logLabel, reporter, webSeedRetryMs, downloadPayload = webSeedPayload,
+    // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
+    val webSeedWorkers = webSeedUrls.mapIndexed { number, url ->
+      WebSeedWorker(url, webSeedPieces[number], checkNotNull(webSeedHttp), webSeedStats,
+        logLabel, reporter, webSeedRetryMs, downloadPayload = webSeedPayload,
         discardPayload = onDiscarded)
-      return launch(TorrentDispatchers.engine) {
-        try {
-          // A seed started again joins with every piece, those it could not serve included.
-          pieces.join()
-          worker.run()
-        } catch (e: TorrentStorageException) {
-          webSeedFailures.trySend(e)
-        }
+    }
+    fun launchWebSeed(number: Int): Job = launch(TorrentDispatchers.engine) {
+      try {
+        // A seed started again joins with every piece, those it could not serve included.
+        webSeedPieces[number].join()
+        webSeedWorkers[number].run()
+      } catch (e: TorrentStorageException) {
+        webSeedFailures.trySend(e)
       }
     }
-    val webSeeds = webSeedUrls.indices.mapTo(mutableListOf()) { launchWebSeed(it) }
-    if (webSeeds.isNotEmpty()) {
+    val webSeeds = mutableListOf<Job>()
+    // Web seeds start once pieces are wanted: a swarm that only seeds never needs them. Every
+    // seed joins before any claims a run, so the first runs leave the other seeds their share.
+    suspend fun startWebSeeds() {
+      if (webSeeds.isNotEmpty() || webSeedUrls.isEmpty()) return
+      webSeedPieces.forEach { it.join() }
+      webSeedUrls.indices.mapTo(webSeeds) { launchWebSeed(it) }
       log.i { "Swarm $logLabel: downloading from ${webSeeds.size} web seed(s) too" }
     }
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
@@ -345,12 +430,10 @@ internal class TorrentSwarm(
       // our uTP mapping, the port it must hand out when it introduces us.
       val utpPeers = PEX_FLAG_UTP or PEX_FLAG_HOLEPUNCH
       onUtpPeers(update.flags.filterValues { it and utpPeers != 0 }.keys)
+      for (endpoint in update.added) foundAgain(endpoint)
       pexDirectory.update(PeerOrigin.PEX, "${source.host}:${source.port}", update.added,
         update.dropped)
-      for (endpoint in pexDirectory.candidates()) {
-        if (endpoint !in attempts && endpoint !in pending &&
-          attempts.size + pending.size < MAX_CANDIDATES) pending.addLast(endpoint)
-      }
+      for (endpoint in pexDirectory.candidates()) discover(endpoint)
     }
     suspend fun logSummary() {
       // The inline lambda only runs, and only reads the store, when logging is enabled.
@@ -380,15 +463,15 @@ internal class TorrentSwarm(
       corruptPieces = 0
     }
     var lastStallCheck = now()
-    // Peers given up on, or waiting to be retried, are dialed again.
+    // Peers given up on, or waiting to be retried, are dialed again at once. Each keeps its count
+    // of dials, so one that fails again waits, or is given up, as it would have been.
     fun revivePeers() {
       var revived = 0
-      for (endpoint in attempts.keys.toList()) {
-        if (endpoint in active || endpoint in pending || endpoint in faulty) continue
-        attempts.remove(endpoint)
-        attemptedAt.remove(endpoint)
-        retryAt.remove(endpoint)
-        pending.addLast(endpoint)
+      val queued = pending.toHashSet()
+      for (endpoint in attempts.keys) {
+        if (endpoint in active || endpoint in faulty) continue
+        if (endpoint !in queued) pending.addLast(endpoint)
+        else if (retryAt.remove(endpoint) == null) continue
         revived++
       }
       if (revived > 0) log.d { "Swarm $logLabel: dialing $revived peer(s) it gave up on again" }
@@ -397,23 +480,34 @@ internal class TorrentSwarm(
       val published = stall ?: return
       val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
       val running = webSeeds.count { it.isActive }
-      // With nothing connected no piece is missing from what is: it waits for peers.
-      val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else null
+      // With nothing connected, only the pieces every web seed found it could not serve are
+      // known to be missing: the rest wait for peers, or for a seed started again.
+      val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else {
+        webSeedPieces.map { it.unservable }.reduceOrNull { refused, seed -> refused intersect seed }
+          ?.takeIf { it.isNotEmpty() }
+          ?.let { scheduler.health(MAX_REPORTED_MISSING_PIECES, among = it) }
+      }
       val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
       }
+      // In this order, so no web seed byte looks kept before it is (see StallSignals).
+      val payload = payloadReceived.load()
+      val unsettled = webSeedStats.unsettled.load()
+      val wasted = webSeedStats.wasted.load()
       val due = watchdog.check(StallSignals(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
-        droppedWebSeeds = webSeeds.size - running, payloadBytes = payloadReceived.load(),
-        throttledMs = throttledMs.load(), pieceLength = store.metadata.pieceLength,
+        droppedWebSeeds = webSeeds.size - running, payloadBytes = payload,
+        unsettledBytes = unsettled, wastedBytes = wasted, throttledMs = throttledMs.load(),
+        pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall
       val previous = published.value
       if (current?.reason != previous?.reason) {
-        if (current == null) log.i { "Swarm $logLabel makes progress again" }
-        else log.i { "Swarm $logLabel stalled: ${current.describe()}" }
+        if (current != null) log.i { "Swarm $logLabel stalled: ${current.describe()}" }
+        // A swarm that completed is no longer stalled, without making progress again.
+        else if (!complete) log.i { "Swarm $logLabel makes progress again" }
       }
       published.value = current
       for (recovery in due) {
@@ -440,21 +534,21 @@ internal class TorrentSwarm(
       val incoming = connection != null
       // An incoming peer's source port is not a candidate, so it never counts as an attempt.
       if (!incoming) {
-        attempts[endpoint] = (attempts[endpoint] ?: 0) + 1
-        attemptedAt[endpoint] = now()
+        val dials = attempts[endpoint] ?: 0
+        attempts[endpoint] = dials + 1
+        retryAt.remove(endpoint)
+        // A revive's dial of an endpoint given up on leaves when that was (PeerRedial.spent).
+        if (!PeerRedial.spent(dials, endpoint in delivered)) attemptedAt[endpoint] = now()
       }
       val flags = if (incoming) 0 else peerFlags[endpoint]
       val attempt = PeerAttempt(incoming, PeerIdentityHandshake.Mode.V1)
+      val startedAt = now()
       active[endpoint] = launch(TorrentDispatchers.engine, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
-        var listen: PeerEndpoint? = if (incoming) null else endpoint
-        var redundant = false
+        var end = PeerEnd(listen = if (incoming) null else endpoint)
         try {
           peer(id, endpoint, flags, attempt, scheduler, progressEvents, pexEvents, holepunch,
-            punches, connection) { known, seeds ->
-            listen = known
-            redundant = seeds
-          }
+            punches, connection) { end = it }
         } catch (e: TimeoutCancellationException) {
           // A connect, handshake or idle deadline of this peer, not the swarm stopping it.
           failure = e
@@ -473,8 +567,8 @@ internal class TorrentSwarm(
           }
           connection?.close()
           overhead.close()
-          results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags,
-            redundant))
+          results.trySend(PeerResult(endpoint, failure, incoming, end.listen, attempt, flags,
+            startedAt, end.redundant, end.alias, end.inherited))
         }
       }
     }
@@ -496,6 +590,7 @@ internal class TorrentSwarm(
           onCompleted()
           complete = true
         }
+        if (!complete) startWebSeeds()
         val policy = uploadPolicy()
         // Workers apply what changed on their next pass; this loop ticks at least every 100 ms.
         chokerMutex.withLock { choker.update(uploadAllowed(policy, complete), seeding = complete) }
@@ -508,25 +603,19 @@ internal class TorrentSwarm(
           checkStall()
         }
         if (complete && policy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
-        val expired = attemptedAt.filter { (endpoint, time) ->
-          now() - time >= 300_000 && endpoint !in active && endpoint !in pending
-        }.keys
-        expired.forEach {
-          attempts.remove(it)
-          attemptedAt.remove(it)
-          retryAt.remove(it)
-          faulty.remove(it)
-        }
         val limit = connections().coerceIn(1, 512)
         active.entries.drop(limit).forEach { it.value.cancel() }
         var candidates = pending.size
         while (active.size < limit && pending.isNotEmpty() && candidates-- > 0) {
           val endpoint = pending.removeFirst()
-          if (endpoint in active) continue
+          if (endpoint in active) {
+            // Dialed once its connection, or an incoming one from that port, ends.
+            pending.addLast(endpoint)
+            continue
+          }
           if (isOwnAddress(endpoint)) {
             // Known, as given up on, so its discovery does not queue it again.
             log.v { "Peer $endpoint for $logLabel left out: our own address" }
-            attempts[endpoint] = MAX_DIAL_ATTEMPTS
             attemptedAt[endpoint] = now()
             continue
           }
@@ -569,6 +658,8 @@ internal class TorrentSwarm(
             attempts.clear()
             attemptedAt.clear()
             retryAt.clear()
+            delivered.clear()
+            broughtForwardAt.clear()
             done.complete(Unit)
           }
           selections?.onReceive { done ->
@@ -587,11 +678,8 @@ internal class TorrentSwarm(
           if (!discoveryClosed) peers.onReceiveCatching { result ->
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
-            else if (endpoint !in attempts && attempts.size + pending.size < MAX_CANDIDATES &&
-              endpoint !in pending) {
-              pending.addLast(endpoint)
-              discovered++
-            }
+            else if (discover(endpoint)) discovered++
+            else foundAgain(endpoint)
           }
           results.onReceive { result ->
             val endpoint = result.endpoint
@@ -599,7 +687,9 @@ internal class TorrentSwarm(
             active.remove(endpoint)
             diagnostics.record(endpoint, result.attempt, failure, result.incoming, result.flags)
             if (failure is TorrentStorageException) throw failure
-            if (failure != null) {
+            val broughtPayload = result.attempt.payload > 0 || result.inherited
+            val lasted = now() - result.startedAt >= PeerRedial.LASTING_MS
+            if (failure != null && failure !is DuplicatePeerException) {
               connectFailures++
               if (failure is CorruptPieceException) corruptPieces++
               log.v { "Peer $endpoint for $logLabel closed: ${failure.describeWithoutUrls()}" }
@@ -609,30 +699,43 @@ internal class TorrentSwarm(
                 log.v { "Peer $endpoint for $logLabel: asked its introducer to punch through" }
               }
             }
-            if (result.incoming) {
+            val alias = result.alias
+            if (failure is DuplicatePeerException) {
+              // The connection kept to the peer dials it again once it closes, unless it closed
+              // first. Until then, or until forgotten 5 minutes from now, it is given up on.
+              if (!result.incoming && endpoint !in pending) attemptedAt[endpoint] = now()
+              log.v { "Peer $endpoint for $logLabel is connected over another connection" }
+            } else if (result.incoming && alias != null) {
+              // It listens where we dialed it too, and was kept over that dial.
+              if (failure is IllegalArgumentException) {
+                if (alias in attempts) faulty += alias
+              } else if (!complete) {
+                redial(alias, broughtPayload, lasted)
+              }
+            } else if (result.incoming) {
               // Never redial a source port: a public torrent dials where the peer listens, unless
               // both of us were seeds.
               val listen = result.listen
-              if (listen != null && !trackerRestricted && !result.redundant &&
-                listen !in active &&
-                listen !in attempts && listen !in pending &&
-                attempts.size + pending.size < MAX_CANDIDATES) {
-                pending.addLast(listen)
+              if (listen != null && !trackerRestricted && !result.redundant) {
+                if (broughtPayload && !complete && failure !is IllegalArgumentException) {
+                  redial(listen, broughtPayload = true, lasted)
+                } else if (listen !in active) {
+                  discover(listen)
+                }
               }
             } else if (failure is IllegalArgumentException) {
               faulty += endpoint
-            } else if ((attempts[endpoint] ?: 0) < MAX_DIAL_ATTEMPTS && !complete) {
-              retryAt[endpoint] = now() + 1000L * (attempts[endpoint] ?: 1)
-              pending.addLast(endpoint)
+            } else if (!complete) {
+              redial(endpoint, broughtPayload, lasted)
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
           punches.onReceive { endpoint ->
             // Dialed at once and over uTP first, while the peer dials us; a seed answers too, as
             // that is how leechers behind NATs reach it. Bounded like every other candidate.
-            val queued = endpoint in pending
             if (endpoint !in active &&
-              (queued || attempts.size + pending.size < MAX_CANDIDATES)) {
+              (endpoint in attempts || attempts.size < MAX_CANDIDATES)) {
+              attempts.getOrPut(endpoint) { 0 }
               onUtpPeers(listOf(endpoint))
               retryAt.remove(endpoint)
               pending.remove(endpoint)
@@ -669,10 +772,7 @@ internal class TorrentSwarm(
     }
   }
 
-  /**
-   * Runs one peer; [onEnd] learns where it listens once known, also when it fails, and whether
-   * it was closed because both sides were seeds.
-   */
+  /** Runs one peer; [onEnd] learns how it ended ([PeerEnd]), also when it fails. */
   private suspend fun peer(
     id: Int,
     endpoint: PeerEndpoint,
@@ -684,7 +784,7 @@ internal class TorrentSwarm(
     holepunch: SwarmHolepunch,
     punches: SendChannel<PeerEndpoint>,
     accepted: TorrentConnection?,
-    onEnd: (listen: PeerEndpoint?, redundant: Boolean) -> Unit,
+    onEnd: (PeerEnd) -> Unit,
   ) {
     val connection = accepted ?: network.connectPeer(endpoint, store.metadata.infoHash.toBytes())
     attempt.stage = PeerStage.HANDSHAKING
@@ -693,7 +793,9 @@ internal class TorrentSwarm(
     try {
       val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
         scheduler, progressEvents, pexEvents, holepunch, punches)
-      try { worker.run() } finally { onEnd(worker.listen, worker.redundant) }
+      try { worker.run() } finally {
+        onEnd(PeerEnd(worker.listen, worker.redundant, worker.alias, worker.inherited))
+      }
     } finally {
       connection.close()
     }
@@ -790,6 +892,21 @@ internal class TorrentSwarm(
     private var lastWrite = TimeSource.Monotonic.markNow()
     /** This connection among the task's live connections, once its handshake succeeded. */
     private var traffic: PeerTraffic? = null
+    /** The peer this connection reaches, once it is the connection kept to it. */
+    private var identity: PeerIdentity? = null
+    /** Another connection to the same peer, one both ends keep, replaced this one. */
+    private val displaced = AtomicBoolean(false)
+    /** The peer sent payload over this connection; read by one that replaces it. */
+    private val broughtPayload = AtomicBoolean(false)
+    /**
+     * Where we dialed the peer of this incoming connection, which it was kept over; written under
+     * [connectedMutex] while this is the connection kept, read once it ended.
+     */
+    var alias: PeerEndpoint? = null
+      private set
+    /** A connection to the same peer that this one replaced brought payload. */
+    var inherited = false
+      private set
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     suspend fun run() = supervisorScope {
@@ -839,7 +956,10 @@ internal class TorrentSwarm(
           }
         }
       } finally {
-        withContext(NonCancellable) { holepunch.leave(id) }
+        withContext(NonCancellable) {
+          holepunch.leave(id)
+          release()
+        }
         holepunchOut.cancel()
         traffic?.close()
         uploadCache.close()
@@ -852,6 +972,7 @@ internal class TorrentSwarm(
       val handshake = wire.handshake(PeerHandshake(store.metadata.infoHash, peerId, true,
         dht = dhtPort > 0, fast = true))
       require(!handshake.peerId.contentEquals(peerId)) { "Connected to ourselves" }
+      claim(handshake.peerId.toByteString())
       fast = handshake.fast
       state = PeerProtocolState(store.pieceCount, maxPending = MAX_PIPELINE, fast = fast)
       attempt.stage = PeerStage.CONNECTED
@@ -882,6 +1003,46 @@ internal class TorrentSwarm(
     }
 
     /**
+     * Keeps this connection unless the peer is connected already ([PeerIdentity]): of two
+     * connections of one direction the first stays; otherwise both ends keep the same one
+     * ([keepsOutgoing]), which replaces the other. A duplicate fails with [DuplicatePeerException].
+     */
+    private suspend fun claim(remoteId: ByteString) {
+      val key = PeerIdentity.of(endpoint.host, remoteId)
+      val kept = connectedMutex.withLock {
+        val existing = identities[key]
+        val outgoing = if (incoming) existing?.takeUnless { it.incoming }?.endpoint else endpoint
+        val replaces = existing != null && existing.incoming != incoming && outgoing != null &&
+          !incoming == keepsOutgoing(listenPortFor(outgoing), outgoing, peerId.toByteString(),
+            remoteId)
+        if (existing == null || replaces) {
+          if (existing != null) {
+            existing.displaced.store(true)
+            // Where the peer is dialed again once this one closes counts what that one brought.
+            if (incoming) alias = existing.endpoint
+            inherited = existing.broughtPayload.load() || existing.inherited
+          }
+          identities[key] = this
+          identity = key
+        } else if (!incoming && existing.incoming && existing.alias == null) {
+          // The peer that dialed us listens where we just reached it.
+          existing.alias = endpoint
+        }
+        identity != null
+      }
+      if (!kept) {
+        attempt.stage = PeerStage.CONNECTED
+        throw DuplicatePeerException()
+      }
+    }
+
+    /** Lets another connection to the same peer be kept once this one ends. */
+    private suspend fun release() {
+      val key = identity ?: return
+      connectedMutex.withLock { if (identities[key] === this) identities.remove(key) }
+    }
+
+    /**
      * Tells an IPv4 peer the canonical allowed-fast pieces (BEP 6), held or not: the set stays the
      * same for the connection, and a piece we verify later is served once its HAVE goes out.
      */
@@ -907,6 +1068,7 @@ internal class TorrentSwarm(
         val throttling = TimeSource.Monotonic.markNow()
         val throttledAt = nowMs()
         traffic?.received(message.bytes.size)
+        if (attempt.payload == 0L) broughtPayload.store(true)
         attempt.payload += message.bytes.size
         downloadPayload(message.bytes.size)
         lastBlock += throttling.elapsedNow()
@@ -1295,6 +1457,7 @@ internal class TorrentSwarm(
 
     /** Runs after every message and idle tick: upload slot, PEX, HAVEs, deadlines, requests. */
     private suspend fun maintain() {
+      if (displaced.load()) throw DuplicatePeerException()
       uploadCache.expire()
       val unchoked = chokerMutex.withLock {
         if (reportedInterest != state.interested) {
@@ -1389,8 +1552,8 @@ private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
 /** Endpoints a swarm keeps to dial, known and queued together. */
 private const val MAX_CANDIDATES = 4096
 
-/** Times a swarm dials a peer before it gives up on it until it is revived or forgotten. */
-private const val MAX_DIAL_ATTEMPTS = 3
+/** How long after its last dial an endpoint given up on starts over when a source names it. */
+private const val GIVEN_UP_MS = 300_000L
 
 /** CONNECTs (BEP 55) one peer may send a minute; each names a host we dial. */
 private const val MAX_CONNECTS_PER_MINUTE = 8
@@ -1434,6 +1597,21 @@ private const val IDLE_MS = 100L
 
 /** An [IllegalArgumentException], so the swarm never retries the peer that sent the piece. */
 internal class CorruptPieceException : IllegalArgumentException("Peer sent a corrupt piece")
+
+/** Closes a connection to a peer the swarm keeps another connection to. */
+internal class DuplicatePeerException : IOException("Peer is connected over another connection")
+
+/**
+ * How a peer worker ended: where the peer [listen]s, once known; whether it was closed as
+ * [redundant], both sides being seeds; where we dialed the peer of an incoming connection kept
+ * over that dial ([alias]); and whether a connection it replaced brought payload ([inherited]).
+ */
+private class PeerEnd(
+  val listen: PeerEndpoint?,
+  val redundant: Boolean = false,
+  val alias: PeerEndpoint? = null,
+  val inherited: Boolean = false,
+)
 
 private suspend fun <T> storage(block: suspend () -> T): T = try {
   block()

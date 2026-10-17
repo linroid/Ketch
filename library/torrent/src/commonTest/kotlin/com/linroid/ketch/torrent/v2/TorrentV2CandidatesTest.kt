@@ -4,6 +4,7 @@ import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.peer.PeerHandshakeUnansweredException
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerOrigin
+import com.linroid.ketch.torrent.peer.PeerRedial
 import com.linroid.ketch.torrent.peer.PeerSwarmChangedException
 import okio.ByteString.Companion.toByteString
 import okio.IOException
@@ -70,11 +71,179 @@ class TorrentV2CandidatesTest {
     book.failed(target, IOException("Connection refused"))
     assertFalse(book.hasWork())
     assertNull(book.nextDueMs())
-    // Exhausted until the window that began with its first attempt has passed.
+    // It never brought payload: given up on until found again once its window has passed.
+    now += TorrentV2Candidates.ATTEMPT_WINDOW_MS - 1
     book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
     assertNull(book.next())
-    now = TorrentV2Candidates.ATTEMPT_WINDOW_MS
+    now += 1
     book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    assertEquals(a, book.next()?.endpoint)
+  }
+
+  @Test
+  fun peerThatBroughtPayload_isDialedAgainForAboutHalfAnHour() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.connected(assertNotNull(book.next()).endpoint)
+    // It dropped after sending us payload: it may come back.
+    book.closed(a, violation = false, delivered = true)
+    for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+      assertEquals(wait, book.nextDueMs())
+      now += wait
+      book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    }
+    assertEquals(60_000L, book.nextDueMs())
+    // Back, it sends payload again: its dials start over once it drops.
+    now += 60_000
+    book.connected(assertNotNull(book.next()).endpoint)
+    book.closed(a, violation = false, delivered = true)
+    val waits = listOf(5_000L, 15_000L, 30_000L, 60_000L, 120_000L) + List(5) { 300_000L }
+    for (wait in waits) {
+      assertEquals(wait, book.nextDueMs())
+      now += wait
+      book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    }
+    // Ten dials in about half an hour all failed: it is given up as any other endpoint.
+    assertFalse(book.hasWork())
+    // Found again once its window has passed, it starts over as an endpoint that never brought
+    // payload: given up after its fourth dial.
+    now += TorrentV2Candidates.ATTEMPT_WINDOW_MS
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    var target = assertNotNull(book.next())
+    for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+      book.failed(target, IOException("Connection refused"))
+      now += wait
+      target = assertNotNull(book.next())
+    }
+    book.failed(target, IOException("Connection refused"))
+    assertFalse(book.hasWork())
+  }
+
+  @Test
+  fun peerThatBroughtPayload_seedRetriesItNoMore() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.connected(assertNotNull(book.next()).endpoint)
+    book.closed(a, violation = false, complete = true, delivered = true)
+    assertFalse(book.hasWork())
+  }
+
+  @Test
+  fun peerThatBroughtPayload_foundAgain_isDialedThirtySecondsAfterItsLastDial() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.connected(assertNotNull(book.next()).endpoint)
+    book.closed(a, violation = false, delivered = true)
+    repeat(3) {
+      now += assertNotNull(book.nextDueMs())
+      book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    }
+    assertEquals(60_000L, book.nextDueMs())
+    // Ten seconds on, a source names it again: it may be back, so it waits twenty more seconds.
+    now += 10_000
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertEquals(20_000L, book.nextDueMs())
+    now += 20_000
+    book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    // The DHT names it every minute: that brings it forward again only five minutes after the
+    // last time, not at each lookup.
+    assertEquals(120_000L, book.nextDueMs())
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertEquals(120_000L, book.nextDueMs())
+    now += 60_000
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertEquals(60_000L, book.nextDueMs())
+    now += 60_000
+    book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    assertEquals(300_000L, book.nextDueMs())
+    now += 159_999
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertNull(book.next())
+    now += 1
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertEquals(a, book.next()?.endpoint)
+  }
+
+  @Test
+  fun connectionThatLasted_countsAsTheFirstDial() {
+    val book = book()
+    for (endpoint in listOf(a, b)) {
+      book.offer(endpoint, PeerTopic.V2, PeerOrigin.TRACKER)
+      var target = assertNotNull(book.next())
+      for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+        book.failed(target, IOException("Connection refused"))
+        now += wait
+        target = assertNotNull(book.next())
+      }
+      // The fourth dial connects.
+      book.connected(target.endpoint)
+    }
+    // b drops at once: its dials are spent.
+    book.closed(b, violation = false)
+    assertFalse(book.hasWork())
+    // a stays up for five minutes without payload, as a peer with nothing we need yet does: its
+    // dials start over.
+    now += PeerRedial.LASTING_MS
+    book.closed(a, violation = false)
+    assertEquals(5_000L, book.nextDueMs())
+  }
+
+  @Test
+  fun incomingPeerThatBroughtPayload_isDialedWhereItListensAsADialedOneIs() {
+    val source = PeerEndpoint("10.0.0.9", 51_234)
+    val listen = PeerEndpoint("10.0.0.9", 6881)
+    val book = book()
+    // Known and given up on already: a tracker named it, and every dial failed.
+    book.offer(listen, PeerTopic.V2, PeerOrigin.TRACKER)
+    var target = assertNotNull(book.next())
+    for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+      book.failed(target, IOException("Connection refused"))
+      now += wait
+      target = assertNotNull(book.next())
+    }
+    book.failed(target, IOException("Connection refused"))
+    assertFalse(book.hasWork())
+    // It dialed us, sent payload and dropped: not dialed at once, but for about half an hour.
+    book.incomingClosed(source, listen, PeerTopic.V2, delivered = true)
+    val waits = listOf(5_000L, 15_000L, 30_000L, 60_000L, 120_000L) + List(5) { 300_000L }
+    for (wait in waits) {
+      assertNull(book.next())
+      assertEquals(wait, book.nextDueMs())
+      now += wait
+      target = assertNotNull(book.next())
+      assertEquals(listen, target.endpoint)
+      book.failed(target, IOException("Connection refused"))
+    }
+    assertFalse(book.hasWork())
+    // Restricted sessions dial only what trackers name.
+    val restricted = book(restricted = true)
+    restricted.incomingClosed(source, listen, PeerTopic.V2, delivered = true)
+    assertFalse(restricted.hasWork())
+  }
+
+  @Test
+  fun incomingOverUtp_fromThePortItListensOn_isDialedBackWhenItSentPayload() {
+    // A peer dials uTP from the socket it listens on: its source is where it listens.
+    val peer = PeerEndpoint("10.0.0.9", 51413)
+    val book = book()
+    book.incomingClosed(peer, peer, PeerTopic.V2, delivered = true)
+    assertNull(book.next())
+    assertEquals(5_000L, book.nextDueMs())
+    now += 5_000
+    assertEquals(peer, assertNotNull(book.next()).endpoint)
+  }
+
+  @Test
+  fun duplicate_isGivenUpUntilFoundAfterItsWindow() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    // It reached a peer we are connected to at another address.
+    book.duplicate(assertNotNull(book.next()).endpoint)
+    assertFalse(book.hasWork())
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    assertNull(book.next())
+    now += TorrentV2Candidates.ATTEMPT_WINDOW_MS
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
     assertEquals(a, book.next()?.endpoint)
   }
 
@@ -272,7 +441,7 @@ class TorrentV2CandidatesTest {
     val targets = generateSequence { book.next() }.associateBy { it.endpoint }
     // a is given up on after its last retry, b backs off, c broke the protocol.
     var target = targets.getValue(a)
-    for (wait in TorrentV2Candidates.RETRY_DELAYS_MS) {
+    for (wait in listOf(5_000L, 15_000L, 30_000L)) {
       book.failed(target, IOException("Connection refused"))
       now += wait
       target = assertNotNull(book.next())
@@ -285,8 +454,39 @@ class TorrentV2CandidatesTest {
     // Both are dialed at once.
     val revived = generateSequence { book.next() }.associateBy { it.endpoint }
     assertEquals(setOf(a, b), revived.keys)
-    // Their attempts start over: a fails once more and backs off its first five seconds.
+    // Each keeps its count of dials: a is given up again at once, b backs off for its second.
     book.failed(revived.getValue(a), IOException("Connection refused"))
-    assertEquals(5_000, book.nextDueMs())
+    book.failed(revived.getValue(b), IOException("Connection refused"))
+    assertEquals(15_000, book.nextDueMs())
+    now += 15_000
+    assertEquals(b, book.next()?.endpoint)
+    assertNull(book.next())
+  }
+
+  @Test
+  fun revive_leavesWhenAnEndpointWasGivenUp() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    var target = assertNotNull(book.next())
+    for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+      book.failed(target, IOException("Connection refused"))
+      now += wait
+      target = assertNotNull(book.next())
+    }
+    book.failed(target, IOException("Connection refused"))
+    val givenUpAt = now
+    // A stall without a peer revives it every minute, and each dial fails.
+    repeat(4) {
+      now += 60_000
+      assertEquals(1, book.revive())
+      book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+      assertFalse(book.hasWork())
+    }
+    // Found again five minutes after it was first given up, it starts over as a new endpoint.
+    now = givenUpAt + TorrentV2Candidates.ATTEMPT_WINDOW_MS
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    target = assertNotNull(book.next())
+    book.failed(target, IOException("Connection refused"))
+    assertEquals(5_000L, book.nextDueMs())
   }
 }

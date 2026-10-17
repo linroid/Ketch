@@ -5,6 +5,7 @@ import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import com.linroid.ketch.torrent.engine.TorrentSession
 import com.linroid.ketch.torrent.engine.TorrentSessionState
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -126,11 +127,20 @@ internal class FakeTorrentSession(
 
   /** What [changeSelection] returns: whether the change was taken live. */
   var changeSelectionResult = true
+
+  /** Holds every [changeSelection] until it completes; null lets them through. */
+  var changeSelectionGate: CompletableDeferred<Unit>? = null
+
+  /** The state [resume] enters, such as [TorrentSessionState.CHECKING_FILES]. */
+  var stateOnResume = TorrentSessionState.DOWNLOADING
   var changeSelectionError: Exception? = null
   var counters = TorrentPayloadCounters(received = 0, uploaded = 0, uploadSpeed = null)
   var sessionDownloadRateLimit = 0L
     private set
   var sessionUploadRateLimit = 0L
+    private set
+  /** The task's limits [setTaskThrottle] last set, null before any. */
+  var taskThrottle: (suspend (Int) -> Unit)? = null
     private set
   var savedResumeData: ByteArray? = null
 
@@ -141,10 +151,11 @@ internal class FakeTorrentSession(
 
   override suspend fun resume() {
     resumed = true
-    _state.value = TorrentSessionState.DOWNLOADING
+    _state.value = stateOnResume
   }
 
   override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    changeSelectionGate?.await()
     selectionChanges += fileIds
     changeSelectionError?.let { throw it }
     selectedFileIds = fileIds
@@ -159,6 +170,10 @@ internal class FakeTorrentSession(
 
   override fun setUploadRateLimit(bytesPerSecond: Long) {
     sessionUploadRateLimit = bytesPerSecond
+  }
+
+  override fun setTaskThrottle(throttle: suspend (Int) -> Unit) {
+    taskThrottle = throttle
   }
 
   override suspend fun saveResumeData(): ByteArray? {

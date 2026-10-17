@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.v2
 
 import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.TorrentV2Fixture
+import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
@@ -32,12 +33,14 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Semaphore
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
 import okio.FileHandle
 import okio.FileSystem
 import okio.ForwardingFileSystem
+import okio.IOException
 import okio.Path
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
@@ -93,12 +96,18 @@ internal class TorrentV2RemotePeer(
     closed.complete(Unit)
     input.cancel()
   }
+
+  /** The peer hangs up: our reads fail as they do on a connection the peer reset. */
+  fun hangUp() {
+    input.close(IOException("Connection reset by peer"))
+  }
 }
 
 /**
  * One swarm loop over [fixture]'s storage and the peers the test connects. Upload reads are
  * charged to a partition of [uploadBytes] when given. We listen on [listenPort] as peers see
- * it, unknown when zero. The loop's clock runs with real time, plus what the test [skip]s.
+ * it, unknown when zero. The loop's clock runs with real time, plus what the test [skip]s. With
+ * a [stall] flow, the loop looks for stalls and recovers from them.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class TorrentV2SwarmRig(
@@ -106,6 +115,7 @@ internal class TorrentV2SwarmRig(
   private val onCompleted: suspend () -> Boolean,
   uploadBytes: Int? = null,
   private val listenPort: Int = 0,
+  private val stall: MutableStateFlow<TorrentStall?>? = null,
 ) {
   val layout = fixture.layout
   val pieceCount = layout.pieceCount.toInt()
@@ -227,7 +237,7 @@ internal class TorrentV2SwarmRig(
         restricted = false, waitForPeers = true, discovered = discovered, dial = dial,
         dialFailures = failures, controls = controls, connectionLimit = { 8 },
         generation = { 0 }, serve = serve, sessionUploadRate = session,
-        onCompleted = onCompleted, onIncomplete = { onIncomplete() })
+        onCompleted = onCompleted, onIncomplete = { onIncomplete() }, stall = stall)
     }
     val loop = async {
       PeerV2Pool.run(state, maxPeers = 8) { pool ->

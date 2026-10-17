@@ -907,6 +907,8 @@ internal class DownloadExecution(
     var speed = 0L
     val reportedSpeed = MutableStateFlow<Long?>(null)
     val request = handle.record.value.request
+    // A local, so the global throttle keeps no reference to this execution.
+    val global = globalLimiter
     return DownloadContext(
       taskId = taskId,
       url = request.url,
@@ -941,6 +943,7 @@ internal class DownloadExecution(
       config = config,
       selection = selection,
       connections = connections,
+      globalThrottle = { bytes -> global.acquire(bytes) },
     )
   }
 

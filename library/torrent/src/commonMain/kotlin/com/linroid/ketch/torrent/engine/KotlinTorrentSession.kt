@@ -66,7 +66,10 @@ internal class KotlinTorrentSession(
   private val checkpoint: TorrentCheckpoint? = null,
   private val peerId: ByteArray = TorrentClient.peerId(),
   private val discover: suspend (SendChannel<PeerEndpoint>, KotlinTorrentSession) -> Unit,
+  /** The engine's download limits, which payload pays after this torrent's. */
   private val downloadThrottle: suspend (Int) -> Unit = {},
+  /** The task's limits, paid last; [setTaskThrottle] replaces them. */
+  taskThrottle: suspend (Int) -> Unit = {},
   /** The engine's upload bucket, shared by every torrent and applied before this one's. */
   private val engineUploadRate: TorrentRateLimiter = TorrentRateLimiter(),
   private val trackerConfigurationBudget: TorrentBufferBudget? = null,
@@ -248,6 +251,7 @@ internal class KotlinTorrentSession(
 
   private val rate = TorrentRateLimiter()
   private val uploadRate = TorrentRateLimiter()
+  private val taskThrottle = AtomicReference(taskThrottle)
   private val connectionLimit = AtomicInt(connections)
   private val received = AtomicLong(checkpoint?.receivedBytes ?: 0)
   /** Peers local service discovery found, for the swarm summary. */
@@ -462,6 +466,7 @@ internal class KotlinTorrentSession(
                 }
                 rate.acquire(bytes)
                 downloadThrottle(bytes)
+                taskThrottle.load()(bytes)
               },
               uploadRate = engineUploadRate, sessionUploadRate = uploadRate,
               onUploaded = ::countUploaded,
@@ -600,6 +605,8 @@ internal class KotlinTorrentSession(
   }
 
   override fun setDownloadRateLimit(bytesPerSecond: Long) = rate.set(bytesPerSecond)
+
+  override fun setTaskThrottle(throttle: suspend (Int) -> Unit) = taskThrottle.store(throttle)
 
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
 

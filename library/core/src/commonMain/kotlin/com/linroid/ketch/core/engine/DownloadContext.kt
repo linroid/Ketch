@@ -99,6 +99,13 @@ class DownloadContext(
     MutableStateFlow(SelectionUpdate(request.selectedFileIds, 0)),
   val connections: ConnectionReporter = ConnectionReporter.None,
   val watchdog: TransferWatchdog = TransferWatchdog.of(config),
+  /**
+   * Ketch's global speed limit alone, live like [throttle] but without the task's limit, which
+   * ends with this run. For transfers a source keeps running after [DownloadSource.download]
+   * returns, such as a torrent that keeps seeding and fetches a piece again; it holds nothing of
+   * the run.
+   */
+  val globalThrottle: suspend (bytes: Int) -> Unit = {},
 ) {
   @Volatile
   var publishedChecksum: Checksum? = preResolved?.checksum

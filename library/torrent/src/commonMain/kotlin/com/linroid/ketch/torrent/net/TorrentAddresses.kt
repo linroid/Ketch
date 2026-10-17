@@ -78,3 +78,27 @@ internal fun publicTorrentAddress(address: ByteArray): Boolean {
     !(a == 198 && (b in 18..19 || b == 51 && c == 100)) &&
     !(a == 203 && b == 0 && c == 113)
 }
+
+/**
+ * Whether [address] is on this machine or a network it is attached to: loopback, private
+ * ([privateIpv4]), link-local and unique local addresses, IPv4-mapped ones included.
+ */
+internal fun localTorrentAddress(address: ByteArray): Boolean {
+  val mapped = address.size == 16 && (0 until 10).all { address[it] == 0.toByte() } &&
+    address[10] == 0xff.toByte() && address[11] == 0xff.toByte()
+  val ipv4 = when {
+    address.size == 4 -> address
+    mapped -> address.copyOfRange(12, 16)
+    else -> null
+  }
+  if (ipv4 != null) {
+    val a = ipv4[0].toInt() and 255
+    return a == 127 || privateIpv4(ipv4) || a == 169 && (ipv4[1].toInt() and 255) == 254
+  }
+  if (address.size != 16) return false
+  val loopback = (0 until 15).all { address[it] == 0.toByte() } && address[15] == 1.toByte()
+  // Link-local fe80::/10 and unique local fc00::/7.
+  return loopback ||
+    (address[0].toInt() and 255) == 0xfe && (address[1].toInt() and 0xc0) == 0x80 ||
+    (address[0].toInt() and 0xfe) == 0xfc
+}
