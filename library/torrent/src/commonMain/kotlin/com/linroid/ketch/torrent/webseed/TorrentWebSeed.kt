@@ -164,12 +164,15 @@ internal class WebSeedStats {
     if (bytes.isNotEmpty()) ledger.update { it.copy(kept = it.kept.plusBytes(bytes)) }
   }
 
-  /** The bytes [arrivals] tally were thrown away. */
+  /**
+   * The bytes [arrivals] tally were thrown away. The ledger takes them before [wasted] counts
+   * them, so a stall check made once [wasted] grew finds them.
+   */
   fun throwAway(arrivals: List<WebSeedArrivals>) {
     val bytes = merged(arrivals)
     if (bytes.isEmpty()) return
-    thrownAway.addAndFetch(bytes.values.sum())
     ledger.update { it.copy(wasted = it.wasted.plusBytes(bytes)) }
+    thrownAway.addAndFetch(bytes.values.sum())
   }
 
   /** What changed since the last stall check, for one: the bytes arriving next come after it. */
