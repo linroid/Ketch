@@ -598,7 +598,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   [Metalink](docs/metalink.md). The parsed document (HTTP(S) mirrors only, without user info, at
   most 64 per file, best priority first; MD5/SHA-1/SHA-256/SHA-512 hashes and piece hashes) is
   kept with the task as `METAINFO_KEY`, so resumes never fetch it again; a size it lacks is asked
-  of the first three mirrors with `HEAD`. A Metalink fetched over HTTPS keeps plain HTTP mirrors
+  of the first three mirrors with `HEAD` while resolving (first 32 files, the request's headers and
+  proxy); `planSelection` never probes. A Metalink fetched over HTTPS keeps plain HTTP mirrors
   only for files with a SHA-1 or stronger digest. Its strongest hash is
   `ResolvedSource.checksum` / `DownloadContext.publishedChecksum`, which Ketch verifies. Several
   files are a `FileSelectionMode.SINGLE` choice, each `SourceFile` naming its

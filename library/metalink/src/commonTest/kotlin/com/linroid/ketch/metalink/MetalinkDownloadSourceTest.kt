@@ -40,7 +40,11 @@ class MetalinkDownloadSourceTest {
     "<hash>${hex(bytes.copyOfRange(it, minOf(it + length, bytes.size)))}</hash>"
   }
 
-  private fun document(withSize: Boolean = true, second: Boolean = false) = """
+  private fun document(
+    withSize: Boolean = true,
+    second: Boolean = false,
+    secondSize: Boolean = true,
+  ) = """
     <?xml version="1.0" encoding="UTF-8"?>
     <metalink xmlns="urn:ietf:params:xml:ns:metalink">
       <file name="release.iso">
@@ -52,9 +56,9 @@ class MetalinkDownloadSourceTest {
       </file>
       ${if (second) """
       <file name="NOTES.txt">
-        <size>${notes.size}</size>
+        ${if (secondSize) "<size>${notes.size}</size>" else ""}
         <hash type="sha-256">${hex(notes)}</hash>
-        <url>https://a.example/NOTES.txt</url>
+        <url>https://example.com/NOTES.txt</url>
       </file>""" else ""}
     </metalink>
   """.trimIndent()
@@ -108,6 +112,24 @@ class MetalinkDownloadSourceTest {
     val engine = Engine(document(withSize = false))
     val resolved = source(engine).resolve(docUrl)
     assertEquals(2000, resolved.totalBytes)
+    assertEquals(1, engine.heads.size)
+  }
+
+  @Test
+  fun resolve_otherFileWithoutSize_asksItsMirrorsWithTheRequestHeaders() = runTest {
+    val engine = Engine(document(second = true, secondSize = false))
+    val source = source(engine)
+    val resolved = source.resolve(docUrl, mapOf("Cookie" to "secret"))
+
+    assertEquals(notes.size.toLong(), resolved.files[1].size)
+    // The mirror shares the Metalink's origin, so it gets the cookie.
+    assertEquals("secret", engine.headHeaders.single()["Cookie"])
+    val plan = source.planSelection(
+      SelectionRequest<MetalinkSourceState>(
+        "t", setOf("1"), emptySet(), null, resolved, null, null, completed = false,
+      ),
+    )
+    assertEquals(notes.size.toLong(), plan.totalBytes)
     assertEquals(1, engine.heads.size)
   }
 
@@ -201,12 +223,14 @@ class MetalinkDownloadSourceTest {
   private inner class Engine(private val document: String) : HttpEngine {
     var documents = 0
     val heads = mutableListOf<String>()
+    val headHeaders = mutableListOf<Map<String, String>>()
     val ranges = mutableListOf<Pair<String, LongRange?>>()
 
     private fun content(url: String) = if (url.endsWith("NOTES.txt")) notes else iso
 
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
       heads += url
+      headHeaders += headers
       return ServerInfo(
         contentLength = content(url).size.toLong(), acceptRanges = true, etag = null,
         lastModified = null,

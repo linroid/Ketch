@@ -3,6 +3,7 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.app.platform.DroppedFile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -39,6 +40,19 @@ class IntakeSingleChoiceTest {
     assertFalse(entry.singleChoice)
     entry.selectedFiles = setOf("0", "1")
     assertEquals(setOf("0", "1"), entry.selectedFiles)
+  }
+
+  @Test
+  fun isTorrent_metalinkFile_isNot() {
+    fun file(name: String) =
+      IntakeEntry(IntakeSource.File(DroppedFile(name) { byteArrayOf() }, name))
+    val metalink = file("Release.meta4")
+    val torrent = file("Pack.TORRENT")
+    assertFalse(metalink.isTorrent)
+    assertTrue(torrent.isTorrent)
+    // Neither has a link to add before its content is read.
+    assertFalse(metalink.addable)
+    assertFalse(torrent.addable)
   }
 
   @Test

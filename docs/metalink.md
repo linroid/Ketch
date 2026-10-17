@@ -22,7 +22,8 @@ against the Metalink's checksum.
 - Piece hashes (`<pieces>`): once every byte is in, Ketch checks each piece. The mirrors that
   wrote a piece that does not match are dropped while another one remains, and the failed
   pieces are fetched again from the others, at most three times before the download fails.
-- A size the Metalink leaves out is asked of the first mirrors with `HEAD`.
+- A size the Metalink leaves out is asked of the file's first three mirrors with `HEAD` as the
+  Metalink is read (for its first 32 files), with the request's headers and proxy.
 - A Metalink listing several files offers them as a single choice: a task downloads one, saved
   under its own name, which you choose before it starts (the add sheet, or a task waiting for
   its files). To download another file of the same Metalink, add it again.

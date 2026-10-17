@@ -19,6 +19,9 @@ import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.mirror.MirrorDownloadHelper
 import com.linroid.ketch.core.mirror.mirrorHeaders
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -109,9 +112,9 @@ class MetalinkDownloadSource internal constructor(
     check(!changed || request.outputPath == null && !request.completed) {
       "This download already saves another file; add the Metalink again for this one"
     }
+    // Sizes are asked of the mirrors while resolving, with the request's headers and proxy.
     val size = file.size
-      ?: probeSize(file, request.resolved?.url.orEmpty(), emptyMap(), Proxy.System)
-      ?: throw IllegalStateException("No mirror reports the size of this file")
+      ?: throw IllegalStateException("No mirror reported the size of this file")
     return SelectionPlan(setOf(id), size, changed, expands = changed, segments = null)
   }
 
@@ -145,17 +148,14 @@ class MetalinkDownloadSource internal constructor(
     headers: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource {
-    var metalink = parsed
-    val first = metalink.files.first()
-    if (first.size == null) {
-      val size = probeSize(first, url, headers, config.proxy)
-        ?: throw KetchError.SourceError(
-          TYPE,
-          detail = "The Metalink gives no size and no mirror reports one",
-        )
-      metalink = metalink.copy(files = listOf(first.copy(size = size)) + metalink.files.drop(1))
-    }
+    val metalink = withProbedSizes(parsed, url, headers, config.proxy)
     val default = metalink.files.first()
+    if (default.size == null) {
+      throw KetchError.SourceError(
+        TYPE,
+        detail = "The Metalink gives no size and no mirror reports one",
+      )
+    }
     val several = metalink.files.size > 1
     log.i {
       "Resolved Metalink: files=${metalink.files.size}, mirrors=${default.urls.size}, " +
@@ -190,6 +190,30 @@ class MetalinkDownloadSource internal constructor(
       },
       selectionMode = if (several) FileSelectionMode.SINGLE else FileSelectionMode.MULTIPLE,
       checksum = default.checksum,
+    )
+  }
+
+  /**
+   * [metalink] with the sizes it lacks, of its first [PROBED_FILES] files, asked of their mirrors
+   * with the request's [headers] and [proxy], so a file chosen later is sized as it is fetched.
+   */
+  private suspend fun withProbedSizes(
+    metalink: Metalink,
+    from: String,
+    headers: Map<String, String>,
+    proxy: Proxy,
+  ): Metalink {
+    val missing = metalink.files.withIndex().filter { it.value.size == null }.take(PROBED_FILES)
+    if (missing.isEmpty()) return metalink
+    val sizes = coroutineScope {
+      missing.map { (index, file) ->
+        async { index to probeSize(file, from, headers, proxy) }
+      }.awaitAll()
+    }.toMap()
+    return metalink.copy(
+      files = metalink.files.mapIndexed { index, file ->
+        sizes[index]?.let { file.copy(size = it) } ?: file
+      },
     )
   }
 
@@ -279,6 +303,7 @@ class MetalinkDownloadSource internal constructor(
     private const val DEFAULT_FILE = "0"
     private const val SNIFF_BYTES = 1024
     private const val PROBED_MIRRORS = 3
+    private const val PROBED_FILES = 32
     private val EXTENSIONS = listOf(".meta4", ".metalink")
     private val json = Json { ignoreUnknownKeys = true }
   }

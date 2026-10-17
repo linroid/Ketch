@@ -281,10 +281,13 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   /** Whether the row is a magnet link. */
   val isMagnet: Boolean get() = (source as? IntakeSource.Link)?.kind == LinkKind.Magnet
 
-  /** Whether the row is a torrent: a magnet, a `.torrent` link or file. */
+  /** Whether the row is a torrent: a magnet, a `.torrent` link or file; not a Metalink file. */
   val isTorrent: Boolean
     get() = when (val current = source) {
-      is IntakeSource.File -> true
+      // A Metalink file is not a torrent: it downloads over HTTP, into any folder.
+      is IntakeSource.File ->
+        current.file.name.endsWith(".torrent", ignoreCase = true) ||
+          resolved?.sourceType == TORRENT_SOURCE
       is IntakeSource.Link -> current.kind.isTorrent || resolved?.sourceType == TORRENT_SOURCE
       is IntakeSource.Range -> false
     }
@@ -355,7 +358,9 @@ class IntakeEntry internal constructor(source: IntakeSource) {
     get() = when {
       duplicate != null && !downloadAgain -> false
       blockingProblem != null -> false
-      isTorrent && status !is IntakeStatus.Ready && !addAnyway -> false
+      // A file has no link to add until its content is read.
+      (isTorrent || source is IntakeSource.File) && status !is IntakeStatus.Ready &&
+        !addAnyway -> false
       files.isNotEmpty() && selectedFiles?.isEmpty() == true -> false
       else -> true
     }
