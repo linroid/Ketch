@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
@@ -306,6 +307,52 @@ class TorrentSourceRunTest {
             context.segments.value)
           session.finish()
           run.join()
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_waitingForAnEngineSlot_showsItsOwnFiles() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.DISABLED, maxActiveTorrents = 1))
+          .also { it.engineFactory = { engine } }
+        try {
+          // Another torrent holds the only engine slot.
+          val busy = MultiFileTorrent(sizes = listOf(50_000, 50_000))
+          val busySession = FakeTorrentSession(busy.metadata.infoHash.hex)
+          engine.addTorrentResult = busySession
+          val busyResolved = source.resolveMetainfo(busy.metainfo)
+          val running = CompletableDeferred<Unit>()
+          val busyRun = launch {
+            source.download(context("busy", busyResolved, "unused".toPath(), setOf("0", "1"),
+              onProgress = { _, _ -> running.complete(Unit) }), null)
+          }
+          running.await()
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val hash = torrent.metadata.infoHash.hex
+          val all = setOf("0", "1", "2")
+          val state = TorrentSourceState(hash, torrent.sizeOf(0, 1, 2), "", all, "unused",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          // Run again for a selection without f0, with the last run's segments over every file.
+          val previous = listOf(Segment(0, 0, 99_999, 100_000),
+            Segment(1, 100_000, 169_999, 35_000), Segment(2, 170_000, 256_143))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, segments = previous,
+            selection = MutableStateFlow(SelectionUpdate(setOf("1", "2"), 1)),
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val waiting = launch { source.download(context, state) }
+          assertEquals(35_000L to torrent.sizeOf(1, 2), reports.receive())
+          assertEquals(listOf(Segment(1, 0, 69_999, 35_000), Segment(2, 70_000, 156_143)),
+            context.segments.value)
+          waiting.cancelAndJoin()
+          busySession.finish()
+          busyRun.join()
           source.assertNoLeaks()
         } finally { source.close() }
       }

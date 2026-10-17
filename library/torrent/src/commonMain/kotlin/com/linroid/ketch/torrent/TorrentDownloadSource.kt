@@ -1202,8 +1202,19 @@ class TorrentDownloadSource(
     // Only this run's completion counts: an earlier run's no longer stands for the task.
     deferredSharing.update { it - taskId }
     val adopted = adoptLive(taskId, hash)
-    val total = { table.totalOf(context.selection.value.fileIds.ifEmpty { state.selectedFileIds }) }
-    withActiveSlot(context, total, hash, owned = adopted != null) {
+    val following = {
+      table.ordered(context.selection.value.fileIds.ifEmpty { state.selectedFileIds })
+    }
+    // Before its session reports, a run shows the progress Ketch restored or planned over its own
+    // files, as track() does: Ketch may run it again with a context whose segments describe the
+    // files the last run had.
+    val fit = {
+      val held = context.segments.value.associate { it.index to it.downloadedBytes }
+      val ids = following()
+      context.segments.value = table.segments(ids) { held[it.id.toInt()] ?: 0 }
+      table.totalOf(ids)
+    }
+    withActiveSlot(context, fit, hash, owned = adopted != null) {
       if (adopted == null) tasks.reserve(taskId, hash)
       var session: TorrentSession? = adopted
       var keepSeeding = false
@@ -1518,7 +1529,8 @@ class TorrentDownloadSource(
    */
   private suspend fun withActiveSlot(
     context: DownloadContext,
-    total: () -> Long,
+    /** Fits the task's segments to the files it follows; returns their size. */
+    fit: () -> Long,
     hash: String,
     owned: Boolean,
     block: suspend () -> Boolean,
@@ -1538,7 +1550,8 @@ class TorrentDownloadSource(
           // The task holds a Ketch download slot, so it reports as downloading (which also lets
           // it be paused) at 0 bytes/s with its restored progress; waiting transfers nothing.
           context.reportedSpeed.value = 0
-          context.onProgress(context.segments.value.sumOf { it.downloadedBytes }, total())
+          val total = fit()
+          context.onProgress(context.segments.value.sumOf { it.downloadedBytes }, total)
         }
       } finally {
         waitingForSlot.update { it - taskId }

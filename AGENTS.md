@@ -521,7 +521,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it caps the task in addition to the global limit (the lower rate wins)
 - Sources pay both through `DownloadContext.throttle`; transfers a source keeps running after its
   run, such as a lent torrent seeder, pay `DownloadContext.globalThrottle`, the global limit
-  alone, which holds nothing of the run
+  alone, which holds nothing of the run. Seeders `TorrentControls` restores have no context and
+  pay no Ketch limit
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
 ### Download Scheduling (`DownloadScheduler`)
