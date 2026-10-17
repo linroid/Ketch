@@ -320,7 +320,7 @@ internal class TorrentSwarm(
     }
     fun launchWebSeed(number: Int): Job = launch(TorrentDispatchers.engine) {
       try {
-        // A seed started again joins without the pieces it sent corrupt.
+        // A seed started again joins with every piece, those it could not serve included.
         webSeedPieces[number].join()
         webSeedWorkers[number].run()
       } catch (e: TorrentStorageException) {
@@ -394,10 +394,6 @@ internal class TorrentSwarm(
       val published = stall ?: return
       val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
       val running = webSeeds.count { it.isActive }
-      // Stopped seeds that would have a piece to fetch if started again.
-      val dropped = webSeeds.indices.count {
-        !webSeeds[it].isActive && webSeedPieces[it].mayServe()
-      }
       // With nothing connected, only the pieces a web seed could not serve are known to be
       // missing: the rest wait for peers.
       val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else {
@@ -415,8 +411,8 @@ internal class TorrentSwarm(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
-        droppedWebSeeds = dropped, payloadBytes = payload, unsettledBytes = unsettled,
-        wastedBytes = wasted, throttledMs = throttledMs.load(),
+        droppedWebSeeds = webSeeds.size - running, payloadBytes = payload,
+        unsettledBytes = unsettled, wastedBytes = wasted, throttledMs = throttledMs.load(),
         pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall
@@ -437,9 +433,7 @@ internal class TorrentSwarm(
           }
           StallRecovery.REVIVE_PEERS -> revivePeers()
           StallRecovery.RELAUNCH_WEB_SEEDS -> for (number in webSeeds.indices) {
-            if (!webSeeds[number].isActive && webSeedPieces[number].mayServe()) {
-              webSeeds[number] = launchWebSeed(number)
-            }
+            if (!webSeeds[number].isActive) webSeeds[number] = launchWebSeed(number)
           }
         }
       }

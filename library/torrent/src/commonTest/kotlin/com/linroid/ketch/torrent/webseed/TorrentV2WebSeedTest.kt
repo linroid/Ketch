@@ -531,7 +531,7 @@ class TorrentV2WebSeedTest {
   }
 
   @Test
-  fun relaunchedSeed_neverAsksAgainForPiecesItSentCorrupt() = runTest {
+  fun relaunchedSeed_asksOnceMoreForPiecesItSentCorrupt() = runTest {
     val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
       webSeeds = listOf("http://mirror.test/pub/"))
     val bad = "http://mirror.test/pub/pack/bad.bin"
@@ -545,11 +545,49 @@ class TorrentV2WebSeedTest {
     stalling(fixture, outage) { run ->
       awaitDropped(outage)
       restored.store(true)
-      // Two minutes of stall start the seed again: it fetches good.bin, never bad.bin again.
+      // Two minutes of stall start the seed again: it fetches good.bin and asks once more for
+      // bad.bin, giving it up again at the next stale copy.
       run.skip(130_000)
       run.session.downloadedBytes.first { it == 40_000L }
+      while (mirror.requests.count { it.first == bad } < 3) delay(10)
       delay(500)
-      assertEquals(2, mirror.requests.count { it.first == bad })
+      assertEquals(3, mirror.requests.count { it.first == bad })
+    }
+  }
+
+  @Test
+  fun mirrorFixedAfterItsSeedWasDropped_isAskedAgainOnceTheStallLasts() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    val good = "http://mirror.test/pub/pack/good.bin"
+    // The only source has another bad.bin until it is fixed, and no peer connects.
+    val before = MirrorEngine(mapOf(bad to fixture.payloads[0].reversedArray(),
+      good to fixture.payloads[1]))
+    val after = MirrorEngine(mapOf(bad to fixture.payloads[0], good to fixture.payloads[1]))
+    val fixed = AtomicBoolean(false)
+    val mirror = object : HttpEngine by before {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) = (if (fixed.load()) after else before).download(url, range, headers, onData)
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      // Sent corrupt twice, the seed has nothing left to fetch and is dropped.
+      while (before.requests.count { it.first == bad } < 2) delay(10)
+      delay(2_000)
+      run.skip(40_000)
+      assertEquals(TorrentStallReason.MISSING_PIECES,
+        run.session.stall.first { it != null }?.reason)
+      // The mirror is fixed: two minutes into the stall the seed starts again, asks once more
+      // and finishes.
+      fixed.store(true)
+      run.skip(90_000)
+      run.session.downloadedBytes.first { it == 20_000L }
+      assertEquals(1, after.requests.count { it.first == bad })
     }
   }
 }

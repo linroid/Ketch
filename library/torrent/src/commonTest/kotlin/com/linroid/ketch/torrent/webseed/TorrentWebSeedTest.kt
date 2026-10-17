@@ -488,7 +488,7 @@ class TorrentWebSeedTest {
 
   @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun relaunchedSeed_neverAsksAgainForPiecesItSentCorrupt() = runTest {
+  fun relaunchedSeed_asksOnceMoreForPiecesItSentCorrupt() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         val (stale, good) = staleSet
@@ -512,7 +512,6 @@ class TorrentWebSeedTest {
           // Dropped while the mirror is down, knowing piece 0 is not the torrent's there.
           worker.run()
           assertEquals(setOf(0), pieces.unservable)
-          assertTrue(pieces.mayServe())
           restored.store(true)
           coroutineScope {
             val started = launch {
@@ -522,10 +521,66 @@ class TorrentWebSeedTest {
             while (!(1..3).all { store.verifiedPieces()[it] }) delay(10)
             started.cancel()
           }
-          // Started again, it fetched the rest, never the copy it knows is stale.
-          assertEquals(2, mirror.requests.count { it.first == staleUrl })
+          // Started again, it fetched the rest and asked once more for stale.bin: one more stale
+          // copy was enough to give it up again.
+          assertEquals(3, mirror.requests.count { it.first == staleUrl })
           assertEquals(setOf(0), pieces.unservable)
-          assertFalse(pieces.mayServe())
+        }
+      }
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun mirrorFixedAfterItsSeedWasDropped_isAskedAgainOnceTheStallLasts() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        val goodUrl = "http://mirror.test/pub/set/good.bin"
+        // The only source has another stale.bin until it is fixed, and no peer connects.
+        val before = MirrorEngine(mapOf(staleUrl to stale.reversedArray(), goodUrl to good))
+        val after = MirrorEngine(mapOf(staleUrl to stale, goodUrl to good))
+        val fixed = AtomicBoolean(false)
+        val mirror = object : HttpEngine by before {
+          override suspend fun download(
+            url: String,
+            range: LongRange?,
+            headers: Map<String, String>,
+            onData: suspend (ByteArray) -> Unit,
+          ) = (if (fixed.load()) after else before).download(url, range, headers, onData)
+        }
+        withStore(staleSetMetadata(), selected = setOf(0)) { store, output ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>()
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              // Sent corrupt twice, the seed has nothing left to fetch and is dropped.
+              while (before.requests.count { it.first == staleUrl } < 2) delay(20)
+              delay(500)
+              clock = 40_000
+              assertEquals(TorrentStallReason.MISSING_PIECES,
+                withTimeout(5_000) { stall.filterNotNull().first() }.reason)
+              // The mirror is fixed: two minutes into the stall the seed starts again, asks once
+              // more and finishes.
+              fixed.store(true)
+              clock = 130_000
+              while (!store.completed()) delay(20)
+              assertEquals(1, after.requests.count { it.first == staleUrl })
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
+          assertContentEquals(stale,
+            torrentFileSystem.read(output / "stale.bin") { readByteArray() })
         }
       }
     }

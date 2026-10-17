@@ -119,10 +119,10 @@ internal class TorrentV2WebSeeds private constructor(
     })
   }
 
-  // The pieces each seed cannot serve, which its workers report and the loop reads, and of
-  // those the ones it sent corrupt, which it is never asked for again while the transfer runs.
+  // The pieces each seed cannot serve, which its workers report and the loop reads: those it is
+  // not asked for until it starts again, and all it ever could not serve, kept for the transfer.
   private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
-  private val corrupt = urls.indices.map { AtomicReference(emptySet<Int>()) }
+  private val refused = urls.indices.map { AtomicReference(emptySet<Int>()) }
 
   // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
   private val workers = urls.indices.map { seed ->
@@ -136,11 +136,17 @@ internal class TorrentV2WebSeeds private constructor(
   /** What the seeds tell the session loop. */
   val updates: ReceiveChannel<Event> get() = events
 
-  /** Whether [seed] may be asked for piece [index]: false once it could not serve it. */
+  /**
+   * Whether [seed] may be asked for piece [index]: false once it could not serve it, until it is
+   * started again.
+   */
   fun serves(seed: Int, index: Int): Boolean = index !in unservable[seed].load()
 
-  /** The pieces [seed] sent corrupt: started again, it is still never asked for them. */
-  fun corruptPieces(seed: Int): Set<Int> = corrupt[seed].load()
+  /**
+   * Whether [seed] could not serve piece [index] when it last asked for it, whether it runs or
+   * stopped.
+   */
+  fun refuses(seed: Int, index: Int): Boolean = index in refused[seed].load()
 
   sealed interface Event {
     /** [seed] waits for a piece. */
@@ -177,12 +183,12 @@ internal class TorrentV2WebSeeds private constructor(
     assignments[seed].tryReceive().getOrNull().orEmpty()
 
   /**
-   * Starts [seed], which [Event.Stopped], again, as a stalled transfer asks: it may be asked for
-   * the files it lacked again, as its mirror may have them by now, but never for the pieces it
-   * sent corrupt. False once the seeds closed.
+   * Starts [seed], which [Event.Stopped], again, as a stalled transfer asks: it may be asked once
+   * more for every piece it could not serve, as its mirror may have them by now. False once the
+   * seeds closed.
    */
   fun relaunch(seed: Int): Boolean {
-    unservable[seed].store(corrupt[seed].load())
+    unservable[seed].store(emptySet())
     return relaunches.trySend(seed).isSuccess
   }
 
@@ -257,8 +263,8 @@ internal class TorrentV2WebSeeds private constructor(
       piece.lease.close()
     }
 
-    override suspend fun unavailable(indices: Set<Int>, stale: Boolean) {
-      if (stale) corrupt[seed].update { it + indices }
+    override suspend fun unavailable(indices: Set<Int>) {
+      refused[seed].update { it + indices }
       unservable[seed].update { it + indices }
     }
 

@@ -310,12 +310,6 @@ internal class TorrentV2PieceScheduler private constructor(
     return verified.indices.count { wanted[it] && !verified[it] && available(it) }
   }
 
-  /** Whether a needed piece lies outside [excluded]. */
-  fun needsOutside(excluded: Set<Int>): Boolean {
-    check(!closed)
-    return remaining > excluded.count { it in verified.indices && wanted[it] && !verified[it] }
-  }
-
   fun completed(): Boolean {
     check(!closed)
     return remaining == 0

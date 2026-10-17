@@ -320,10 +320,6 @@ internal object TorrentV2SessionLoop {
       fun sourced(index: Int): Boolean = rarity.hasAny(index) || mirrors != null &&
         mirrors.urls.indices.any { it !in stoppedMirrors && mirrors.serves(it, index) }
 
-      /** Whether stopped web seed [seed], started again, would have a needed piece to fetch. */
-      fun mirrorMayServe(seed: Int): Boolean =
-        mirrors != null && pieces.needsOutside(mirrors.corruptPieces(seed))
-
       /** Tells peers to cancel the requests other peers delivered first. */
       fun sendCancels() {
         cancels.addAll(pieces.takeCancels())
@@ -836,7 +832,7 @@ internal object TorrentV2SessionLoop {
         val downloading = !complete && !seeding
         // No web seed, running or stopped, found it could not serve piece [index].
         fun unrefused(index: Int): Boolean =
-          mirrors == null || mirrors.urls.indices.all { mirrors.serves(it, index) }
+          mirrors == null || mirrors.urls.indices.none { mirrors.refuses(it, index) }
         // With nothing connected, only the pieces a web seed could not serve are known to be
         // missing: the rest wait for peers.
         val connected = peers.size + mirrorsRunning > 0
@@ -856,7 +852,7 @@ internal object TorrentV2SessionLoop {
           missingFileIds = missing?.fileIds.orEmpty(),
           lateBlocks = if (downloading) pieces.lateCount() else 0,
           webSeeds = mirrorsRunning,
-          droppedWebSeeds = stoppedMirrors.count(::mirrorMayServe),
+          droppedWebSeeds = stoppedMirrors.size,
           payloadBytes = payload,
           unsettledBytes = unsettled,
           wastedBytes = wasted,
@@ -881,7 +877,7 @@ internal object TorrentV2SessionLoop {
             }
             StallRecovery.RELAUNCH_WEB_SEEDS -> if (mirrors != null) {
               for (seed in stoppedMirrors.toList()) {
-                if (!mirrorMayServe(seed) || !mirrors.relaunch(seed)) continue
+                if (!mirrors.relaunch(seed)) continue
                 stoppedMirrors -= seed
                 mirrorsRunning++
               }

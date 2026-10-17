@@ -14,8 +14,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property missingFileIds the files those pieces belong to.
  * @property lateBlocks requested blocks their peer is late with.
  * @property webSeeds web seeds running now.
- * @property droppedWebSeeds web seeds that stopped and would have a wanted piece to fetch,
- *   which [StallRecovery.RELAUNCH_WEB_SEEDS] starts again.
+ * @property droppedWebSeeds web seeds that stopped, which [StallRecovery.RELAUNCH_WEB_SEEDS] starts
+ *   again.
  * @property payloadBytes payload received so far, from peers and web seeds.
  * @property unsettledBytes of that payload, what may still be thrown away: web seed bytes of
  *   pieces not stored yet. Swarms read it after [payloadBytes] and before [wastedBytes], as web

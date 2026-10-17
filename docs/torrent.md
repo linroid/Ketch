@@ -695,8 +695,8 @@ seeds alone until a selection wants pieces again.
   once, down to one, as a server or proxy may refuse that many; each run that works allows one
   more. Five further failed runs in a row without a verified piece drop it, as does having nothing
   left it can serve before it served anything; a download that stalls starts dropped seeds again.
-  Started again, a seed asks once more for the files it lacked, but never for the pieces it sent
-  corrupt, and a seed left with only those is not started again.
+  Started again, a seed asks once more for what it could not serve, as its mirror may have fixed
+  it by then; a piece it sent corrupt before is given up again after one more corrupt copy.
 - Requests go through the source's HTTP engine with the system's proxy settings, count against the
   download limits, fail after 30 seconds without data, and show among the task's live connections
   as `HTTP`.

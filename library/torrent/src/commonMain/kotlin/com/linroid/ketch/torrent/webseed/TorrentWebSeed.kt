@@ -186,12 +186,10 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
 
   /**
    * This seed cannot serve [indices]: their files are missing there or not the torrent's, as
-   * when a mirror has since changed one. Later claims leave them to peers and other seeds. Pieces
-   * it sent corrupt are [stale]: its copy is not the torrent's, so they stay out of its claims
-   * when it starts again, while those of a file it lacked are asked for once more, as the mirror
-   * may have it by then.
+   * when a mirror has since changed one. Later claims leave them to peers and other seeds until
+   * the seed starts again, which asks for them once more, as its mirror may have them by then.
    */
-  suspend fun unavailable(indices: Set<Int>, stale: Boolean)
+  suspend fun unavailable(indices: Set<Int>)
 
   /** Every piece holding bytes of the file at [url]. */
   fun piecesOf(url: String): Set<Int>
@@ -220,7 +218,9 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
  * can serve before it served anything. Only [TorrentStorageException] escapes [run].
  *
  * One worker serves its seed for the whole transfer: [run] starts it again after it was
- * dropped, keeping what it learned, such as the pieces it sent corrupt.
+ * dropped, keeping what it learned. Started again, it is asked once more for what it could not
+ * serve, as its mirror may have fixed it, and a piece it sent corrupt before is given up again
+ * after one more corrupt copy.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedWorker<P : WebSeedPiece>(
@@ -244,7 +244,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   // pieces it cannot serve.
   private var served = false
   private var refused = false
-  // Pieces it sent corrupt once, also kept: a second time, the copy it has is not the torrent's.
+  // Pieces it sent corrupt once, also kept: a second time, the copy it has is not the torrent's,
+  // and once started again, the first time it does is enough.
   private val corrupted = mutableSetOf<Int>()
   // Requests for other files a run sends at once, also kept.
   private var parallel = PARALLEL_REQUESTS
@@ -320,8 +321,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         }
         if (unservable.isNotEmpty()) {
           refused = true
-          val stale = failure is CorruptWebSeedPiece
-          withContext(NonCancellable) { pieces.unavailable(unservable, stale) }
+          withContext(NonCancellable) { pieces.unavailable(unservable) }
         }
         // A failure that may pass sends fewer requests at once before it counts.
         if (unservable.isEmpty() && failure !is CorruptWebSeedPiece && parallel > 1) {
@@ -600,7 +600,7 @@ private val UNSERVABLE_STATUSES = setOf(404, 410, 416)
  * A v1 swarm's pieces for one web seed: to the [scheduler] it is a peer with every piece but those
  * it cannot serve that claims runs of them in order ([TorrentPieceScheduler.claimRun]), so it
  * never fetches what a peer or another seed fetches, except a single piece in the endgame. It
- * outlives the seed's worker: what the seed cannot serve is kept when the worker stops.
+ * outlives the seed's worker: what the seed could not serve is kept when the worker stops.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class SwarmWebSeedPieces(
@@ -612,31 +612,25 @@ internal class SwarmWebSeedPieces(
 ) : WebSeedPieces<TorrentPieceScheduler.Claim> {
   private val layout = WebSeedLayout(store.metadata, url)
   private var joined = false
-  // Pieces the seed sent corrupt, for the rest of the transfer, and those of files it lacked,
-  // until it starts again; the swarm reads them while it checks for a stall.
-  private val corrupt = AtomicReference(emptySet<Int>())
-  private val lacked = AtomicReference(emptySet<Int>())
-
-  /** The pieces this seed cannot serve now, whether it runs or stopped. */
-  val unservable: Set<Int> get() = corrupt.load() + lacked.load()
+  // The pieces the seed could not serve, kept for the transfer: the swarm reads them while it
+  // checks for a stall.
+  private val refused = AtomicReference(emptySet<Int>())
 
   /**
-   * Tells the [scheduler] of this seed, which has every piece but those it sent corrupt; [claim]
-   * does if it was not. Joining again, it may be asked for the files it lacked once more.
+   * The pieces this seed could not serve when it last asked for them, whether it runs or stopped:
+   * its files are missing there or not the torrent's.
+   */
+  val unservable: Set<Int> get() = refused.load()
+
+  /**
+   * Tells the [scheduler] of this seed, which has every piece; [claim] does if it was not. Joining
+   * again, it is asked once more for the pieces it could not serve.
    */
   suspend fun join() {
     if (joined) return
-    lacked.store(emptySet())
-    val skipped = corrupt.load()
-    scheduler.availability(id, BooleanArray(store.pieceCount) { it !in skipped })
+    scheduler.availability(id, BooleanArray(store.pieceCount) { true })
     joined = true
   }
-
-  /**
-   * Whether the seed, joined again, would have a wanted piece that is not verified yet: one it
-   * never sent corrupt.
-   */
-  suspend fun mayServe(): Boolean = scheduler.wantsOutside(corrupt.load())
 
   override suspend fun claim(): List<TorrentPieceScheduler.Claim> {
     join()
@@ -660,8 +654,8 @@ internal class SwarmWebSeedPieces(
     scheduler.release(id, piece.index)
   }
 
-  override suspend fun unavailable(indices: Set<Int>, stale: Boolean) {
-    (if (stale) corrupt else lacked).update { it + indices }
+  override suspend fun unavailable(indices: Set<Int>) {
+    refused.update { it + indices }
     scheduler.withdraw(id, indices)
   }
 
