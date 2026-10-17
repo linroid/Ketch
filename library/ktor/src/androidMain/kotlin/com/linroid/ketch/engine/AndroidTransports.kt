@@ -5,9 +5,6 @@ import android.net.Network
 import android.net.Uri
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ProxyBypass
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.Url
 import java.net.InetAddress
 import java.net.Socket
@@ -39,7 +36,7 @@ internal class AndroidTransports(
     val client = clients.get(route) {
       // OkHttp's own protocols, as before proxies could be chosen.
       if (route == ProxyRoute.Platform) {
-        platformClient()
+        okHttpClient()
       } else {
         okHttpClient(route, binding, http1Only = false)
       }
@@ -62,16 +59,6 @@ internal class AndroidTransports(
       ProxyRoute.Direct
     } else {
       ProxyRoute.Http(host, info.port)
-    }
-  }
-
-  private fun platformClient(): HttpClient = HttpClient(OkHttp) {
-    followRedirects = false
-    engine { dispatcher = httpDispatcher }
-    install(HttpTimeout) {
-      connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS
-      socketTimeoutMillis = Long.MAX_VALUE
-      requestTimeoutMillis = Long.MAX_VALUE
     }
   }
 }
