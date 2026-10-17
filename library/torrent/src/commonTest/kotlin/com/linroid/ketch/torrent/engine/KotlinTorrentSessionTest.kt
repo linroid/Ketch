@@ -13,6 +13,7 @@ import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.TorrentCheckpoint
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
+import com.linroid.ketch.torrent.storage.torrentFileIdentity
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -29,10 +30,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.FileSystem
+import okio.Path.Companion.toPath
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -186,6 +189,63 @@ class KotlinTorrentSessionTest {
           torrentFileSystem.deleteRecursively(root, mustExist = false)
         }
         assertEquals(0, budget.allocated)
+      }
+    }
+  }
+
+  @Test
+  fun currentResumeData_whileAPauseWaitsForGoodbye_readsTheCheckpointWithoutWritingIt() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        coroutineScope {
+          val network = createTorrentNetwork()
+          val budget = TorrentBufferBudget(4 * 1024 * 1024)
+          val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+            "ketch-current-resume-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+          val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+            "name" to "file", "length" to 4L, "piece length" to 4L,
+            "pieces" to sha1Digest(byteArrayOf(1, 2, 3, 4))
+          ))))
+          val discovering = CompletableDeferred<Unit>()
+          val stopping = CompletableDeferred<Unit>()
+          val goodbye = CompletableDeferred<Unit>()
+          val session = KotlinTorrentSession(
+            TorrentPieceStore(metadata, root / "file", emptySet(), "task"), network, budget, this,
+            discover = { _, _ ->
+              discovering.complete(Unit)
+              // Its trackers hear that it stopped only once the test says so.
+              try { awaitCancellation() } finally {
+                stopping.complete(Unit)
+                withContext(NonCancellable) { goodbye.await() }
+              }
+            })
+          try {
+            session.resume()
+            discovering.await()
+            val saved = assertNotNull(session.saveResumeData())
+            val sidecar = root / ".ketch-${metadata.infoHash.hex}-task" / "checkpoint"
+            val written = assertNotNull(torrentFileIdentity(sidecar))
+            val pausing = launch { session.pause() }
+            stopping.await()
+            // The pause holds the session while it says goodbye; this read neither waits for it
+            // nor writes the checkpoint again.
+            assertContentEquals(saved, session.currentResumeData())
+            assertEquals(written, torrentFileIdentity(sidecar))
+            goodbye.complete(Unit)
+            pausing.join()
+            // The pause wrote its own, which the read names from then on.
+            val paused = assertNotNull(TorrentCheckpoint.decode(
+              assertNotNull(session.currentResumeData())))
+            val named = paused.files.single { it.path.toPath().name == "checkpoint" }
+            assertEquals(torrentFileIdentity(sidecar), named.identity)
+            assertNotEquals(written, named.identity)
+          } finally {
+            goodbye.complete(Unit)
+            session.close()
+            network.close()
+            torrentFileSystem.deleteRecursively(root, mustExist = false)
+          }
+        }
       }
     }
   }

@@ -422,10 +422,12 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Stops the seeding sessions side by side, each pausing first, which sends its `stopped`
-   * announces, so a slow save never uses up the window they share, then saving its state, with
-   * the final counters, as no download run saves it: within [SHUTDOWN_SAVE_MS], so a session
-   * that cannot save never holds the rest up.
+   * Stops the seeding sessions side by side, each pausing, which sends its `stopped` announces,
+   * while it saves its state, with the counters, as no download run saves it: first as the
+   * seeder is now, read without writing anything, so a slow disk saves while the trackers hear
+   * it, within the 5 s hosts wait before they exit, rather than after the window they share;
+   * then, once it paused, as it stopped, when that differs. Within [SHUTDOWN_SAVE_MS], so a
+   * session that cannot save never holds the rest up.
    */
   private suspend fun stopSeeders() {
     val watched = stateMutex.withLock {
@@ -439,15 +441,22 @@ class TorrentDownloadSource(
     coroutineScope {
       for (taskId in watched.keys + bases.keys) launch {
         val session = tasks.session(taskId) ?: return@launch
-        try {
-          session.pause()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          log.w { "Torrent taskId=$taskId did not stop seeding: ${e.describeCauses()}" }
+        val pausing = launch {
+          try {
+            session.pause()
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: Exception) {
+            log.w { "Torrent taskId=$taskId did not stop seeding: ${e.describeCauses()}" }
+          }
         }
-        bases[taskId]?.let { base ->
-          withTimeoutOrNull(SHUTDOWN_SAVE_MS) { saveSeedingState(taskId, session, base) }
+        val base = bases[taskId] ?: return@launch
+        withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
+          val saved = saveSeedingState(taskId, session, base) { session.currentResumeData() }
+          pausing.join()
+          saveSeedingState(taskId, session, base) {
+            session.currentResumeData()?.takeUnless { it.contentEquals(saved) }
+          }
         }
       }
     }
@@ -848,25 +857,30 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Saves the latest checkpoint of [taskId]'s seeding [session], as [base] with its resume data,
-   * into the task's record through [sessionStates]: no download run saves it, so the payload
-   * counters, what it uploaded above all, would otherwise go back to what the task completed
-   * with after a restart. A failure is logged, and the record keeps its last state.
+   * Saves the latest checkpoint of [taskId]'s seeding [session], as [base] with its resume data
+   * ([resumeData]: what [TorrentSession.saveResumeData] writes, unless the caller reads it
+   * otherwise; null saves nothing), into the task's record through [sessionStates]: no download
+   * run saves it, so the payload counters, what it uploaded above all, would otherwise go back to
+   * what the task completed with after a restart. Returns the resume data it saved. A failure is
+   * logged, and the record keeps its last state.
    */
   private suspend fun saveSeedingState(
     taskId: String,
     session: TorrentSession,
     base: TorrentSourceState,
-  ) {
-    val save = sessionStates.load() ?: return
-    try {
-      val saved = session.saveResumeData() ?: return
+    resumeData: suspend () -> ByteArray? = { session.saveResumeData() },
+  ): ByteArray? {
+    val save = sessionStates.load() ?: return null
+    return try {
+      val saved = resumeData() ?: return null
       save(taskId, encodeState(base.copy(resumeData = encodeBase64(saved))))
       log.d { "Torrent taskId=$taskId saved its seeding state" }
+      saved
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       log.w { "Torrent taskId=$taskId could not save its seeding state: ${e.describeCauses()}" }
+      null
     }
   }
 

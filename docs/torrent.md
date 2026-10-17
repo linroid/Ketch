@@ -617,9 +617,10 @@ This section describes the engine's protocol behavior for people who debug swarm
   Trackers of other schemes, such as WebTorrent's `wss://`, are skipped. A torrent that stops
   gives its trackers 2 seconds to hear it. When Ketch shuts down, every torrent shares one such
   window, from the moment it begins, while the router removes the port mappings: downloading
-  torrents pause and seeding ones stop side by side, each seeder saving its state once it said
-  goodbye, so slow trackers and routers hold the shutdown up for about 2 seconds. The engine then
-  stops what is left, within what remains of the window.
+  torrents pause and seeding ones stop side by side, each seeder saving its state while it says
+  goodbye and again once it has, so slow trackers and routers hold the shutdown up for about 2
+  seconds and a slow disk still saves before Ketch's host exits. The engine then stops what is
+  left, within what remains of the window.
 - **DHT**: public torrents look up peers in the DHT. With a `stateDirectory`, routing candidates
   are saved, so a restart reaches known nodes even where the bootstrap names do not resolve. Peers
   of public torrents exchange DHT ports (BEP 5 `PORT`), and Ketch pings the nodes they name, so the

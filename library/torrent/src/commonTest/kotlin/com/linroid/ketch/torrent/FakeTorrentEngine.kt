@@ -140,7 +140,11 @@ internal class FakeTorrentSession(
     private set
   var savedResumeData: ByteArray? = null
 
+  /** Holds every [pause] until it completes, as trackers hearing it stopped do; null does not. */
+  var pauseGate: CompletableDeferred<Unit>? = null
+
   override suspend fun pause() {
+    pauseGate?.await()
     paused = true
     _state.value = TorrentSessionState.PAUSED
   }

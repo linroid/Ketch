@@ -38,6 +38,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -50,7 +51,9 @@ import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
@@ -142,7 +145,8 @@ class TorrentShutdownTest {
    * Runs Ketch with a completed task seeding and, with [download], a torrent no peer serves,
    * against [SilentTrackers] and a router that maps the listen port but never answers its
    * removal, as port mapping is on by default; shuts it down once every torrent announced and the
-   * port is mapped, right after [beforeShutdown], and hands [check] what happened.
+   * port is mapped, right after [beforeShutdown], waiting as long as hosts do (the default 5 s)
+   * before their process exits, and hands [check] what happened by then.
    */
   private fun shutdownTest(
     download: Boolean,
@@ -202,13 +206,16 @@ class TorrentShutdownTest {
           beforeShutdown(source)
           val stopping = TimeSource.Monotonic.markNow()
           trackers.stopping.complete(stopping)
-          ketch.shutdown(10.seconds)
+          ketch.shutdown()
           val took = stopping.elapsedNow()
           val removalStarted = if (removal.isCompleted) removal.await() - stopping else null
           Shutdown(trackers, store, source, task?.taskId, took, removalStarted).check()
         } finally {
-          ketch.close()
-          withContext(NonCancellable) { routerScope.coroutineContext.job.cancelAndJoin() }
+          // What goes on in the background stops before the router and the network do.
+          withContext(NonCancellable) {
+            ketch.shutdown(10.seconds)
+            routerScope.coroutineContext.job.cancelAndJoin()
+          }
           network.close()
           torrentFileSystem.deleteRecursively(root, mustExist = false)
         }
@@ -245,17 +252,19 @@ class TorrentShutdownTest {
     }
 
   @Test
-  fun shutdown_seederSavingSlowly_stillAnnouncesStoppedInTheWindow() {
+  fun shutdown_seederSavingSlowly_announcesAndSavesBeforeTheHostStopsWaiting() {
     val saved = CompletableDeferred<Pair<String, SourceState>>()
     shutdownTest(download = false, beforeShutdown = { source ->
-      // A busy disk: saving the seeder's checkpoint takes longer than the whole window.
+      // A busy disk: each save of the seeder's state takes longer than the whole window, and
+      // longer than the host's 5 s leave after it.
       source.saveSessionStates { taskId, state ->
-        delay(2_500)
+        delay(3_500)
         saved.complete(taskId to state)
       }
     }) {
       assertStoppedInWindow(SEED_TRACKER)
-      // It still saved, once it had said goodbye.
+      // Saved while the trackers heard it, before the host stopped waiting and its process exits.
+      assertTrue(saved.isCompleted, "The seeder's state was not saved within the shutdown")
       val (taskId, state) = saved.await()
       assertEquals("seeder", taskId)
       assertTrue(source.decodeState(state).resumeData.isNotEmpty())
@@ -272,6 +281,24 @@ class TorrentShutdownTest {
       version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
     return SeedingTask(name, "http://fixture/$name.torrent", state.saved(), null,
       "unused-$name", ids) to hash
+  }
+
+  /** Seeds a completed task named [name] through [source] on [engine]; its resume data is `1`. */
+  private suspend fun seed(
+    source: TorrentDownloadSource,
+    engine: FakeTorrentEngine,
+    name: String,
+  ): FakeTorrentSession = coroutineScope {
+    val (task, hash) = seedingTask(name)
+    val session = FakeTorrentSession(hash).apply { savedResumeData = byteArrayOf(1) }
+    engine.addTorrentResult = session
+    val seeds = launch {
+      eventually("$name to check its files") { session.resumed }
+      session.seed()
+    }
+    assertEquals(SeedingOutcome.SEEDING, source.startSeeding(task))
+    seeds.join()
+    session
   }
 
   @Test
@@ -291,18 +318,7 @@ class TorrentShutdownTest {
         // Each save, and whether the engine had stopped by then.
         val saves = Channel<Pair<String, Boolean>>(Channel.UNLIMITED)
         source.saveSessionStates { taskId, _ -> saves.send(taskId to fake.stopped) }
-        suspend fun seed(name: String): FakeTorrentSession {
-          val (task, hash) = seedingTask(name)
-          val session = FakeTorrentSession(hash).apply { savedResumeData = byteArrayOf(1) }
-          fake.addTorrentResult = session
-          val seeds = launch {
-            eventually("$name to check its files") { session.resumed }
-            session.seed()
-          }
-          assertEquals(SeedingOutcome.SEEDING, source.startSeeding(task))
-          seeds.join()
-          return session
-        }
+        suspend fun seed(name: String) = seed(source, fake, name)
         try {
           val early = seed("early")
 
@@ -319,6 +335,40 @@ class TorrentShutdownTest {
           assertTrue(late.paused)
           assertEquals("late" to false, saves.receive())
           assertTrue(fake.stopped)
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun stopping_savesTheSeederWhileItPauses_thenAsThePauseLeftIt() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val fake = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { fake } }
+        // The resume data of each save.
+        val saves = Channel<ByteArray>(Channel.UNLIMITED)
+        source.saveSessionStates { _, state ->
+          saves.send(decodeBase64(source.decodeState(state).resumeData))
+        }
+        try {
+          val seeder = seed(source, fake, "seeder")
+          // Its trackers take their time to hear that it stopped.
+          val goodbye = CompletableDeferred<Unit>()
+          seeder.pauseGate = goodbye
+
+          source.stopping()
+          // Saved as it is meanwhile, not after: a host may exit before the pause ends.
+          assertContentEquals(byteArrayOf(1), saves.receive())
+          assertFalse(seeder.paused)
+          // Then as its pause left it, the final counters.
+          seeder.savedResumeData = byteArrayOf(2)
+          goodbye.complete(Unit)
+          assertContentEquals(byteArrayOf(2), saves.receive())
+          source.stop()
+          assertTrue(saves.tryReceive().isFailure)
         } finally { source.close() }
       }
     }
