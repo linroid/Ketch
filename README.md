@@ -118,6 +118,9 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   after Ketch restarts.
 - **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
   HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
+- **Metalink (`.meta4`, `.metalink`)** — Download from every mirror a Metalink lists at once.
+  A mirror that fails or sends bad pieces is left out, and the file is checked against the
+  Metalink's hashes ([details](docs/metalink.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or
   the file manager lands in Ketch.
 
@@ -235,7 +238,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Distribution before v1.0.0** — Signed Windows releases, signed and notarized macOS releases,
   the extension in more browser stores and verified installation/update paths
   ([plan](docs/plans/v1-distribution.md))
-- **Metalink** — Downloads from several mirrors at once, with checksums
 - **WebDAV** — Download from WebDAV servers, with resume
 - **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
   AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
@@ -285,6 +287,7 @@ task.state.collect { println(it) }
 - [Browser extension](app/browser-extension/README.md) — Setup, capturing, permissions and
   privacy
 - [BitTorrent](docs/torrent.md) — Torrent and magnet support and its limits
+- [Metalink](docs/metalink.md) — Downloads from several mirrors, with piece and file checks
 - [Multiple networks](docs/multiple-networks.md) — Spreading downloads across network interfaces
 - [AI discovery](docs/ai-discovery.md) — Providers, keys, web search, page access, chats and history
 - [Automation hooks](docs/hooks.md) — Commands and webhooks run on download events
