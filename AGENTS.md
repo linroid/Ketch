@@ -773,8 +773,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   list, http/https only, at most 16) and magnet `ws` parameters (`MagnetUri.webSeeds`, carried
   into the rebuilt metainfo by `metainfoFromInfo`). The v1 swarm runs a `WebSeedWorker` per URL
   (`TorrentWebSeed.kt`) through the engine's `TorrentHttp` (`fetchRange`, which fails with
-  `HttpIdleException` after 30 s without data): to `TorrentPieceScheduler` it is a peer with every
-  piece that claims runs in order (`claimRun`), so peers and seeds never fetch the same piece
+  `HttpIdleException` 30 s after the last data, checked every second): to `TorrentPieceScheduler`
+  it is a peer with every piece that claims runs in order (`claimRun`), so peers and seeds never
+  fetch the same piece
   outside the endgame. A run is the first free wanted piece and the free wanted pieces after it,
   at most `WEB_SEED_RUN_PIECES` (16) and `WEB_SEED_RUN_BYTES` (4 MiB), no more than its share of
   the free pieces split between every peer and seed (the swarm joins every seed before any
