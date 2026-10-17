@@ -760,7 +760,9 @@ Each download checks itself every second. It has stalled once no payload arrived
 or no piece verified for four pieces' worth of time at its rate (between one and ten minutes);
 time spent waiting on a speed limit never counts. Payload thrown away, such as a web seed's piece
 that fails its hash check, is no payload, and payload back after 30 seconds without any gives the
-next piece its full time again once none of it can still be thrown away. It then says why, in the most telling order:
+next piece its full time again once none of it can still be thrown away, but only the first time
+until a piece verifies, so payload that comes and goes does not hide a stall. It then says why, in
+the most telling order:
 
 - **Missing pieces**: wanted pieces that no connected peer or web seed has, and the files they
   belong to; with nothing connected, the pieces a web seed could not serve. The download waits for

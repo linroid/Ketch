@@ -108,6 +108,24 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun payloadComingAndGoing_givesAPieceItsTimeAgainOnlyOnce() {
+    // Peers mostly choke us: every 100 s, 10 s of payload at 10 KB a second, and no piece
+    // verifies.
+    fun received(time: Long) = (1..time / 100_000).sumOf { burst ->
+      (time - burst * 100_000).coerceIn(0, 10_000) * 10
+    }
+    val stalls = stallsTo(600_000) { time ->
+      val sending = time % 100_000 in 1..10_000 && time > 100_000
+      signals(payloadBytes = received(time), peers = 1, unchokingPeers = if (sending) 1 else 0)
+    }
+    // The first burst after the stall began gives a piece its time again, and ends it.
+    assertNull(stalls[100])
+    // No more than that: once that time is up, the stall stays, bursts or not.
+    val after = stalls.drop(164)
+    assertTrue(after.all { it != null }, after.toString())
+  }
+
+  @Test
   fun wastedPayload_isNoProgress() {
     runTo(40_000) { signals(webSeeds = 1) }
     assertNotNull(watchdog.stall)

@@ -60,7 +60,8 @@ internal enum class StallRecovery {
  * verified for four pieces' worth of time at its rate (at least [MIN_PIECE_MS], at most
  * [MAX_PIECE_MS]), counted from the last verified piece or from payload coming back after a gap,
  * as the gap was no slow piece, once nothing can throw that payload away any more and none was
- * meanwhile. Payload later thrown away is no payload: it takes back the checks that counted it,
+ * meanwhile. It does so once until the next piece verifies, so payload that comes and goes never
+ * keeps a stall from showing. Payload later thrown away is no payload: it takes back the checks that counted it,
  * newest first, but a gap is told from when any payload last arrived, so payload thrown away never
  * makes the next look back after one. Time spent waiting on speed limits counts as progress: a
  * slow limit is no stall. Recoveries start once it has lasted [RECOVER_AFTER_MS], each at most
@@ -78,6 +79,8 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var payloadAt = progressAt
   // When payload last arrived, thrown away or not: it never moves back.
   private var seenAt = progressAt
+  // Whether payload back after a gap gave a piece its time again since the last verified one.
+  private var restarted = false
   private var payloadBytes = 0L
   private var wastedBytes = 0L
   private var throttledMs = 0L
@@ -113,6 +116,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     pieceAt = progressAt
     payloadAt = progressAt
     seenAt = progressAt
+    restarted = false
     stall = null
     reannounceEveryMs = REANNOUNCE_MS
     // Payload before a verified piece is never taken back.
@@ -212,7 +216,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
    * they are kept, as payload thrown away meanwhile was no payload.
    */
   private fun took(bytes: Long, now: Long) {
-    val restartAt = if (now - seenAt >= NO_PAYLOAD_MS) now else null
+    val restartAt = if (!restarted && now - seenAt >= NO_PAYLOAD_MS) now else null
     credits.addLast(Credit(bytes, payloadBytes, payloadAt, restartAt))
     if (credits.size > MAX_CREDITS) {
       // The oldest two become one, which taking back moves the clock to before both.
@@ -248,11 +252,14 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
 
   /**
    * The checks whose payload nothing can throw away any more, the payload received up to
-   * [settled], are kept: back after a gap, a piece gets its full time again.
+   * [settled], are kept: back after a gap, a piece gets its full time again, the first time since
+   * the last verified piece.
    */
   private fun kept(settled: Long) {
     while (credits.isNotEmpty() && credits.first().mark <= settled) {
       val restartAt = credits.removeFirst().restartAt ?: continue
+      if (restarted) continue
+      restarted = true
       pieceAt = maxOf(pieceAt, restartAt)
     }
   }
