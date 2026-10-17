@@ -882,27 +882,6 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
-  fun startSeeding_v1FileDroppedThenDeleted_seedsEveryPieceOfTheSelection() {
-    val torrent = MultiFileTorrent()
-    v1Seeding(torrent) { source, engine, output ->
-      val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
-      assertEquals(SeedingOutcome.SEEDING, source.startSeeding(v1SeedingTask(torrent, output, ids)))
-      assertTrue(source.changeSeedingSelection("seeder", ids - "1"))
-      source.stopSeeding("seeder")
-      // The owner deletes the file it dropped, which shares two pieces with the files it keeps.
-      torrentFileSystem.delete(output / "f1")
-
-      val outcome = source.startSeeding(v1SeedingTask(torrent, output, ids - "1"))
-
-      assertEquals(SeedingOutcome.SEEDING, outcome)
-      val kept = (torrent.piecesOf(0) + torrent.piecesOf(2)).toSet()
-      val pieces = BooleanArray(torrent.pieceCount) { it in kept }
-      assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
-      source.stopSeeding("seeder")
-    }
-  }
-
-  @Test
   fun startSeeding_v1FileDeletedThenDropped_seedsWithoutTheSharedPieces() {
     val torrent = MultiFileTorrent()
     v1Seeding(torrent) { source, engine, output ->

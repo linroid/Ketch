@@ -5,7 +5,6 @@ import com.linroid.ketch.torrent.TorrentDispatchers
 import com.linroid.ketch.torrent.crypto.newSha1
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
-import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
@@ -60,10 +59,8 @@ internal class SelectionView(
 /**
  * Verified piece storage; files retain their original torrent offsets. A file is stored in place
  * once it is *materialized*: selected, or owned in place from an earlier selection. Spans of other
- * files live in owned `<piece>.piece` sidecars. Shrinking the selection keeps what is verified,
- * and a sidecar of each verified piece a file left in place shares with a selected one, so that
- * file can be deleted; expanding it copies verified sidecar spans into the new files and rehashes
- * those pieces.
+ * files live in owned `<piece>.piece` sidecars. Shrinking the selection keeps what is verified;
+ * expanding it copies verified sidecar spans into the new files and rehashes those pieces.
  */
 internal class TorrentPieceStore(
   val metadata: TorrentMetadata,
@@ -251,9 +248,7 @@ internal class TorrentPieceStore(
         // A deselected file the user deleted is never created again for a neighbor's piece.
         overlappingFiles(index).forEach(::dropIfVanished)
         spans = overlappingFiles(index).filter { it in materialized }
-        // A deselected file kept in place may be deleted: its span goes to the sidecar too.
-        val inPlace = overlappingFiles(index)
-          .filter { it in materialized && it in selected || padding[it] }
+        val inPlace = overlappingFiles(index).filter { it in materialized || padding[it] }
           .sumOf { overlap(start, end, it) }
         if (inPlace < bytes.size) {
           ensureDirectory(sidecar)
@@ -279,40 +274,17 @@ internal class TorrentPieceStore(
     }
 
   /**
-   * Reads a piece from the files it is stored in place and from its owned sidecar. A deselected
-   * file deleted from disk is read from the sidecar from then on. A failed read of a piece that
-   * is no longer wanted, or that spans a deselected file, revokes it: [PieceRevokedException].
-   * Other failures are storage errors.
+   * Reads a piece from the files it is stored in place and from its owned sidecar. A failed read
+   * of a piece that is no longer wanted, or that spans a deselected file, revokes it:
+   * [PieceRevokedException]. Other failures are storage errors.
    */
   suspend fun read(index: Int): ByteArray = mutex.withLock {
     try {
       storageOperation { readPiece(index) }
     } catch (failure: okio.IOException) {
       if (!revocable(index)) throw failure
-      storageOperation { readWithoutVanished(index) }?.let { return@withLock it }
       storageOperation { revokeLocked(index) }
       throw PieceRevokedException(index)
-    }
-  }
-
-  /**
-   * Reads piece [index] again with the deselected files it spans that are gone from disk read
-   * from its owned sidecar; null when none is gone or the sidecar does not verify.
-   */
-  private fun readWithoutVanished(index: Int): ByteArray? {
-    val vanished = overlappingFiles(index).filter {
-      it !in selected && it in materialized && !fileSystem.exists(filePath(it))
-    }
-    if (vanished.isEmpty()) return null
-    val path = sidecar / "$index.piece"
-    if (!ownedSidecar(path) || !sidecarMatches(index, path, ByteArray(CHECK_CHUNK_BYTES))) {
-      return null
-    }
-    vanished.forEach(::dropIfVanished)
-    return try {
-      readPiece(index)
-    } catch (_: okio.IOException) {
-      null
     }
   }
 
@@ -376,8 +348,6 @@ internal class TorrentPieceStore(
       if (healedPieces > 0) {
         log.d { "Healed $healedPieces piece(s) of taskId=$taskId from their sidecars" }
       }
-      // A selection saved while no store ran dropped files this store finds in place.
-      keepSharedSidecars(selected, wanted, chunk)
       verified.copyOf()
     }
   }
@@ -482,102 +452,6 @@ internal class TorrentPieceStore(
   // Under the mutex: pieces the current recheck healed from sidecars, for its log line.
   private var healedPieces = 0
 
-  /**
-   * Keeps an owned sidecar of each verified piece of [selection], wanted as [wantedNow] says,
-   * that a file outside it stored in place shares: the file may be deleted, and the piece then
-   * reads its span from the sidecar, as a recheck or [read] finds. Only a file's first and last
-   * pieces can hold another file's bytes.
-   */
-  private suspend fun keepSharedSidecars(
-    selection: Set<Int>,
-    wantedNow: BooleanArray,
-    chunk: ByteArray,
-  ) {
-    val pieces = linkedSetOf<Int>()
-    for (file in materialized) {
-      val range = piecesOf(file)
-      if (file in selection || padding[file] || range.isEmpty()) continue
-      for (index in intArrayOf(range.first, range.last)) {
-        if (wantedNow[index] && verified[index]) pieces += index
-      }
-    }
-    var written = 0
-    var failed = 0
-    for (index in pieces) {
-      currentCoroutineContext().ensureActive()
-      // Best effort: without a sidecar, the piece is lost only once that file is deleted.
-      val kept = try {
-        keepSidecar(index, chunk)
-      } catch (e: okio.IOException) {
-        log.d { "Piece $index of taskId=$taskId kept no sidecar: ${e.describeWithoutUrls()}" }
-        SidecarCopy.FAILED
-      }
-      when (kept) {
-        SidecarCopy.WRITTEN -> written++
-        SidecarCopy.FAILED -> failed++
-        SidecarCopy.KEPT -> Unit
-      }
-    }
-    if (written > 0 || failed > 0) {
-      log.d {
-        "Saved $written sidecar piece(s) of taskId=$taskId shared with deselected files" +
-          if (failed > 0) "; $failed could not be saved" else ""
-      }
-    }
-  }
-
-  private enum class SidecarCopy { KEPT, WRITTEN, FAILED }
-
-  /**
-   * Gives verified piece [index] an owned sidecar that verifies, written whole from the files
-   * that store it in place and hashed on the way. A sidecar this store did not write is left
-   * alone, and nothing is left behind when the piece cannot be read from its files or does not
-   * verify.
-   */
-  private fun keepSidecar(index: Int, chunk: ByteArray): SidecarCopy {
-    val path = sidecar / "$index.piece"
-    validateRegularPath(path)
-    val exists = fileSystem.exists(path)
-    if (exists && !ownedSidecar(path)) return SidecarCopy.FAILED
-    if (exists && sidecarMatches(index, path, chunk)) return SidecarCopy.KEPT
-    val start = index * metadata.pieceLength
-    val end = start + pieceSize(index)
-    val inPlace = overlappingFiles(index).all {
-      overlap(start, end, it) == 0L || padding[it] || it in materialized
-    }
-    if (!inPlace) return SidecarCopy.FAILED
-    if (exists) {
-      // Cut short as it was written, or changed since.
-      fileSystem.delete(path, mustExist = false)
-      ownedFiles.remove(path)
-    }
-    ensureDirectory(sidecar)
-    val digest = newSha1()
-    val written = try {
-      fileSystem.openReadWrite(path, mustCreate = true).use { target ->
-        recordOwned(path, directory = false)
-        forEachStoredSpan(index) { handle, offset, targetOffset, count ->
-          var done = 0
-          while (done < count) {
-            val size = minOf(chunk.size, count - done)
-            if (handle != null) readFully(handle, offset + done, chunk, 0, size)
-            else chunk.fill(0, 0, size)
-            digest.update(chunk, 0, size)
-            target.write((targetOffset + done).toLong(), chunk, 0, size)
-            done += size
-          }
-        }
-      }
-      digest.digest().contentEquals(metadata.pieceHashes.copyOfRange(index * 20, index * 20 + 20))
-    } catch (_: okio.IOException) {
-      false
-    }
-    if (written) return SidecarCopy.WRITTEN
-    if (ownedSidecar(path)) fileSystem.delete(path, mustExist = false)
-    ownedFiles.remove(path)
-    return SidecarCopy.FAILED
-  }
-
   private fun matchesStored(
     index: Int,
     chunk: ByteArray,
@@ -645,10 +519,8 @@ internal class TorrentPieceStore(
    * Replaces the selection with [newSelected], a non-empty set of file indices, without
    * downloading anything. Verified pieces stay verified. Each added file is created unless it
    * exists; verified pieces it overlaps are copied from their sidecars and rehashed, and lose
-   * their verification when that fails. Each dropped file stays in place, and a verified piece
-   * it shares with the selection is copied to its sidecar. Newly wanted pieces whose bytes are
-   * already stored are listed for [verifyExisting]. Before [initialize] it only replaces the
-   * selection.
+   * their verification when that fails. Newly wanted pieces whose bytes are already stored are
+   * listed for [verifyExisting]. Before [initialize] it only replaces the selection.
    */
   suspend fun changeSelection(newSelected: Set<Int>): SelectionView = mutex.withLock {
     require(newSelected.isNotEmpty() && newSelected.all { it in contentFiles }) {
@@ -705,9 +577,6 @@ internal class TorrentPieceStore(
       if (pieces.isNotEmpty()) {
         log.d { "Selection of taskId=$taskId copied $copied of ${pieces.size} verified piece(s)" }
       }
-      // A file this drops stays in place, and may be deleted: the pieces it shares with the
-      // selection keep a sidecar.
-      keepSharedSidecars(next, nextWanted, chunk)
       nextWanted.indices.filter { index ->
         nextWanted[index] && !previousWanted[index] && !verified[index] && storedSpansExist(index)
       }
@@ -795,10 +664,7 @@ internal class TorrentPieceStore(
     true
   }
 
-  /**
-   * Deletes owned sidecars of verified pieces stored wholly in place in selected files, which
-   * nothing reads. One a file outside the selection shares stays: that file may be deleted.
-   */
+  /** Deletes owned sidecars of verified pieces stored wholly in place, which nothing reads. */
   private fun deleteObsoleteSidecars() {
     var deleted = 0
     for ((path, identity) in ownedFiles.toList()) {
@@ -809,7 +675,7 @@ internal class TorrentPieceStore(
       val end = start + pieceSize(index)
       val inPlace = overlappingFiles(index).all { file ->
         overlap(start, end, file) == 0L || padding[file] ||
-          file in selected && file in materialized && fileSystem.exists(filePath(file))
+          file in materialized && fileSystem.exists(filePath(file))
       }
       if (!inPlace) continue
       validateRegularPath(path)

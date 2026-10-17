@@ -132,9 +132,8 @@ What happens next depends on the task's state:
   one you deleted before removing it no longer keeps the task from seeding. A v2 or hybrid
   torrent that still has a deleted file selected cannot start seeding again, though; removing
   that file then lets it seed the next time Ketch restores seeding, such as when it starts again.
-  In a v1 torrent a file usually shares its first and last pieces with the files beside it. Ketch
-  keeps a copy of those pieces when you remove a file, so deleting it afterwards changes nothing.
-  A file deleted before Ketch kept that copy, such as one deleted before you removed it, takes
+  In a v1 torrent a file usually shares its first and last pieces with the files beside it, and
+  a file you removed keeps its part of them. Deleting it, before or after you removed it, takes
   those pieces with it: the task seeds every other piece of the files you kept and never offers
   those, until you add a file, which downloads them again.
 
@@ -893,10 +892,8 @@ peers that dial it before answering their handshake.
 
 In v1, a piece that spans a selected and a skipped file needs all its bytes to be verified. The
 skipped file's part is kept in a hidden sidecar for the task, not in the skipped file. When that
-file is chosen later, its verified bytes are copied from the sidecar and rechecked. A file you skip
-once it was written stays where it is, and the pieces it shares with the chosen files are copied
-to the sidecar too, so deleting it later loses nothing. A v2 or hybrid task refuses a newly chosen
-file whose path holds a file it did not create.
+file is chosen later, its verified bytes are copied from the sidecar and rechecked. A v2 or hybrid
+task refuses a newly chosen file whose path holds a file it did not create.
 
 ## Storage, restart and compatibility
 

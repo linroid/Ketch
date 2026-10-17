@@ -876,13 +876,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   verified pieces when they are deselected, copies verified spans of boundary pieces from the
   task's sidecar into newly selected files and rehashes them, discards pieces no longer wanted
   without blaming the peer, and revokes rather than fails on an unreadable piece outside the
-  selection; a recheck heals a piece from its sidecar. A deselected file kept in place keeps an
-  owned sidecar of each verified piece it shares with the selection (written as the selection
-  shrinks, as such a piece commits and at each recheck; `deleteObsoleteSidecars` keeps them), so
-  deleting it later loses nothing: `read` and a recheck read its span from the sidecar. v2 and
-  hybrid create or recheck newly selected files, refuse one whose path holds a file they did not
-  create, keep deselected verified pieces readable, and bind their creation log without the
-  selection once it changes.
+  selection; a recheck heals a piece from its sidecar. v2 and hybrid create or recheck newly
+  selected files, refuse one whose path holds a file they did not create, keep deselected
+  verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more, the run that takes
   the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). One that
   shrinks before its restored seeder reads the task's selection as it starts, or while it checks
@@ -894,12 +890,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   missing a selected file fails as it opens, before any check (its checkpoint's ownership no
   longer holds), and keeps its intent: a drop saved between that read and the check takes effect
   the next time seeding is restored. A v1 seeder whose check misses only pieces it shares with
-  deselected files whose bytes are gone (deleted or cut short before a sidecar kept them, the
-  selected files whole) sets them aside (`TorrentPieceStore.setAsideLostPieces`): neither
-  wanted, verified nor offered, and wanted again at the next check or once the selection adds a
-  file. It seeds the rest, logs a warning and keeps its intent. A lent seeder pays the global
-  limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery
-  keeps only the spec fields it reads, so no finished run stays reachable.
+  deselected files whose bytes are gone (deleted or cut short, the selected files whole) sets
+  them aside (`TorrentPieceStore.setAsideLostPieces`): neither wanted, verified nor offered, and
+  wanted again at the next check or once the selection adds a file. It seeds the rest, logs a
+  warning and keeps its intent. A lent seeder pays the global limit alone
+  (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
+  the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
