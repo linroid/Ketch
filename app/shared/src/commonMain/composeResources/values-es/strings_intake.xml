@@ -166,6 +166,7 @@
   <string name="intake_user_name">Usuario</string>
   <string name="intake_password">Contraseña</string>
   <string name="intake_connections">Conexiones</string>
+  <string name="intake_quality">Calidad</string>
 
   <string name="intake_options">Opciones</string>
   <string name="intake_pill_label">%1$s:</string>

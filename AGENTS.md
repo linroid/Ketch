@@ -595,9 +595,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   manifest no longer lists the chosen ID (or, from `preResolved`, its bandwidth); `download` refuses
   a plan whose container differs from the output name Ketch chose (not a file `Destination`); and
   `downloadFollowingSelection` restarts the transfer with a variant selected while it runs,
-  acknowledging each revision as it plans it. The add sheet does not pick variants
-  (`IntakeEntry.files` leaves single choices out): it downloads the best, and the inspector's Files
-  tab switches
+  acknowledging each revision as it plans it. The add sheet's preview card for a single link
+  offers them as Quality radio buttons (`IntakeEntry.variants`, `selectedVariant`; `files` leaves
+  single choices out), the first checked, and a request names the ID only when another is chosen;
+  the inspector's Files tab switches later
 - Separate tracks: an HLS variant's `AUDIO` group rendition with a `URI` (the `DEFAULT`, else
   `AUTOSELECT`, else first) and a DASH presentation's main audio adaptation set (`Role` `main`,
   else first; text and image sets are ignored) are merged with the video when both are

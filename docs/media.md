@@ -35,8 +35,8 @@ ketch 'https://example.com/video/index.m3u8' --files 1
 
 A stream that offers several qualities (HLS variants, DASH representations) lists them as a single
 choice, best first, such as `1080p · 5.1 Mbps`. Ketch downloads the best one unless you choose
-another: in the apps, open the task's **Files** tab in the inspector and pick a quality; in the
-SDK, pass its ID in `DownloadRequest.selectedFileIds` or call `DownloadTask.selectFiles`. Choosing
+another: in the apps, pick a **Quality** in the add sheet, or later in the task's **Files** tab
+in the inspector; in the SDK, pass its ID in `DownloadRequest.selectedFileIds` or call `DownloadTask.selectFiles`. Choosing
 another quality while the task downloads starts it over with that one. "Best" is the highest
 declared bandwidth among the variants with video; audio-only variants come last.
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LinearProgressIndicator
@@ -54,6 +55,7 @@ import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchRadio
 import com.linroid.ketch.app.components.KetchSpinner
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTooltip
@@ -88,6 +90,7 @@ import ketch.app.shared.generated.resources.intake_download_all_now
 import ketch.app.shared.generated.resources.intake_finish_background
 import ketch.app.shared.generated.resources.intake_keep_out
 import ketch.app.shared.generated.resources.intake_password
+import ketch.app.shared.generated.resources.intake_quality
 import ketch.app.shared.generated.resources.intake_remove_named
 import ketch.app.shared.generated.resources.intake_rename
 import ketch.app.shared.generated.resources.intake_user_name
@@ -195,7 +198,29 @@ internal fun PreviewCard(actions: IntakeActions, entry: IntakeEntry) {
       signingIn = false
       session.signIn(entry, user, password)
     })
+    QualityPicker(entry)
     LanesPreview(actions, entry)
+  }
+}
+
+/** The variants of a stream, best first, of which the row downloads the one chosen. */
+@Composable
+private fun QualityPicker(entry: IntakeEntry) {
+  val variants = entry.variants
+  if (variants.isEmpty()) return
+  val chosen = entry.variant
+  Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {
+    KetchEyebrow(stringResource(Res.string.intake_quality))
+    Column(Modifier.selectableGroup()) {
+      variants.forEach { variant ->
+        KetchRadio(
+          selected = variant == chosen,
+          onClick = { entry.selectedVariant = variant.id },
+          label = variant.name,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
+    }
   }
 }
 

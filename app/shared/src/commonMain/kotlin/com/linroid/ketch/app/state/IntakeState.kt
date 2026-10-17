@@ -250,6 +250,9 @@ class IntakeEntry internal constructor(source: IntakeSource) {
   /** Ids of the torrent files to download; `null` until the file list arrives. */
   var selectedFiles: Set<String>? by mutableStateOf(null)
 
+  /** Id of the stream variant chosen among [variants]; `null` keeps the first, the best. */
+  var selectedVariant: String? by mutableStateOf(null)
+
   internal var job: Job? = null
   internal var wanted: Boolean = false
 
@@ -275,12 +278,26 @@ class IntakeEntry internal constructor(source: IntakeSource) {
 
   /**
    * The files of a torrent with several, once its file list arrived; otherwise empty. A stream's
-   * variants, a single choice, are not picked here: it downloads the best, and the inspector's
-   * Files tab switches to another.
+   * variants, a single choice, are [variants].
    */
   val files: List<SourceFile>
     get() = resolved?.takeIf { it.selectionMode == FileSelectionMode.MULTIPLE }?.files
       ?.takeIf { it.size > 1 }.orEmpty()
+
+  /**
+   * The variants of a stream with several, best first, such as an HLS master's qualities, of
+   * which the row downloads one; otherwise empty.
+   */
+  val variants: List<SourceFile>
+    get() = resolved?.takeIf { it.selectionMode == FileSelectionMode.SINGLE }?.files
+      ?.takeIf { it.size > 1 }.orEmpty()
+
+  /** The variant the row downloads: the [selectedVariant] while listed, else the first. */
+  val variant: SourceFile?
+    get() {
+      val all = variants
+      return all.firstOrNull { it.id == selectedVariant } ?: all.firstOrNull()
+    }
 
   /** The link the row stands for: a range's first link, or a file's resolved `torrent:` id. */
   val url: String?
@@ -1440,12 +1457,13 @@ class IntakeSession internal constructor(
       else -> emptyMap()
     }.let { if (TaskOrigin.PROPERTY in it) it else it + (TaskOrigin.PROPERTY to TaskOrigin.App.id) }
     val selection = entry.selectedFiles
-    val selectedIds = if (entry.files.isEmpty() || selection == null ||
-      selection.size == entry.files.size
-    ) {
-      emptySet()
-    } else {
-      selection
+    val variant = entry.variant
+    val selectedIds = when {
+      // The first variant is the source's default, so a request names only another.
+      variant != null -> if (variant == entry.variants.first()) emptySet() else setOf(variant.id)
+      entry.files.isEmpty() || selection == null || selection.size == entry.files.size ->
+        emptySet()
+      else -> selection
     }
     // A link added anyway before its files were known, such as a magnet still looking for its
     // file list, waits for a choice on devices that can, should it turn out to have several

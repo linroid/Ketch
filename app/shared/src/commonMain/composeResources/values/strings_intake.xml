@@ -222,6 +222,7 @@
   <string name="intake_user_name">User name</string>
   <string name="intake_password">Password</string>
   <string name="intake_connections">Connections</string>
+  <string name="intake_quality">Quality</string>
 
   <!-- The Options pill and its popover. -->
   <string name="intake_options">Options</string>

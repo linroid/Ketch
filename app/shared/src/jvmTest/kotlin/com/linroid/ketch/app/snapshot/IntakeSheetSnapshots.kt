@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolveInput
@@ -80,6 +81,13 @@ class IntakeSheetSnapshots {
   fun torrent_desktopAndPhone_showsTheFilePicker() {
     intakeSnapshots("intake-torrent", DESKTOP_AND_PHONE, resolve = ::problemResolve) {
       state.openIntake(IntakeRequest(MAGNET))
+    }
+  }
+
+  @Test
+  fun stream_desktopAndPhone_showsTheQualityPicker() {
+    intakeSnapshots("intake-stream", DESKTOP_AND_PHONE, resolve = ::streamResolve) {
+      state.openIntake(IntakeRequest(STREAM))
     }
   }
 
@@ -313,6 +321,7 @@ private val DESKTOP_ONLY = listOf(SnapshotSize.Desktop)
 private const val MAGNET =
   "magnet:?xt=urn:btih:3f2a91c0d4b5e6f708192a3b4c5d6e7f8091a2b3&dn=Big.Buck.Bunny"
 private const val KERNEL = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz"
+private const val STREAM = "https://media.example.com/films/sintel/master.m3u8"
 private const val CLIP = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg"
 
 private val CURL = """
@@ -370,6 +379,25 @@ private suspend fun problemResolve(url: String): ResolvedSource = when {
   "part" in url -> readyResolve(url).copy(totalBytes = 1_181_116_006)
   else -> readyResolve(url).copy(totalBytes = 2_754_981_888)
 }
+
+/** An HLS master with its variants, best first, as the HLS source resolves one. */
+private fun streamResolve(url: String): ResolvedSource = ResolvedSource(
+  url = url,
+  sourceType = "hls",
+  totalBytes = -1,
+  supportsResume = false,
+  suggestedFileName = "master.mp4",
+  maxSegments = 1,
+  files = listOf(
+    Triple("3fa1c2", "1080p · 5.1 Mbps", "1920x1080"),
+    Triple("9b04e7", "720p · 2.8 Mbps", "1280x720"),
+    Triple("51d8a0", "480p · 1.2 Mbps", "854x480"),
+    Triple("c06e19", "360p · 640 kbps", "640x360"),
+  ).map { (id, name, resolution) ->
+    SourceFile(id, name, metadata = mapOf("resolution" to resolution))
+  },
+  selectionMode = FileSelectionMode.SINGLE,
+)
 
 private fun torrent(url: String): ResolvedSource {
   val files = buildList {
