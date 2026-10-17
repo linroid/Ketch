@@ -788,21 +788,20 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   discovery (v1, and v2 as `PeerOrigin.EXPLICIT` in the swarm they answered in)
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or no
   verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
-  back after a gap once none of it can be thrown away, once until the next piece; time waiting on
-  speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
+  back after a gap once some of it is kept, once until the next piece; time waiting on speed
+  limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
   peer or running web seed has and every stopped one could not serve, a seed started again
   counting as stopped until it answers (`WebSeedWorker.unproven`) and one dropped again once
   started again without answering aside until a later relaunch finds it answering, and their
   files, kept 10 s after the last source leaves;
   no peers, all choking, whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
-  seed payload thrown away (`WebSeedStats.wasted`), as it may be until its piece is stored
-  (`WebSeedStats.unsettled`, `StallSignals`), is split by when it arrived, a failed run's bytes
-  taken as the last it received (`WebSeedStats.checked`, `recentWastedBytes`): what arrived since
-  the last check is none of that check's payload, whatever else it brought, and the rest takes back
-  as much from the checks before whose payload may still be thrown away, newest first; a gap is
-  told from any payload, so payload thrown away never makes the next look back after one. After a
-  minute it
+  seed payload thrown away (`WebSeedStats.wasted`), as it may be until its piece is stored, is
+  taken back from the checks that counted it and no other: workers tally each part's bytes by the
+  checks before they arrived (`WebSeedArrivals`), and each check gets the bytes since the last and
+  what was stored or thrown away of earlier ones (`WebSeedStats.checked`, `WebSeedLedger`); a gap
+  is told from any payload, so payload thrown away never makes the next look back after one. After
+  a minute it
   reannounces to trackers (5, 10, up to 30 minutes apart), revives peers it gave up on, and after
   two minutes relaunches dropped web seeds. The inspector says why
   (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
