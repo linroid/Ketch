@@ -794,11 +794,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   files, kept 10 s after the last source leaves;
   no peers, all choking, whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
-  seed payload thrown away (`WebSeedStats.wasted`) takes back the checks before that counted it, as
-  it may be until its piece is stored (`WebSeedStats.unsettled`, `StallSignals`), and the check
-  that finds it counts only the rest of what it brought, such as the next piece's first bytes; a
-  gap is told from any payload, so payload thrown away never makes the next look back after one.
-  After a minute it
+  seed payload thrown away (`WebSeedStats.wasted`), as it may be until its piece is stored
+  (`WebSeedStats.unsettled`, `StallSignals`), is split by when it arrived, a failed run's bytes
+  taken as the last it received (`WebSeedStats.checked`, `recentWastedBytes`): what arrived since
+  the last check is none of that check's payload, whatever else it brought, and the rest takes back
+  as much from the checks before whose payload may still be thrown away, newest first; a gap is
+  told from any payload, so payload thrown away never makes the next look back after one. After a
+  minute it
   reannounces to trackers (5, 10, up to 30 minutes apart), revives peers it gave up on, and after
   two minutes relaunches dropped web seeds. The inspector says why
   (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
