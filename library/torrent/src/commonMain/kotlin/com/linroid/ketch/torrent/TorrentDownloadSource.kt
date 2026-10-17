@@ -422,9 +422,10 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Stops the seeding sessions side by side, each once it saved its state, as no download run
-   * saves it: within [SHUTDOWN_SAVE_MS], so a session that cannot save never holds the rest up.
-   * Pausing a session sends its `stopped` announces.
+   * Stops the seeding sessions side by side, each pausing first, which sends its `stopped`
+   * announces, so a slow save never uses up the window they share, then saving its state, with
+   * the final counters, as no download run saves it: within [SHUTDOWN_SAVE_MS], so a session
+   * that cannot save never holds the rest up.
    */
   private suspend fun stopSeeders() {
     val watched = stateMutex.withLock {
@@ -438,15 +439,15 @@ class TorrentDownloadSource(
     coroutineScope {
       for (taskId in watched.keys + bases.keys) launch {
         val session = tasks.session(taskId) ?: return@launch
-        bases[taskId]?.let { base ->
-          withTimeoutOrNull(SHUTDOWN_SAVE_MS) { saveSeedingState(taskId, session, base) }
-        }
         try {
           session.pause()
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
           log.w { "Torrent taskId=$taskId did not stop seeding: ${e.describeCauses()}" }
+        }
+        bases[taskId]?.let { base ->
+          withTimeoutOrNull(SHUTDOWN_SAVE_MS) { saveSeedingState(taskId, session, base) }
         }
       }
     }

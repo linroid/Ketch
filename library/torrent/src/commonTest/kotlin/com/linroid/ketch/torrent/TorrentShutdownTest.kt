@@ -36,6 +36,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -242,6 +243,24 @@ class TorrentShutdownTest {
       val seeder = assertNotNull(store.load("seeder")?.sourceState)
       assertTrue(source.decodeState(seeder).resumeData.isNotEmpty())
     }
+
+  @Test
+  fun shutdown_seederSavingSlowly_stillAnnouncesStoppedInTheWindow() {
+    val saved = CompletableDeferred<Pair<String, SourceState>>()
+    shutdownTest(download = false, beforeShutdown = { source ->
+      // A busy disk: saving the seeder's checkpoint takes longer than the whole window.
+      source.saveSessionStates { taskId, state ->
+        delay(2_500)
+        saved.complete(taskId to state)
+      }
+    }) {
+      assertStoppedInWindow(SEED_TRACKER)
+      // It still saved, once it had said goodbye.
+      val (taskId, state) = saved.await()
+      assertEquals("seeder", taskId)
+      assertTrue(source.decodeState(state).resumeData.isNotEmpty())
+    }
+  }
 
   /** A completed one-file task of a torrent named [name], to seed, and its info hash. */
   private fun seedingTask(name: String): Pair<SeedingTask, String> {
