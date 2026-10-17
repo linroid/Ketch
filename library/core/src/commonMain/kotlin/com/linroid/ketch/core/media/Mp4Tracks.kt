@@ -148,8 +148,9 @@ private class InitSegment(
 
 /**
  * Rewrites one media segment of a separate track as the bytes arrive: keeps its movie fragments
- * (`moof`) and their media data (`mdat`), drops every other box (`styp`, `sidx`, `emsg`, ...),
- * and gives each fragment [trackId] and the next sequence number from [nextSequence]. A fragment
+ * (`moof`), their media data (`mdat`) and any box between the two, as sample offsets relative to
+ * the fragment count those, drops every other box (`styp`, `sidx`, `emsg`, ...), and gives each
+ * fragment [trackId] and the next sequence number from [nextSequence]. A fragment
  * that names an absolute base data offset gets one in the output file.
  *
  * @param sourceStart where the segment's first byte lies in the file it was fetched from
@@ -170,6 +171,8 @@ internal class FragmentRewriter(
   private var boxStart = 0L
   private var moof: Buffer = Buffer()
   private var fragments = 0
+  // Between a fragment and its media data, where every box is kept.
+  private var awaitingData = false
 
   private enum class Mode { Header, Fragment, Data, Skip }
 
@@ -244,6 +247,7 @@ internal class FragmentRewriter(
         if (remaining == 0L) emitFragment(out).also { mode = Mode.Header }
       }
       "mdat" -> {
+        awaitingData = false
         out.write(header, 0, headerLength)
         emitted += headerLength
         remaining = if (size == -1L) Long.MAX_VALUE else size - headerLength
@@ -252,7 +256,15 @@ internal class FragmentRewriter(
       else -> {
         require(size != -1L) { "Invalid MP4 box size" }
         remaining = size - headerLength
-        mode = if (remaining == 0L) Mode.Header else Mode.Skip
+        if (awaitingData) {
+          out.write(header, 0, headerLength)
+          emitted += headerLength
+        }
+        mode = when {
+          remaining == 0L -> Mode.Header
+          awaitingData -> Mode.Data
+          else -> Mode.Skip
+        }
       }
     }
   }
@@ -280,6 +292,7 @@ internal class FragmentRewriter(
     out.write(bytes)
     emitted += bytes.size
     fragments++
+    awaitingData = true
   }
 
   private companion object {

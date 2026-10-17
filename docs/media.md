@@ -142,9 +142,15 @@ own. Without these modules, Ketch downloads `.m3u8` and `.mpd` URLs as ordinary 
   `download.awaitFileSelection`, as their variants are a single choice.
 - **Variants**: `ResolvedSource.files` lists them best first with `selectionMode`
   `FileSelectionMode.SINGLE` (empty for a stream with one), each with `bandwidth` and, when the
-  manifest says, `resolution`, `codecs`, `frameRate` and `audio` in its metadata. IDs are their
-  places in that order, so a download whose manifest no longer lists the same bandwidth under the
-  chosen ID fails rather than download another quality. Sizes are unknown (`-1`).
+  manifest says, `resolution`, `codecs`, `frameRate` and `audio` in its metadata. IDs are short
+  hashes of what identifies each variant in the manifest (an HLS variant's URL path without its
+  query, bandwidth, resolution, codecs and audio group; a DASH representation's and its adaptation
+  set's `id`, bandwidth and size), so they survive a refreshed or re-signed manifest, also on a
+  resumed download. A chosen ID the manifest no longer lists fails the download rather than
+  download another quality. Sizes are unknown (`-1`).
+- **Containers**: the file is named for the best variant's container. Choosing a variant in
+  another container (a TS variant in a master whose best variant is fragmented MP4) fails rather
+  than write it under the wrong extension, unless the destination is a file you named.
 - **Redirects**: relative references resolve against the manifest's final URL. A custom
   `HttpEngine` that follows redirects must override `downloadResource` and return the final URL.
   `KtorHttpEngine` and the network engines do.

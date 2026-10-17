@@ -39,10 +39,15 @@ internal object Mp4Fixtures {
 
   /**
    * A media segment: `styp`, `sidx`, then one fragment whose `tfhd` names [trackId] and, when
-   * given, the absolute [baseDataOffset], and its `mdat` of [payload].
+   * given, the absolute [baseDataOffset], then [beforeData] and its `mdat` of [payload].
    */
-  fun segment(trackId: Int, sequence: Int, payload: String, baseDataOffset: Long? = null):
-    ByteArray {
+  fun segment(
+    trackId: Int,
+    sequence: Int,
+    payload: String,
+    baseDataOffset: Long? = null,
+    beforeData: ByteArray = ByteArray(0),
+  ): ByteArray {
     val tfhd = full("tfhd", if (baseDataOffset != null) 0x1 else 0x020000) {
       writeInt(trackId)
       baseDataOffset?.let { writeLong(it) }
@@ -50,6 +55,6 @@ internal object Mp4Fixtures {
     val moof = box("moof", full("mfhd", 0) { writeInt(sequence) },
       box("traf", tfhd, full("trun", 0) { writeInt(0) }))
     return box("styp", "msdh".encodeToByteArray()) + box("sidx", ByteArray(12)) + moof +
-      box("mdat", payload.encodeToByteArray())
+      beforeData + box("mdat", payload.encodeToByteArray())
   }
 }

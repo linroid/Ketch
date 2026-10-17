@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.media
 
+import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
@@ -97,6 +98,20 @@ class MediaDownloadHelperTest {
   }
 
   @Test
+  fun download_otherContainerThanTheChosenName_isRefusedUnlessTheUserNamedIt() = runTest {
+    val engine = PartsEngine(mapOf("https://example.com/a.ts" to "ts".encodeToByteArray()))
+    val plan = MediaPlan(listOf(MediaPart("https://example.com/a.ts")), "ts")
+    val helper = MediaDownloadHelper(engine, "hls")
+    assertFailsWith<KetchError.SourceError> {
+      helper.download(context(MemoryFile(), outputPath = "/downloads/index.mp4"), plan)
+    }
+    val file = MemoryFile()
+    helper.download(context(file, outputPath = "/downloads/index.mp4",
+      destination = Destination("/downloads/index.mp4")), plan)
+    assertEquals("ts", file.bytes.decodeToString())
+  }
+
+  @Test
   fun downloadFollowingSelection_newVariant_restartsAndAcknowledges() = runTest {
     val started = CompletableDeferred<Unit>()
     val engine = PartsEngine(mapOf(
@@ -156,10 +171,13 @@ class MediaDownloadHelperTest {
     headers: Map<String, String> = emptyMap(),
     selection: MutableStateFlow<SelectionUpdate> =
       MutableStateFlow(SelectionUpdate(emptySet(), 0)),
+    outputPath: String? = null,
+    destination: Destination? = null,
   ) = DownloadContext(
     taskId = "media",
     url = "https://example.com/index.m3u8",
-    request = DownloadRequest("https://example.com/index.m3u8"),
+    request = DownloadRequest("https://example.com/index.m3u8", destination = destination),
+    outputPath = outputPath,
     fileAccessor = file,
     segments = MutableStateFlow(emptyList()),
     onProgress = { _, _ -> },

@@ -46,7 +46,9 @@ class HlsPlaylistTest {
       media.replace("#EXTINF", "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"key\"\n#EXTINF"),
       media.replace("#EXTINF", "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://k\"," +
         "KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXTINF"),
-      media.replace("#EXTINF", "#EXT-X-KEY:METHOD=AES-128,URI=\"key\",IV=0x12\n#EXTINF"),
+      media.replace("#EXTINF", "#EXT-X-KEY:METHOD=AES-128,URI=\"key\",IV=0x12G4\n#EXTINF"),
+      media.replace("#EXTINF",
+        "#EXT-X-KEY:METHOD=AES-128,URI=\"key\",IV=0x${"1".repeat(33)}\n#EXTINF"),
       media.replace("#EXTINF", "#EXT-X-DISCONTINUITY\n#EXTINF"),
       media.replace("a.ts", "file:///etc/passwd"),
       media.replace("a.ts", "http://example.com/a.ts"),
@@ -78,6 +80,9 @@ class HlsPlaylistTest {
       "https://example.com/media/k2", null), plan.parts.map { it.key?.url })
     assertEquals(listOf(7, 8), plan.parts.take(2).map { it.key!!.iv.last().toInt() })
     assertEquals((0..15).toList(), plan.parts[2].key!!.iv.map { it.toInt() })
+    val short = parseHls("#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"k\",IV=0x1\n#EXTINF:1,\na.ts\n" +
+      "#EXT-X-ENDLIST", base).plan!!
+    assertEquals(List(15) { 0 } + 1, short.parts.single().key!!.iv.map { it.toInt() })
     assertEquals(listOf(0.0, 2.0, 4.0, 6.0), plan.parts.map { it.startSeconds })
   }
 

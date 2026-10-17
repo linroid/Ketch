@@ -218,10 +218,13 @@ internal fun parseHls(text: String, base: String): HlsPlaylist {
   return HlsPlaylist(MediaPlan(parts, extension), emptyList())
 }
 
+/** A 128-bit IV written as a hexadecimal sequence of any width up to 32 digits, per RFC 8216. */
 private fun hlsIv(value: String): ByteArray {
-  val hex = value.removePrefix("0x").removePrefix("0X")
-  mediaRequire(hex.length == 32 && hex.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' },
-    "Invalid HLS key IV")
+  mediaRequire(value.startsWith("0x") || value.startsWith("0X"), "Invalid HLS key IV")
+  val digits = value.drop(2)
+  mediaRequire(digits.length in 1..32 &&
+    digits.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }, "Invalid HLS key IV")
+  val hex = digits.padStart(32, '0')
   return ByteArray(16) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 }
 

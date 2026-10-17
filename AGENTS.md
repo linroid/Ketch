@@ -587,15 +587,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SAMPLE-AES`, non-`identity` key formats, DASH `ContentProtection`) and separate audio for
   MPEG-TS/AAC/MP3 HLS are rejected; see [media support and limits](docs/media.md)
 - Quality: a stream with several HLS variants or DASH video representations resolves them as a
-  `FileSelectionMode.SINGLE` choice (`ResolvedSource.files`, best first: video before
-  audio-only, then by declared bandwidth; IDs are positions, each with `bandwidth`,
-  `resolution`, `codecs`, `frameRate`, `audio` metadata; sizes -1), so both sources list
-  `download.fileSelection` and `download.awaitFileSelection`. `MediaDownloadHelper.chosenVariant`
-  fails a download whose manifest no longer lists the chosen ID's bandwidth (from
-  `preResolved`), and `downloadFollowingSelection` restarts the transfer with a variant selected
-  while it runs, acknowledging each revision as it plans it. The add sheet does not pick
-  variants (`IntakeEntry.files` leaves single choices out): it downloads the best, and the
-  inspector's Files tab switches
+  `FileSelectionMode.SINGLE` choice (`ResolvedSource.files`, best first: video before audio-only,
+  then by declared bandwidth; IDs are `mediaVariantIds` hashes of each variant's manifest identity,
+  kept across refreshed or re-signed manifests and resumes, each with `bandwidth`, `resolution`,
+  `codecs`, `frameRate`, `audio` metadata; sizes -1), so both sources list `download.fileSelection`
+  and `download.awaitFileSelection`. `MediaDownloadHelper.chosenVariant` fails a download whose
+  manifest no longer lists the chosen ID (or, from `preResolved`, its bandwidth); `download` refuses
+  a plan whose container differs from the output name Ketch chose (not a file `Destination`); and
+  `downloadFollowingSelection` restarts the transfer with a variant selected while it runs,
+  acknowledging each revision as it plans it. The add sheet does not pick variants
+  (`IntakeEntry.files` leaves single choices out): it downloads the best, and the inspector's Files
+  tab switches
 - Separate tracks: an HLS variant's `AUDIO` group rendition with a `URI` (the `DEFAULT`, else
   `AUTOSELECT`, else first) and a DASH presentation's main audio adaptation set (`Role` `main`,
   else first; text and image sets are ignored) are merged with the video when both are

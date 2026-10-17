@@ -12,6 +12,7 @@ import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.media.MediaDownloadHelper
 import com.linroid.ketch.core.media.MediaVariant
+import com.linroid.ketch.core.media.mediaVariantIds
 import com.linroid.ketch.core.media.mediaVariantNames
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.serializer
@@ -73,8 +74,9 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     val names = mediaVariantNames(stream.variants.map { it.height }, stream.variants.map {
       it.bandwidth
     })
+    val ids = mediaVariantIds(stream.variants.map { it.key })
     return stream.variants.mapIndexed { index, variant ->
-      MediaVariant(index.toString(), names[index], variant.bandwidth, variant.metadata)
+      MediaVariant(ids[index], names[index], variant.bandwidth, variant.metadata)
     }
   }
 }

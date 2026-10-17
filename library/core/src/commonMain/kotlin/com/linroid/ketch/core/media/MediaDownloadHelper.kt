@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
+import com.linroid.ketch.api.isFile
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
@@ -43,6 +44,7 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     const val BANDWIDTH_KEY: String = "bandwidth"
 
     private const val MAX_INIT_BYTES = 4L * 1024 * 1024
+    private val MEDIA_EXTENSIONS = setOf("ts", "aac", "mp3", "mp4")
   }
 
   /**
@@ -157,6 +159,15 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     mediaRequire(expected == null || expected == plan.extension ||
       (variant != null && selected != null && selected != variant),
       "Media format changed; add it again")
+    // A name Ketch chose ends with the container of the variant it was resolved for, so another
+    // variant in another container must not be written under it. A file the user named is theirs.
+    val named = context.request.destination?.isFile() != true
+    val chosenExtension = context.outputPath?.substringAfterLast('/')?.substringAfterLast('\\')
+      ?.substringAfterLast('.', "")?.lowercase()
+    mediaRequire(
+      !named || chosenExtension !in MEDIA_EXTENSIONS || chosenExtension == plan.extension,
+      "This quality is a .${plan.extension} stream, not .$chosenExtension; add it again for it",
+    )
     mediaRequire(plan.tracks in 1..2, "Unsupported media tracks")
     val engine = http.through(context.config.proxy)
     context.segments.value = emptyList()

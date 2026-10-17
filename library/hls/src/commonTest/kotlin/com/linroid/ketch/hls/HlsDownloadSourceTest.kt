@@ -152,9 +152,9 @@ class HlsDownloadSourceTest {
     assertEquals(FileSelectionMode.SINGLE, resolved.selectionMode)
     assertEquals(listOf("1080p · 5.0 Mbps", "720p · 2.5 Mbps", "480p · 1.0 Mbps"),
       resolved.files.map { it.name })
-    assertEquals(listOf("0", "1", "2"), resolved.files.map { it.id })
+    assertEquals(3, resolved.files.map { it.id }.toSet().size)
     assertEquals("1920x1080", resolved.files[0].metadata["resolution"])
-    assertEquals("0", resolved.metadata[MediaDownloadHelper.VARIANT_KEY])
+    assertEquals(resolved.files[0].id, resolved.metadata[MediaDownloadHelper.VARIANT_KEY])
     assertTrue(KetchFeatures.FILE_SELECTION in HlsDownloadSource(MasterEngine()).features)
   }
 
@@ -163,7 +163,7 @@ class HlsDownloadSourceTest {
     val engine = MasterEngine()
     val source = HlsDownloadSource(engine)
     val resolved = source.resolve(MasterEngine.URL)
-    val request = DownloadRequest(MasterEngine.URL, selectedFileIds = setOf("2"))
+    val request = DownloadRequest(MasterEngine.URL, selectedFileIds = setOf(resolved.files[2].id))
     val file = MemoryFile()
     source.download(DownloadContext("t", MasterEngine.URL, request, file,
       MutableStateFlow(emptyList()), { _, _ -> }, {}, emptyMap(), preResolved = resolved), null)
@@ -179,6 +179,22 @@ class HlsDownloadSourceTest {
       source.download(DownloadContext("t", MasterEngine.URL, request, MemoryFile(),
         MutableStateFlow(emptyList()), { _, _ -> }, {}, emptyMap(), preResolved = stale), null)
     }
+  }
+
+  @Test
+  fun resolve_reorderedOrSignedAgain_keepsEachVariantsId() = runTest {
+    val first = HlsDownloadSource(MasterEngine()).resolve(MasterEngine.URL)
+    val master = MasterEngine().manifests.getValue(MasterEngine.URL)
+    val lines = master.lines()
+    // The 1080p variant first, and every variant URL signed anew.
+    val refreshed = (listOf(lines[0]) + lines.subList(3, 5) + lines.subList(1, 3) + lines.drop(5))
+      .joinToString("\n") { if (it.endsWith(".m3u8")) "$it?token=new" else it }
+    val engine = MasterEngine(MasterEngine().manifests.mapKeys { (url, _) ->
+      if (url == MasterEngine.URL) url else "$url?token=new"
+    } + (MasterEngine.URL to refreshed))
+    val second = HlsDownloadSource(engine).resolve(MasterEngine.URL)
+    assertEquals(first.files.associate { it.name to it.id },
+      second.files.associate { it.name to it.id })
   }
 
   @Test
@@ -214,7 +230,8 @@ class HlsDownloadSourceTest {
     val resolved = source.resolve(MasterEngine.URL)
     fun request(ids: Set<String>) =
       SelectionRequest<Unit>("t", ids, emptySet(), null, resolved, null, null, false)
-    assertEquals(setOf("1"), source.planSelection(request(setOf("1"))).fileIds)
+    val id = resolved.files[1].id
+    assertEquals(setOf(id), source.planSelection(request(setOf(id))).fileIds)
     assertFailsWith<IllegalArgumentException> { source.planSelection(request(setOf("7"))) }
   }
 

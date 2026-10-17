@@ -69,6 +69,16 @@ class Mp4TracksTest {
   }
 
   @Test
+  fun fragmentRewriter_boxBetweenFragmentAndData_isKeptForSampleOffsets() {
+    val free = Mp4Fixtures.box("free", ByteArray(5))
+    val input = segment(trackId = 1, sequence = 1, payload = "samples", beforeData = free)
+    val rewriter = FragmentRewriter(1, { 1 }, sourceStart = 0, outputStart = 0)
+    val out = rewriter.update(input)
+    rewriter.finish()
+    assertEquals(listOf("moof", "free", "mdat"), mp4Boxes(out).map { it.type })
+  }
+
+  @Test
   fun fragmentRewriter_absoluteBaseOffset_pointsIntoTheOutput() {
     // The fragment's media lies 100 bytes into a file of which the segment starts at 5000.
     val plain = segment(trackId = 1, sequence = 1, payload = "x", baseDataOffset = 0)
@@ -115,6 +125,13 @@ class Mp4TracksTest {
     assertFailsWith<IllegalArgumentException> {
       mergeTracks(MediaPlan(listOf(MediaPart("https://a/1.ts")), "ts"), plan("a", listOf(0.0)))
     }
+  }
+
+  @Test
+  fun mediaVariantIds_followTheKeysNotTheirOrder() {
+    val ids = mediaVariantIds(listOf("a|1", "b|2", "a|1"))
+    assertEquals(ids[0] + "-2", ids[2])
+    assertEquals(mediaVariantIds(listOf("b|2", "a|1")), listOf(ids[1], ids[0]))
   }
 
   @Test

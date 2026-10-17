@@ -1,5 +1,7 @@
 package com.linroid.ketch.core.media
 
+import com.linroid.ketch.core.digest.sha256Digest
+
 /**
  * One initialization or media segment, with an optional inclusive byte range.
  *
@@ -47,7 +49,7 @@ data class MediaPlan(val parts: List<MediaPart>, val extension: String, val trac
 /**
  * One choice of a stream offering several, such as an HLS variant or a DASH representation.
  *
- * @property id unique within the manifest, stable while it does not change
+ * @property id unique within the manifest and kept when it is refreshed ([mediaVariantIds])
  * @property name what users see, such as `1080p · 5.1 Mbps`
  * @property bandwidth bits per second the manifest declares
  * @property metadata values for [com.linroid.ketch.api.SourceFile.metadata], such as
@@ -92,6 +94,22 @@ fun mergeTracks(video: MediaPlan, audio: MediaPlan): MediaPlan {
     extension = "mp4",
     tracks = 2,
   )
+}
+
+/**
+ * IDs for variants from what identifies each in its manifest ([keys], such as its URL path and
+ * attributes, never a signed query), so a refreshed manifest that reorders or adds variants keeps
+ * each one's ID. Keys that repeat get a number.
+ */
+fun mediaVariantIds(keys: List<String>): List<String> {
+  val seen = mutableMapOf<String, Int>()
+  return keys.map { key ->
+    val id = sha256Digest(key.encodeToByteArray()).take(6)
+      .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+    val count = (seen[id] ?: 0) + 1
+    seen[id] = count
+    if (count == 1) id else "$id-$count"
+  }
 }
 
 /**

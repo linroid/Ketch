@@ -17,6 +17,7 @@ import com.linroid.ketch.core.media.MediaPlan
 import com.linroid.ketch.core.media.MediaVariant
 import com.linroid.ketch.core.media.mediaHeaders
 import com.linroid.ketch.core.media.mediaUrl
+import com.linroid.ketch.core.media.mediaVariantIds
 import com.linroid.ketch.core.media.mediaVariantNames
 import com.linroid.ketch.core.media.mergeTracks
 import kotlinx.serialization.KSerializer
@@ -123,9 +124,14 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
       variant.attributes["RESOLUTION"]?.substringAfter('x', "")?.toIntOrNull()
     }
     val names = mediaVariantNames(heights, ranked.map { it.bandwidth })
+    val ids = mediaVariantIds(ranked.map { variant ->
+      listOf(variant.url.substringBefore('?'), variant.bandwidth.toString(),
+        variant.attributes["RESOLUTION"], variant.attributes["CODECS"], variant.audioGroup)
+        .joinToString("|")
+    })
     return ranked.mapIndexed { index, variant ->
       MediaVariant(
-        id = index.toString(),
+        id = ids[index],
         name = names[index],
         bandwidth = variant.bandwidth,
         metadata = buildMap {

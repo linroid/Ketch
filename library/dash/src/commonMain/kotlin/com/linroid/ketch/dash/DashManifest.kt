@@ -7,8 +7,12 @@ import com.linroid.ketch.core.media.mediaUrl
 import com.linroid.ketch.core.media.mergeTracks
 import kotlin.math.ceil
 
-/** A representation to choose: its declared [bandwidth], picture [height] and [plan]. */
+/**
+ * A representation to choose: its declared [bandwidth], picture [height] and [plan], and the
+ * [key] that identifies it in the manifest (its adaptation set's and its own `id`).
+ */
 internal class DashRepresentation(
+  val key: String,
   val bandwidth: Long,
   val height: Int?,
   val metadata: Map<String, String>,
@@ -60,6 +64,8 @@ internal fun parseDashStream(text: String, url: String): DashStream {
         ?.toIntOrNull()
       val width = representation.attributes["width"] ?: adaptation.attributes["width"]
       DashRepresentation(
+        key = listOf(adaptation.attributes["id"], representation.attributes["id"],
+          representation.attributes["bandwidth"], width, height).joinToString("|"),
         bandwidth = representation.attributes["bandwidth"]?.toLongOrNull() ?: 0,
         height = height,
         metadata = buildMap {
