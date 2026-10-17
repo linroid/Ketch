@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.engine
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.magnet.cacheWeight
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
+import com.linroid.ketch.torrent.metainfo.requireSupportedPieceLength
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.TorrentV2Checkpoint
 import kotlin.concurrent.atomics.AtomicReference
@@ -107,10 +108,8 @@ internal fun admitV2Session(
     selectedCount in 0..config.maxFilesPerTorrent) {
     fileLimitExceeded(document.info.files.size, config)
   }
-  require(document.info.pieceLength <= MAX_PIECE_LENGTH) {
-    "The torrent's pieces are ${document.info.pieceLength / MIB} MiB, larger than the " +
-      "${MAX_PIECE_LENGTH / MIB} MiB Ketch supports"
-  }
+  // New inputs were refused when they resolved; a task saved before then is refused here.
+  requireSupportedPieceLength(document.info.pieceLength)
   var pieces = 0L
   for (file in document.info.files) {
     val count = file.length / document.info.pieceLength +
@@ -136,9 +135,6 @@ internal fun admitV2Session(
 }
 
 private const val MIB = 1024 * 1024
-
-/** The largest piece a v2 or hybrid torrent may have: each is assembled in memory. */
-private const val MAX_PIECE_LENGTH = 16 * MIB
 
 private fun fileLimitExceeded(files: Int, config: TorrentConfig) =
   "The torrent has $files files, more than the ${config.maxFilesPerTorrent} Ketch accepts"

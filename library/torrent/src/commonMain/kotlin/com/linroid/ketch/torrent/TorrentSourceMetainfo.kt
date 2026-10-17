@@ -9,6 +9,7 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.isDiskComponent
+import com.linroid.ketch.torrent.metainfo.requireSupportedPieceLength
 import com.linroid.ketch.torrent.storage.TorrentOutputMapping
 import com.linroid.ketch.torrent.tracker.TrackerConfiguration
 import kotlinx.coroutines.sync.Mutex
@@ -17,16 +18,18 @@ import okio.ByteString.Companion.toByteString
 import okio.Path
 
 /**
- * Validates the format before dispatch so hybrid content never falls back to v1 parsing. With
- * [checkDiscovery], for new inputs, it refuses a torrent that could never find a peer
- * ([requireDiscoverable]); a saved task's metainfo is read whatever it holds.
+ * Validates the format before dispatch so hybrid content never falls back to v1 parsing. A
+ * [newInput] that Ketch could never download is refused: one that could never find a peer
+ * ([requireDiscoverable]) or whose pieces are larger than Ketch supports
+ * ([requireSupportedPieceLength]). A saved task's metainfo is read whatever it holds, and its
+ * pieces are refused when it starts.
  */
 internal fun resolveV2Metainfo(
   url: String?,
   bytes: ByteArray,
   config: TorrentConfig,
   privacy: TorrentDiscoveryPrivacy,
-  checkDiscovery: Boolean = true,
+  newInput: Boolean = true,
 ): ResolvedSource? {
   val envelope = Bencode.parse(bytes, config.maxMetadataBytes)
   val version = envelope["info"]?.get("meta version") ?: return null
@@ -34,7 +37,8 @@ internal fun resolveV2Metainfo(
   val document = TorrentV2Document.parse(bytes, maxDocumentBytes = config.maxMetadataBytes,
     maxFiles = config.maxFilesPerTorrent)
   val tiers = sourceTrackerTiers(bytes, config.maxMetadataBytes)
-  if (checkDiscovery) {
+  if (newInput) {
+    requireSupportedPieceLength(document.info.pieceLength)
     requireDiscoverable(document.info.privateTorrent, tiers, document.webSeeds, privacy)
   }
   val mapping = TorrentOutputMapping.from(document)
@@ -139,7 +143,7 @@ internal class TorrentFileTable(
     /** Parses [bytes] as v2 or hybrid metainfo first, then as v1. */
     fun parse(bytes: ByteArray, config: TorrentConfig): TorrentFileTable {
       resolveV2Metainfo(null, bytes, config, config.discoveryPrivacy,
-        checkDiscovery = false)?.let { resolved ->
+        newInput = false)?.let { resolved ->
         return TorrentFileTable(requireNotNull(resolved.metadata["infoHash"]), v2 = true,
           resolved.files.map { TorrentFileRow(it.id, it.name, it.size, it.name.split('/')) })
       }

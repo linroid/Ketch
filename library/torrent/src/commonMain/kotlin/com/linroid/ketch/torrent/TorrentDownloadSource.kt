@@ -1216,7 +1216,7 @@ class TorrentDownloadSource(
     val hash = requireNotNull(resolved.metadata[META_INFO_HASH])
     val bytes = decodeBase64(requireNotNull(resolved.metadata[ResolvedSource.METAINFO_KEY]))
     val v2 = resolveV2Metainfo(resolved.url, bytes, config, resolvedPrivacy(resolved),
-      checkDiscovery = false)
+      newInput = false)
     if (v2 != null) {
       require(v2.metadata[META_INFO_HASH] == hash) { "Resolved torrent hash mismatch" }
       executeV2(context, v2, previous)

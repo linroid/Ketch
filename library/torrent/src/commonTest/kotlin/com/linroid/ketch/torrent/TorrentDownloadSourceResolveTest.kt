@@ -278,6 +278,22 @@ class TorrentDownloadSourceResolveTest {
   }
 
   @Test
+  fun resolveContent_v2PiecesLargerThanSupported_refused() = runTest {
+    for (hybrid in listOf(false, true)) {
+      // Pieces of 32 MiB, which a v2 session never takes: refused before a task exists.
+      val content = TorrentV2Fixture.build(listOf("a.bin" to 40_000),
+        pieceLength = 32 * 1024 * 1024, hybrid = hybrid).metainfo
+      val error = assertFailsWith<KetchError.SourceError> {
+        source.resolve(ResolveInput.Content(content, "large.torrent"))
+      }
+      assertEquals("The torrent's pieces are 32 MiB, larger than the 16 MiB Ketch supports",
+        error.cause?.message)
+      // A task saved before then still reads; it is refused as it starts.
+      TorrentFileTable.parse(content, TorrentConfig())
+    }
+  }
+
+  @Test
   fun resolveMetainfo_trackerOnlyWithoutAUsableTracker_refused() {
     val metainfo = withTrackers(TorrentV2Fixture.build(listOf("a.bin" to 40_000)).metainfo,
       listOf(listOf("wss://tracker.test/announce")))
