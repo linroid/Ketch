@@ -599,8 +599,9 @@ This section describes the engine's protocol behavior for people who debug swarm
   are saved, so a restart reaches known nodes even where the bootstrap names do not resolve. Peers
   of public torrents exchange DHT ports (BEP 5 `PORT`), and Ketch pings the nodes they name, so the
   DHT starts from a tracker's peers even where no bootstrap router answers.
-- **Peer exchange** (BEP 11) for v1, v2 and hybrid public torrents. Ketch advertises its listen
-  port (BEP 10 `p`) and dials the port a peer announced, never an incoming peer's source port.
+- **Peer exchange** (BEP 11) for v1, v2 and hybrid public torrents. Ketch advertises the port a peer
+  reaches it on (BEP 10 `p`), its listen port to peers on its own networks and the port its router
+  forwards to others, and dials the port a peer announced, never an incoming peer's source port.
   Peers reached over uTP or with encryption are advertised with the matching BEP 11 flags.
 - **Hole punching** (BEP 55) for v1 public torrents. When two peers cannot reach each other,
   because both are behind routers or carrier-grade NAT, however many layers, a peer connected to
@@ -631,11 +632,13 @@ This section describes the engine's protocol behavior for people who debug swarm
   again every minute. A seeding torrent dials nobody back.
 - **One connection per peer**: a peer reached at two addresses, such as loopback from a magnet's
   `x.pe` and its LAN address from local discovery, or dialed while it dials Ketch, keeps one
-  connection, and both ends agree which: of two dialed the same way the first, otherwise the one
-  the side with the lower listen port dialed, as libtorrent decides. Peers are told apart by the
-  ID they claim and their host; addresses on this machine and its local networks count as one
-  host, while a public host claiming another peer's ID is a different peer. The address of the
-  connection closed is not dialed again for five minutes.
+  connection, and both ends agree which: of two dialed the same way the first, otherwise the one the
+  side with the lower listen port dialed, as libtorrent decides. Each side compares the port the
+  other reaches it on: its listen port for a peer on its own networks, the port its router forwards
+  for others, so they agree while a router forwards another port. Peers are told apart by the ID
+  they claim and their host; addresses on this machine and its local networks count as one host,
+  while a public host claiming another peer's ID is a different peer. The address of the connection
+  closed is not dialed again for five minutes.
 
 ### Encryption details
 

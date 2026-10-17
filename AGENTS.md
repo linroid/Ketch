@@ -817,13 +817,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   last dial. A revive dials every waiting or given-up endpoint at once and keeps its count; a
   stall without a single peer revives every minute (`LONELY_REVIVE_MS`), others every five. A
   complete swarm dials nobody back
-- One connection per peer, in v1 and v2 swarms (`PeerIdentity`): peers are told apart by the ID
-  they claim and their host, where loopback, private, link-local and unique local hosts count as
-  one (`localTorrentAddress`), as one client there is reached at several addresses (loopback
-  from `x.pe`, its LAN address from LSD); a public host claiming another's ID is another peer. Of
-  two connections of one direction the first stays; of opposite directions both ends keep the
-  one the side with the lower listen port dialed, else the higher peer ID's (`keepsOutgoing`, as
-  libtorrent decides), and a v1 worker it replaces ends at its next pass. The endpoint of the
+- One connection per peer, in v1 and v2 swarms (`PeerIdentity`): peers are told apart by the ID they
+  claim and their host, where loopback, private, link-local and unique local hosts count as one
+  (`localTorrentAddress`), as one client there is reached at several addresses (loopback from
+  `x.pe`, its LAN address from LSD); a public host claiming another's ID is another peer. Of two
+  connections of one direction the first stays; of opposite directions both ends keep the one the
+  side with the lower listen port dialed, else the higher peer ID's (`keepsOutgoing`, as libtorrent
+  decides), and a v1 worker it replaces ends at its next pass. The port each end compares is the one
+  the other reaches it on (`TorrentAdvertisedPort.portFor`, also the BEP 10 `p` it sends): the
+  listen port for a peer at a local address, which dials the address local discovery announces, else
+  the port a router maps, so both ends agree while a router maps another. The endpoint of the
   connection closed is given up until found again 5 minutes later (v1 `DuplicatePeerException`,
   `TorrentV2Candidates.duplicate`)
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
