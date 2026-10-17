@@ -999,8 +999,9 @@ internal class TorrentPieceScheduler(
 
     /**
      * The most blocks a peer holds in the endgame that other peers owe and are not late with
-     * while its rate is unknown or slow (256 KiB): few enough that copies arriving twice waste
-     * little. A faster peer holds more ([endgameCopies]).
+     * while its rate is unknown or slow (256 KiB), or as many as it keeps outstanding if that is
+     * fewer: few enough that copies arriving twice waste little. A faster peer holds more
+     * ([endgameCopies]).
      */
     const val ENDGAME_DUPLICATES = 16
 
@@ -1011,7 +1012,7 @@ internal class TorrentPieceScheduler(
      * The most blocks other peers owe on time that a peer receiving [bytesPerSecond] holds in the
      * endgame: about [ENDGAME_COPY_MS] of its rate, so a fast peer far away takes a slower or
      * stalled peer's queue over at its own pace rather than a few blocks a round trip; at least
-     * [ENDGAME_DUPLICATES] and never more than the [pipeline] it keeps.
+     * [ENDGAME_DUPLICATES], or the [pipeline] it keeps if that is fewer, which it never exceeds.
      */
     fun endgameCopies(bytesPerSecond: Double, pipeline: Int): Int =
       (bytesPerSecond * ENDGAME_COPY_MS / 1000 / BLOCK).toInt()
