@@ -994,17 +994,24 @@ class TorrentDownloadSource(
    * Applies to [task]'s seeder, which seeds [from], the smaller selection its task saved since:
    * [changeSeedingSelection] changes a seeder only while it checks or seeds, so one saved from
    * then on reaches it, and one saved before is read here, before the check and once it seeds.
+   * Reads it again after each change, which a newer selection applied meanwhile may have
+   * preceded, until it holds.
    */
   private suspend fun seedLatestSelection(task: SeedingTask, from: Set<String>) {
-    val latest = smallerSelection(task, from) ?: return
-    try {
-      changeSeedingSelection(task.taskId, latest)
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      log.w {
-        "Torrent taskId=${task.taskId} seeds its previous selection: ${e.describeCauses()}"
+    var seeded = from
+    while (true) {
+      val latest = smallerSelection(task, seeded) ?: return
+      try {
+        changeSeedingSelection(task.taskId, latest)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w {
+          "Torrent taskId=${task.taskId} seeds its previous selection: ${e.describeCauses()}"
+        }
+        return
       }
+      seeded = latest
     }
   }
 

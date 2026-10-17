@@ -838,7 +838,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selection, so a dropped file, deleted maybe, never stops it: `startSeeding` opens it with the
   task's latest smaller selection (`SeedingTask.selection`), `changeSeedingSelection` also
   changes a seeder that checks, which checks again, and the selection is read again before the
-  check and once it seeds. A lent seeder
+  check and once it seeds, after each change until it holds, so a newer one applied meanwhile
+  is never undone. A lent seeder
   pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again,
   and its discovery keeps only the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges

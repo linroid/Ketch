@@ -6,6 +6,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
@@ -34,6 +35,7 @@ import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerTraffic
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -451,6 +453,62 @@ class TorrentSourceSeedingTest {
           assertEquals(torrent.sizes[1].toLong(), saved.totalBytes)
           source.assertNoLeaks()
         } finally { ketch.close() }
+      }
+    }
+  }
+
+  @Test
+  fun startSeeding_newerSelectionAppliedFirst_seedsTheNewerOne() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        try {
+          val torrent = MultiFileTorrent()
+          val hash = torrent.metadata.infoHash.hex
+          val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+          val state = TorrentSourceState(hash, torrent.sizes.sum().toLong(), "", ids,
+            "unused-pack", encodeBase64(torrent.metainfo), version = 2,
+            privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val session = FakeTorrentSession(hash).apply {
+            stateOnResume = TorrentSessionState.CHECKING_FILES
+            savedResumeData = byteArrayOf(1)
+          }
+          engine.addTorrentResult = session
+          val saved = MutableStateFlow<SourceState?>(null)
+          source.saveSessionStates { _, state -> saved.value = state }
+          val selection = MutableStateFlow(ids)
+          val held = CompletableDeferred<Unit>()
+          val release = CompletableDeferred<Unit>()
+          session.beforeChange = {
+            if (it == setOf("0", "1")) {
+              held.complete(Unit)
+              release.await()
+            }
+          }
+          val seeding = async {
+            source.startSeeding(SeedingTask("seeder", "http://fixture/pack.torrent", state.saved(),
+              null, "unused-pack", ids, selection = { selection.value }))
+          }
+          eventually { session.resumed }
+          // The task drops a file as the seeder starts seeding, which it reads then...
+          selection.value = setOf("0", "1")
+          session.seed()
+          held.await()
+          // ...and another before it applies that one, which Ketch applies first.
+          selection.value = setOf("0")
+          source.changeSeedingSelection("seeder", setOf("0"))
+          release.complete(Unit)
+
+          assertEquals(SeedingOutcome.SEEDING, seeding.await())
+          assertEquals(listOf(setOf("0"), setOf("0", "1"), setOf("0")), session.selectionChanges)
+          source.stopSeeding("seeder")
+          assertEquals(setOf("0"),
+            source.decodeState(assertNotNull(saved.value)).selectedFileIds)
+          source.assertNoLeaks()
+        } finally { source.close() }
       }
     }
   }
