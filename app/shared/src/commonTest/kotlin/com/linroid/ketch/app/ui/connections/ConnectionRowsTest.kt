@@ -79,6 +79,20 @@ class ConnectionRowsTest {
   }
 
   @Test
+  fun arrangement_roundTrips_andFallsBackToTheDefault() {
+    for (sort in ConnectionSort.entries) {
+      for (descending in listOf(true, false)) {
+        val arrangement = ConnectionArrangement(sort, descending)
+        assertEquals(arrangement, ConnectionArrangement.decode(arrangement.encode()))
+      }
+    }
+    assertEquals("down:desc", ConnectionArrangement(ConnectionSort.Down).encode())
+    for (value in listOf(null, "", "down", "speed:desc", "down:sideways", "down:desc:x")) {
+      assertEquals(ConnectionArrangement(), ConnectionArrangement.decode(value))
+    }
+  }
+
+  @Test
   fun arranged_longestOpen_readsEachDevicesOwnClock() {
     // The NAS's clock runs an hour behind: its connection opened 5 s before its sample, which
     // reads as an hour earlier than the Mac's, open for a minute.

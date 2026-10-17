@@ -20,6 +20,10 @@
   <string name="connections_peer_choked">Bloqué</string>
   <string name="connections_peer_unchoked">Débloqué</string>
   <string name="connections_peer_uploading">Envoi en cours</string>
+  <string name="connections_peer_interested">Intéressé</string>
+  <string name="connections_detail_hint">Cliquez sur la tâche pour l'afficher dans les téléchargements.</string>
+  <string name="connections_show_details">Afficher les détails</string>
+  <string name="connections_hide_details">Masquer les détails</string>
   <string name="connections_empty_body">Les connexions s'affichent ici pendant les téléchargements ou le partage de torrents.</string>
   <string name="connections_no_match">Aucune connexion ne correspond</string>
   <string name="connections_unsupported_title">Cet appareil ne signale pas ses connexions</string>

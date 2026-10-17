@@ -20,6 +20,10 @@
   <string name="connections_peer_choked">チョーク</string>
   <string name="connections_peer_unchoked">アンチョーク</string>
   <string name="connections_peer_uploading">アップロード中</string>
+  <string name="connections_peer_interested">関心あり</string>
+  <string name="connections_detail_hint">タスクをクリックするとダウンロードに表示します。</string>
+  <string name="connections_show_details">詳細を表示</string>
+  <string name="connections_hide_details">詳細を隠す</string>
   <string name="connections_empty_body">ダウンロード中やトレントのシード中は、ここに接続が表示されます。</string>
   <string name="connections_no_match">一致する接続はありません</string>
   <string name="connections_unsupported_title">このデバイスは接続情報を報告しません</string>
