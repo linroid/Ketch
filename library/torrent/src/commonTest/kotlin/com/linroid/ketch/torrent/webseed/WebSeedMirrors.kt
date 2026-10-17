@@ -142,6 +142,28 @@ internal class Gate(private val engine: HttpEngine) : HttpEngine by engine {
 }
 
 /**
+ * Sends what [engine] answers a part at a time: each part waits until [steps] lets it through;
+ * [asked] once a request comes.
+ */
+internal class Stepped(private val engine: HttpEngine) : HttpEngine by engine {
+  val steps = Channel<Unit>()
+  val asked = CompletableDeferred<Unit>()
+
+  override suspend fun download(
+    url: String,
+    range: LongRange?,
+    headers: Map<String, String>,
+    onData: suspend (ByteArray) -> Unit,
+  ) {
+    asked.complete(Unit)
+    engine.download(url, range, headers) { part ->
+      steps.receive()
+      onData(part)
+    }
+  }
+}
+
+/**
  * Refuses a request to [engine] with a network error while another is under way, as some proxies
  * do, counting them in [refused]; each request it lets through takes a moment.
  */

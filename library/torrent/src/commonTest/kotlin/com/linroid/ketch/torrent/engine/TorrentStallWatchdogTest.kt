@@ -15,6 +15,7 @@ class TorrentStallWatchdogTest {
 
   private fun signals(
     payloadBytes: Long = 0,
+    unsettledBytes: Long = 0,
     wastedBytes: Long = 0,
     throttledMs: Long = 0,
     peers: Int = 0,
@@ -26,7 +27,8 @@ class TorrentStallWatchdogTest {
     droppedWebSeeds: Int = 0,
     downloading: Boolean = true,
   ) = StallSignals(downloading, peers, unchokingPeers, missingPieces, missingFileIds, lateBlocks,
-    webSeeds, droppedWebSeeds, payloadBytes, wastedBytes, throttledMs, pieceLength = 262_144)
+    webSeeds, droppedWebSeeds, payloadBytes, unsettledBytes, wastedBytes, throttledMs,
+    pieceLength = 262_144)
 
   /** Checks once a second up to [until], as a swarm does. */
   private fun runTo(until: Long, signals: (Long) -> StallSignals): Set<StallRecovery> {
@@ -37,6 +39,16 @@ class TorrentStallWatchdogTest {
     }
     return due
   }
+
+  /** Checks as [runTo] does, and returns the stall after each check. */
+  private fun stallsTo(until: Long, signals: (Long) -> StallSignals): List<TorrentStall?> =
+    buildList {
+      while (now < until) {
+        now += 1_000
+        watchdog.check(signals(now))
+        add(watchdog.stall)
+      }
+    }
 
   @Test
   fun payloadAndPieces_areNoStall() {
@@ -102,9 +114,12 @@ class TorrentStallWatchdogTest {
     // A web seed sends a piece that fails its hash check at once.
     runTo(41_000) { signals(payloadBytes = 16_384, wastedBytes = 16_384, webSeeds = 1) }
     assertEquals(41, assertNotNull(watchdog.stall).seconds)
-    // The next one arrives over four checks, which take it as payload, then fails too.
+    // The next one arrives over four checks, which take it as payload while it may still be
+    // kept, then fails too.
     runTo(45_000) { time ->
-      signals(payloadBytes = 16_384 + (time - 41_000) * 4, wastedBytes = 16_384, webSeeds = 1)
+      val arrived = (time - 41_000) * 4
+      signals(payloadBytes = 16_384 + arrived, unsettledBytes = arrived, wastedBytes = 16_384,
+        webSeeds = 1)
     }
     assertNull(watchdog.stall)
     runTo(46_000) { signals(payloadBytes = 32_768, wastedBytes = 32_768, webSeeds = 1) }
@@ -112,6 +127,41 @@ class TorrentStallWatchdogTest {
     // Payload kept after it counts again.
     runTo(47_000) { signals(payloadBytes = 40_000, wastedBytes = 32_768, webSeeds = 1) }
     assertNull(watchdog.stall)
+  }
+
+  @Test
+  fun payloadThatMayBeThrownAway_neverEndsALongStall() {
+    // Ten minutes without payload, then a web seed sends a piece over five checks.
+    runTo(600_000) { signals(webSeeds = 1) }
+    val arriving = stallsTo(605_000) { time ->
+      val arrived = (time - 600_000) * 4
+      signals(payloadBytes = arrived, unsettledBytes = arrived, webSeeds = 1)
+    }
+    // Until it is kept, the time for a piece still counts from before the gap.
+    assertTrue(arriving.all { it != null }, arriving.toString())
+    // It fails its hash check: still a stall, which counts from the start.
+    runTo(606_000) { signals(payloadBytes = 20_000, wastedBytes = 20_000, webSeeds = 1) }
+    assertEquals(606, assertNotNull(watchdog.stall).seconds)
+  }
+
+  @Test
+  fun wastedPayload_neverLooksLikePayloadBackAfterAGap() {
+    // A peer trickles 1 KB a second and no piece verifies: a stall once four pieces are due.
+    runTo(70_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
+    assertEquals(TorrentStallReason.UNKNOWN, watchdog.stall?.reason)
+    // A web seed sends 60 KB a second besides for 40 s, then its connection resets: all of it is
+    // thrown away.
+    val fetching = stallsTo(109_000) { time ->
+      val fetched = (time - 70_000) * 60
+      signals(payloadBytes = time + fetched, unsettledBytes = fetched, peers = 1,
+        unchokingPeers = 1, webSeeds = 1)
+    }
+    // The peer goes on trickling: its next bytes come after no gap, so the stall stays.
+    val wasted = 39_000L * 60
+    val after = stallsTo(140_000) { time ->
+      signals(payloadBytes = time + wasted, wastedBytes = wasted, peers = 1, unchokingPeers = 1)
+    }
+    assertTrue((fetching + after).all { it != null }, (fetching + after).toString())
   }
 
   @Test

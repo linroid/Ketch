@@ -17,6 +17,9 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property droppedWebSeeds web seeds that stopped and would have a wanted piece to fetch,
  *   which [StallRecovery.RELAUNCH_WEB_SEEDS] starts again.
  * @property payloadBytes payload received so far, from peers and web seeds.
+ * @property unsettledBytes of that payload, what may still be thrown away: web seed bytes of
+ *   pieces not stored yet. Swarms read it after [payloadBytes] and before [wastedBytes], as web
+ *   seeds count it before the first and settle it after the second, so no byte looks kept early.
  * @property wastedBytes of that payload, what was thrown away so far: web seed bytes of pieces
  *   that failed their hash check or that a failed request cut off.
  * @property throttledMs time spent so far waiting on speed limits, which is never a stall: the
@@ -33,6 +36,7 @@ internal data class StallSignals(
   val webSeeds: Int,
   val droppedWebSeeds: Int,
   val payloadBytes: Long,
+  val unsettledBytes: Long,
   val wastedBytes: Long,
   val throttledMs: Long,
   val pieceLength: Long,
@@ -55,10 +59,12 @@ internal enum class StallRecovery {
  * recoveries are due. A download stalls when no payload arrived for [NO_PAYLOAD_MS], or no piece
  * verified for four pieces' worth of time at its rate (at least [MIN_PIECE_MS], at most
  * [MAX_PIECE_MS]), counted from the last verified piece or from payload coming back after a gap,
- * as the gap was no slow piece. Payload later thrown away is no payload: it takes back the checks
- * that counted it, newest first. Time spent waiting on speed limits counts as progress: a slow
- * limit is no stall. Recoveries start once it has lasted [RECOVER_AFTER_MS], each at most once
- * per its own cooldown, announcing to trackers less often each time it does not help. Pieces
+ * as the gap was no slow piece, once nothing can throw that payload away any more and none was
+ * meanwhile. Payload later thrown away is no payload: it takes back the checks that counted it,
+ * newest first, but a gap is told from when any payload last arrived, so payload thrown away never
+ * makes the next look back after one. Time spent waiting on speed limits counts as progress: a
+ * slow limit is no stall. Recoveries start once it has lasted [RECOVER_AFTER_MS], each at most
+ * once per its own cooldown, announcing to trackers less often each time it does not help. Pieces
  * missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS] once the last
  * one goes, so a peer that reconnects at once does not flip the reason.
  *
@@ -68,11 +74,15 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var progressAt = nowMs()
   // When the time for a piece to verify started: [progressAt], or payload back after a gap.
   private var pieceAt = progressAt
+  // When payload last arrived; payload thrown away moves it back.
   private var payloadAt = progressAt
+  // When payload last arrived, thrown away or not: it never moves back.
+  private var seenAt = progressAt
   private var payloadBytes = 0L
   private var wastedBytes = 0L
   private var throttledMs = 0L
-  // The checks that took payload lately, oldest first: payload found wasted takes them back.
+  // The checks whose payload may still be thrown away, oldest first: payload found wasted takes
+  // them back.
   private val credits = ArrayDeque<Credit>()
   // Payload rate over the last check, smoothed: how long a piece should take.
   private var rate = 0.0
@@ -86,8 +96,12 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var sourcedMissing = 0
   private var sourcedFiles = emptyList<String>()
 
-  /** [bytes] of payload a check took, and the clocks as they were before it did. */
-  private class Credit(var bytes: Long, var payloadAt: Long, var pieceAt: Long)
+  /**
+   * [bytes] of payload a check took, kept once the payload no longer at risk reaches [mark], the
+   * payload received by then, and [payloadAt] as it was before. Back after a gap, it gives a piece
+   * its time again from [restartAt] once kept, unless payload is thrown away before.
+   */
+  private class Credit(var bytes: Long, val mark: Long, var payloadAt: Long, var restartAt: Long?)
 
   /** Why the download makes no progress now; null while it does. */
   var stall: TorrentStall? = null
@@ -98,6 +112,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     progressAt = nowMs()
     pieceAt = progressAt
     payloadAt = progressAt
+    seenAt = progressAt
     stall = null
     reannounceEveryMs = REANNOUNCE_MS
     // Payload before a verified piece is never taken back.
@@ -121,6 +136,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     if (throttled > 0) waited(throttled, now)
     if (received > 0) took(received, now)
     if (wasted > 0) takeBack(wasted)
+    kept(signals.payloadBytes - signals.unsettledBytes)
     var missing = signals.missingPieces
     var missingFiles = signals.missingFileIds
     if (signals.peers > 0 || signals.webSeeds > 0) {
@@ -184,22 +200,39 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     progressAt = minOf(progressAt + throttled, now)
     pieceAt = minOf(pieceAt + throttled, now)
     payloadAt = minOf(payloadAt + throttled, now)
+    seenAt = minOf(seenAt + throttled, now)
     for (credit in credits) {
       credit.payloadAt = minOf(credit.payloadAt + throttled, now)
-      credit.pieceAt = minOf(credit.pieceAt + throttled, now)
+      credit.restartAt = credit.restartAt?.let { minOf(it + throttled, now) }
     }
   }
 
-  /** [bytes] of payload arrived; back after a gap, a piece has its full time again. */
+  /**
+   * [bytes] of payload arrived. Back after a gap, a piece gets its full time again from now once
+   * they are kept, as payload thrown away meanwhile was no payload.
+   */
   private fun took(bytes: Long, now: Long) {
-    credits.addLast(Credit(bytes, payloadAt, pieceAt))
-    if (credits.size > MAX_CREDITS) credits.removeFirst()
-    if (now - payloadAt >= NO_PAYLOAD_MS) pieceAt = now
+    val restartAt = if (now - seenAt >= NO_PAYLOAD_MS) now else null
+    credits.addLast(Credit(bytes, payloadBytes, payloadAt, restartAt))
+    if (credits.size > MAX_CREDITS) {
+      // The oldest two become one, which taking back moves the clock to before both.
+      val oldest = credits.removeFirst()
+      val next = credits.first()
+      next.bytes += oldest.bytes
+      next.payloadAt = oldest.payloadAt
+      next.restartAt = oldest.restartAt ?: next.restartAt
+    }
     payloadAt = now
+    seenAt = now
   }
 
-  /** [bytes] of payload were thrown away: they were the latest, so the newest checks go back. */
+  /**
+   * [bytes] of payload were thrown away: they were the latest, so the newest checks go back. Which
+   * bytes they were is not known, so no payload still waiting to be kept gives a piece its time
+   * again.
+   */
   private fun takeBack(bytes: Long) {
+    for (credit in credits) credit.restartAt = null
     var left = bytes
     while (left > 0) {
       val credit = credits.lastOrNull() ?: return
@@ -210,7 +243,17 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       left -= credit.bytes
       credits.removeLast()
       payloadAt = credit.payloadAt
-      pieceAt = credit.pieceAt
+    }
+  }
+
+  /**
+   * The checks whose payload nothing can throw away any more, the payload received up to
+   * [settled], are kept: back after a gap, a piece gets its full time again.
+   */
+  private fun kept(settled: Long) {
+    while (credits.isNotEmpty() && credits.first().mark <= settled) {
+      val restartAt = credits.removeFirst().restartAt ?: continue
+      pieceAt = maxOf(pieceAt, restartAt)
     }
   }
 
@@ -242,7 +285,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     /** How long pieces missing while something was connected stay missing once nothing is. */
     const val SOURCE_GRACE_MS = 10_000L
 
-    /** The most checks that took payload kept to be taken back, about a minute of them. */
+    /** The most checks whose payload may still be taken back kept apart; older ones merge. */
     private const val MAX_CREDITS = 64
   }
 }

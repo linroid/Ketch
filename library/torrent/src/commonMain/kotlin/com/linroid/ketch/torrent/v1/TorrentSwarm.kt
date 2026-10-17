@@ -407,12 +407,16 @@ internal class TorrentSwarm(
       val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
       }
+      // In this order, so no web seed byte looks kept before it is (see StallSignals).
+      val payload = payloadReceived.load()
+      val unsettled = webSeedStats.unsettled.load()
+      val wasted = webSeedStats.wasted.load()
       val due = watchdog.check(StallSignals(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
-        droppedWebSeeds = dropped, payloadBytes = payloadReceived.load(),
-        wastedBytes = webSeedStats.wasted.load(), throttledMs = throttledMs.load(),
+        droppedWebSeeds = dropped, payloadBytes = payload, unsettledBytes = unsettled,
+        wastedBytes = wasted, throttledMs = throttledMs.load(),
         pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall

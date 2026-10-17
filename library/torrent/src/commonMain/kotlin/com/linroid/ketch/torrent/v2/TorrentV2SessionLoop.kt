@@ -844,6 +844,10 @@ internal object TorrentV2SessionLoop {
           pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES,
             if (connected) ::sourced else ::unrefused)
         }
+        // In this order, so no web seed byte looks kept before it is (see StallSignals).
+        val payload = store.receivedBytes() - payloadAtStart
+        val unsettled = mirrors?.unsettledBytes ?: 0
+        val wasted = mirrors?.wastedBytes ?: 0
         val due = stallWatchdog.check(StallSignals(
           downloading = downloading,
           peers = peers.size,
@@ -853,8 +857,9 @@ internal object TorrentV2SessionLoop {
           lateBlocks = if (downloading) pieces.lateCount() else 0,
           webSeeds = mirrorsRunning,
           droppedWebSeeds = stoppedMirrors.count(::mirrorMayServe),
-          payloadBytes = store.receivedBytes() - payloadAtStart,
-          wastedBytes = mirrors?.wastedBytes ?: 0,
+          payloadBytes = payload,
+          unsettledBytes = unsettled,
+          wastedBytes = wasted,
           throttledMs = throttledMs + swarm.webSeedThrottledMs(),
           pieceLength = layout.pieceLength,
         ))

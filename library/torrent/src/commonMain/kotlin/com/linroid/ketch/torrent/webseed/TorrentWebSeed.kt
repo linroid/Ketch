@@ -131,12 +131,14 @@ private const val HEX = "0123456789ABCDEF"
 /**
  * Web seed counters of one swarm, for its periodic summary and stall checks; any worker may
  * count. [wasted] is the part of [payload] thrown away: bytes of pieces that failed their hash
- * check or that a failed request cut off.
+ * check or that a failed request cut off. [unsettled] is the part that may still be: bytes of
+ * pieces not stored yet, counted before [payload] as they arrive and settled after [wasted].
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedStats {
   val payload = AtomicLong(0)
   val wasted = AtomicLong(0)
+  val unsettled = AtomicLong(0)
   val pieces = AtomicInt(0)
   val failures = AtomicInt(0)
   val dropped = AtomicInt(0)
@@ -388,7 +390,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
    * run of many small files spent most of its time waiting for answers, and on mirrors that
    * redirect each file, as archive.org does, for two of them per file. A mirror that fails sees
    * one request per run. What arrived for the pieces a failed run gives back unstored counts as
-   * [WebSeedStats.wasted].
+   * [WebSeedStats.wasted]; until stored or thrown away, it is [WebSeedStats.unsettled].
    */
   private suspend fun fetch(run: MutableList<P?>) {
     val handle = connection ?: open().also { connection = it }
@@ -397,7 +399,9 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     val missing = IntArray(run.size)
     for (request in requests) for (part in request.parts) missing[part.piece] += part.length
     val asked = missing.copyOf()
+    // What arrived for the run, and of it what was stored and so settled.
     val arrived = AtomicLong(0)
+    val stored = AtomicLong(0)
     try {
       for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece)
       // A piece spanning files completes from whichever request brings its last part.
@@ -405,7 +409,11 @@ internal class WebSeedWorker<P : WebSeedPiece>(
       val received: suspend (Int, Int) -> Unit = { piece, length ->
         completion.withLock {
           missing[piece] -= length
-          if (missing[piece] == 0) store(run, piece)
+          if (missing[piece] == 0) {
+            store(run, piece)
+            stored.addAndFetch(asked[piece].toLong())
+            stats.unsettled.addAndFetch(-asked[piece].toLong())
+          }
         }
       }
       val first = requests.firstOrNull() ?: return
@@ -421,6 +429,9 @@ internal class WebSeedWorker<P : WebSeedPiece>(
       val kept = run.indices.sumOf { if (run[it] == null) asked[it].toLong() else 0L }
       stats.wasted.addAndFetch((arrived.load() - kept).coerceAtLeast(0))
       throw e
+    } finally {
+      // The rest is settled once counted as wasted, so none of it looks kept meanwhile.
+      stats.unsettled.addAndFetch(stored.load() - arrived.load())
     }
   }
 
@@ -448,9 +459,11 @@ internal class WebSeedWorker<P : WebSeedPiece>(
             if (bytes.size > length - total) throw IOException("Web seed sent more than asked")
             total += bytes.size
             handle.received(bytes.size)
+            // At risk until its piece is stored, which counts before it is payload.
+            arrived.addAndFetch(bytes.size.toLong())
+            stats.unsettled.addAndFetch(bytes.size.toLong())
             stats.payload.addAndFetch(bytes.size.toLong())
             downloadPayload(bytes.size)
-            arrived.addAndFetch(bytes.size.toLong())
             var read = 0
             while (read < bytes.size) {
               val target = request.parts[part]

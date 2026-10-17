@@ -7,6 +7,7 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.torrent.RecordingConnections
 import com.linroid.ketch.torrent.TorrentV2Fixture
+import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentStallReason
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
@@ -43,7 +44,9 @@ import okio.FileSystem
 import okio.Path
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.update
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -459,20 +462,29 @@ class TorrentV2WebSeedTest {
     val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
       webSeeds = listOf("http://mirror.test/pub/"))
     val bad = "http://mirror.test/pub/pack/bad.bin"
-    // The one file wanted is another bad.bin at the only source, which answers late.
-    val mirror = MirrorEngine(mapOf(bad to fixture.payloads[0].reversedArray(),
-      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
-    val gate = Gate(mirror)
+    // The one file wanted is another bad.bin at the only source, which sends it slowly.
+    val mirror = Stepped(MirrorEngine(mapOf(bad to fixture.payloads[0].reversedArray(),
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1])))
     val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
-    stalling(fixture, gate, selected = setOf(wanted)) { run ->
-      gate.asked.await()
-      run.skip(40_000)
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      // Nothing for longer than a piece may take: a stall.
+      mirror.asked.await()
+      run.skip(70_000)
       assertEquals(TorrentStallReason.UNKNOWN, run.session.stall.first { it != null }?.reason)
-      // The piece arrives, corrupt, twice: thrown away, it is no progress.
-      gate.open.complete(Unit)
-      while (mirror.requests.count { it.first == bad } < 2) delay(10)
-      delay(2_000)
-      assertEquals(TorrentStallReason.MISSING_PIECES, run.session.stall.value?.reason)
+      // The piece arrives, corrupt, twice, a part a second: what may still be thrown away is no
+      // progress, and once thrown away it never was.
+      val seen = AtomicReference(emptyList<TorrentStall?>())
+      coroutineScope {
+        val watching = launch { run.session.stall.collect { stall -> seen.update { it + stall } } }
+        while (seen.load().lastOrNull()?.reason != TorrentStallReason.MISSING_PIECES) {
+          mirror.steps.trySend(Unit)
+          delay(100)
+          run.skip(1_000)
+          delay(400)
+        }
+        watching.cancel()
+      }
+      assertTrue(seen.load().all { it != null }, seen.load().toString())
     }
   }
 

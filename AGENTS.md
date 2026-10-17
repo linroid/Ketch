@@ -727,14 +727,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   discovery (v1, and v2 as `PeerOrigin.EXPLICIT` in the swarm they answered in)
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or
   no verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
-  back after a gap; time waiting on speed limits never counts), is a stall, whose reason
-  (`TorrentStall`: missing pieces no
-  connected peer or web seed has and their files, with nothing connected those a web seed could
-  not serve, kept 10 s after the last source leaves; no peers, all choking, slow peers) the session
-  publishes (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm
-  summary). Web seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted
-  it. After a minute it reannounces to trackers (5, 10, up to 30 minutes apart), revives
-  peers it gave up on, and after two minutes relaunches dropped web seeds. The inspector says why
+  back after a gap once none of it can be thrown away; time waiting on speed limits never counts),
+  is a stall, whose reason (`TorrentStall`: missing pieces no connected peer or web seed has and
+  their files, with nothing connected those a web seed could not serve, kept 10 s after the last
+  source leaves; no peers, all choking, slow peers) the session publishes (`TorrentSession.stall`,
+  `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web seed payload thrown away
+  (`WebSeedStats.wasted`) takes back the checks that counted it, as it may be until its piece is
+  stored (`WebSeedStats.unsettled`, `StallSignals`); a gap is told from any payload, so payload
+  thrown away never makes the next look back after one. After a minute it reannounces to trackers
+  (5, 10, up to 30 minutes apart), revives peers it gave up on, and after two minutes relaunches
+  dropped web seeds. The inspector says why
   (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
   its queue's time at its rate, 4 to 30 s) is asked of another peer with room, and the endgame
   starts once every unopened piece is one no source has. V2 and hybrid owners do the same

@@ -583,8 +583,8 @@ class TorrentWebSeedTest {
         val stall = MutableStateFlow<TorrentStall?>(null)
         val (stale, good) = staleSet
         val staleUrl = "http://mirror.test/pub/set/stale.bin"
-        // The one file wanted is another stale.bin at the only source, which answers late.
-        val gate = Gate(MirrorEngine(mapOf(staleUrl to stale.reversedArray(),
+        // The one file wanted is another stale.bin at the only source, which sends it slowly.
+        val mirror = Stepped(MirrorEngine(mapOf(staleUrl to stale.reversedArray(),
           "http://mirror.test/pub/set/good.bin" to good)))
         withInfoLog { lines ->
           withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
@@ -594,21 +594,25 @@ class TorrentWebSeedTest {
               coroutineScope {
                 val swarm = launch {
                   TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
-                    webSeedHttp = TorrentHttp(gate), webSeedRetryMs = 5, nowMs = { clock },
+                    webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
                     stall = stall).run(peers)
                 }
-                gate.asked.await()
-                clock = 40_000
+                // Nothing for longer than a piece may take: a stall.
+                mirror.asked.await()
+                clock = 70_000
                 assertEquals(TorrentStallReason.UNKNOWN,
                   withTimeout(5_000) { stall.filterNotNull().first() }.reason)
-                // The piece arrives, corrupt, twice: thrown away, it is no progress.
-                gate.open.complete(Unit)
-                delay(500)
-                clock = 41_000
-                val after = withTimeout(5_000) {
-                  stall.first { it?.reason != TorrentStallReason.UNKNOWN }
+                // The piece arrives, corrupt, twice, a part a second: what may still be thrown
+                // away is no progress, and once thrown away it never was.
+                val seen = mutableListOf<TorrentStall?>()
+                while (stall.value?.reason != TorrentStallReason.MISSING_PIECES) {
+                  mirror.steps.trySend(Unit)
+                  delay(100)
+                  clock += 1_000
+                  delay(300)
+                  seen += stall.value
                 }
-                assertEquals(TorrentStallReason.MISSING_PIECES, after?.reason)
+                assertTrue(seen.all { it != null }, seen.toString())
                 swarm.cancel()
               }
             } finally {
