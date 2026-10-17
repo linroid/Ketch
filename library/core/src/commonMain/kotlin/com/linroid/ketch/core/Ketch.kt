@@ -680,53 +680,51 @@ class Ketch(
       null
     }
     val now = Clock.System.now()
-    // Saving publishes the new request, so a running task shows the plan first: the request never
-    // comes with the old selection's progress. A save that fails shows that progress again.
-    val previous = handle.mutableState.value
-    val shown = if (running) previous.showing(plan) else null
-    if (shown != null) handle.mutableState.compareAndSet(previous, shown)
-    try {
-      handle.record.update { r ->
-        r.copy(
-          request = r.request.copy(selectedFileIds = plan.fileIds),
-          totalBytes = plan.totalBytes,
-          segments = when {
-            reopen -> plan.segments ?: emptyList()
-            // A task that never started (or waits for files) starts fresh: segments would make
-            // it resume without an output path.
-            r.outputPath == null -> r.segments
-            else -> plan.segments ?: r.segments
-          },
-          state = if (reopen || awaiting) TaskState.QUEUED else r.state,
-          completedAt = if (reopen) null else r.completedAt,
-          control = (r.control ?: TaskControl()).let { c ->
-            c.copy(
-              selectionGeneration = generation,
-              commands = if (ledger != null && entry != null) {
-                ledger.entries + entry
-              } else {
-                c.commands
-              },
-            )
-          },
-          updatedAt = now,
-        )
+    // Saving publishes the new request, so a running task shows the plan first, and its transfer,
+    // which reports the old selection until it receives the new one, is held back meanwhile: the
+    // request never comes with the old selection's progress. A save that fails shows that progress
+    // again.
+    val delivery = coordinator.withProgressHeld(taskId) {
+      val shown = handle.show(plan)
+      try {
+        handle.record.update { r ->
+          r.copy(
+            request = r.request.copy(selectedFileIds = plan.fileIds),
+            totalBytes = plan.totalBytes,
+            segments = when {
+              reopen -> plan.segments ?: emptyList()
+              // A task that never started (or waits for files) starts fresh: segments would make
+              // it resume without an output path.
+              r.outputPath == null -> r.segments
+              else -> plan.segments ?: r.segments
+            },
+            state = if (reopen || awaiting) TaskState.QUEUED else r.state,
+            completedAt = if (reopen) null else r.completedAt,
+            control = (r.control ?: TaskControl()).let { c ->
+              c.copy(
+                selectionGeneration = generation,
+                commands = if (ledger != null && entry != null) {
+                  ledger.entries + entry
+                } else {
+                  c.commands
+                },
+              )
+            },
+            updatedAt = now,
+          )
+        }
+      } catch (e: Throwable) {
+        shown?.let { (previous, planned) -> handle.mutableState.compareAndSet(planned, previous) }
+        throw e
       }
-    } catch (e: Throwable) {
-      if (shown != null) handle.mutableState.compareAndSet(shown, previous)
-      throw e
+      command?.afterSave()
+      // Whether or not the task ran when it was planned: the queue may have started it since, its
+      // execution built from the request it had then.
+      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
     }
-    command?.afterSave()
-    // Whether or not the task ran when it was planned: the queue may have started it since, its
-    // execution built from the request it had then.
-    val delivery = coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
     when {
-      delivery == SelectionDelivery.DELIVERED -> {
-        // Shown again: a transfer that moves no bytes reports no progress to carry the new size,
-        // and one reported since the plan was shown described the old selection.
-        val current = handle.mutableState.value
-        current.showing(plan)?.let { handle.mutableState.compareAndSet(current, it) }
-      }
+      // Shown before the save if the task downloads, and nothing was reported since.
+      delivery == SelectionDelivery.DELIVERED -> Unit
       // Cannot happen while the lock is held, as an execution only starts finishing under it.
       delivery == SelectionDelivery.FINISHING -> return null
       reopen || awaiting -> {
@@ -852,14 +850,22 @@ class Ketch(
     return sourceResolver.resolve(url)
   }
 
-  /** This state showing [plan]'s progress and size, when the task downloads. */
-  private fun DownloadState.showing(plan: SelectionPlan): DownloadState.Downloading? {
-    if (this !is DownloadState.Downloading) return null
-    val downloaded = plan.segments?.sumOf { it.downloadedBytes }
-      ?: progress.downloadedBytes.coerceAtMost(plan.totalBytes)
-    return copy(
-      progress = progress.copy(downloadedBytes = downloaded, totalBytes = plan.totalBytes),
-    )
+  /**
+   * Shows [plan]'s progress and size while the task downloads. Returns the state it replaced and
+   * the one it shows, or `null` when the task does not download.
+   */
+  private fun TaskHandle.show(plan: SelectionPlan): Pair<DownloadState, DownloadState>? {
+    while (true) {
+      val current = mutableState.value as? DownloadState.Downloading ?: return null
+      val progress = current.progress
+      val downloaded = plan.segments?.sumOf { it.downloadedBytes }
+        ?: progress.downloadedBytes.coerceAtMost(plan.totalBytes)
+      val shown = current.copy(
+        progress = progress.copy(downloadedBytes = downloaded, totalBytes = plan.totalBytes),
+      )
+      // A report that landed as the hold began is replaced too.
+      if (mutableState.compareAndSet(current, shown)) return current to shown
+    }
   }
 
   /**

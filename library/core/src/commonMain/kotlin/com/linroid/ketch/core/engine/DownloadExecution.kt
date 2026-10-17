@@ -102,6 +102,16 @@ internal class DownloadExecution(
   fun stopReportingProgress() { reportsProgress.value = false }
 
   @Volatile
+  private var progressHeld = false
+
+  /**
+   * Holds back the transfer's progress reports while [held], so the task keeps the state shown
+   * meanwhile, as while Ketch saves and delivers a new selection, which the source reports only
+   * once it receives it.
+   */
+  fun holdProgress(held: Boolean) { progressHeld = held }
+
+  @Volatile
   private var discardsPartialFile = false
 
   /**
@@ -932,8 +942,9 @@ internal class DownloadExecution(
           lastBytes = downloaded
           lastMark = now
         }
+        // The hold is read on every attempt, so no report replaces a state shown once it began.
         handle.mutableState.update { current ->
-          if (reportsProgress.value) DownloadState.Downloading(
+          if (reportsProgress.value && !progressHeld) DownloadState.Downloading(
             DownloadProgress(downloaded, total, reportedSpeed.value ?: speed),
           ) else current
         }

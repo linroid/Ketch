@@ -173,7 +173,7 @@ internal class RecordingTaskStore : TaskStore {
   val saves = mutableListOf<TaskRecord>()
 
   /** Sees each record before it is saved, so before its task publishes it; may fail the save. */
-  var onSave: (TaskRecord) -> Unit = {}
+  var onSave: suspend (TaskRecord) -> Unit = {}
 
   override suspend fun save(record: TaskRecord) {
     onSave(record)

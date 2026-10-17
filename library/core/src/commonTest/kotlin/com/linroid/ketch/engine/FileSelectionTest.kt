@@ -211,6 +211,43 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_runningTaskReportsTheOldFilesDuringTheSave_showsTheNewProgress() = runTest {
+    val source = SelectableSource().apply { reportsOnChange = false }
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      val run = source.runs.value.single()
+      run.context.segments.value = listOf(Segment(0, 0, 99, 80), Segment(1, 100, 299, 50))
+      run.context.onProgress(130, 300)
+      var published: DownloadState? = null
+      store.onSave = {
+        if (it.request.selectedFileIds.size == 3) {
+          // The transfer has not seen the new selection yet; the request is published next.
+          run.context.onProgress(130, 300)
+          published = task.state.value
+        }
+      }
+
+      task.selectFiles(setOf("0", "1", "2"))
+      runCurrent()
+
+      assertEquals(600, assertIs<DownloadState.Downloading>(published).progress.totalBytes)
+      assertEquals(600, assertIs<DownloadState.Downloading>(task.state.value).progress.totalBytes)
+      // Delivered, the selection is what the transfer reports from then on.
+      run.context.onProgress(140, 600)
+      val reported = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(140, reported.progress.downloadedBytes)
+      store.onSave = {}
+      run.finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun selectFiles_runningTaskSaveFails_showsTheOldProgressAgain() = runTest {
     val source = SelectableSource().apply { reportsOnChange = false }
     val store = RecordingTaskStore()
@@ -231,6 +268,10 @@ class FileSelectionTest {
       assertEquals(300, downloading.progress.totalBytes)
       assertEquals(setOf("0", "1"), task.request.selectedFileIds)
       assertTrue(run.applied.isEmpty())
+      // The transfer's reports show again.
+      run.context.onProgress(140, 300)
+      val reported = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(140, reported.progress.downloadedBytes)
       store.onSave = {}
       run.finish.complete(Unit)
       runCurrent()

@@ -629,9 +629,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   validates it with `DownloadSource.planSelection` against metadata the source holds, never
   client sizes, fitting a running download's latest segments (else the saved ones), saves it
   (selection, total, segments and `TaskControl.selectionGeneration` in one record write; a
-  running task shows the plan's progress first, so its new request never comes with the old
-  selection's progress), then delivers it: a running task takes it live as a new
-  `DownloadContext.selection` revision, which the source acknowledges (a run that ends with an
+  running task shows the plan's progress first and holds back its transfer's reports until the
+  selection is delivered, so its new request never comes with the old selection's progress),
+  then delivers it: a running task takes it live as a new `DownloadContext.selection` revision,
+  whose files the source reports from then on and acknowledges (a run that ends with an
   unacknowledged selection runs again through `resume`, so completion covers the latest one);
   paused, queued, scheduled and failed tasks use it when they start (it goes to whatever
   execution runs once it is saved, and an execution reads the saved selection again under the
