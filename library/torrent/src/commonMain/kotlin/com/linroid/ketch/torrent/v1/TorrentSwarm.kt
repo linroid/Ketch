@@ -424,6 +424,15 @@ internal class TorrentSwarm(
       webSeedUrls.indices.mapTo(webSeeds) { launchWebSeed(it) }
       log.i { "Swarm $logLabel: downloading from ${webSeeds.size} web seed(s) too" }
     }
+    // A swarm that has every piece stops its web seeds, which would only keep looking for one to
+    // fetch; [startWebSeeds] starts them again once a selection wants pieces.
+    suspend fun stopWebSeeds() {
+      if (webSeeds.isEmpty()) return
+      webSeeds.forEach { it.cancel() }
+      webSeeds.forEach { it.join() }
+      webSeeds.clear()
+      log.d { "Swarm $logLabel: complete, web seeds stopped" }
+    }
     fun acceptPex(source: PeerEndpoint, update: PexUpdate) {
       peerFlags.record(update.flags)
       // A peer that punches holes speaks uTP (BEP 55), and a connection to it over uTP shows it
@@ -591,6 +600,7 @@ internal class TorrentSwarm(
           onProgress(store.progress().sum())
           onCompleted()
           complete = true
+          stopWebSeeds()
         }
         if (!complete) startWebSeeds()
         val policy = uploadPolicy()

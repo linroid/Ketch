@@ -2,6 +2,7 @@ package com.linroid.ketch.torrent.webseed
 
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.torrent.RecordingConnections
 import com.linroid.ketch.torrent.TorrentUploadPolicy
@@ -18,6 +19,7 @@ import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.SWARM_SUMMARY_INTERVAL_MS
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import com.linroid.ketch.torrent.v1.TorrentPieceScheduler
@@ -973,6 +975,53 @@ class TorrentWebSeedTest {
                 CompletableDeferred<Unit>().also { selections.send(it) }.await()
                 while (!store.completed()) delay(10)
                 assertEquals(1, lines.drain().count { "web seed(s) too" in it })
+                swarm.cancel()
+              }
+            } finally {
+              network.close()
+            }
+          }
+          assertContentEquals(parts[3].second,
+            torrentFileSystem.read(output / "c.bin") { readByteArray() })
+        }
+      }
+    }
+  }
+
+  @Test
+  fun completedSwarm_stopsItsWebSeedsUntilTheSelectionGrows() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val mirror = MirrorEngine(mirrorFiles)
+        val completions = Channel<Unit>(Channel.UNLIMITED)
+        withStore(multiFile("http://mirror.test/pub"), selected = setOf(0)) { store, output ->
+          withLog(LogLevel.DEBUG) { lines ->
+            val network = createTorrentNetwork()
+            val selections = Channel<CompletableDeferred<Unit>>()
+            try {
+              coroutineScope {
+                val swarm = launch {
+                  TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                    uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION },
+                    onCompleted = { completions.send(Unit) }, nowMs = { clock },
+                    webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5)
+                    .run(Channel(), selections = selections)
+                }
+                completions.receive()
+                // Seeding, the swarm has nothing left to fetch: its summary lists no web seed.
+                clock = SWARM_SUMMARY_INTERVAL_MS
+                var summary: String
+                do {
+                  summary = lines.receive()
+                } while ("peers connected=" !in summary)
+                assertFalse("webSeeds=" in summary, summary)
+                // c.bin is wanted too: the seed starts again and fetches it.
+                store.changeSelection(setOf(0, 3))
+                CompletableDeferred<Unit>().also { selections.send(it) }.await()
+                completions.receive()
+                val logged = lines.drain()
+                assertEquals(1, logged.count { "web seed(s) too" in it }, logged.toString())
                 swarm.cancel()
               }
             } finally {

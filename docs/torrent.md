@@ -703,8 +703,8 @@ found.
 
 Web seeds (BEP 19: a metainfo's `url-list`, or a magnet's `ws` parameters; `http` and `https` only,
 at most 16) let a torrent download from HTTP mirrors as well as peers, so it completes even with no
-reachable peer. A magnet's metadata still comes from peers. A torrent that only seeds leaves its web
-seeds alone until a selection wants pieces again.
+reachable peer. A magnet's metadata still comes from peers. A torrent that only seeds, or has
+finished downloading, leaves its web seeds alone until a selection wants pieces again.
 
 - A single-file torrent's URL names the file (or, ending in `/`, its folder). A multi-file
   torrent's URL names the folder holding the torrent's folder; each file is fetched from the URL,
@@ -727,7 +727,7 @@ seeds alone until a selection wants pieces again.
   Started again, a seed asks once more for what it could not serve, as its mirror may have fixed
   it by then; a piece it sent corrupt before is given up again after one more corrupt copy. A seed
   that still serves other files is not dropped, so it asks again only when the task is paused and
-  resumed.
+  resumed, or when a finished task's selection grows.
 - Requests go through the source's HTTP engine with the system's proxy settings, count against the
   download limits, fail after 30 seconds without data, and show among the task's live connections
   as `HTTP`.

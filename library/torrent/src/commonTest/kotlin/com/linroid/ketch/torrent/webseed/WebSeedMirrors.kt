@@ -194,17 +194,26 @@ internal class OneAtATime(private val engine: HttpEngine) : HttpEngine by engine
 }
 
 /** Runs [block] with the info lines Ketch logs meanwhile, which [block] gets as they come. */
-internal suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) {
+internal suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) =
+  withLog(LogLevel.INFO, block)
+
+/**
+ * Runs [block] with the lines Ketch logs meanwhile at [least] or above, which [block] gets as they
+ * come; warnings and errors are left out.
+ */
+internal suspend fun withLog(least: LogLevel, block: suspend (Channel<String>) -> Unit) {
   val lines = Channel<String>(Channel.UNLIMITED)
   KetchLogger.setLogger(object : Logger {
-    override fun v(message: String) = Unit
-    override fun d(message: String) = Unit
-    override fun i(message: String) {
-      lines.trySend(message)
-    }
+    override fun v(message: String) = line(LogLevel.VERBOSE, message)
+    override fun d(message: String) = line(LogLevel.DEBUG, message)
+    override fun i(message: String) = line(LogLevel.INFO, message)
     override fun w(message: String, throwable: Throwable?) = Unit
     override fun e(message: String, throwable: Throwable?) = Unit
-    override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
+    override fun isLoggable(level: LogLevel): Boolean = level >= least
+
+    private fun line(level: LogLevel, message: String) {
+      if (isLoggable(level)) lines.trySend(message)
+    }
   })
   try {
     block(lines)
