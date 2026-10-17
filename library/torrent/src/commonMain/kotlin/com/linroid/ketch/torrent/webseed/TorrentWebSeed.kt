@@ -612,22 +612,24 @@ internal class SwarmWebSeedPieces(
 ) : WebSeedPieces<TorrentPieceScheduler.Claim> {
   private val layout = WebSeedLayout(store.metadata, url)
   private var joined = false
-  // The pieces the seed could not serve, kept for the transfer: the swarm reads them while it
-  // checks for a stall.
+  // The pieces the seed could not serve since it last joined: the swarm reads them while it
+  // checks for a stall, also once the seed stopped.
   private val refused = AtomicReference(emptySet<Int>())
 
   /**
-   * The pieces this seed could not serve when it last asked for them, whether it runs or stopped:
-   * its files are missing there or not the torrent's.
+   * The pieces this seed could not serve since it last started, whether it runs or stopped: its
+   * files are missing there or not the torrent's.
    */
   val unservable: Set<Int> get() = refused.load()
 
   /**
    * Tells the [scheduler] of this seed, which has every piece; [claim] does if it was not. Joining
-   * again, it is asked once more for the pieces it could not serve.
+   * again, it is asked once more for the pieces it could not serve, and forgets that it could not
+   * until it fails again: its mirror may have them by now.
    */
   suspend fun join() {
     if (joined) return
+    refused.store(emptySet())
     scheduler.availability(id, BooleanArray(store.pieceCount) { true })
     joined = true
   }

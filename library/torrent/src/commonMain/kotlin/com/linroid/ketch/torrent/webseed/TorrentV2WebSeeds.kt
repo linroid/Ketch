@@ -120,7 +120,8 @@ internal class TorrentV2WebSeeds private constructor(
   }
 
   // The pieces each seed cannot serve, which its workers report and the loop reads: those it is
-  // not asked for until it starts again, and all it ever could not serve, kept for the transfer.
+  // not asked for until it starts again, and all it could not serve since it last started, kept
+  // once it stops.
   private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
   private val refused = urls.indices.map { AtomicReference(emptySet<Int>()) }
 
@@ -143,7 +144,7 @@ internal class TorrentV2WebSeeds private constructor(
   fun serves(seed: Int, index: Int): Boolean = index !in unservable[seed].load()
 
   /**
-   * Whether [seed] could not serve piece [index] when it last asked for it, whether it runs or
+   * Whether [seed] could not serve piece [index] since it last started, whether it runs or
    * stopped.
    */
   fun refuses(seed: Int, index: Int): Boolean = index in refused[seed].load()
@@ -189,6 +190,7 @@ internal class TorrentV2WebSeeds private constructor(
    */
   fun relaunch(seed: Int): Boolean {
     unservable[seed].store(emptySet())
+    refused[seed].store(emptySet())
     return relaunches.trySend(seed).isSuccess
   }
 

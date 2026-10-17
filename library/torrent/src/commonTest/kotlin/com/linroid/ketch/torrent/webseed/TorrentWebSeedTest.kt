@@ -864,6 +864,29 @@ class TorrentWebSeedTest {
   }
 
   @Test
+  fun refusals_areForgottenWhenASeedStartsAgain() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        withStore(multiFile("http://mirror.test/pub")) { store, _ ->
+          store.initialize()
+          val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
+            store.verifiedPieces(), store::pieceSize, TorrentBufferBudget(4 * 1024 * 1024))
+          val pieces = SwarmWebSeedPieces(-1, "http://mirror.test/pub/", store, scheduler)
+          pieces.join()
+          pieces.unavailable(setOf(3, 4))
+          // Stopped, it still says what it could not serve, for the stall check.
+          pieces.stop()
+          assertEquals(setOf(3, 4), pieces.unservable)
+          // Started again, it is asked again before it refuses them: its mirror may have them now.
+          pieces.join()
+          assertEquals(emptySet(), pieces.unservable)
+          pieces.stop()
+        }
+      }
+    }
+  }
+
+  @Test
   fun unservable_onlyLastingAnswersAndCorruptPieces() {
     val pieces = setOf(3, 4)
     assertEquals(pieces, unservable(WebSeedRequestFailure(pieces, FILE, KetchError.Http(404))))
