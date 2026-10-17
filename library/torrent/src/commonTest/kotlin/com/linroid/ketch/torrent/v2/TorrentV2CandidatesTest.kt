@@ -4,6 +4,7 @@ import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.peer.PeerHandshakeUnansweredException
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerOrigin
+import com.linroid.ketch.torrent.peer.PeerRedial
 import com.linroid.ketch.torrent.peer.PeerSwarmChangedException
 import okio.ByteString.Companion.toByteString
 import okio.IOException
@@ -161,6 +162,30 @@ class TorrentV2CandidatesTest {
     now += 1
     book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
     assertEquals(a, book.next()?.endpoint)
+  }
+
+  @Test
+  fun connectionThatLasted_countsAsTheFirstDial() {
+    val book = book()
+    for (endpoint in listOf(a, b)) {
+      book.offer(endpoint, PeerTopic.V2, PeerOrigin.TRACKER)
+      var target = assertNotNull(book.next())
+      for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+        book.failed(target, IOException("Connection refused"))
+        now += wait
+        target = assertNotNull(book.next())
+      }
+      // The fourth dial connects.
+      book.connected(target.endpoint)
+    }
+    // b drops at once: its dials are spent.
+    book.closed(b, violation = false)
+    assertFalse(book.hasWork())
+    // a stays up for five minutes without payload, as a peer with nothing we need yet does: its
+    // dials start over.
+    now += PeerRedial.LASTING_MS
+    book.closed(a, violation = false)
+    assertEquals(5_000L, book.nextDueMs())
   }
 
   @Test

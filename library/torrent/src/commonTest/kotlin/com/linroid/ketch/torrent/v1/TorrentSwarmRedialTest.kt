@@ -22,6 +22,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -99,6 +100,32 @@ class TorrentSwarmRedialTest {
     assertEquals(10, rig.dials.load() - dropped)
     // A source naming it again brings it back as any new peer.
     rig.reachAgain(upAt = 2_400_000) { rig.peers.send(rig.listener.local) }
+  }
+
+  @Test
+  fun peerUpFiveMinutes_isDialedAgainAsAtFirst() = swarmTest { rig ->
+    rig.down.store(true)
+    rig.peers.send(rig.listener.local)
+    // Refused three times, it answers its fourth dial with nothing we want.
+    while (rig.dials.load() < 3) rig.advanceTo(rig.clock.load() + 5_000)
+    rig.down.store(false)
+    val accepted = async { rig.listener.accept() }
+    while (!accepted.isCompleted) rig.advanceTo(rig.clock.load() + 5_000)
+    val connection = accepted.await()
+    val wire = PeerWire(connection, metadata)
+    wire.handshake(rig.peerHandshake())
+    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(2))))
+    // It drops five minutes later. Its fourth dial would have spent its retries, but a
+    // connection that lasted counts as its first dial: it is dialed again 5 s later.
+    rig.advanceTo(rig.clock.load() + 300_000, step = 300_000)
+    rig.down.store(true)
+    connection.close()
+    delay(300)
+    val before = rig.dials.load()
+    rig.advanceTo(rig.clock.load() + 5_000)
+    delay(300)
+    assertEquals(before + 1, rig.dials.load())
+    rig.reachAgain(upAt = rig.clock.load(), served = intArrayOf(0, 1))
   }
 
   @Test

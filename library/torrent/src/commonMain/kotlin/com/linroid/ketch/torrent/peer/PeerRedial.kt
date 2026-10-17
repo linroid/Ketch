@@ -9,10 +9,11 @@ package com.linroid.ketch.torrent.peer
  * source finds it again later or a stalled swarm revives it: most endpoints trackers and the DHT
  * name are long gone. One that brought payload is retried [DELIVERED_RETRIES] times, about half
  * an hour, as a peer that drops often comes back; then it is given up as any other, so peers
- * gone for good never fill the swarm's book or its dials. A connection that brings payload
- * counts as the first of its endpoint's dials when it closes. A source naming a peer that
- * brought payload again has it dialed once [FOUND_AGAIN_MS] have passed since its last dial, at
- * most once every [FOUND_AGAIN_EVERY_MS]: the DHT names the same peers every minute.
+ * gone for good never fill the swarm's book or its dials. A connection that brings payload, or
+ * stays up [LASTING_MS], counts as the first of its endpoint's dials when it closes. A source
+ * naming a peer that brought payload again has it dialed once [FOUND_AGAIN_MS] have passed since
+ * its last dial, at most once every [FOUND_AGAIN_EVERY_MS]: the DHT names the same peers every
+ * minute.
  */
 internal object PeerRedial {
   /** How often an endpoint that never brought payload is dialed again before it is given up. */
@@ -26,6 +27,9 @@ internal object PeerRedial {
 
   /** How often at most a source naming a peer again has it dialed sooner. */
   const val FOUND_AGAIN_EVERY_MS = 300_000L
+
+  /** A connection that stayed up this long counts as the first of its endpoint's dials. */
+  const val LASTING_MS = 300_000L
 
   private val DELAYS_MS = longArrayOf(5_000, 15_000, 30_000, 60_000, 120_000, 300_000)
 

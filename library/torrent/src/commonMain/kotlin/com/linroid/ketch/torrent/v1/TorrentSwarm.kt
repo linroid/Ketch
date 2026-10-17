@@ -189,6 +189,8 @@ internal class TorrentSwarm(
     val listen: PeerEndpoint?,
     val attempt: PeerAttempt,
     val flags: Int,
+    /** When the worker started, on the swarm's clock. */
+    val startedAt: Long,
     /** Closed because both sides were seeds. */
     val redundant: Boolean = false,
     /** Where we dialed the peer of an incoming connection kept over that dial. */
@@ -308,11 +310,11 @@ internal class TorrentSwarm(
     }
     // A connection to the peer that listens at [endpoint], dialed there or not, ended while we
     // download: it is dialed again after its delay, or given up until forgotten. One that brought
-    // payload, over it or a connection it replaced, counts as its first dial.
-    fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean) {
+    // payload, over it or a connection it replaced, or that [lasted], counts as its first dial.
+    fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean, lasted: Boolean) {
       if (endpoint in faulty || endpoint !in attempts && attempts.size >= MAX_CANDIDATES) return
       if (broughtPayload) delivered += endpoint
-      val dials = if (broughtPayload) 1 else attempts[endpoint] ?: 1
+      val dials = if (broughtPayload || lasted) 1 else attempts[endpoint] ?: 1
       attempts[endpoint] = dials
       // Never dialed, it is still forgotten once given up long enough.
       attemptedAt.getOrPut(endpoint) { now() }
@@ -512,6 +514,7 @@ internal class TorrentSwarm(
       }
       val flags = if (incoming) 0 else peerFlags[endpoint]
       val attempt = PeerAttempt(incoming, PeerIdentityHandshake.Mode.V1)
+      val startedAt = now()
       active[endpoint] = launch(TorrentDispatchers.engine, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
         var end = PeerEnd(listen = if (incoming) null else endpoint)
@@ -537,7 +540,7 @@ internal class TorrentSwarm(
           connection?.close()
           overhead.close()
           results.trySend(PeerResult(endpoint, failure, incoming, end.listen, attempt, flags,
-            end.redundant, end.alias, end.inherited))
+            startedAt, end.redundant, end.alias, end.inherited))
         }
       }
     }
@@ -668,6 +671,7 @@ internal class TorrentSwarm(
             diagnostics.record(endpoint, result.attempt, failure, result.incoming, result.flags)
             if (failure is TorrentStorageException) throw failure
             val broughtPayload = result.attempt.payload > 0 || result.inherited
+            val lasted = now() - result.startedAt >= PeerRedial.LASTING_MS
             if (failure != null && failure !is DuplicatePeerException) {
               connectFailures++
               if (failure is CorruptPieceException) corruptPieces++
@@ -688,7 +692,7 @@ internal class TorrentSwarm(
               if (failure is IllegalArgumentException) {
                 if (alias in attempts) faulty += alias
               } else if (!complete) {
-                redial(alias, broughtPayload)
+                redial(alias, broughtPayload, lasted)
               }
             } else if (result.incoming) {
               // Never redial a source port: a public torrent dials where the peer listens, unless
@@ -696,7 +700,7 @@ internal class TorrentSwarm(
               val listen = result.listen
               if (listen != null && !trackerRestricted && !result.redundant) {
                 if (broughtPayload && !complete && failure !is IllegalArgumentException) {
-                  redial(listen, broughtPayload = true)
+                  redial(listen, broughtPayload = true, lasted)
                 } else if (listen !in active) {
                   discover(listen)
                 }
@@ -704,7 +708,7 @@ internal class TorrentSwarm(
             } else if (failure is IllegalArgumentException) {
               faulty += endpoint
             } else if (!complete) {
-              redial(endpoint, broughtPayload)
+              redial(endpoint, broughtPayload, lasted)
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }

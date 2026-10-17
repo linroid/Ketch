@@ -67,12 +67,14 @@ internal class TorrentV2Candidates(
     var v2 = false
     /** It refused a hybrid's v2 handshake, so it is dialed in v1 mode from then on. */
     var v1Only = false
-    /** Dials since it last brought payload. */
+    /** Dials since it last brought payload, or since a connection to it lasted. */
     var attempts = 0
     /** It brought payload since it was last given up, so it is dialed again for longer. */
     var delivered = false
     /** When it was last dialed. */
     var dialedAt = 0L
+    /** When a connection to it, dialed or learned, last came up. */
+    var connectedAt = 0L
     /** When a source naming it again last brought its dial forward. */
     var broughtForwardAt: Long? = null
     /** When it was given up on; it is dialed again once found after [ATTEMPT_WINDOW_MS]. */
@@ -174,6 +176,7 @@ internal class TorrentV2Candidates(
   /** A connection to [endpoint] is up, dialed or learned as an incoming peer's listen port. */
   fun connected(endpoint: PeerEndpoint) {
     val entry = entries.getOrPut(endpoint) { Entry(endpoint) }
+    entry.connectedAt = nowMs()
     move(entry, Status.CONNECTED)
   }
 
@@ -213,11 +216,11 @@ internal class TorrentV2Candidates(
     }
     val entry = entries[endpoint] ?: return
     if (entry.status != Status.CONNECTED && entry.status != Status.DIALING) return
-    if (delivered) {
-      entry.delivered = true
-      // Its dials start over: the connection counts as the first of them.
-      entry.attempts = 1
-    }
+    if (delivered) entry.delivered = true
+    val lasted = entry.status == Status.CONNECTED &&
+      nowMs() - entry.connectedAt >= PeerRedial.LASTING_MS
+    // Its dials start over: the connection counts as the first of them.
+    if (delivered || lasted) entry.attempts = 1
     retry(entry, complete)
   }
 
