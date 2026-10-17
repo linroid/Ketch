@@ -788,10 +788,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seeding (`[torrent] upload`, while downloading by default in the apps, the CLI and the server;
   the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so). A run
   publishes its session's progress only once the session checked its files (`DOWNLOADING`,
-  `SEEDING` or `FINISHED`) and, when it took over a seeder, applied the run's selection; until
-  then the task shows each file's progress as Ketch restored or planned it, or as the session
-  last reported it, over the files the run follows now, so a recheck never shows 0 and a
-  selection taken during one, or a run Ketch repeats for a selection, shows its own files and size
+  `SEEDING` or `FINISHED`) and took the last selection the run received (a seeder it took over,
+  the run's own); until then the task shows each file's progress as Ketch restored or planned it,
+  or as the session last reported it, over the files the run follows, which a selection changes
+  as it arrives, so a recheck never shows 0 and a selection taken during one, or while a session
+  takes it, or a run Ketch repeats for a selection, shows its own files and size
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
   verified pieces when they are deselected, copies verified spans of boundary pieces from the

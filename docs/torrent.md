@@ -79,7 +79,8 @@ restarts, seeding included: a seeding task saves them about every minute and as 
 
 While a resumed or restarted torrent checks its files, it keeps showing the progress it had, and
 a finished torrent that reopens for files you added shows the new selection from the start. Files
-you check or uncheck during the check change the progress and size shown at once.
+you check or uncheck change the progress and size shown at once, also during the check, which
+starts over with them.
 
 ### Opening `.torrent` files in the apps
 

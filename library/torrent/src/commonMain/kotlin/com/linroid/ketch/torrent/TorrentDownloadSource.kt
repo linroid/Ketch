@@ -1500,6 +1500,9 @@ class TorrentDownloadSource(
    * the files an earlier run gave it. Should it check them again, the task keeps what the session
    * reported last. Either way the task shows that progress over the files it follows now, which
    * a selection taken meanwhile changes, as [planSelection] fits saved progress to a selection.
+   * The task follows a new selection from the moment it arrives, as Ketch shows it then, also
+   * while the session takes it, which can last: until it has, the session reports the files it
+   * had, and one checking its files checks them again.
    */
   private suspend fun track(
     context: DownloadContext,
@@ -1514,7 +1517,9 @@ class TorrentDownloadSource(
     // All guarded by gate.
     var attached = true
     var appliedRevision = if (adopted) -1 else revision
-    // The files the run follows: the ones it started with until it applies a selection. Ketch
+    // Whether the session is taking a selection, the one the run follows already.
+    var applying = false
+    // The files the run follows: the ones it started with until it receives a selection. Ketch
     // may run it again for a selection that came as the last run finished, with segments that
     // still describe that run's files.
     var following = files
@@ -1534,6 +1539,13 @@ class TorrentDownloadSource(
       context.selection.collect { update ->
         if (gate.withLock { update.revision <= appliedRevision }) return@collect
         val ids = table.ordered(update.fileIds.ifEmpty { table.ids })
+        // Shown until the session reports the new selection, as taking it can last: one taken
+        // while the session checks its files starts the check again.
+        gate.withLock {
+          following = ids
+          applying = true
+          hold()
+        }
         val live = session.changeSelection(ids)
         stateMutex.withLock {
           states[taskId]?.let {
@@ -1542,10 +1554,7 @@ class TorrentDownloadSource(
         }
         gate.withLock {
           appliedRevision = update.revision
-          following = ids
-          // Shown until the session reports the new selection; one taken while the session
-          // checks its files starts the check again.
-          hold()
+          applying = false
           if (attached && live) context.acknowledgeSelection(update.revision)
         }
         log.i {
@@ -1578,7 +1587,14 @@ class TorrentDownloadSource(
           log.d { "Torrent taskId=$taskId session state: $status" }
           lastState = status
         }
-        if (status in CHECKED && gate.withLock { appliedRevision >= revision }) {
+        // The revision the session runs, once its report describes the files the run follows: it
+        // took the last selection the run received.
+        val reporting = if (status in CHECKED) {
+          gate.withLock { appliedRevision.takeIf { it >= revision && !applying } }
+        } else {
+          null
+        }
+        if (reporting != null) {
           val chosen = session.selectedFileIds.ifEmpty { files }
           val reported = when (session) {
             is KotlinTorrentSession -> {
@@ -1592,9 +1608,14 @@ class TorrentDownloadSource(
             else -> table.segments(chosen) { 0 }
           }
           gate.withLock {
-            context.segments.value = reported
-            total = table.totalOf(chosen)
-            reported.forEach { held[it.index] = it.downloadedBytes }
+            if (applying || appliedRevision != reporting) {
+              // A selection arrived as the session reported, which may still describe the last.
+              hold()
+            } else {
+              context.segments.value = reported
+              total = table.totalOf(chosen)
+              reported.forEach { held[it.index] = it.downloadedBytes }
+            }
           }
         } else {
           // The selection may have changed since the session last reported.
