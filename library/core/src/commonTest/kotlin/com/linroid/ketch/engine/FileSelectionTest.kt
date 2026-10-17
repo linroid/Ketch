@@ -182,6 +182,64 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_runningTask_showsTheNewProgressBeforeTheNewRequest() = runTest {
+    // Clients follow a task's request and its state apart: the request must not come first, with
+    // the old selection's progress.
+    val source = SelectableSource().apply { reportsOnChange = false }
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      val run = source.runs.value.single()
+      run.context.segments.value = listOf(Segment(0, 0, 99, 80), Segment(1, 100, 299, 50))
+      run.context.onProgress(130, 300)
+      var shown: DownloadState? = null
+      store.onSave = { if (it.request.selectedFileIds.size == 3) shown = task.state.value }
+
+      task.selectFiles(setOf("0", "1", "2"))
+      runCurrent()
+
+      val downloading = assertIs<DownloadState.Downloading>(shown)
+      assertEquals(130, downloading.progress.downloadedBytes)
+      assertEquals(600, downloading.progress.totalBytes)
+      run.finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_runningTaskSaveFails_showsTheOldProgressAgain() = runTest {
+    val source = SelectableSource().apply { reportsOnChange = false }
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      val run = source.runs.value.single()
+      run.context.segments.value = listOf(Segment(0, 0, 99, 80), Segment(1, 100, 299, 50))
+      run.context.onProgress(130, 300)
+      store.onSave = { check(it.request.selectedFileIds.size != 3) { "Disk full" } }
+
+      assertFailsWith<IllegalStateException> { task.selectFiles(setOf("0", "1", "2")) }
+      runCurrent()
+
+      val downloading = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(130, downloading.progress.downloadedBytes)
+      assertEquals(300, downloading.progress.totalBytes)
+      assertEquals(setOf("0", "1"), task.request.selectedFileIds)
+      assertTrue(run.applied.isEmpty())
+      store.onSave = {}
+      run.finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun selectFiles_unacknowledgedAtFinish_reruns() = runTest {
     val source = SelectableSource().apply { collects = false }
     val ketch = ketch(source)

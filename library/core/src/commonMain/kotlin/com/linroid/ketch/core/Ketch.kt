@@ -680,27 +680,41 @@ class Ketch(
       null
     }
     val now = Clock.System.now()
-    handle.record.update { r ->
-      r.copy(
-        request = r.request.copy(selectedFileIds = plan.fileIds),
-        totalBytes = plan.totalBytes,
-        segments = when {
-          reopen -> plan.segments ?: emptyList()
-          // A task that never started (or waits for files) starts fresh: segments would make it
-          // resume without an output path.
-          r.outputPath == null -> r.segments
-          else -> plan.segments ?: r.segments
-        },
-        state = if (reopen || awaiting) TaskState.QUEUED else r.state,
-        completedAt = if (reopen) null else r.completedAt,
-        control = (r.control ?: TaskControl()).let { c ->
-          c.copy(
-            selectionGeneration = generation,
-            commands = if (ledger != null && entry != null) ledger.entries + entry else c.commands,
-          )
-        },
-        updatedAt = now,
-      )
+    // Saving publishes the new request, so a running task shows the plan first: the request never
+    // comes with the old selection's progress. A save that fails shows that progress again.
+    val previous = handle.mutableState.value
+    val shown = if (running) previous.showing(plan) else null
+    if (shown != null) handle.mutableState.compareAndSet(previous, shown)
+    try {
+      handle.record.update { r ->
+        r.copy(
+          request = r.request.copy(selectedFileIds = plan.fileIds),
+          totalBytes = plan.totalBytes,
+          segments = when {
+            reopen -> plan.segments ?: emptyList()
+            // A task that never started (or waits for files) starts fresh: segments would make
+            // it resume without an output path.
+            r.outputPath == null -> r.segments
+            else -> plan.segments ?: r.segments
+          },
+          state = if (reopen || awaiting) TaskState.QUEUED else r.state,
+          completedAt = if (reopen) null else r.completedAt,
+          control = (r.control ?: TaskControl()).let { c ->
+            c.copy(
+              selectionGeneration = generation,
+              commands = if (ledger != null && entry != null) {
+                ledger.entries + entry
+              } else {
+                c.commands
+              },
+            )
+          },
+          updatedAt = now,
+        )
+      }
+    } catch (e: Throwable) {
+      if (shown != null) handle.mutableState.compareAndSet(shown, previous)
+      throw e
     }
     command?.afterSave()
     val delivery = if (running) {
@@ -710,21 +724,10 @@ class Ketch(
     }
     when {
       delivery == SelectionDelivery.DELIVERED -> {
-        // Show the new size now: a transfer that moves no bytes reports no progress to carry it.
+        // Shown again: a transfer that moves no bytes reports no progress to carry the new size,
+        // and one reported since the plan was shown described the old selection.
         val current = handle.mutableState.value
-        if (current is DownloadState.Downloading) {
-          val downloaded = plan.segments?.sumOf { it.downloadedBytes }
-            ?: current.progress.downloadedBytes.coerceAtMost(plan.totalBytes)
-          handle.mutableState.compareAndSet(
-            current,
-            current.copy(
-              progress = current.progress.copy(
-                downloadedBytes = downloaded,
-                totalBytes = plan.totalBytes,
-              ),
-            ),
-          )
-        }
+        current.showing(plan)?.let { handle.mutableState.compareAndSet(current, it) }
       }
       // Cannot happen while the lock is held, as an execution only starts finishing under it.
       delivery == SelectionDelivery.FINISHING -> return null
@@ -849,6 +852,16 @@ class Ketch(
       return sourceResolver.resolveByType(it.sourceType, it.url)
     }
     return sourceResolver.resolve(url)
+  }
+
+  /** This state showing [plan]'s progress and size, when the task downloads. */
+  private fun DownloadState.showing(plan: SelectionPlan): DownloadState.Downloading? {
+    if (this !is DownloadState.Downloading) return null
+    val downloaded = plan.segments?.sumOf { it.downloadedBytes }
+      ?: progress.downloadedBytes.coerceAtMost(plan.totalBytes)
+    return copy(
+      progress = progress.copy(downloadedBytes = downloaded, totalBytes = plan.totalBytes),
+    )
   }
 
   /**
