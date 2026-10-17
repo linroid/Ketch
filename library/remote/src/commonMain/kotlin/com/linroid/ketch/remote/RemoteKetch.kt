@@ -975,7 +975,8 @@ class RemoteKetch internal constructor(
   private suspend fun checkSuccess(response: HttpResponse) {
     if (response.status.isSuccess()) return
     val error = response.toRemoteApiException()
-    log.w { "HTTP error ${error.status}: ${error.errorCode ?: "no error code"}" }
+    // Debug only: the caller gets the error, and says what failed.
+    log.d { "HTTP error ${error.status}: ${error.errorCode ?: "no error code"}" }
     throw error
   }
 

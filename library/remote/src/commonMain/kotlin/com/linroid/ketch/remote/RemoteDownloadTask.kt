@@ -284,7 +284,8 @@ internal class RemoteDownloadTask(
   }
 
   private fun fail(error: RemoteApiException): Nothing {
-    log.w {
+    // Debug only: the caller gets the error, and says what failed.
+    log.d {
       "HTTP error ${error.status} for taskId=$taskId: ${error.errorCode ?: "no error code"}"
     }
     throw error

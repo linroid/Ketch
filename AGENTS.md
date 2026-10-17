@@ -1800,7 +1800,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   an older app's empty reply asks to update it), else the `ketch server` or
   `ketch mcp --standalone` that `instance.json` names, when its pid runs. Results go to stdout,
   everything else to stderr; exit 0, 1 on failure, 2 for invalid arguments (`InstanceExit`).
-  Task IDs may be shortened to a unique prefix
+  Task IDs may be shortened to a unique prefix. Without `-v` they log warnings only: the CLI's
+  `logback.xml` keeps Ktor's engine choice (logger `HttpClient`) at WARN, and `RemoteKetch`
+  logs the HTTP errors its callers get as exceptions at debug
 - `ketch add` sends a `requestId` (`--idempotency-key`: a UUID as it is, other text a name-based
   UUID) and sends it again, up to three times, when the connection fails or the instance answers
   5xx (`submitDownload`); a destination is made absolute for an instance on this machine.

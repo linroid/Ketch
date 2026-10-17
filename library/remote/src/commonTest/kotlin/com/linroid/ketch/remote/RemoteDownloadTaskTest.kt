@@ -153,6 +153,27 @@ class RemoteDownloadTaskTest {
   }
 
   @Test
+  fun remove_refused_logsNoWarning() = runTest {
+    // The caller gets the error and says what failed: a warning would only repeat it.
+    val client = client {
+      respond(
+        content = Json.encodeToString(ErrorResponse("path_rejected", "Outside the folders")),
+        status = HttpStatusCode.Forbidden,
+        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    }
+    try {
+      val warnings = warningsDuring {
+        assertFailsWith<RemoteApiException> { task(client).remove(deleteFiles = true) }
+      }
+
+      assertEquals(emptyList(), warnings)
+    } finally {
+      client.close()
+    }
+  }
+
+  @Test
   fun setConnections_snapshotResponse_updatesQueuePosition() = runTest {
     val request = DownloadRequest(url = "https://example.com/file", connections = 4)
     val snapshot = TaskSnapshot(

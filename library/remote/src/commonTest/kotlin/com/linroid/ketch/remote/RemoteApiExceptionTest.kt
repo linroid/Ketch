@@ -70,6 +70,19 @@ class RemoteApiExceptionTest {
     }
   }
 
+  @Test
+  fun download_refused_logsNoWarning() = runTest {
+    // The caller gets the error and says what failed: a warning would only repeat it.
+    val warnings = warningsDuring {
+      downloadFailure(
+        HttpStatusCode.Forbidden,
+        Json.encodeToString(ErrorResponse("path_rejected", "Outside the download folders"))
+      )
+    }
+
+    assertEquals(emptyList(), warnings)
+  }
+
   private suspend fun downloadFailure(
     status: HttpStatusCode,
     body: String,

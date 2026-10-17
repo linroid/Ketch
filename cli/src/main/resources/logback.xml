@@ -6,6 +6,9 @@
   </appender>
 
   <logger name="io.ktor" level="INFO"/>
+  <!-- Ktor names the engine it picks among those on the classpath, for every client built
+       without one, such as the attaching commands' RemoteKetch. -->
+  <logger name="HttpClient" level="WARN"/>
 
   <root level="INFO">
     <appender-ref ref="STDOUT"/>
