@@ -19,7 +19,11 @@ import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.peer.SWARM_SUMMARY_INTERVAL_MS
+import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
 import com.linroid.ketch.torrent.v1.TorrentPieceScheduler
@@ -35,6 +39,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -732,7 +737,7 @@ class TorrentWebSeedTest {
 
   @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun pieceOneSeedLacked_isMissingOnlyOnceEverySeedLacksIt() = runTest {
+  fun pieceOneDroppedSeedLacked_isMissingThoughTheOtherWasOnlyDown() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         var clock = 0L
@@ -761,13 +766,15 @@ class TorrentWebSeedTest {
                 delay(20)
               }
               delay(500)
-              // Nothing arrives for 40 s: the second seed may still serve stale.bin once started
-              // again, so it is not missing, and the download waits for a source.
+              // Nothing arrives for 40 s: the seed that was down refused nothing, which says
+              // nothing of stale.bin, so the one that lacked it has the say: missing.
               clock = 40_000
               val reported = withTimeout(5_000) { stall.filterNotNull().first() }
-              assertEquals(TorrentStallReason.NO_PEERS, reported.reason)
-              assertEquals(0, reported.missingPieces)
-              // Two minutes into the stall both start again, and neither has stale.bin: missing.
+              assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
+              assertEquals(1, reported.missingPieces)
+              assertEquals(listOf("0"), reported.missingFileIds)
+              // Two minutes into the stall both start again, and neither has stale.bin: still
+              // missing once the relaunch's grace is over, as both refused it again.
               back.store(true)
               clock = 130_000
               while (lacking.requests.count { it.first == staleUrl } < 2 ||
@@ -775,10 +782,10 @@ class TorrentWebSeedTest {
                 delay(20)
               }
               delay(500)
-              clock = 131_000
-              val missing = withTimeout(5_000) {
-                stall.filterNotNull().first { it.reason == TorrentStallReason.MISSING_PIECES }
-              }
+              clock = 141_000
+              delay(500)
+              val missing = assertNotNull(stall.value)
+              assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
               assertEquals(1, missing.missingPieces)
               assertEquals(listOf("0"), missing.missingFileIds)
               swarm.cancel()
@@ -793,7 +800,7 @@ class TorrentWebSeedTest {
 
   @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun pieceTheRunningSeedLacks_isMissingOnlyOnceTheStoppedSeedLacksItToo() = runTest {
+  fun pieceTheRunningSeedLacks_isMissingWhileTheOtherSeedIsDown() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         var clock = 0L
@@ -824,30 +831,85 @@ class TorrentWebSeedTest {
                 delay(20)
               }
               delay(500)
-              // Payload stopped 40 s ago: the dropped seed may still serve stale.bin once started
-              // again, so it is not missing while the other seed runs, and the download waits for
-              // a source.
+              // Payload stopped 40 s ago: the dropped seed refused nothing, which says nothing of
+              // stale.bin, and the running one lacks it: missing.
               clock = 40_000
               delay(500)
               clock = 80_000
               val reported = withTimeout(5_000) { stall.filterNotNull().first() }
-              assertEquals(TorrentStallReason.NO_PEERS, reported.reason)
-              assertEquals(0, reported.missingPieces)
+              assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
+              assertEquals(1, reported.missingPieces)
+              assertEquals(listOf("0"), reported.missingFileIds)
               // Two minutes into the stall the dropped seed starts again, without stale.bin
-              // either: missing.
+              // either: still missing once the relaunch's grace is over, as it refused it too.
               back.store(true)
               clock = 130_000
               while (second.requests.none { it.first == staleUrl }) delay(20)
               delay(500)
-              clock = 131_000
-              val missing = withTimeout(5_000) {
-                stall.filterNotNull().first { it.reason == TorrentStallReason.MISSING_PIECES }
-              }
+              clock = 141_000
+              delay(500)
+              val missing = assertNotNull(stall.value)
+              assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
               assertEquals(1, missing.missingPieces)
               assertEquals(listOf("0"), missing.missingFileIds)
               swarm.cancel()
             }
           } finally {
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun peerLackingAPieceBesideADownSeed_reportsItMissing() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        // The only web seed is down, and the one peer has good.bin but not stale.bin.
+        val down = Outage(MirrorEngine(emptyMap())) { true }
+        withStore(staleSetMetadata()) { store, _ ->
+          val network = createTorrentNetwork()
+          val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val peers = Channel<PeerEndpoint>(1)
+          peers.send(listener.local)
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(down), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              val connection = listener.accept()
+              try {
+                val wire = PeerWire(connection, store.metadata)
+                wire.handshake(PeerHandshake(store.metadata.infoHash, torrentRandomBytes(20),
+                  extensions = false, dht = false))
+                wire.send(PeerMessage.Bitfield(pieceBitfield(booleanArrayOf(false, true, true,
+                  true))))
+                // Interested, the swarm took the peer's pieces; the peer never unchokes it.
+                do {
+                  val message = wire.read()
+                } while (message != PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+                while (down.refused < 2 + WebSeedWorker.MAX_FAILURES) delay(20)
+                delay(500)
+                // Nothing arrives for 40 s: the seed dropped for network errors refused nothing,
+                // which says nothing of stale.bin, and the peer lacks it: missing.
+                clock = 40_000
+                val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+                assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
+                assertEquals(1, reported.missingPieces)
+                assertEquals(listOf("0"), reported.missingFileIds)
+                assertEquals(1, reported.peers)
+                swarm.cancel()
+              } finally {
+                connection.close()
+              }
+            }
+          } finally {
+            listener.close()
             network.close()
           }
         }

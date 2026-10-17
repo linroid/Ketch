@@ -490,10 +490,13 @@ internal class TorrentSwarm(
       val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
       val running = webSeeds.count { it.isActive }
       // A piece no connected peer or running web seed has is missing only once every web seed
-      // that stopped found it could not serve it: the rest wait for a seed started again. With
-      // nothing connected and no web seed, nothing is known to be missing: it waits for peers.
+      // that stopped after refusing pieces could not serve it either: the rest wait for a seed
+      // started again. One dropped for failures that may pass, such as a host that is down,
+      // refused nothing and says nothing of what it serves. With nothing connected and no such
+      // seed, nothing is known to be missing: it waits for peers.
       val refused = webSeeds.indices.filter { !webSeeds[it].isActive }
         .map { webSeedPieces[it].unservable }
+        .filter { it.isNotEmpty() }
         .reduceOrNull { others, seed -> others intersect seed }
       val health = if (peers + running == 0 && refused == null) null else {
         scheduler.health(MAX_REPORTED_MISSING_PIECES, among = refused)
