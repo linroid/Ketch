@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchTextField
@@ -58,6 +61,9 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DeviceScope
+import com.linroid.ketch.app.platform.CountryLookupState
+import com.linroid.ketch.app.platform.LocalCountryLookup
+import com.linroid.ketch.app.platform.flagOf
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.TrafficDirection
@@ -76,6 +82,10 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.connections_column_device
 import ketch.app.shared.generated.resources.connections_column_down
 import ketch.app.shared.generated.resources.connections_column_endpoint
+import ketch.app.shared.generated.resources.connections_countries_attribution
+import ketch.app.shared.generated.resources.connections_countries_download
+import ketch.app.shared.generated.resources.connections_countries_failed
+import ketch.app.shared.generated.resources.connections_countries_hint
 import ketch.app.shared.generated.resources.connections_column_open
 import ketch.app.shared.generated.resources.connections_column_peer
 import ketch.app.shared.generated.resources.connections_column_protocol
@@ -188,6 +198,66 @@ fun ConnectionsScreen(state: AppState) {
       }
     }
     Footer(grid, listed = all.size)
+    CountryFooter()
+  }
+}
+
+/**
+ * [row]'s endpoint, after its country's flag once the country database is loaded; a host name's
+ * is its address's, as this device resolves it.
+ */
+@Composable
+private fun endpointText(row: ConnectionRow): String {
+  val countries = LocalCountryLookup.current ?: return row.endpoint
+  val state by countries.state.collectAsState()
+  if (state != CountryLookupState.Ready) return row.endpoint
+  // Read so that rows draw again as host names resolve.
+  countries.resolved.collectAsState().value
+  val code = countries.countryOf(row.connection.host) ?: return row.endpoint
+  return "${flagOf(code)} ${row.endpoint}"
+}
+
+/**
+ * The button that downloads the country database for the endpoints' flags, or the database's
+ * attribution, which its licence asks for, once it is loaded.
+ */
+@Composable
+private fun CountryFooter() {
+  val countries = LocalCountryLookup.current ?: return
+  LaunchedEffect(countries) { countries.load() }
+  val state by countries.state.collectAsState()
+  val spacing = KetchTheme.spacing
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = KetchTheme.density.pagePadding, vertical = spacing.s2),
+  ) {
+    val note = when (val current = state) {
+      CountryLookupState.Ready -> stringResource(Res.string.connections_countries_attribution)
+      is CountryLookupState.Failed ->
+        stringResource(Res.string.connections_countries_failed, current.reason)
+      else -> stringResource(Res.string.connections_countries_hint)
+    }
+    Text(
+      text = note,
+      style = KetchTheme.typography.caption,
+      color = KetchTheme.colors.textTertiary,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier.weight(1f),
+    )
+    if (state != CountryLookupState.Ready) {
+      KetchButton(
+        text = stringResource(Res.string.connections_countries_download),
+        onClick = countries::download,
+        variant = KetchButtonVariant.Ghost,
+        size = KetchButtonSize.Small,
+        loading = state == CountryLookupState.Loading,
+        enabled = state != CountryLookupState.Loading,
+      )
+    }
   }
 }
 
@@ -443,7 +513,7 @@ private fun TableRow(
     ) {
       TrafficSwatch(row, Modifier.width(LeadWidth))
       Text(
-        text = row.endpoint,
+        text = endpointText(row),
         style = type.monoS,
         color = colors.textPrimary,
         maxLines = 1,
@@ -653,7 +723,7 @@ private fun ListRow(row: ConnectionRow, showDevices: Boolean, onShow: (Connectio
       TrafficSwatch(row, Modifier.width(LeadWidth))
       Column(Modifier.weight(1f)) {
         Text(
-          text = row.endpoint,
+          text = endpointText(row),
           style = type.monoS,
           color = colors.textPrimary,
           maxLines = 1,

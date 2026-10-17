@@ -66,7 +66,9 @@ import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.AwtFilePicker
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.FileActions
+import com.linroid.ketch.app.platform.DbIpCountryLookup
 import com.linroid.ketch.app.platform.LocalAppUpdates
+import com.linroid.ketch.app.platform.LocalCountryLookup
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberFileActions
@@ -472,6 +474,13 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
   }
   val updater = remember { createUpdater(launch, controller, behavior, scope) }
+  val countryLookup = remember {
+    DbIpCountryLookup(
+      fileSystem = FileSystem.SYSTEM,
+      path = launch.configDir.toOkioPath() / COUNTRY_DATABASE_FILE,
+      dispatcher = Dispatchers.IO,
+    )
+  }
   LaunchedEffect(updater) {
     val appSettings = controller.appSettings
     val lastVersion = appSettings.ui.lastVersion
@@ -628,6 +637,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
           LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
           LocalHostShortcuts provides shellSkips,
           LocalAppUpdates provides updater,
+          LocalCountryLookup provides countryLookup,
         ) {
           val app = @Composable {
             windowStates.SaveableStateProvider(MAIN_WINDOW_STATE) {
@@ -1239,6 +1249,7 @@ private const val LOGS_DIR = "logs"
 private const val UPDATES_DIR = "updates"
 private const val UPDATE_LOG = "update.log"
 private const val DISCOVER_HISTORY_FILE = "discover-history.json"
+private const val COUNTRY_DATABASE_FILE = "dbip-country-lite.csv.gz"
 private const val MAIN_WINDOW_STATE = "main-window"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
