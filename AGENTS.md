@@ -128,7 +128,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `HttpExchangeObserver`, `TransferWatchdog`, `TransferMonitor`, `TransferStalledException`,
   `RetryPolicy`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
-  `SegmentedDownloadHelper`
+  `SegmentedDownloadHelper`, `SegmentLane` and its internal `SegmentLedger`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
   `PathFileAccessor`, `ContentUriFileAccessor` (Android), `NoOpFileAccessor`,
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
@@ -307,6 +307,20 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Multi-platform: Android (minSdk 26), JVM 11+, iOS (iosArm64, iosSimulatorArm64), plus
   JS (Node.js) and WasmWasi for the engine; the browser (WasmJs) uses `RemoteKetch`
 - Segmented downloads with concurrent HTTP Range requests
+- Work stealing (HTTP and FTP, `SegmentedDownloadHelper`): each segment runs as a `SegmentLane`
+  on one connection, and a connection that finishes its lane takes over the tail of the one
+  expected to finish last (`SegmentLedger.steal`) instead of closing, with a request of its own.
+  The split is where both finish together, from rates measured once a lane ran 1 s (with 0.5 s
+  for a new request's setup), else in half; a lane that received nothing in that time hands over
+  everything it has not admitted, and its idle transfer is cancelled. Only ranges of at least
+  `DEFAULT_MIN_SPLIT_BYTES` (1 MiB) are handed over, so small files stay on their connections,
+  and never without range support or when an HTTP server counts the requests left
+  (`RateLimit-Remaining`), as each takeover is a request. Sources write what `SegmentLane.admit` allows and report it
+  with `commit`; a lane whose tail was taken ends its transfer by throwing a
+  `CancellationException` (`LaneDrainedException`) once it reaches its new end, which the helper
+  counts as done, as it does any transfer that ends once its lane is complete. A batch still
+  fails as a whole when a lane fails. Split ranges are saved as segments of their own, ordered and
+  indexed by offset
 - Servers without Range support use a single connection; resuming them restarts from zero
 - Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
   connection; a retry or resume restarts it, and the completed task records the file's size
@@ -1926,9 +1940,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### Coroutine-Based Concurrency
 - Each `Ketch` serializes task coordination on a `limitedParallelism(1)` view of
   `KetchDispatchers.main`; `network` runs transfers and `disk` blocking file I/O
-- Segments run as `async` children of one `coroutineScope`: a failed segment cancels the batch
-  and the retry continues from saved segment progress; a connection change cancels and
-  resegments it
+- Each connection runs as a child of one `coroutineScope`, its transfers in a job of their own
+  that a steal can cancel: a failed segment cancels the batch and the retry continues from saved
+  segment progress; a connection change cancels and resegments it
 - Structured concurrency for cleanup on cancel/pause
 
 ## Development Guidelines
@@ -2012,10 +2026,11 @@ Planned features not yet implemented:
    supporting various media sites and extractors
 5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
-   [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
-   that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
-   alone instead of cancelling the batch, and a minimum segment size keeps small files whole
+6. **Lane scheduler** - The rest of the `LaneScheduler` / `RangeLedger` from the helper devices
+   [proposal](docs/design/multi-instance-downloads.md), beyond today's work stealing
+   (`SegmentLedger`): a failed range retries alone instead of cancelling the batch, a minimum
+   segment size keeps small files on one connection from the start, lowering the connection count
+   drains the slowest lane instead of resegmenting, and stalled lanes are revoked in the endgame
 7. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
 8. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
