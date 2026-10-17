@@ -6,9 +6,11 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
+import com.linroid.ketch.core.engine.SINGLE_CHOICE_MESSAGE
 import com.linroid.ketch.core.task.TaskStore
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -119,7 +121,8 @@ class SingleChoiceSelectionTest {
       val task = ketch.download(request("0", "1"))
       runCurrent()
 
-      assertIs<DownloadState.Failed>(task.state.value)
+      val failed = assertIs<DownloadState.Failed>(task.state.value)
+      assertEquals(SINGLE_CHOICE_MESSAGE, assertIs<KetchError.SourceError>(failed.error).detail)
       assertTrue(source.runs.value.isEmpty())
     } finally {
       ketch.close()

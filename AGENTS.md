@@ -664,7 +664,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`download.awaitFileSelection`) in `DownloadSource.features`; clients gate on those, never on
   the source type
 - `DownloadRequest.selectedFileIds` specifies which files to download; empty downloads the
-  source's default (every file, or the first variant)
+  source's default (every file, or the first variant). `download` refuses IDs a given
+  `resolvedSource` does not list (`IllegalArgumentException`); a start fails with a
+  `KetchError.SourceError` naming the IDs its resolution does not list (`unknownFilesMessage`:
+  a torrent's padding files too), or saying why its source refused the selection
 - `DownloadTask.selectFiles` changes the selection in every state but canceled (default throws
   `UnsupportedOperationException`; `RemoteDownloadTask` sends `PUT /api/tasks/{id}/files`). Ketch
   validates it with `DownloadSource.planSelection` against metadata the source holds, never

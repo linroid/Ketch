@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.Ketch
@@ -836,6 +837,64 @@ class FileSelectionTest {
       assertTrue(ketch.tasks.value.none { it.taskId == task.taskId })
       assertNull(store.load(task.taskId))
       assertEquals(1, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun download_fileItsResolutionDoesNotList_isRefusedNamingIt() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val resolved = source.resolved("pick:files", "client")
+
+      val error = assertFailsWith<IllegalArgumentException> {
+        ketch.download(request("0", "7").copy(resolvedSource = resolved))
+      }
+
+      assertEquals("Unknown file ID: 7", error.message)
+      assertTrue(ketch.tasks.value.isEmpty())
+      assertTrue(store.saves.isEmpty())
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun freshStart_unknownFile_failsWithASourceErrorNamingIt() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source)
+    try {
+      val task = ketch.download(request("0", "7"))
+      runCurrent()
+
+      val failed = assertIs<DownloadState.Failed>(task.state.value)
+      val error = assertIs<KetchError.SourceError>(failed.error)
+      assertEquals(SelectableSource.TYPE, error.sourceType)
+      assertEquals("Unknown file ID: 7", error.detail)
+      assertTrue(source.runs.value.isEmpty())
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun freshStart_sourceRefusesAListedFile_failsWithItsReason() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source)
+    try {
+      // The client's resolution lists a fourth file, which the source does not have.
+      val listed = SelectableSource(sizes = listOf(100, 200, 300, 400))
+        .resolved("pick:files", "client")
+      val task = ketch.download(request("3").copy(resolvedSource = listed))
+      runCurrent()
+
+      val failed = assertIs<DownloadState.Failed>(task.state.value)
+      val error = assertIs<KetchError.SourceError>(failed.error)
+      assertEquals("Unknown file id", error.detail)
+      assertTrue(source.runs.value.isEmpty())
     } finally {
       ketch.close()
     }

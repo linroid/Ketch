@@ -460,7 +460,9 @@ ketch.shutdown() // waits while seeding sessions tell their trackers they stoppe
 ```
 
 An empty `selectedFileIds` downloads every file. File IDs keep their index in the metainfo, so the
-IDs of a torrent with padding files, such as a hybrid, have gaps where the padding is left out.
+IDs of a torrent with padding files, such as a hybrid, have gaps where the padding is left out. An
+ID the torrent does not list, a padding file's included, is refused at once when the request
+carries the resolution; otherwise the download fails with a `KetchError.SourceError` naming it.
 
 `KetchApi.resolve` waits until a magnet's metadata is found or the caller cancels it; bound it with
 `withTimeout` if you need to. Up to 16 magnet lookups run at once; more wait for one to finish.

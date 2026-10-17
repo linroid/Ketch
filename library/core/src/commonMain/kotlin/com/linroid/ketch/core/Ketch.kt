@@ -53,6 +53,7 @@ import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.SpeedLimiter
 import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.engine.decodeState
+import com.linroid.ketch.core.engine.unknownFilesMessage
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.geo.CountryLookup
@@ -248,8 +249,9 @@ class Ketch(
    * downloads has been reached.
    *
    * @throws IllegalArgumentException if a header in [DownloadRequest.headers] cannot be sent
-   *   (see [RequestHeaders.requireValid]), or the request selects several variants of a
-   *   [DownloadRequest.resolvedSource] offering a single choice
+   *   (see [RequestHeaders.requireValid]), or the request selects files its
+   *   [DownloadRequest.resolvedSource] does not list, or several variants of one offering a
+   *   single choice
    */
   override suspend fun download(request: DownloadRequest): DownloadTask {
     RequestHeaders.requireValid(request.headers)
@@ -267,6 +269,7 @@ class Ketch(
       request.resolvedSource?.selectionMode != FileSelectionMode.SINGLE ||
         request.selectedFileIds.size <= 1
     ) { SINGLE_CHOICE_MESSAGE }
+    requireListedFiles(request)
     if (request.requestId == null) return createDownload(request)
     return submissionsMutex.withLock {
       val existing = tasks.value.find { it.request.requestId == request.requestId }
@@ -1101,6 +1104,19 @@ class Ketch(
     queue.updateLimits(config.maxConcurrentDownloads, config.maxConnectionsPerHost)
 
     log.i { "Config updated: $config" }
+  }
+
+  /**
+   * Refuses [DownloadRequest.selectedFileIds] that the request's [DownloadRequest.resolvedSource]
+   * does not list, such as a torrent's padding files; a request without one is checked as it
+   * starts.
+   */
+  private fun requireListedFiles(request: DownloadRequest) {
+    val files = request.resolvedSource?.files.orEmpty()
+    if (files.isEmpty() || request.selectedFileIds.isEmpty()) return
+    val listed = files.mapTo(HashSet()) { it.id }
+    val unknown = request.selectedFileIds.filter { it !in listed }
+    require(unknown.isEmpty()) { unknownFilesMessage(unknown) }
   }
 
   /** Refuses a [proxy] other than the system's when the HTTP engine cannot apply it. */

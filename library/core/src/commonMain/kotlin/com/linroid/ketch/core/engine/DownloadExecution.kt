@@ -369,7 +369,8 @@ internal class DownloadExecution(
    * from the source's own metadata ([DownloadSource.planSelection]) rather than the client's, or
    * the whole content.
    *
-   * @throws IllegalArgumentException when a source offering a single choice is given several
+   * @throws KetchError.SourceError when the source refuses the selection, such as several
+   *   variants of a source offering a single choice, or files it does not list, which it names
    */
   private suspend fun freshTotal(
     source: DownloadSource<*>,
@@ -377,8 +378,14 @@ internal class DownloadExecution(
     selected: Set<String>,
   ): Long {
     if (selected.isEmpty()) return resolved.totalBytes
-    require(resolved.selectionMode != FileSelectionMode.SINGLE || selected.size == 1) {
-      SINGLE_CHOICE_MESSAGE
+    if (resolved.selectionMode == FileSelectionMode.SINGLE && selected.size > 1) {
+      throw refusedSelection(source, SINGLE_CHOICE_MESSAGE)
+    }
+    // A source lists every file it takes, never padding: what it lacks is named here.
+    val listed = resolved.files.mapTo(HashSet()) { it.id }
+    val unknown = selected.filter { it !in listed }
+    if (listed.isNotEmpty() && unknown.isNotEmpty()) {
+      throw refusedSelection(source, unknownFilesMessage(unknown))
     }
     return try {
       source.planSelection(
@@ -394,15 +401,30 @@ internal class DownloadExecution(
         )
       ).totalBytes
     } catch (_: UnsupportedOperationException) {
-      require(selected.all { id -> resolved.files.any { it.id == id } }) {
-        "Unknown selected file"
-      }
+      if (unknown.isNotEmpty()) throw refusedSelection(source, unknownFilesMessage(unknown))
       resolved.files.filter { it.id in selected }.fold(0L) { sum, file ->
         require(file.size >= 0 && sum <= Long.MAX_VALUE - file.size)
         sum + file.size
       }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: IllegalArgumentException) {
+      throw refusedSelection(source, e.message, e)
+    } catch (e: IllegalStateException) {
+      throw refusedSelection(source, e.message, e)
     }
   }
+
+  /** The task fails saying why [source] refused its selection, rather than as an unknown error. */
+  private fun refusedSelection(
+    source: DownloadSource<*>,
+    reason: String?,
+    cause: Throwable? = null,
+  ): KetchError.SourceError = KetchError.SourceError(
+    sourceType = source.type,
+    cause = cause ?: IllegalArgumentException(reason),
+    detail = reason ?: "The selected files cannot be downloaded",
+  )
 
   /**
    * Stops the task, which asked to wait for a file selection, once its files are known. The

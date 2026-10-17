@@ -8,6 +8,8 @@ import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
@@ -179,6 +181,38 @@ class DownloadRoutesTest {
       }
       assertEquals(HttpStatusCode.BadRequest, response.status)
     }
+
+  @Test
+  fun post_fileItsResolutionDoesNotList_returns400NamingIt() = testApplication {
+    val ketch = createKetch()
+    application {
+      with(createTestServer(ketch = ketch)) { configureServer() }
+    }
+    val client = createClient {
+      install(ContentNegotiation) { json(json) }
+    }
+    val resolved = ResolvedSource(
+      url = "https://example.com/pack.zip", sourceType = "http", totalBytes = 10,
+      supportsResume = true, suggestedFileName = "pack.zip", maxSegments = 1,
+      files = listOf(SourceFile("0", "a", 4), SourceFile("2", "b", 6)),
+    )
+    val response = client.post("/api/tasks") {
+      contentType(ContentType.Application.Json)
+      setBody(
+        DownloadRequest(
+          url = "https://example.com/pack.zip",
+          destination = Destination("/tmp/downloads/"),
+          selectedFileIds = setOf("0", "1"),
+          resolvedSource = resolved,
+        )
+      )
+    }
+    assertEquals(HttpStatusCode.BadRequest, response.status)
+    val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    assertEquals("bad_request", error.error)
+    assertEquals("Unknown file ID: 1", error.message)
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
 
   @Test
   fun `GET by ID returns created task`() = testApplication {

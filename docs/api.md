@@ -183,6 +183,9 @@ ketch.download(
 - `FileSelectionMode.SINGLE` takes exactly one ID, and defaults to the first file. It is reserved
   for HLS quality; no built-in source offers it yet.
 - `ResolvedSource.defaultSelection()` returns what an empty selection downloads.
+- An ID that `ResolvedSource.files` does not list is refused: `download` throws
+  `IllegalArgumentException` when the request carries the resolution, and otherwise the download
+  fails with a `KetchError.SourceError` whose `detail` names it.
 
 With `awaitFileSelection = true` and no `selectedFileIds`, a download with several files or
 variants pauses as `Paused(AwaitingFileSelection)` once they are known. It holds no download slot
