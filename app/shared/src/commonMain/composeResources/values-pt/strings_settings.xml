@@ -135,6 +135,12 @@
   <string name="settings_general_power">Energia</string>
   <string name="settings_general_keep_awake">Manter ativo durante downloads</string>
   <string name="settings_general_keep_awake_hint">%1$s não entra em repouso automaticamente enquanto houver downloads em andamento. A tela ainda pode desligar.</string>
+  <string name="settings_general_when_done">Ao terminar os downloads</string>
+  <string name="settings_general_when_done_hint">É executado quando nada mais estiver baixando ou aguardando neste computador, após um aviso de um minuto. Vale uma vez e é esquecido quando o Ketch fecha.</string>
+  <string name="settings_general_when_done_nothing">Não fazer nada</string>
+  <string name="settings_general_when_done_quit">Sair do Ketch</string>
+  <string name="settings_general_when_done_sleep">Repousar</string>
+  <string name="settings_general_when_done_shut_down">Desligar</string>
 
   <string name="settings_notifications_downloads">Downloads</string>
   <string name="settings_notifications_footer">“Notificar” usa as notificações do sistema. “Só no app” mostra os avisos dentro do Ketch.</string>
@@ -707,6 +713,7 @@
   <string name="settings_search_badge">O que o ícone no Dock ou na barra de tarefas mostra</string>
   <string name="settings_search_badge_keywords">contador, indicador, selo, dock, barra de tarefas</string>
   <string name="settings_search_keep_awake_keywords">repouso, suspensão, energia, bateria, impedir repouso, wake lock</string>
+  <string name="settings_search_when_done_keywords">desligar, repouso, suspender, sair, fechar, após os downloads, fila, concluído</string>
   <string name="settings_search_shortcuts">Todos os atalhos de teclado</string>
   <string name="settings_search_shortcuts_keywords">teclas, atalhos, teclado, combinações de teclas</string>
   <string name="settings_search_finished_keywords">concluído, terminado, pronto, alerta, aviso</string>

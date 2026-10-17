@@ -233,4 +233,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$s ist offline</string>
   <string name="feedback_device_online">Wieder mit %1$s verbunden</string>
+  <string name="finish_warning_quit">Ketch wird in einer Minute beendet</string>
+  <string name="finish_warning_sleep">Dieser Computer wechselt in einer Minute in den Ruhezustand</string>
+  <string name="finish_warning_shut_down">Dieser Computer wird in einer Minute ausgeschaltet</string>
+  <string name="finish_warning_detail">Die Downloads auf diesem Computer sind fertig.</string>
+  <string name="finish_failed_quit">Ketch konnte nicht beendet werden</string>
+  <string name="finish_failed_sleep">Dieser Computer konnte nicht in den Ruhezustand wechseln</string>
+  <string name="finish_failed_shut_down">Dieser Computer konnte nicht ausgeschaltet werden</string>
 </resources>

@@ -1363,6 +1363,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   user's own suspend; GNOME ignores `idle` locks); Android's
   `WakeLockInhibitor` is a partial `WakeLock`, held only while `KetchService` is in the
   foreground, which keeps it out of Android vitals' excessive wake lock count
+- When downloads finish (Settings → General → Power, desktop only): `AppState.whenDownloadsFinish`
+  (`WhenDownloadsFinish`, built when the host passes `AppController(finishActions = ...)` and an
+  embedded device exists) quits Ketch, puts the computer to sleep or shuts it down
+  (`FinishAction`) once the embedded device goes from `ForegroundStatus.keepsAwake` to idle, so a
+  choice made while idle waits for downloads to run and finish; paused and failed tasks never
+  hold it back. A sticky warning (`notify = true`, so also a system notification while the app is
+  not in front) offers Cancel and running it at once for `GRACE` (1 minute); downloads starting
+  again withdraw it until they finish too. The choice is never saved and runs once, so no later
+  launch or wake shuts the computer down unasked; a failure posts an error. The desktop's
+  `DesktopFinishActions` quits through `CloseBehavior.quitWithoutAsking` and runs System Events'
+  `sleep` and `shut down` (macOS asks once to let Ketch control it; `pmset sleepnow` needs root),
+  `SetSuspendState` and `shutdown /s` (Windows), `systemctl suspend`/`poweroff` (Linux)
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
@@ -2016,11 +2028,9 @@ Planned features not yet implemented:
    [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
    that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
-7. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
-   the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-8. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+7. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-9. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+8. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
    own network and IP, joining or leaving mid-download without pausing it; see the
    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6

@@ -233,4 +233,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$s se desconectó</string>
   <string name="feedback_device_online">Se volvió a conectar con %1$s</string>
+  <string name="finish_warning_quit">Ketch se cerrará en un minuto</string>
+  <string name="finish_warning_sleep">Este equipo se suspenderá en un minuto</string>
+  <string name="finish_warning_shut_down">Este equipo se apagará en un minuto</string>
+  <string name="finish_warning_detail">Las descargas de este equipo han terminado.</string>
+  <string name="finish_failed_quit">No se pudo salir de Ketch</string>
+  <string name="finish_failed_sleep">No se pudo suspender este equipo</string>
+  <string name="finish_failed_shut_down">No se pudo apagar este equipo</string>
 </resources>
