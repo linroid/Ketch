@@ -82,7 +82,9 @@ Run `ketch` with no arguments, or with `--help`, to print the usage. Every comma
 ### Global options
 
 These flags can go anywhere on the command line and apply to every command. Logs go to the
-console at info level by default; see [logging](../docs/logging.md) for what each level shows.
+console at info level by default, and only warnings and errors for downloads, `--list-files`,
+`update` and the commands that work on a running instance; see [logging](../docs/logging.md) for
+what each level shows.
 
 | Option | Effect |
 |---|---|

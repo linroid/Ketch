@@ -112,8 +112,7 @@ fun main(args: Array<String>) {
     "update" -> {
       // The engine that downloads the release only logs warnings unless -v or --debug asks for
       // more, so the progress line stays readable.
-      val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
-      exitProcess(runUpdate(remaining.drop(1), Logger.console(level)))
+      exitProcess(runUpdate(remaining.drop(1), Logger.console(quietLogLevel(ketchLogLevel))))
     }
     else -> when (val parsed = parseDownloadArgs(remaining)) {
       DownloadArgs.Help -> printUsage()
@@ -172,10 +171,11 @@ private fun runDownload(args: DownloadArgs.Download): Int {
   )
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
+  // Only warnings unless -v or --debug asks for more, so the progress line stays readable.
   val ketch = Ketch(
     httpEngine = httpEngine,
     config = config,
-    logger = Logger.console(ketchLogLevel),
+    logger = Logger.console(quietLogLevel(ketchLogLevel)),
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
@@ -199,11 +199,10 @@ private fun runListFiles(args: DownloadArgs.Download): Int {
   val fileConfig = readDefaultConfig()
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   // Only warnings unless -v or --debug asks for more, so the rows are not lost among log lines.
-  val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
   val ketch = Ketch(
     httpEngine = httpEngine,
     config = DownloadConfig(proxy = args.proxy ?: fileConfig.download.proxy),
-    logger = Logger.console(level),
+    logger = Logger.console(quietLogLevel(ketchLogLevel)),
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
@@ -701,8 +700,7 @@ internal fun runInstance(name: String, args: List<String>, results: PrintStream 
       is InstanceArgs.Run -> parsed.command
     }
     // Only warnings unless -v or --debug asks for more, so the results stay readable.
-    val level = if (ketchLogLevel < LogLevel.INFO) ketchLogLevel else LogLevel.WARN
-    KetchLogger.setLogger(Logger.console(level))
+    KetchLogger.setLogger(Logger.console(quietLogLevel(ketchLogLevel)))
     val locator = instanceLocator(command.target)
     return runBlocking { runInstanceCommand(command, locator::locate, results, System.err) }
   } finally {

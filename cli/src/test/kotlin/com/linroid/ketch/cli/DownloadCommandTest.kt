@@ -1,8 +1,12 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Destination
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
@@ -10,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
+import java.net.UnknownHostException
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -49,7 +54,51 @@ class DownloadCommandTest {
 
     assertEquals(DownloadExit.FAILED, status)
     val message = err.toString(Charsets.UTF_8)
-    assertTrue("Download failed: HTTP error 404" in message, message)
+    assertTrue("Download failed: Http: HTTP error 404: Not Found" in message, message)
+  }
+
+  @Test
+  fun downloadUntilDone_hostNotFound_saysWhyWithoutAStackTrace() {
+    // Logged as `ketch <url>` logs. The error's own message, "Network error occurred", said
+    // nothing of why, and Ketch's info records crowded the progress line.
+    val engine = FailingEngine(KetchError.Network(UnknownHostException("host.invalid")))
+    val status = withConsole {
+      download(
+        "https://host.invalid/a.iso",
+        engine,
+        logger = Logger.console(quietLogLevel(LogLevel.INFO)),
+      )
+    }
+
+    assertEquals(DownloadExit.FAILED, status)
+    val message = err.toString(Charsets.UTF_8)
+    assertTrue(
+      "Download failed: Network: Network error occurred <- UnknownHostException: host.invalid"
+        in message,
+      message,
+    )
+    assertFalse("\tat " in message, message)
+    val stdout = out.toString(Charsets.UTF_8)
+    assertFalse("[INFO]" in stdout, stdout)
+  }
+
+  @Test
+  fun downloadUntilDone_sourceLacksSomething_saysWhat() {
+    val engine = FailingEngine(
+      KetchError.Unsupported(IllegalStateException("The server sends no file size")),
+    )
+    val status = download("https://example.com/a.iso", engine)
+
+    assertEquals(DownloadExit.FAILED, status)
+    val message = err.toString(Charsets.UTF_8)
+    assertTrue("Download failed: Not supported: The server sends no file size" in message, message)
+  }
+
+  @Test
+  fun quietLogLevel_verboseFlags_keepTheirLevel() {
+    assertEquals(LogLevel.WARN, quietLogLevel(LogLevel.INFO))
+    assertEquals(LogLevel.DEBUG, quietLogLevel(LogLevel.DEBUG))
+    assertEquals(LogLevel.VERBOSE, quietLogLevel(LogLevel.VERBOSE))
   }
 
   @Test
@@ -83,8 +132,12 @@ class DownloadCommandTest {
     )
   }
 
-  private fun download(url: String, engine: HttpEngine): Int = runBlocking {
-    val ketch = Ketch(httpEngine = engine)
+  private fun download(
+    url: String,
+    engine: HttpEngine,
+    logger: Logger = Logger.None,
+  ): Int = runBlocking {
+    val ketch = Ketch(httpEngine = engine, config = DownloadConfig(retryCount = 0), logger = logger)
     try {
       downloadUntilDone(
         ketch = ketch,
@@ -94,20 +147,37 @@ class DownloadCommandTest {
       )
     } finally {
       ketch.shutdown()
+      // Ketch installs its logger for the whole process.
+      KetchLogger.setLogger(Logger.None)
     }
   }
 
-  /** Answers every request with 404. */
-  private class FailingEngine : HttpEngine {
-    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
-      throw KetchError.Http(404, "Not Found")
+  /** Runs [block] with the console's stdout and stderr going to [out] and [err]. */
+  private fun <T> withConsole(block: () -> T): T {
+    val stdout = System.out
+    val stderr = System.err
+    System.setOut(outStream)
+    System.setErr(errStream)
+    try {
+      return block()
+    } finally {
+      System.setOut(stdout)
+      System.setErr(stderr)
+    }
+  }
+
+  /** Fails every request with [error], 404 by default. */
+  private class FailingEngine(
+    private val error: KetchError = KetchError.Http(404, "Not Found"),
+  ) : HttpEngine {
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo = throw error
 
     override suspend fun download(
       url: String,
       range: LongRange?,
       headers: Map<String, String>,
       onData: suspend (ByteArray) -> Unit,
-    ) = throw KetchError.Http(404, "Not Found")
+    ) = throw error
 
     override fun close() {}
   }

@@ -66,7 +66,7 @@ val logger = Logger.combine(Logger.console(LogLevel.DEBUG), myFileLogger)
 | Where | Default level | How to change it |
 |-------|---------------|------------------|
 | Desktop app | debug | `KETCH_LOG_LEVEL` = `verbose`, `debug`, `info`, `warn` or `error`; applies to the console and the log file |
-| CLI | info | `-v` or `--verbose` for debug, `--debug` for verbose |
+| CLI | info; warn for `ketch <url>`, `--list-files`, `update` and the commands on a running instance | `-v` or `--verbose` for debug, `--debug` for verbose |
 | Android and iOS apps | debug | — |
 | Web app | info | — (logs go to the browser's developer console) |
 

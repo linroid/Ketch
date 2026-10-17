@@ -5,6 +5,8 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.reason
 import com.linroid.ketch.api.resolve
 import kotlinx.coroutines.coroutineScope
@@ -25,9 +27,26 @@ internal object DownloadExit {
 }
 
 /**
+ * The level of the Ketch logger of a command that prints its own output, such as a download's
+ * progress or a list of files: only warnings, unless -v or --debug asks for more ([verbosity]
+ * below [LogLevel.INFO]).
+ */
+internal fun quietLogLevel(verbosity: LogLevel): LogLevel =
+  if (verbosity < LogLevel.INFO) verbosity else LogLevel.WARN
+
+/**
+ * Why [error] failed a download, in one line: what the source lacks for
+ * [KetchError.Unsupported], whose own message is the same whatever the reason, else the error
+ * and its causes, as a [KetchError]'s message alone is only a summary such as "Network error
+ * occurred".
+ */
+internal fun failureReason(error: Throwable): String =
+  if (error is KetchError.Unsupported) error.reason() else error.describeCauses()
+
+/**
  * Downloads [request] with [ketch] until it completes or fails, printing its progress to [out],
  * and returns its exit status, one of [DownloadExit]. Why Ketch refused it or it failed goes to
- * [err], without a stack trace. The task is removed once it ends.
+ * [err] in one line ([failureReason]), without a stack trace. The task is removed once it ends.
  */
 internal suspend fun downloadUntilDone(
   ketch: KetchApi,
@@ -95,7 +114,7 @@ internal suspend fun downloadUntilDone(
       DownloadExit.OK
     },
     onFailure = { error ->
-      err.println("\nDownload failed: ${error.message}")
+      err.println("\nDownload failed: ${failureReason(error)}")
       DownloadExit.FAILED
     },
   )
