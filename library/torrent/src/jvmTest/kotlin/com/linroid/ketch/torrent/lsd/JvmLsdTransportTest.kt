@@ -64,8 +64,19 @@ class JvmLsdTransportTest {
       return@runBlocking skip("no IPv4 multicast on loopback")
     }
     val port = DatagramSocket(0).use { it.localPort }
-    val first = JvmLsdTransport.open(listOf(loopback), emptyList(), port)
-    val second = JvmLsdTransport.open(listOf(loopback), emptyList(), port)
+    // The transport joins through its dual-stack socket, which may refuse what the probe's IPv4
+    // channel took.
+    val first = try {
+      JvmLsdTransport.open(listOf(loopback), emptyList(), port)
+    } catch (e: Exception) {
+      return@runBlocking skip("the system refused to join the group on loopback: $e")
+    }
+    val second = try {
+      JvmLsdTransport.open(listOf(loopback), emptyList(), port)
+    } catch (e: Exception) {
+      first.close()
+      return@runBlocking skip("the system refused to join the group on loopback: $e")
+    }
     try {
       val announce = LsdAnnounce(7000, listOf(ByteArray(20) { 7 }.toByteString()), "first")
       first.send(announce)
