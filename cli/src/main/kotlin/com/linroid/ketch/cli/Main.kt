@@ -5,7 +5,6 @@ import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
 import com.linroid.ketch.ai.resolveAiSettingsFromEnv
 import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
@@ -18,7 +17,6 @@ import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
-import com.linroid.ketch.api.resolve
 import com.linroid.ketch.config.CONFIG_DIR_ENV
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
@@ -194,9 +192,8 @@ private fun runDownload(args: DownloadArgs.Download): Int {
 }
 
 /**
- * Lists the files or variants of [args]' URL, such as a torrent's files, without downloading
- * it: one `ID  SIZE  PATH` row each, in the order `--sort` and `--reverse` ask for. Returns 0, or
- * 1 when the URL cannot be resolved or has no files to choose.
+ * Lists the files or variants of [args]' URL without downloading it, and returns the exit
+ * status of [listFiles].
  */
 private fun runListFiles(args: DownloadArgs.Download): Int {
   val fileConfig = readDefaultConfig()
@@ -213,21 +210,7 @@ private fun runListFiles(args: DownloadArgs.Download): Int {
     ),
   )
   return try {
-    val source = runBlocking { ketch.resolve(args.url, args.headers) }
-    val rows = fileListRows(source, args.fileOrder, args.reverse)
-    if (rows.isEmpty()) {
-      System.err.println("This download has no files to choose.")
-      1
-    } else {
-      rows.forEach(::println)
-      if (source.selectionMode == FileSelectionMode.SINGLE) {
-        System.err.println("These are variants: choose one with --files <id>.")
-      }
-      0
-    }
-  } catch (e: Exception) {
-    System.err.println("Couldn't list the files: ${e.message}")
-    1
+    runBlocking { listFiles(ketch, args) }
   } finally {
     ketch.close()
   }

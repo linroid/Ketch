@@ -1527,6 +1527,11 @@ public final class com/linroid/ketch/api/NoDownloadSourceException : java/lang/E
 	public fun <init> ()V
 }
 
+public final class com/linroid/ketch/api/NoDownloadSourceExceptionKt {
+	public static final fun reason (Lcom/linroid/ketch/api/KetchError$Unsupported;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun reason$default (Lcom/linroid/ketch/api/KetchError$Unsupported;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+}
+
 public abstract class com/linroid/ketch/api/PauseReason {
 	public static final field Companion Lcom/linroid/ketch/api/PauseReason$Companion;
 }

@@ -75,7 +75,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
   and `resolve(bytes, fileName)` extensions build them; a `KetchError.Unsupported` it throws is
   caused by a `NoDownloadSourceException` when no source takes the input, else by what the
-  source that does lacks, such as a usable proxy),
+  source that does lacks, such as a usable proxy; its `reason()` (`@InternalKetchApi`) says
+  which, as the server, MCP and `ketch --list-files` word it),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `CountryDatabase` (its `Key` is a `ControlKey`) and `CountryDatabaseStatus`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules

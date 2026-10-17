@@ -15,12 +15,15 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DownloadCommandTest {
   private val folder: File = Files.createTempDirectory("ketch-cli-download").toFile()
   private val out = ByteArrayOutputStream()
   private val err = ByteArrayOutputStream()
+  private val outStream = PrintStream(out, true, Charsets.UTF_8)
+  private val errStream = PrintStream(err, true, Charsets.UTF_8)
 
   @AfterTest
   fun cleanUp() {
@@ -58,14 +61,36 @@ class DownloadCommandTest {
     assertEquals(3L, File(folder, "a.bin").length())
   }
 
+  @Test
+  fun listFiles_linkNoSourceHandles_saysSo() {
+    val args = assertIs<DownloadArgs.Download>(
+      parseDownloadArgs(listOf("--list-files", "gopher://example.com/a.iso")),
+    )
+
+    val status = runBlocking {
+      val ketch = Ketch(httpEngine = ServingEngine(ByteArray(0)))
+      try {
+        listFiles(ketch, args, outStream, errStream)
+      } finally {
+        ketch.close()
+      }
+    }
+
+    assertEquals(DownloadExit.FAILED, status)
+    assertEquals(
+      "Couldn't list the files: No download source handles this link",
+      err.toString(Charsets.UTF_8).trim(),
+    )
+  }
+
   private fun download(url: String, engine: HttpEngine): Int = runBlocking {
     val ketch = Ketch(httpEngine = engine)
     try {
       downloadUntilDone(
         ketch = ketch,
         request = DownloadRequest(url = url, destination = Destination(folder.path + "/")),
-        out = PrintStream(out, true, Charsets.UTF_8),
-        err = PrintStream(err, true, Charsets.UTF_8),
+        out = outStream,
+        err = errStream,
       )
     } finally {
       ketch.shutdown()

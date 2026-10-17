@@ -5,6 +5,8 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
@@ -104,6 +106,32 @@ class SourceResolverTest {
     }
     // Callers tell it apart from a source's own by its cause.
     assertIs<NoDownloadSourceException>(error.cause)
+  }
+
+  @Test
+  fun resolve_noMatch_logsNoWarning() {
+    // A link someone typed that no source takes is theirs to fix, which the caller reports.
+    val problems = mutableListOf<String>()
+    KetchLogger.setLogger(object : Logger {
+      override fun v(message: String) {}
+      override fun d(message: String) {}
+      override fun i(message: String) {}
+      override fun w(message: String, throwable: Throwable?) {
+        problems += message
+      }
+      override fun e(message: String, throwable: Throwable?) {
+        problems += message
+      }
+    })
+    try {
+      assertFailsWith<KetchError.Unsupported> {
+        SourceResolver(listOf(httpSource)).resolve("gopher://example.com/a.iso")
+      }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    assertEquals(emptyList(), problems)
   }
 
   @Test

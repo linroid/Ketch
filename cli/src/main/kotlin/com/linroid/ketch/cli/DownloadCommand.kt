@@ -2,17 +2,25 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.reason
+import com.linroid.ketch.api.resolve
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.io.PrintStream
+import kotlin.coroutines.cancellation.CancellationException
 
-/** Exit statuses of `ketch <url>`, for scripts that run it. */
+/** Exit statuses of `ketch <url>` and `ketch --list-files <url>`, for scripts that run them. */
 internal object DownloadExit {
-  /** The download completed. */
+  /** The download completed, or the files were listed. */
   const val OK = 0
 
-  /** Ketch refused the download, such as a link no source handles, or the download failed. */
+  /**
+   * Ketch refused the download, such as a link no source handles, or the download failed; for
+   * `--list-files`, the URL could not be resolved or has no files to choose.
+   */
   const val FAILED = 1
 }
 
@@ -91,4 +99,39 @@ internal suspend fun downloadUntilDone(
       DownloadExit.FAILED
     },
   )
+}
+
+/**
+ * Prints the files or variants [ketch] resolves for [args]' URL, such as a torrent's files, to
+ * [out]: one `ID  SIZE  PATH` row each, in the order `--sort` and `--reverse` ask for. Returns its
+ * exit status, one of [DownloadExit]; why the URL could not be listed goes to [err].
+ */
+internal suspend fun listFiles(
+  ketch: KetchApi,
+  args: DownloadArgs.Download,
+  out: PrintStream = System.out,
+  err: PrintStream = System.err,
+): Int {
+  val source = try {
+    ketch.resolve(args.url, args.headers)
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: KetchError.Unsupported) {
+    // Its own message is the same whatever the reason.
+    err.println("Couldn't list the files: ${e.reason()}")
+    return DownloadExit.FAILED
+  } catch (e: Exception) {
+    err.println("Couldn't list the files: ${e.message}")
+    return DownloadExit.FAILED
+  }
+  val rows = fileListRows(source, args.fileOrder, args.reverse)
+  if (rows.isEmpty()) {
+    err.println("This download has no files to choose.")
+    return DownloadExit.FAILED
+  }
+  rows.forEach(out::println)
+  if (source.selectionMode == FileSelectionMode.SINGLE) {
+    err.println("These are variants: choose one with --files <id>.")
+  }
+  return DownloadExit.OK
 }
