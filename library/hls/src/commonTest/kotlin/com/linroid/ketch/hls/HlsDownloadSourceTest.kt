@@ -1,18 +1,22 @@
 package com.linroid.ketch.hls
 
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.core.media.MediaDownloadHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -139,6 +143,123 @@ class HlsDownloadSourceTest {
       assertFailsWith<KetchError.SourceError> { source.download(context, null) }
       assertEquals("existing", file.bytes.decodeToString())
       assertEquals(0, engine.parts.size)
+    }
+  }
+
+  @Test
+  fun resolve_master_listsVariantsBestFirstAsASingleChoice() = runTest {
+    val resolved = HlsDownloadSource(MasterEngine()).resolve(MasterEngine.URL)
+    assertEquals(FileSelectionMode.SINGLE, resolved.selectionMode)
+    assertEquals(listOf("1080p · 5.0 Mbps", "720p · 2.5 Mbps", "480p · 1.0 Mbps"),
+      resolved.files.map { it.name })
+    assertEquals(listOf("0", "1", "2"), resolved.files.map { it.id })
+    assertEquals("1920x1080", resolved.files[0].metadata["resolution"])
+    assertEquals("0", resolved.metadata[MediaDownloadHelper.VARIANT_KEY])
+    assertTrue(KetchFeatures.FILE_SELECTION in HlsDownloadSource(MasterEngine()).features)
+  }
+
+  @Test
+  fun download_selectedVariant_fetchesOnlyItsSegments() = runTest {
+    val engine = MasterEngine()
+    val source = HlsDownloadSource(engine)
+    val resolved = source.resolve(MasterEngine.URL)
+    val request = DownloadRequest(MasterEngine.URL, selectedFileIds = setOf("2"))
+    val file = MemoryFile()
+    source.download(DownloadContext("t", MasterEngine.URL, request, file,
+      MutableStateFlow(emptyList()), { _, _ -> }, {}, emptyMap(), preResolved = resolved), null)
+    assertEquals("480-a480-b", file.bytes.decodeToString())
+    assertEquals(listOf("https://example.com/480/a.ts", "https://example.com/480/b.ts"),
+      engine.parts)
+
+    // A manifest whose variants changed since the task chose one is not guessed at.
+    val stale = resolved.copy(files = resolved.files.map {
+      it.copy(metadata = it.metadata + (MediaDownloadHelper.BANDWIDTH_KEY to "1"))
+    })
+    assertFailsWith<KetchError.SourceError> {
+      source.download(DownloadContext("t", MasterEngine.URL, request, MemoryFile(),
+        MutableStateFlow(emptyList()), { _, _ -> }, {}, emptyMap(), preResolved = stale), null)
+    }
+  }
+
+  @Test
+  fun resolve_separateAudio_mergesFragmentedMp4AndRefusesTransportStreams() = runTest {
+    val master = """
+      #EXTM3U
+      #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a",NAME="English",DEFAULT=YES,URI="audio.m3u8"
+      #EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO="a"
+      video.m3u8
+    """.trimIndent()
+    fun media(segment: String) = "#EXTM3U\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:1,\n$segment\n" +
+      "#EXT-X-ENDLIST"
+    val fmp4 = MasterEngine(mapOf(
+      MasterEngine.URL to master,
+      "https://example.com/video.m3u8" to media("v.m4s"),
+      "https://example.com/audio.m3u8" to media("a.m4s"),
+    ))
+    val resolved = HlsDownloadSource(fmp4).resolve(MasterEngine.URL)
+    assertEquals("2", resolved.metadata[MediaDownloadHelper.TRACKS_KEY])
+    assertEquals("master.mp4", resolved.suggestedFileName)
+
+    val ts = MasterEngine(mapOf(
+      MasterEngine.URL to master,
+      "https://example.com/video.m3u8" to "#EXTM3U\n#EXTINF:1,\nv.ts\n#EXT-X-ENDLIST",
+      "https://example.com/audio.m3u8" to "#EXTM3U\n#EXTINF:1,\na.aac\n#EXT-X-ENDLIST",
+    ))
+    assertFailsWith<KetchError.SourceError> { HlsDownloadSource(ts).resolve(MasterEngine.URL) }
+  }
+
+  @Test
+  fun planSelection_unknownVariant_isRefused() = runTest {
+    val source = HlsDownloadSource(MasterEngine())
+    val resolved = source.resolve(MasterEngine.URL)
+    fun request(ids: Set<String>) =
+      SelectionRequest<Unit>("t", ids, emptySet(), null, resolved, null, null, false)
+    assertEquals(setOf("1"), source.planSelection(request(setOf("1"))).fileIds)
+    assertFailsWith<IllegalArgumentException> { source.planSelection(request(setOf("7"))) }
+  }
+
+  /** A master playlist of three TS variants, by URL. */
+  private class MasterEngine(
+    val manifests: Map<String, String> = mapOf(
+      URL to """
+        #EXTM3U
+        #EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=854x480
+        480/index.m3u8
+        #EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028"
+        1080/index.m3u8
+        #EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720
+        720/index.m3u8
+      """.trimIndent(),
+    ) + listOf("480", "720", "1080").associate {
+      "https://example.com/$it/index.m3u8" to
+        "#EXTM3U\n#EXTINF:1,\na.ts\n#EXTINF:1,\nb.ts\n#EXT-X-ENDLIST"
+    },
+  ) : HttpEngine {
+    val parts = mutableListOf<String>()
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      error("Media does not require HEAD")
+    override suspend fun downloadResource(
+      url: String,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ): String {
+      onData(manifests.getValue(url).encodeToByteArray())
+      return url
+    }
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) {
+      parts += url
+      val name = url.removePrefix("https://example.com/").removeSuffix(".ts").replace('/', '-')
+      onData(name.encodeToByteArray())
+    }
+    override fun close() {}
+
+    companion object {
+      const val URL = "https://example.com/master.m3u8"
     }
   }
 

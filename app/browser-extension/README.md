@@ -169,10 +169,10 @@ browser-internal pages cannot be scanned.
 does not guarantee it is still valid or downloadable on its own.
 
 Streaming playlists in the picker need the receiving instance to support them: `hls.finite` for
-HLS and `dash.finite` for DASH (older servers' combined `media.finite` also counts). Finite,
-unencrypted, single-stream HLS and static MP4 DASH work within the
-[media engine's limits](../../docs/media.md); live or encrypted streams and separate tracks that
-would need merging are rejected by the engine.
+HLS and `dash.finite` for DASH (older servers' combined `media.finite` also counts). Finite HLS,
+AES-128 HLS included, and static MP4 DASH work within the
+[media engine's limits](../../docs/media.md), with separate fragmented MP4 audio merged in; live
+streams and DRM are rejected by the engine.
 
 ### Download dialog
 
