@@ -1345,9 +1345,11 @@ class TorrentDownloadSource(
    * run left running, applies the current selection first.
    *
    * Until the session has checked its files and runs this run's selection, the task keeps the
-   * progress it started with, the [DownloadContext.segments] Ketch restored or planned: a session
-   * checking its files reports none yet, and one taken over still describes the files an earlier
-   * run gave it. Should it check them again, the task keeps what the session reported last.
+   * progress of each file it started with, from the [DownloadContext.segments] Ketch restored or
+   * planned: a session checking its files reports none yet, and one taken over still describes
+   * the files an earlier run gave it. Should it check them again, the task keeps what the session
+   * reported last. Either way the task shows that progress over the files it follows now, which
+   * a selection taken meanwhile changes, as [planSelection] fits saved progress to a selection.
    */
   private suspend fun track(
     context: DownloadContext,
@@ -1359,9 +1361,25 @@ class TorrentDownloadSource(
   ): Boolean = coroutineScope {
     val taskId = context.taskId
     val gate = Mutex()
-    // Both guarded by gate.
+    // All guarded by gate.
     var attached = true
     var appliedRevision = if (adopted) -1 else revision
+    // The files the run follows: the ones it started with until it applies a selection. Ketch
+    // may run it again for a selection that came as the last run finished, with segments that
+    // still describe that run's files.
+    var following = files
+    // Each file's progress by file index, as Ketch restored or planned it, or as the session
+    // last reported it, kept for files deselected meanwhile.
+    val held = context.segments.value.associateTo(HashMap()) { it.index to it.downloadedBytes }
+    // The size of the files the segments describe.
+    var total = 0L
+
+    /** Under gate: shows [held] over the files the run follows. */
+    fun hold() {
+      context.segments.value = table.segments(following) { held[it.id.toInt()] ?: 0 }
+      total = table.totalOf(following)
+    }
+    hold()
     val collector = launch {
       context.selection.collect { update ->
         if (gate.withLock { update.revision <= appliedRevision }) return@collect
@@ -1374,6 +1392,10 @@ class TorrentDownloadSource(
         }
         gate.withLock {
           appliedRevision = update.revision
+          following = ids
+          // Shown until the session reports the new selection; one taken while the session
+          // checks its files starts the check again.
+          hold()
           if (attached && live) context.acknowledgeSelection(update.revision)
         }
         log.i {
@@ -1397,8 +1419,6 @@ class TorrentDownloadSource(
     var lastReceived = (session as? TorrentV2DownloadSession)?.receivedBytes() ?: 0
     var v2Speed = 0L
     var seeding = false
-    // The size of what the segments describe: this run's files until the session reports its own.
-    var total = table.totalOf(files)
     try {
       if (!adopted) session.resume()
       var lastState: TorrentSessionState? = null
@@ -1410,7 +1430,7 @@ class TorrentDownloadSource(
         }
         if (status in CHECKED && gate.withLock { appliedRevision >= revision }) {
           val chosen = session.selectedFileIds.ifEmpty { files }
-          context.segments.value = when (session) {
+          val reported = when (session) {
             is KotlinTorrentSession -> {
               val progress = session.fileProgress()
               table.segments(chosen) { progress.getOrElse(it.id.toInt()) { 0 } }
@@ -1421,7 +1441,14 @@ class TorrentDownloadSource(
             }
             else -> table.segments(chosen) { 0 }
           }
-          total = table.totalOf(chosen)
+          gate.withLock {
+            context.segments.value = reported
+            total = table.totalOf(chosen)
+            reported.forEach { held[it.index] = it.downloadedBytes }
+          }
+        } else {
+          // The selection may have changed since the session last reported.
+          gate.withLock { hold() }
         }
         context.reportedSpeed.value = if (session is TorrentV2DownloadSession) {
           // Over a second or more, as v1 sessions sample theirs: blocks arrive in bursts, and
@@ -1435,7 +1462,10 @@ class TorrentDownloadSource(
           }
           v2Speed
         } else session.downloadSpeed
-        context.onProgress(context.segments.value.sumOf { it.downloadedBytes }, total)
+        val (downloaded, size) = gate.withLock {
+          context.segments.value.sumOf { it.downloadedBytes } to total
+        }
+        context.onProgress(downloaded, size)
         when (status) {
           // The task completes either way; a seeding session outlives it.
           TorrentSessionState.FINISHED -> {

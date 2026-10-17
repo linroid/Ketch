@@ -73,7 +73,8 @@ run [`ketch server`](#seeding-and-uploading).
 Progress counts verified bytes of the files you chose. The network speed also counts bytes that
 are received but not kept, such as retries and the parts of pieces that overlap a skipped file.
 While a resumed or restarted torrent checks its files, it keeps showing the progress it had, and
-a finished torrent that reopens for files you added shows the new selection from the start.
+a finished torrent that reopens for files you added shows the new selection from the start. Files
+you check or uncheck during the check change the progress and size shown at once.
 
 ### Opening `.torrent` files in the apps
 

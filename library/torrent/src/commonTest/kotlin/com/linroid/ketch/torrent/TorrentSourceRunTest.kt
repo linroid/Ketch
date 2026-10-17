@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.SelectionUpdate
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
@@ -16,8 +17,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -33,6 +36,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * Each run of a torrent task follows the task's session as Ketch runs it: the run pays its own
@@ -59,14 +63,27 @@ class TorrentSourceRunTest {
     segments: List<Segment> = emptyList(),
     throttle: suspend (Int) -> Unit = {},
     globalThrottle: suspend (Int) -> Unit = {},
+    selection: StateFlow<SelectionUpdate> = MutableStateFlow(SelectionUpdate(files, 0)),
     onProgress: suspend (Long, Long) -> Unit = { _, _ -> },
   ) = DownloadContext(
     taskId = taskId, url = resolved.url,
     request = DownloadRequest(resolved.url, selectedFileIds = files), fileAccessor = NoIo,
     segments = MutableStateFlow(segments), onProgress = onProgress, throttle = throttle,
     headers = emptyMap(), preResolved = resolved, outputPath = output.toString(),
-    globalThrottle = globalThrottle,
+    selection = selection, globalThrottle = globalThrottle,
   )
+
+  /** The first report that differs from [previous], which the reports repeat until then. */
+  private suspend fun ReceiveChannel<Pair<Long, Long>>.next(
+    previous: Pair<Long, Long>,
+  ): Pair<Long, Long> {
+    // A pass every 200 ms: a few seconds of the same report means it is not changing.
+    repeat(20) {
+      val report = receive()
+      if (report != previous) return report
+    }
+    fail("The task kept reporting $previous")
+  }
 
   @Test
   fun download_takesOverASeeder_paysItsOwnTaskLimits() = runTest {
@@ -202,6 +219,93 @@ class TorrentSourceRunTest {
           run.await()
           assertEquals(listOf(setOf("0", "1")), session.selectionChanges)
           source.stopSeeding("task")
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_selectionChangesWhileTheSessionChecks_showsTheNewSelection() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.DISABLED)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val hash = torrent.metadata.infoHash.hex
+          val all = setOf("0", "1", "2")
+          val session = FakeTorrentSession(hash)
+          session.stateOnResume = TorrentSessionState.CHECKING_FILES
+          engine.addTorrentResult = session
+          val restored = listOf(Segment(0, 0, 99_999, 100_000),
+            Segment(1, 100_000, 169_999, 35_000), Segment(2, 170_000, 256_143))
+          val state = TorrentSourceState(hash, torrent.sizeOf(0, 1, 2), "", all, "unused",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val selection = MutableStateFlow(SelectionUpdate(all, 0))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, segments = restored,
+            selection = selection,
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val run = launch { source.download(context, state) }
+          val everything = 135_000L to torrent.sizeOf(0, 1, 2)
+          assertEquals(everything, reports.receive())
+          // f0 is unchecked while the session checks, which starts its check again: the task
+          // shows f1 and f2 as they were, in the size Ketch gave the selection.
+          selection.value = SelectionUpdate(setOf("1", "2"), 1)
+          val narrowed = 35_000L to torrent.sizeOf(1, 2)
+          val narrowedSegments = listOf(Segment(1, 0, 69_999, 35_000), Segment(2, 70_000, 156_143))
+          assertEquals(narrowed, reports.next(everything))
+          assertEquals(narrowedSegments, context.segments.value)
+          repeat(2) { assertEquals(narrowed, reports.receive()) }
+          // Checked again, f0 shows the progress it had.
+          selection.value = SelectionUpdate(all, 2)
+          assertEquals(everything, reports.next(narrowed))
+          assertEquals(restored, context.segments.value)
+          // A pause keeps the progress of the files the task follows, which Ketch saves.
+          selection.value = SelectionUpdate(setOf("1", "2"), 3)
+          assertEquals(narrowed, reports.next(everything))
+          run.cancel()
+          run.join()
+          assertEquals(narrowedSegments, context.segments.value)
+          assertEquals(listOf(setOf("1", "2"), all, setOf("1", "2")), session.selectionChanges)
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_runAgainForANewSelection_showsItsFilesFromTheStart() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.DISABLED)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val hash = torrent.metadata.infoHash.hex
+          val all = setOf("0", "1", "2")
+          val session = FakeTorrentSession(hash)
+          session.stateOnResume = TorrentSessionState.CHECKING_FILES
+          engine.addTorrentResult = session
+          val state = TorrentSourceState(hash, torrent.sizeOf(0, 1, 2), "", all, "unused",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          // f0 was unchecked as the last run finished, so Ketch runs the task again with that
+          // run's context, whose segments still describe every file.
+          val previous = listOf(Segment(0, 0, 99_999, 100_000),
+            Segment(1, 100_000, 169_999, 35_000), Segment(2, 170_000, 256_143))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, segments = previous,
+            selection = MutableStateFlow(SelectionUpdate(setOf("1", "2"), 1)),
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val run = launch { source.download(context, state) }
+          assertEquals(35_000L to torrent.sizeOf(1, 2), reports.receive())
+          assertEquals(listOf(Segment(1, 0, 69_999, 35_000), Segment(2, 70_000, 156_143)),
+            context.segments.value)
+          session.finish()
+          run.join()
           source.assertNoLeaks()
         } finally { source.close() }
       }
