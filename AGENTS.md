@@ -470,6 +470,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   task either finds the execution and stops it or keeps it from starting, and its slot is freed.
   The queue's and a pause's saves keep a `CANCELED` record, and no state write or progress
   report leaves `Canceled`
+- `remove` deletes the record under its `AtomicSaver`'s lock and closes it (`close`): a write
+  after it, such as a late source save or a setting, saves nothing, so a removed task never comes
+  back after a restart; the task leaves `tasks` right after
 - A source that writes its own files (torrents) resumes into the output path its task chose even
   when no segments were saved yet, as when the process exits right after a start: starting over
   would pick a new `name (n)` beside the files it already owns

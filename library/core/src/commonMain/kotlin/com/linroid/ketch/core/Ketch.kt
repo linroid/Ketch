@@ -423,11 +423,13 @@ class Ketch(
         log.w(e) { "Cleanup failed for taskId=$taskId" }
       }
       connectionRegistry.closeTask(taskId)
-      taskStore.remove(taskId)
-      monitorMutex.withLock { taskMonitors.remove(taskId)?.cancel() }
+      // Deleted after any save in progress, and nothing saves the record again: a late writer,
+      // such as a source saving its state, never brings the task back after a restart.
+      handle.record.close { taskStore.remove(taskId) }
       tasksMutex.withLock {
         _tasks.value = _tasks.value.filter { it.taskId != taskId }
       }
+      monitorMutex.withLock { taskMonitors.remove(taskId)?.cancel() }
     }
 
     override suspend fun setSpeedLimit(taskId: String, limit: SpeedLimit) {

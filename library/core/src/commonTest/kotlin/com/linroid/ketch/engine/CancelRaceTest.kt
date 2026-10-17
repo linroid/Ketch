@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
@@ -204,6 +205,27 @@ class CancelRaceTest {
 
       assertIs<DownloadState.Canceled>(waiting.state.value)
       assertEquals(TaskState.CANCELED, store.load(waiting.taskId)?.state)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun remove_writeAfterIt_savesNothing() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      task.remove(deleteFiles = false)
+      assertNull(store.load(task.taskId))
+
+      // A caller still holding the task, as a late writer holds its handle.
+      task.setSpeedLimit(SpeedLimit.of(1024))
+      runCurrent()
+
+      assertNull(store.load(task.taskId))
     } finally {
       ketch.close()
     }
