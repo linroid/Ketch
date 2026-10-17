@@ -328,6 +328,8 @@ public magnet can also get its file list from another device at home this way.
 - It works over IPv4 and IPv6. Over IPv6 it only finds devices with a unique local address
   (`fc00::/7`); devices with only a link-local address are heard but cannot be dialed.
 - Devices announce every 5 minutes, so a new one may take that long to be found.
+- VPN tunnels are left out: Ketch announces on each local network interface itself, also when a
+  VPN takes the system's multicast traffic.
 - Private and tracker-only torrents never take part, and peers found this way are never shared
   with other peers.
 - It runs on desktop and Android. iOS does not support it, as multicast there needs an entitlement

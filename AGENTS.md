@@ -944,11 +944,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`lsdSenderAllowed`, `lsdPeerDialable`: IPv6 link-local senders are dropped, as `PeerEndpoint`
   carries no zone to dial them), never its own cookie, 32 at once then 4 a second, each peer once a
   minute per torrent. `openLsdMulticast` is one dual-stack `MulticastSocket` with `SO_REUSEADDR`
-  (`JvmLsdTransport`, jvmAndAndroidMain) that joins the IPv4 group on each private IPv4 interface
-  (`lsdInterfaces`) and the IPv6 group on each non-point-to-point interface with a link-local or
-  unique local IPv6 address (`lsdIpv6Interfaces`), sending IPv6 announces to the group scoped to
-  each interface (macOS finds no route to `ff15::` otherwise); its `isCurrent` compares both
-  families' interfaces and addresses. It is `null` on iOS (multicast needs Apple's entitlement).
+  (`JvmLsdTransport`, jvmAndAndroidMain) that joins the IPv4 group on each interface with a
+  private IPv4 address (`lsdInterfaces`) and the IPv6 group on each with a link-local or unique
+  local IPv6 address (`lsdIpv6Interfaces`), point-to-point links (VPN tunnels) left out of both.
+  It sends IPv6 announces to the group scoped to each interface (macOS finds no route to `ff15::`
+  otherwise) and IPv4 ones through an IPv4 `DatagramChannel` with `IP_MULTICAST_IF` set per
+  interface, as on macOS the IPv6 socket's interface option does not steer IPv4 multicast (every
+  announce left on the interface holding the route, often a VPN tunnel). Its `isCurrent` compares
+  both families' interfaces and addresses. It is `null` on iOS (multicast needs Apple's
+  entitlement).
   `TorrentDownloadSource(multicastLock = ...)` holds a `TorrentMulticastLock` while the group is
   joined: the Android app's `KetchService` passes a Wi-Fi `MulticastLock`.
   `TorrentLocalDiscoveryTest` uses virtual time and `FakeLsdTransport`, `JvmLsdTransportTest` real

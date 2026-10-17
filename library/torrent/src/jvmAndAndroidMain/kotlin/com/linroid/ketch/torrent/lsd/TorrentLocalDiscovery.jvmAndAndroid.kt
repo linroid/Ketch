@@ -13,6 +13,10 @@ import java.net.InetSocketAddress
 import java.net.MulticastSocket
 import java.net.NetworkInterface
 import java.net.SocketTimeoutException
+import java.net.StandardProtocolFamily
+import java.net.StandardSocketOptions
+import java.nio.ByteBuffer
+import java.nio.channels.DatagramChannel
 
 internal actual suspend fun openLsdMulticast(): LsdTransport? =
   withContext(TorrentDispatchers.lookup) {
@@ -32,24 +36,26 @@ private fun signature(ipv4: List<NetworkInterface>, ipv6: List<NetworkInterface>
       .map { "${nif.name} ${it.hostAddress}" }
   } + ipv6.flatMap { nif -> lanIpv6Addresses(nif).map { "${nif.name} ${it.hostAddress}" } }
 
-private fun multicastCapable(nif: NetworkInterface): Boolean =
-  runCatching { nif.isUp && !nif.isLoopback && nif.supportsMulticast() }.getOrDefault(false)
+/**
+ * Whether [nif] is up, with multicast, and neither loopback nor a point-to-point link: a VPN
+ * tunnel has no LAN behind it, though it may have a private IPv4 or a link-local IPv6 address,
+ * and peers heard through it carry the tunnel's address, which its proxy resets.
+ */
+private fun lanMulticast(nif: NetworkInterface): Boolean = runCatching {
+  nif.isUp && !nif.isLoopback && !nif.isPointToPoint && nif.supportsMulticast()
+}.getOrDefault(false)
 
-/** The interfaces up with multicast and a private or link-local IPv4 address. */
+/** The LAN interfaces ([lanMulticast]) with a private or link-local IPv4 address. */
 internal fun lsdInterfaces(): List<NetworkInterface> =
   NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().filter { nif ->
-    multicastCapable(nif) &&
+    lanMulticast(nif) &&
       nif.inetAddresses.toList().any { it is Inet4Address && lsdSenderAllowed(it.address) }
   }
 
-/**
- * The interfaces up with multicast and a link-local or unique local IPv6 address, leaving out
- * point-to-point links (VPN tunnels), which have a link-local address but no LAN behind them.
- */
+/** The LAN interfaces ([lanMulticast]) with a link-local or unique local IPv6 address. */
 internal fun lsdIpv6Interfaces(): List<NetworkInterface> =
   NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().filter { nif ->
-    multicastCapable(nif) && !runCatching { nif.isPointToPoint }.getOrDefault(true) &&
-      lanIpv6Addresses(nif).isNotEmpty()
+    lanMulticast(nif) && lanIpv6Addresses(nif).isNotEmpty()
   }
 
 private fun lanIpv6Addresses(nif: NetworkInterface): List<Inet6Address> =
@@ -64,6 +70,12 @@ private fun lanIpv6Addresses(nif: NetworkInterface): List<Inet6Address> =
  */
 internal class JvmLsdTransport private constructor(
   private val socket: MulticastSocket,
+  /**
+   * Sends the IPv4 announces, while [socket] sends the IPv6 ones. [socket] is an IPv6 socket, and
+   * on macOS its interface option does not steer IPv4 multicast: every IPv4 announce left on the
+   * interface the routes choose, a VPN's tunnel when one takes them. An IPv4 socket's does.
+   */
+  private val ipv4Sender: DatagramChannel?,
   private val memberships: List<Membership>,
   /** The signature of the interfaces offered when it opened, joined or not. */
   private val offered: Set<String>,
@@ -96,8 +108,7 @@ internal class JvmLsdTransport private constructor(
         val bytes = announce.encode(membership.host)
         for (nif in membership.interfaces) {
           try {
-            socket.networkInterface = nif
-            socket.send(DatagramPacket(bytes, bytes.size, membership.destination(nif)))
+            sendOn(nif, bytes, membership.destination(nif))
             sent++
           } catch (e: Exception) {
             failure = e
@@ -106,6 +117,18 @@ internal class JvmLsdTransport private constructor(
       }
     }
     if (sent == 0) failure?.let { throw it }
+  }
+
+  /** Sends [bytes] to [destination] out of [nif]. */
+  private fun sendOn(nif: NetworkInterface, bytes: ByteArray, destination: InetSocketAddress) {
+    val channel = ipv4Sender?.takeIf { destination.address is Inet4Address }
+    if (channel != null) {
+      channel.setOption(StandardSocketOptions.IP_MULTICAST_IF, nif)
+      channel.send(ByteBuffer.wrap(bytes), destination)
+    } else {
+      socket.networkInterface = nif
+      socket.send(DatagramPacket(bytes, bytes.size, destination))
+    }
   }
 
   override suspend fun receive(): TorrentDatagram = withContext(TorrentDispatchers.multicast) {
@@ -131,6 +154,7 @@ internal class JvmLsdTransport private constructor(
   }
 
   override fun close() {
+    ipv4Sender?.close()
     socket.close()
   }
 
@@ -147,6 +171,7 @@ internal class JvmLsdTransport private constructor(
       port: Int,
     ): JvmLsdTransport {
       val socket = MulticastSocket(null)
+      var ipv4Sender: DatagramChannel? = null
       try {
         socket.reuseAddress = true
         socket.bind(InetSocketAddress(port))
@@ -165,8 +190,14 @@ internal class JvmLsdTransport private constructor(
         check(memberships.isNotEmpty()) {
           "No interface joined a local service discovery group"
         }
-        return JvmLsdTransport(socket, memberships, signature(ipv4, ipv6))
+        if (memberships.any { it.group.address is Inet4Address }) {
+          ipv4Sender = DatagramChannel.open(StandardProtocolFamily.INET)
+          // Looped back, so that clients on this device hear it too.
+          ipv4Sender.setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true)
+        }
+        return JvmLsdTransport(socket, ipv4Sender, memberships, signature(ipv4, ipv6))
       } catch (e: Throwable) {
+        ipv4Sender?.close()
         socket.close()
         throw e
       }

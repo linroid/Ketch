@@ -8,10 +8,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
+import java.io.IOException
+import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.StandardProtocolFamily
+import java.net.StandardSocketOptions
+import java.nio.ByteBuffer
+import java.nio.channels.DatagramChannel
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -36,6 +45,38 @@ class JvmLsdTransportTest {
     assertTrue(':' in heard.remote.host, heard.remote.host)
     assertTrue('%' !in heard.remote.host, heard.remote.host)
     assertTrue(heard.bytes.decodeToString().contains("\r\nHost: $LSD_HOST_IPV6\r\n"))
+  }
+
+  @Test
+  fun interfaces_leaveOutPointToPointLinks() {
+    // A VPN's tunnel may have a private IPv4 address, but peers heard through it carry the
+    // tunnel's own address, which its proxy resets.
+    for (nif in lsdInterfaces() + lsdIpv6Interfaces()) assertFalse(nif.isPointToPoint, nif.name)
+  }
+
+  @Test
+  fun ipv4_sendsOutOfTheInterfaceItJoined(): Unit = runBlocking {
+    // The multicast routes never choose loopback, so only a send steered there reaches it: an
+    // IPv6 socket's interface option leaves IPv4 multicast on the routes' interface (macOS).
+    val loopback = NetworkInterface.getNetworkInterfaces().toList()
+      .firstOrNull { it.isUp && it.isLoopback }
+    if (loopback == null || !loopbackMulticast(loopback)) {
+      return@runBlocking skip("no IPv4 multicast on loopback")
+    }
+    val port = DatagramSocket(0).use { it.localPort }
+    val first = JvmLsdTransport.open(listOf(loopback), emptyList(), port)
+    val second = JvmLsdTransport.open(listOf(loopback), emptyList(), port)
+    try {
+      val announce = LsdAnnounce(7000, listOf(ByteArray(20) { 7 }.toByteString()), "first")
+      first.send(announce)
+      val heard = assertNotNull(withTimeoutOrNull(5_000) { second.receive() },
+        "The announce left on another interface")
+      assertEquals(announce, LsdAnnounce.parse(heard.bytes))
+      assertEquals("127.0.0.1", heard.remote.host)
+    } finally {
+      first.close()
+      second.close()
+    }
   }
 
   @Test
@@ -99,6 +140,25 @@ class JvmLsdTransportTest {
       first.close()
       second.close()
     }
+  }
+
+  /** Whether IPv4 multicast an IPv4 socket sends out of [loopback] reaches a member there. */
+  private fun loopbackMulticast(loopback: NetworkInterface): Boolean = try {
+    val group = InetAddress.getByName(LSD_GROUP_IPV4)
+    DatagramChannel.open(StandardProtocolFamily.INET).use { receiver ->
+      receiver.bind(InetSocketAddress(0))
+      receiver.join(group, loopback)
+      DatagramChannel.open(StandardProtocolFamily.INET).use { sender ->
+        sender.setOption(StandardSocketOptions.IP_MULTICAST_IF, loopback)
+        sender.send(ByteBuffer.wrap(byteArrayOf(1)),
+          InetSocketAddress(group, (receiver.localAddress as InetSocketAddress).port))
+      }
+      receiver.socket().soTimeout = 2_000
+      receiver.socket().receive(DatagramPacket(ByteArray(16), 16))
+      true
+    }
+  } catch (_: IOException) {
+    false
   }
 
   private fun skip(reason: String) {
