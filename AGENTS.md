@@ -39,6 +39,7 @@ library/
   ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
   hls/        # Finite HLS DownloadSource (same targets as core) -- published SDK module
   dash/       # Finite DASH DownloadSource (same targets as core) -- published SDK module
+  webdav/     # WebDAV DownloadSource (same targets as core) -- published SDK module
   torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM, iOS) -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
@@ -114,7 +115,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:core` (implementation)
 - `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `KetchDispatchers`
   (`KetchDispatchers.Default`, shared by every instance)
-- `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
+- `com.linroid.ketch.core.engine` -- `HttpEngine` (`HttpBody` and `HttpReply` for its
+  `request`), `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
   `SourceResolver`, `SourceState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
@@ -165,6 +167,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.dash` -- `DashDownloadSource` (`.mpd`)
 - Both depend on core's `com.linroid.ketch.core.media` helpers for bounded manifest fetching,
   URL/header handling and sequential transfer; each owns its parser and tests
+
+### `library:webdav`
+- `com.linroid.ketch.webdav` -- `WebDavDownloadSource` (implements `DownloadSource`),
+  `WebDavSourceState`; internal `WebDavUrl` (`Credentials`), `WebDavClient` (`PROPFIND`, probe,
+  ranged `GET`s, answering `401`s), `DavProperties` (multistatus answers), `Xml` (`XmlElement`),
+  `Challenge` and `Authenticator` (Digest and Basic)
 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
@@ -579,10 +587,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   are sequential and pause/retry restarts from zero. Live streams, encryption and separate
   audio/video tracks are rejected; see [media support and limits](docs/media.md)
 - `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
+- `WebDavDownloadSource` (`library:webdav`) handles `webdav(s)://` and `dav(s)://` links with
+  segmented ranged transfers
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source is a `DownloadSource<S>` over its own serializable source state `S`
-  (`HttpSourceState`, `FtpSourceState`, `TorrentSourceState`, `Unit` for HLS/DASH) and defines
+  (`HttpSourceState`, `FtpSourceState`, `WebDavSourceState`, `TorrentSourceState`, `Unit` for
+  HLS/DASH) and defines
   `type`, `stateSerializer`, `canHandle(input)` and `resolve(input, config)`, plus three
   state functions: `download(context, state)` continues from the stored `state` after checking
   the content is unchanged, or starts from the beginning with `null` (Ketch passes the state the
@@ -653,6 +664,41 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   server
 - Passive mode only (PASV/EPSV); FTP URL parsing with credentials
 - Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
+
+### WebDAV Support (`library:webdav`)
+- `WebDavDownloadSource(httpEngine)` takes `webdav://` and `dav://` links (HTTP) and
+  `webdavs://` and `davs://` (HTTPS), registered by the apps, the CLI and `ketch server` after
+  HLS and DASH; see [WebDAV](docs/webdav.md). Requests go through the shared `HttpEngine`, so
+  proxies, network interfaces, redirects and live connections behave as for HTTP
+- Every resolve and every run sends a `PROPFIND` with `Depth: 0` (`HttpEngine.request`, which
+  returns `HttpReply` with the status and headers of any status and reads at most 1 MiB of a
+  success's body; `KtorHttpEngine` and the network engines implement it, the default throws
+  `UnsupportedOperationException`) for `getcontentlength`, `getetag`, `getlastmodified`,
+  `getcontenttype`, `displayname` and `resourcetype`: a collection fails with
+  `KetchError.SourceError`, a resource the multistatus reports with another status fails with
+  that `KetchError.Http`. `403`, `405`, `501`, another success than `207`, or an answer too long
+  (a server taking it for `GET`) read the file from its headers instead (`META_DAV` absent). A
+  probe (`HttpEngine.probe`, else `head`) tells range support and the size
+- Downloads in segments over `SegmentedDownloadHelper` (ranged `GET`s, `TransferWatchdog`,
+  throttle, `ConnectionReporter` with `httpConnectionSpec`/`observeExchanges`, now public), one
+  connection without ranges, and streams content of unknown size. `WebDavSourceState` (entity
+  tag, modification time, size) is what the run found (`store` keeps it per task until
+  `cleanup`), else the resolution's; a resume fails with `KetchError.FileChanged` when the tag
+  (weak prefix and quotes ignored), else the modification time, or the size differs, and keeps
+  saved segments only while the file on disk holds them
+- Sign-in (`WebDavClient`): credentials from the link's user info, else an
+  `Authorization: Basic` header (the apps' Sign in), which is then not sent as it is; other
+  `Authorization` headers pass through. Nothing is sent before a `401`; `Challenge` parses
+  `WWW-Authenticate` and `Authenticator` answers Digest (RFC 7616: `SHA-256` over `MD5`, `-sess`,
+  `qop=auth` or none, `userhash`, a nonce count per nonce) else Basic, warning over plain HTTP. A
+  `401` during a download fetches a new challenge with a `HEAD` once and retries; refused or
+  missing credentials are `KetchError.AuthenticationFailed`
+- The apps read the schemes as `LinkKind.WebDav` (quick add, palette), and Sign in adds the
+  Basic header
+- Tests: `WebDavDownloadSourceTest` over `FakeDavServer` (commonTest), RFC 2617/7616 Digest
+  vectors in `WebDavAuthTest`, and `WebDavIntegrationTest` (jvmTest) against a JDK `HttpServer`
+  requiring Digest, through `KtorHttpEngine` and `Ketch`
+- One file per link: no collection downloads, no NTLM/Negotiate, no Digest `auth-int`
 
 ### BitTorrent/Magnet Support (`library:torrent`)
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
@@ -1957,10 +2003,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Tags: "Ketch", "DownloadTask", "Coordinator", "Execution", "SegmentCalc", "SegmentDownloader",
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
-  "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList", "TorrentController",
-  "TorrentControls", "Connections", "RemoteKetch", "RemoteTask", "RemotePairing",
-  "RemoteTorrents", "TokenBucket", "SqliteStore",
+  "FtpClient", "WebDavSource", "TorrentSource", "TorrentEngine", "TorrentSession",
+  "TorrentSwarm", "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList",
+  "TorrentController", "TorrentControls", "Connections", "RemoteKetch", "RemoteTask",
+  "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
   "GitHubReleases", "Hooks";
@@ -2001,23 +2047,22 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 Planned features not yet implemented:
 
 1. **Metalink** - Multi-source downloads with mirrors, checksums, and chunk verification
-2. **WebDAV** - Download from WebDAV servers with resume support
-3. **More HLS and DASH formats** - Extend the optional HLS/DASH sources with variant selection
+2. **More HLS and DASH formats** - Extend the optional HLS/DASH sources with variant selection
    (the reserved `FileSelectionMode.SINGLE`), matching separate audio/video tracks and AES-128
    HLS encryption. Finite, unencrypted single-stream playlists and byte ranges already work
-4. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
+3. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
    supporting various media sites and extractors
-5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
+4. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
+5. **Work-stealing segments** - The `LaneScheduler` / `RangeLedger` from the helper devices
    [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
    that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
-7. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
+6. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
    the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-8. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+7. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-9. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+8. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
    own network and IP, joining or leaving mid-download without pausing it; see the
-   [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6
+   [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 5

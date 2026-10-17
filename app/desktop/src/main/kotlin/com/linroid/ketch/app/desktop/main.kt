@@ -120,6 +120,7 @@ import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.icon
 import ketch.app.desktop.generated.resources.keep_awake_reason
@@ -705,7 +706,8 @@ private fun createInstanceManager(
           logger = launch.logger,
           additionalSources = listOf(
             FtpDownloadSource(), torrentSource,
-            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+            WebDavDownloadSource(httpEngine),
           ),
           countries = DbIpCountryDatabase(File(configDir, COUNTRY_DATABASE_FILE)),
         ).also { ketch ->

@@ -40,6 +40,7 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.dash.DashDownloadSource
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.hls.HlsDownloadSource
@@ -180,7 +181,8 @@ private fun runDownload(args: DownloadArgs.Download) {
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
-      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+      WebDavDownloadSource(httpEngine),
     ),
   )
 
@@ -257,7 +259,8 @@ private fun runListFiles(args: DownloadArgs.Download): Int {
     logger = Logger.console(level),
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
-      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+      WebDavDownloadSource(httpEngine),
     ),
   )
   return try {
@@ -570,7 +573,8 @@ private fun runServer(args: Array<String>): Int {
     additionalSources = listOf(
       FtpDownloadSource(),
       torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort),
-      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+      WebDavDownloadSource(httpEngine),
     ),
     countries = DbIpCountryDatabase(File(defaultConfigDir(), COUNTRY_DATABASE_FILE)),
   )
@@ -1159,7 +1163,8 @@ private fun runStandaloneMcp(
       // It serves an agent while the client runs, so it does not share finished torrents again
       // when it starts; MCP offers no seeding tool to stop them.
       FtpDownloadSource(), torrentSource(fileConfig.torrent, restoreSeeding = false),
-      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+      HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+      WebDavDownloadSource(httpEngine),
     ),
   )
   val apiToken = newToken()

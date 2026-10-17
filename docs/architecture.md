@@ -21,6 +21,7 @@ dependencies:
 | `library:ftp` | FTP/FTPS `DownloadSource` | Android, iOS, JVM |
 | `library:hls` | Finite HLS `DownloadSource` | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `library:dash` | Finite DASH `DownloadSource` | Android, iOS, JVM, JS (Node.js), WasmWasi |
+| `library:webdav` | WebDAV `DownloadSource` ([details](webdav.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `library:torrent` | BitTorrent and magnet `DownloadSource` ([details](torrent.md)) | Android, iOS, JVM |
 | `library:kermit` | Optional [Kermit](https://github.com/touchlab/Kermit) logging integration | Android, iOS, JVM, JS, WasmJs |
 | `library:remote` | Remote client: control a Ketch server from any platform | Android, iOS, JVM, WasmJs |
@@ -53,6 +54,7 @@ library:api          (public interfaces and models; no protocol types)
   |      +--- library:ftp      (FTP/FTPS DownloadSource)
   |      +--- library:hls      (finite HLS DownloadSource)
   |      +--- library:dash     (finite DASH DownloadSource)
+  |      +--- library:webdav   (WebDAV DownloadSource)
   |      +--- library:torrent  (BitTorrent DownloadSource and controller; ktor, torrent-api)
   |      +--- library:server   (REST API + SSE daemon; endpoints, ktor, sqlite)
   |      +--- updater          (GitHub release updates)
@@ -66,10 +68,10 @@ library:api          (public interfaces and models; no protocol types)
          +--- ai:discover  (LLM-driven resource discovery)
          +--- hooks        (commands and webhooks on download events)
 
-cli          (core, ktor, sqlite, ftp, hls, dash, torrent, server, mcp, remote, config,
+cli          (core, ktor, sqlite, ftp, hls, dash, webdav, torrent, server, mcp, remote, config,
               ai:discover, hooks, updater)
 app/shared   (Compose Multiplatform UI: config and remote everywhere; core, ktor, sqlite, ftp,
-              hls, dash, torrent and ai:discover where the engine runs)
+              hls, dash, webdav, torrent and ai:discover where the engine runs)
 app/desktop  (JVM entry point: shared, the engine modules, server, ai:discover, hooks, updater)
 app/android  (Android entry point: shared, the engine modules, server, ai:discover, updater)
 app/web      (WasmJs entry point: shared, remote only)
@@ -115,7 +117,7 @@ Everything that varies by platform or use is an interface passed to `Ketch`:
 | `HttpEngine` | HTTP `HEAD`/`GET` with ranges, proxies | `KtorHttpEngine` (`library:ktor`), `MultiNetworkHttpEngine` (one engine per network) |
 | `TaskStore` | Save tasks so they survive a restart | `InMemoryTaskStore`, `SqliteTaskStore` |
 | `Logger` | Diagnostic logging | `Logger.None`, `Logger.console()`, `Logger.combine()`, `KermitLogger` |
-| `DownloadSource<S>` | One download protocol | `HttpDownloadSource` (built in), `FtpDownloadSource`, `HlsDownloadSource`, `DashDownloadSource`, `TorrentDownloadSource` |
+| `DownloadSource<S>` | One download protocol | `HttpDownloadSource` (built in), `FtpDownloadSource`, `HlsDownloadSource`, `DashDownloadSource`, `WebDavDownloadSource`, `TorrentDownloadSource` |
 | `FileNameResolver` | Names a file when the source suggests none | `DefaultFileNameResolver` |
 
 ### Download sources
@@ -127,8 +129,8 @@ HTTP source as the fallback. A source:
 - probes a link with `resolve(input, config)`;
 - transfers it with `download(context, state)`, starting over when `state` is `null`;
 - returns what a later run needs to continue from `store(context)`, a value of its own
-  serializable type `S` (`HttpSourceState`, `FtpSourceState`, `TorrentSourceState`, or `Unit` for
-  HLS and DASH);
+  serializable type `S` (`HttpSourceState`, `FtpSourceState`, `WebDavSourceState`,
+  `TorrentSourceState`, or `Unit` for HLS and DASH);
 - releases what outlived the download, and optionally deletes its files, in
   `cleanup(context, state, deleteFiles)`.
 
@@ -321,10 +323,10 @@ Every failure is a `KetchError`:
 | `Http(code)` | 5xx and 429 | Non-success HTTP status |
 | `Disk` | No | File I/O failures (from the `FileAccessor`) |
 | `Unsupported` | No | Server lacks required features, or no source handles the URL |
-| `FileChanged` | No | ETag/Last-Modified (or FTP MDTM) mismatch on resume |
+| `FileChanged` | No | ETag/Last-Modified (or FTP MDTM, WebDAV `getetag`) mismatch on resume |
 | `CorruptResumeState` | No | Saved resume state cannot be decoded |
 | `SourceError` | No | Error from a `DownloadSource` |
-| `AuthenticationFailed` | No | Credentials rejected (e.g. FTP 530) |
+| `AuthenticationFailed` | No | Credentials rejected (e.g. FTP 530, WebDAV 401) |
 | `ChecksumMismatch` | No | The finished file's digest differs from the expected or published one |
 | `Canceled` | No | User-initiated cancellation |
 | `Unknown` | No | Unexpected exceptions |

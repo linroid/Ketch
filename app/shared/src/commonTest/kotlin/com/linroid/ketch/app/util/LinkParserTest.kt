@@ -24,6 +24,8 @@ class LinkParserTest {
       ftp://ftp.example.org/pub/file.tar.gz
       ftps://secure.example.org/file.bin
       http://example.com/a.torrent
+      Shared from davs://cloud.example.org/remote.php/dav/files/me/movie.mkv, and
+      webdav://nas.local/share/a.iso
     """.trimIndent()
 
     assertEquals(
@@ -32,6 +34,8 @@ class LinkParserTest {
         Link("ftp://ftp.example.org/pub/file.tar.gz"),
         Link("ftps://secure.example.org/file.bin"),
         Link("http://example.com/a.torrent"),
+        Link("davs://cloud.example.org/remote.php/dav/files/me/movie.mkv"),
+        Link("webdav://nas.local/share/a.iso"),
       ),
       parse(text),
     )
@@ -411,7 +415,10 @@ class LinkParserTest {
 
   @Test
   fun quickAddLink_onePlainLink_returnsIt() {
-    listOf("https://example.com/a.iso", "http://example.com/a", "ftp://example.com/a.bin")
+    listOf(
+      "https://example.com/a.iso", "http://example.com/a", "ftp://example.com/a.bin",
+      "davs://cloud.example.com/remote.php/dav/files/me/a.mkv",
+    )
       .forEach { assertEquals(Link(it), LinkParser.quickAddLink(" $it\n"), it) }
     assertEquals(Link("https://example.com/a.iso"), LinkParser.quickAddLink("example.com/a.iso"))
   }
@@ -441,6 +448,11 @@ class LinkParserTest {
       "https://x.org/a.torrent.zip" to LinkKind.Http,
       "ftp://x.org/a.torrent" to LinkKind.Ftp,
       "ftps://x.org/a" to LinkKind.Ftp,
+      "webdav://x.org/a" to LinkKind.WebDav,
+      "WebDAVS://x.org/a" to LinkKind.WebDav,
+      "dav://x.org/a.torrent" to LinkKind.WebDav,
+      "davs://x.org/a" to LinkKind.WebDav,
+      "sdav://x.org/a" to LinkKind.Other,
       "Magnet:?xt=urn:btih:$HEX_HASH" to LinkKind.Magnet,
       "torrent:$HEX_HASH" to LinkKind.Other,
     )

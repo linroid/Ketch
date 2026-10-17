@@ -32,6 +32,7 @@ published on Maven Central under `com.linroid.ketch`. You can use it to:
 | `ktor` | `KtorHttpEngine`, the default HTTP engine for `core` | Android, iOS, JVM |
 | `sqlite` | `SqliteTaskStore`, which keeps tasks across restarts | Android, iOS, JVM |
 | `ftp` | FTP and FTPS downloads | Android, iOS, JVM |
+| `webdav` | WebDAV downloads, with Digest and Basic sign-in ([details](webdav.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `hls` | Finite HLS downloads ([details](media.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `dash` | Finite DASH downloads ([details](media.md)) | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `torrent` | BitTorrent and magnet downloads ([details](torrent.md)) | Android, iOS, JVM |
@@ -96,7 +97,8 @@ From here:
   from `sqlite` to resume them after a restart.
 - Add `FtpDownloadSource()` or `TorrentDownloadSource()` to `additionalSources` for FTP or
   BitTorrent, and `HlsDownloadSource(httpEngine)` or `DashDownloadSource(httpEngine)` for
-  [finite streaming media](media.md), sharing the engine you pass to `Ketch`.
+  [finite streaming media](media.md), and `WebDavDownloadSource(httpEngine)` for
+  [WebDAV](webdav.md), sharing the engine you pass to `Ketch`.
 
 The [API reference](api.md) covers configuration, priorities and scheduling, speed limits,
 checksums, errors and logging. [Multiple networks](multiple-networks.md) shows how to spread
@@ -200,7 +202,7 @@ Every part that varies by platform or use is an interface you can replace:
 
 | Interface | Replace it to | Built in |
 |---|---|---|
-| `DownloadSource<S>` | Add a protocol | HTTP(S); `FtpDownloadSource`, `HlsDownloadSource`, `DashDownloadSource`, `TorrentDownloadSource` |
+| `DownloadSource<S>` | Add a protocol | HTTP(S); `FtpDownloadSource`, `HlsDownloadSource`, `DashDownloadSource`, `WebDavDownloadSource`, `TorrentDownloadSource` |
 | `HttpEngine` | Use another HTTP client | `KtorHttpEngine`, `MultiNetworkHttpEngine` |
 | `TaskStore` | Keep tasks somewhere else | `InMemoryTaskStore`, `SqliteTaskStore` |
 | `Logger` | Send logs to your backend | `Logger.console()`, `Logger.combine()`, `KermitLogger` |

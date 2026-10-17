@@ -37,6 +37,14 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
   override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
     nextEngine().probe(url, headers)
 
+  override suspend fun request(
+    method: String,
+    url: String,
+    headers: Map<String, String>,
+    body: HttpBody?,
+    maxBodyBytes: Int,
+  ): HttpReply = nextEngine().request(method, url, headers, body, maxBodyBytes)
+
   override suspend fun downloadResource(
     url: String,
     headers: Map<String, String>,
@@ -89,6 +97,15 @@ class MultiNetworkHttpEngine(engines: List<HttpEngine>) : HttpEngine {
 
     override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
       nextEngine().withProxy(proxy).probe(url, headers)
+
+    override suspend fun request(
+      method: String,
+      url: String,
+      headers: Map<String, String>,
+      body: HttpBody?,
+      maxBodyBytes: Int,
+    ): HttpReply =
+      nextEngine().withProxy(proxy).request(method, url, headers, body, maxBodyBytes)
 
     override suspend fun downloadResource(
       url: String,

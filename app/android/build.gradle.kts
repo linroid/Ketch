@@ -143,6 +143,7 @@ dependencies {
   implementation(projects.library.ftp)
   implementation(projects.library.hls)
   implementation(projects.library.dash)
+  implementation(projects.library.webdav)
   implementation(projects.library.torrent)
   implementation(projects.library.sqlite)
   implementation(projects.library.server)

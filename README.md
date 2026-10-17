@@ -57,7 +57,7 @@
 </p>
 
 Ketch splits every download across parallel connections, and shows each one as a live lane. It
-takes web links, FTP servers, torrents and magnet links in one place. Pair your laptop, phone and
+takes web links, FTP and WebDAV servers, torrents and magnet links in one place. Pair your laptop, phone and
 home server, and you can watch and control the downloads on all of them from any one of them.
 
 **Building your own app?** Embed the same download engine that powers Ketch's apps, with parallel
@@ -108,6 +108,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **HTTP and HTTPS**, with the cookies and referrer of the page when the browser extension sends
   the download.
 - **FTP and FTPS**, with parallel connections and resume.
+- **WebDAV** — Files on Nextcloud, ownCloud, a NAS or any WebDAV server (`davs://` links), with
+  parallel connections, resume and Digest or Basic sign-in ([details](docs/webdav.md)).
 - **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files and
   optional seeding, in an engine written in pure Kotlin. It speaks uTP and protocol encryption,
   downloads from web seeds, forwards its port on your router and finds peers on your local
@@ -236,7 +238,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   the extension in more browser stores and verified installation/update paths
   ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads from several mirrors at once, with checksums
-- **WebDAV** — Download from WebDAV servers, with resume
 - **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
   AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
