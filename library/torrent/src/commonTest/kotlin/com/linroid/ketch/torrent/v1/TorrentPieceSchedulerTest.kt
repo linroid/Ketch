@@ -344,6 +344,41 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun peerThatGaveItsBlocksBack_isDueByWhatItIsGivenNow() = runTest {
+    var now = 0L
+    val budget = TorrentBufferBudget(2 * piece)
+    val scheduler = scheduler(pieces = 2, budget, clock = { now })
+    scheduler.availability(1, all(2))
+    assertEquals(4, scheduler.request(1, max = 4, lateAfterMs = 30_000).requests.size)
+    // It chokes us without the fast extension: everything it owed goes back.
+    scheduler.releasePeer(1)
+    now = 100
+    assertEquals(4, scheduler.request(1, max = 4, lateAfterMs = 4_000).requests.size)
+    now = 4_200
+    assertEquals(4, scheduler.health(limit = 0).lateBlocks)
+    scheduler.remove(1)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun peerThatSentEverythingItOwed_isDueByWhatItIsGivenNow() = runTest {
+    var now = 0L
+    val budget = TorrentBufferBudget(2 * piece)
+    val scheduler = scheduler(pieces = 2, budget, clock = { now })
+    scheduler.availability(1, all(2))
+    val first = scheduler.request(1, max = 4, lateAfterMs = 30_000).requests
+    assertIs<TorrentPieceScheduler.Arrival.Complete>(scheduler.deliver(1, first))
+    assertFalse(scheduler.finish(1, 0, CommitOutcome.VERIFIED))
+    now = 100
+    assertEquals(listOf(1, 1, 1, 1),
+      scheduler.request(1, max = 4, lateAfterMs = 4_000).requests.map { it.index })
+    now = 4_200
+    assertEquals(4, scheduler.health(limit = 0).lateBlocks)
+    scheduler.remove(1)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun endgame_pieceAWebSeedFetches_isNotLateBeforeWhatItsPeerWasAskedEarlier() = runTest {
     var now = 0L
     // Room for the peer's piece, the seed's and the peer's copy of the seed's.
