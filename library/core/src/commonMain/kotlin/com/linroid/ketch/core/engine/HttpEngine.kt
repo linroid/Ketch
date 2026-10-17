@@ -71,6 +71,31 @@ interface HttpEngine {
   }
 
   /**
+   * Sends a request that is not a download, such as WebDAV's `PROPFIND`, following redirects as
+   * the other requests do, and returns the final response. Unlike [head] and [download], a status
+   * that is not a success is returned rather than thrown, so callers can read its headers, such
+   * as an authentication challenge; only a success's body is read, and never a `HEAD`'s.
+   *
+   * The default implementation throws [UnsupportedOperationException]. Engines that wrap another
+   * must override it to pass it on.
+   *
+   * @param method the request method, such as `PROPFIND`
+   * @param url the resource URL
+   * @param headers additional request headers; [body]'s content type is set from [HttpBody]
+   * @param body the request body, or `null` for none
+   * @param maxBodyBytes the longest success body read; a longer one fails the request with
+   *   [KetchError.Unsupported]
+   * @throws com.linroid.ketch.api.KetchError.Network on connection failure
+   */
+  suspend fun request(
+    method: String,
+    url: String,
+    headers: Map<String, String> = emptyMap(),
+    body: HttpBody? = null,
+    maxBodyBytes: Int = HttpReply.DEFAULT_MAX_BODY_BYTES,
+  ): HttpReply = throw UnsupportedOperationException("This engine cannot send $method requests")
+
+  /**
    * Whether [withProxy] accepts proxies other than [Proxy.System]. Ketch lists
    * [com.linroid.ketch.api.KetchFeatures.PROXY], and accepts such proxies, only when it does.
    */
@@ -100,3 +125,41 @@ interface HttpEngine {
 /** This engine for [Proxy.System], which it follows by itself, else [HttpEngine.withProxy]. */
 internal fun HttpEngine.through(proxy: Proxy): HttpEngine =
   if (proxy == Proxy.System) this else withProxy(proxy)
+
+/**
+ * The body of a request [HttpEngine.request] sends.
+ *
+ * @property bytes the body
+ * @property contentType its media type, such as `application/xml; charset=utf-8`
+ */
+class HttpBody(val bytes: ByteArray, val contentType: String)
+
+/**
+ * The final response to an [HttpEngine.request].
+ *
+ * @property status the status code
+ * @property headers the response headers by lowercase name, each with its values in order
+ * @property body the body of a success, empty for other statuses
+ * @property url the URL that answered, after the redirects the engine followed, or `null` when
+ *   the engine does not say
+ */
+class HttpReply(
+  val status: Int,
+  val headers: Map<String, List<String>>,
+  val body: ByteArray,
+  val url: String? = null,
+) {
+  /** Whether [status] is a success (2xx). */
+  val isSuccess: Boolean get() = status in 200..299
+
+  /** The first value of the header named [name], whatever its case, or `null`. */
+  fun header(name: String): String? = headers[name.lowercase()]?.firstOrNull()
+
+  /** Every value of the header named [name], whatever its case. */
+  fun headers(name: String): List<String> = headers[name.lowercase()].orEmpty()
+
+  companion object {
+    /** The longest body [HttpEngine.request] reads unless told otherwise: 1 MiB. */
+    const val DEFAULT_MAX_BODY_BYTES: Int = 1 shl 20
+  }
+}

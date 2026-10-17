@@ -24,6 +24,7 @@ ketch-remote = { module = "com.linroid.ketch:remote", version.ref = "ketch" }
 ketch-ftp = { module = "com.linroid.ketch:ftp", version.ref = "ketch" }
 ketch-hls = { module = "com.linroid.ketch:hls", version.ref = "ketch" }
 ketch-dash = { module = "com.linroid.ketch:dash", version.ref = "ketch" }
+ketch-webdav = { module = "com.linroid.ketch:webdav", version.ref = "ketch" }
 ketch-torrent = { module = "com.linroid.ketch:torrent", version.ref = "ketch" }
 ketch-torrent-api = { module = "com.linroid.ketch:torrent-api", version.ref = "ketch" }
 ```
@@ -62,7 +63,7 @@ dependencies {
 | Modules | Targets |
 |---|---|
 | `api`, `torrent-api` | Android, iOS, JVM, JS, WasmJs, WasmWasi |
-| `core`, `hls`, `dash` | Android, iOS, JVM, JS (Node.js), WasmWasi |
+| `core`, `hls`, `dash`, `webdav` | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `ktor`, `sqlite`, `ftp`, `torrent` | Android, iOS, JVM |
 | `remote`, `endpoints` | Android, iOS, JVM, WasmJs |
 | `kermit` | Android, iOS, JVM, JS, WasmJs |

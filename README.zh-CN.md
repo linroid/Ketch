@@ -111,6 +111,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 
 - **HTTP 和 HTTPS**，浏览器扩展发送下载任务时会附带页面的 Cookie 和来源信息。
 - **FTP 和 FTPS**，支持并行连接与断点续传。
+- **WebDAV** — Nextcloud、ownCloud、NAS 或任何 WebDAV 服务器上的文件（`davs://` 链接），
+  支持并行连接、断点续传以及 Digest 或 Basic 登录（[详情](docs/webdav.md)）。
 - **BitTorrent 和磁力链接** — 纯 Kotlin 引擎支持 v1、v2 和混合种子，可选择要下载的文件，
   也可选择做种。支持 uTP 和协议加密，可从 Web 种子下载，自动在路由器上转发端口，
   并能发现局域网中的节点（[详情](docs/torrent.md)）。
@@ -230,7 +232,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **v1.0.0 前的分发准备** — Windows 版本签名、macOS 版本签名与公证、在更多浏览器商店上架扩展，
   以及安装和更新流程验证（[计划](docs/plans/v1-distribution.md)）
 - **Metalink** — 同时从多个镜像下载，并校验校验和
-- **WebDAV** — 从 WebDAV 服务器下载，支持断点续传
 - **更多 HLS 和 DASH 格式** — 选择画质、合并独立音视频轨道、处理 AES-128 HLS 加密；
   目前已支持有限时长、未加密的单流下载
 - **媒体提取** — 保存网页中的媒体内容

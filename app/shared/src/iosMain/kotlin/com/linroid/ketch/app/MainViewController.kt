@@ -43,6 +43,7 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.IO
@@ -234,7 +235,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
           logger = appLogger,
           additionalSources = listOf(
             FtpDownloadSource(), torrentSource,
-            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+            WebDavDownloadSource(httpEngine),
           ),
         )
       },

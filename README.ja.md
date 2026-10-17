@@ -115,6 +115,8 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 
 - **HTTP と HTTPS** — ブラウザ拡張機能から送る場合は、ページの Cookie とリファラーを引き継ぎます。
 - **FTP と FTPS** — 並列接続と再開に対応します。
+- **WebDAV** — Nextcloud、ownCloud、NAS などの WebDAV サーバー上のファイル（`davs://` リンク）。
+  並列接続、再開、Digest または Basic 認証に対応します（[詳細](docs/webdav.md)）。
 - **BitTorrent とマグネットリンク** — 純粋な Kotlin 製のエンジンで v1、v2、ハイブリッドの
   トレントに対応し、ダウンロードするファイルを選べ、必要ならシードもできます。uTP と
   プロトコル暗号化に対応し、Web シードからもダウンロードし、ルーターのポートを転送して、
@@ -247,7 +249,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **v1.0.0 までの配布準備** — Windows 版の署名、macOS 版の署名と公証、より多くのブラウザストアでの
   拡張機能の公開、インストールと更新手順の検証（[計画](docs/plans/v1-distribution.md)）
 - **Metalink** — チェックサム検証付きの複数ミラーからの同時ダウンロード
-- **WebDAV** — 再開に対応した WebDAV サーバーからのダウンロード
 - **HLS と DASH の対応拡大** — 品質選択、独立した音声・映像トラックの結合、AES-128 HLS 暗号化への
   対応。有限長で暗号化されていない単一ストリームのダウンロードにはすでに対応しています
 - **メディア抽出** — Web ページのメディアを保存
