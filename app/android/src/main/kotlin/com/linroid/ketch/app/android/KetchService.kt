@@ -53,6 +53,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.geo.DbIpCountryDatabase
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.dash.DashDownloadSource
@@ -92,6 +93,7 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.io.File
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -228,6 +230,8 @@ class KetchService : Service() {
               FtpDownloadSource(), torrentSource,
               HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
             ),
+            // Left out of backups, as it downloads again on request.
+            countries = DbIpCountryDatabase(File(noBackupFilesDir, COUNTRY_DATABASE_FILE)),
           )
         },
         localServerFactory = { ketchApi, pairingRequests ->
@@ -652,3 +656,5 @@ private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this
   TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
   TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
 }
+
+private const val COUNTRY_DATABASE_FILE = "dbip-country-lite.csv.gz"

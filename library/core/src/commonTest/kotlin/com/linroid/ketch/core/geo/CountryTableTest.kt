@@ -1,4 +1,4 @@
-package com.linroid.ketch.app.platform
+package com.linroid.ketch.core.geo
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,9 +41,5 @@ class CountryTableTest {
 
   @Test fun ipv4MappedIpv6_readsAsIpv4() {
     assertEquals("CN", table.countryOf("::ffff:1.0.1.1"))
-  }
-
-  @Test fun flag_isTheRegionalIndicators() {
-    assertEquals("🇩🇪", flagOf("DE"))
   }
 }

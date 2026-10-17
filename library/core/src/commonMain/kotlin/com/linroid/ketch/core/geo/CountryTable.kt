@@ -1,71 +1,10 @@
-package com.linroid.ketch.app.platform
-
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.staticCompositionLocalOf
-import kotlinx.coroutines.flow.StateFlow
-
-/** Where [CountryLookup]'s database stands. */
-sealed interface CountryLookupState {
-  /** Not downloaded yet. */
-  data object Missing : CountryLookupState
-
-  /** Being downloaded or read. */
-  data object Loading : CountryLookupState
-
-  /** Loaded; [CountryLookup.countryOf] answers. */
-  data object Ready : CountryLookupState
-
-  /** The download or read failed, for [reason]. */
-  data class Failed(val reason: String) : CountryLookupState
-}
-
-/**
- * The country of an IP address, from a database the user downloads on request (DB-IP's IP to
- * Country Lite, CC BY 4.0), for the flags of the Connections page. Desktop and Android provide
- * it through [LocalCountryLookup].
- */
-interface CountryLookup {
-  val state: StateFlow<CountryLookupState>
-
-  /** Reads the downloaded database, once; the Connections page calls it as it shows. */
-  fun load()
-
-  /** Downloads the database, replacing the one there is, and loads it. */
-  fun download()
-
-  /**
-   * Counts the host names resolved so far: [countryOf] may answer for more names once it moves,
-   * so callers draw again.
-   */
-  val resolved: StateFlow<Int>
-
-  /**
-   * The ISO 3166 code of [host]'s country, such as `DE`; `null` for unknown addresses. A host
-   * name is looked up in DNS the first time it is asked for (over HTTPS when the system only
-   * answers with reserved addresses, as a proxy's fake-IP mode does), answering `null` until it
-   * resolves.
-   */
-  fun countryOf(host: String): String?
-}
-
-/** [CountryLookup] of the running app, `null` where the app cannot download its database. */
-val LocalCountryLookup: ProvidableCompositionLocal<CountryLookup?> =
-  staticCompositionLocalOf { null }
-
-/** The flag emoji of a two-letter country [code], from its regional indicator symbols. */
-fun flagOf(code: String): String = buildString {
-  for (letter in code.uppercase()) {
-    val point = 0x1F1E6 + (letter - 'A')
-    append(Char(0xD800 + ((point - 0x10000) shr 10)))
-    append(Char(0xDC00 + ((point - 0x10000) and 0x3FF)))
-  }
-}
+package com.linroid.ketch.core.geo
 
 /**
  * IP ranges and their countries, read from DB-IP's CSV lines (`start,end,CC`, sorted, covering
  * every address). IPv6 ranges are kept by their first 64 bits, the network part.
  */
-class CountryTable private constructor(
+internal class CountryTable private constructor(
   private val v4Starts: LongArray,
   private val v4Codes: ShortArray,
   private val v6Starts: LongArray,

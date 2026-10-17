@@ -256,6 +256,16 @@ abstract interface com.linroid.ketch.api.log/Logger { // com.linroid.ketch.api.l
     }
 }
 
+abstract interface com.linroid.ketch.api/CountryDatabase { // com.linroid.ketch.api/CountryDatabase|null[0]
+    abstract suspend fun download(): com.linroid.ketch.api/CountryDatabaseStatus // com.linroid.ketch.api/CountryDatabase.download|download(){}[0]
+    abstract suspend fun status(): com.linroid.ketch.api/CountryDatabaseStatus // com.linroid.ketch.api/CountryDatabase.status|status(){}[0]
+
+    final object Key : com.linroid.ketch.api/ControlKey<com.linroid.ketch.api/CountryDatabase> { // com.linroid.ketch.api/CountryDatabase.Key|null[0]
+        final val name // com.linroid.ketch.api/CountryDatabase.Key.name|{}name[0]
+            final fun <get-name>(): kotlin/String // com.linroid.ketch.api/CountryDatabase.Key.name.<get-name>|<get-name>(){}[0]
+    }
+}
+
 abstract interface com.linroid.ketch.api/DownloadTask { // com.linroid.ketch.api/DownloadTask|null[0]
     abstract val createdAt // com.linroid.ketch.api/DownloadTask.createdAt|{}createdAt[0]
         abstract fun <get-createdAt>(): kotlin.time/Instant // com.linroid.ketch.api/DownloadTask.createdAt.<get-createdAt>|<get-createdAt>(){}[0]
@@ -416,8 +426,10 @@ final class com.linroid.ketch.api.log/KetchLogger { // com.linroid.ketch.api.log
 }
 
 final class com.linroid.ketch.api/ActiveConnection { // com.linroid.ketch.api/ActiveConnection|null[0]
-    constructor <init>(kotlin/Long, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/Boolean? = ..., com.linroid.ketch.api/ConnectionDirection = ..., kotlin/String, kotlin/Int? = ..., com.linroid.ketch.api/ConnectionRoute = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin.time/Instant, com.linroid.ketch.api/PeerDetails? = ...) // com.linroid.ketch.api/ActiveConnection.<init>|<init>(kotlin.Long;kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean?;com.linroid.ketch.api.ConnectionDirection;kotlin.String;kotlin.Int?;com.linroid.ketch.api.ConnectionRoute;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.time.Instant;com.linroid.ketch.api.PeerDetails?){}[0]
+    constructor <init>(kotlin/Long, kotlin/String, kotlin/String, kotlin/String? = ..., kotlin/Boolean? = ..., com.linroid.ketch.api/ConnectionDirection = ..., kotlin/String, kotlin/Int? = ..., com.linroid.ketch.api/ConnectionRoute = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin.time/Instant, com.linroid.ketch.api/PeerDetails? = ..., kotlin/String? = ...) // com.linroid.ketch.api/ActiveConnection.<init>|<init>(kotlin.Long;kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean?;com.linroid.ketch.api.ConnectionDirection;kotlin.String;kotlin.Int?;com.linroid.ketch.api.ConnectionRoute;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.time.Instant;com.linroid.ketch.api.PeerDetails?;kotlin.String?){}[0]
 
+    final val country // com.linroid.ketch.api/ActiveConnection.country|{}country[0]
+        final fun <get-country>(): kotlin/String? // com.linroid.ketch.api/ActiveConnection.country.<get-country>|<get-country>(){}[0]
     final val direction // com.linroid.ketch.api/ActiveConnection.direction|{}direction[0]
         final fun <get-direction>(): com.linroid.ketch.api/ConnectionDirection // com.linroid.ketch.api/ActiveConnection.direction.<get-direction>|<get-direction>(){}[0]
     final val downloadBps // com.linroid.ketch.api/ActiveConnection.downloadBps|{}downloadBps[0]
@@ -456,6 +468,7 @@ final class com.linroid.ketch.api/ActiveConnection { // com.linroid.ketch.api/Ac
     final fun component13(): kotlin/Long // com.linroid.ketch.api/ActiveConnection.component13|component13(){}[0]
     final fun component14(): kotlin.time/Instant // com.linroid.ketch.api/ActiveConnection.component14|component14(){}[0]
     final fun component15(): com.linroid.ketch.api/PeerDetails? // com.linroid.ketch.api/ActiveConnection.component15|component15(){}[0]
+    final fun component16(): kotlin/String? // com.linroid.ketch.api/ActiveConnection.component16|component16(){}[0]
     final fun component2(): kotlin/String // com.linroid.ketch.api/ActiveConnection.component2|component2(){}[0]
     final fun component3(): kotlin/String // com.linroid.ketch.api/ActiveConnection.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.linroid.ketch.api/ActiveConnection.component4|component4(){}[0]
@@ -464,7 +477,7 @@ final class com.linroid.ketch.api/ActiveConnection { // com.linroid.ketch.api/Ac
     final fun component7(): kotlin/String // com.linroid.ketch.api/ActiveConnection.component7|component7(){}[0]
     final fun component8(): kotlin/Int? // com.linroid.ketch.api/ActiveConnection.component8|component8(){}[0]
     final fun component9(): com.linroid.ketch.api/ConnectionRoute // com.linroid.ketch.api/ActiveConnection.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Boolean? = ..., com.linroid.ketch.api/ConnectionDirection = ..., kotlin/String = ..., kotlin/Int? = ..., com.linroid.ketch.api/ConnectionRoute = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin.time/Instant = ..., com.linroid.ketch.api/PeerDetails? = ...): com.linroid.ketch.api/ActiveConnection // com.linroid.ketch.api/ActiveConnection.copy|copy(kotlin.Long;kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean?;com.linroid.ketch.api.ConnectionDirection;kotlin.String;kotlin.Int?;com.linroid.ketch.api.ConnectionRoute;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.time.Instant;com.linroid.ketch.api.PeerDetails?){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Boolean? = ..., com.linroid.ketch.api/ConnectionDirection = ..., kotlin/String = ..., kotlin/Int? = ..., com.linroid.ketch.api/ConnectionRoute = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin.time/Instant = ..., com.linroid.ketch.api/PeerDetails? = ..., kotlin/String? = ...): com.linroid.ketch.api/ActiveConnection // com.linroid.ketch.api/ActiveConnection.copy|copy(kotlin.Long;kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean?;com.linroid.ketch.api.ConnectionDirection;kotlin.String;kotlin.Int?;com.linroid.ketch.api.ConnectionRoute;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.time.Instant;com.linroid.ketch.api.PeerDetails?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/ActiveConnection.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/ActiveConnection.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/ActiveConnection.toString|toString(){}[0]
@@ -553,6 +566,58 @@ final class com.linroid.ketch.api/Checksum { // com.linroid.ketch.api/Checksum|n
         final fun parse(kotlin/String): com.linroid.ketch.api/Checksum // com.linroid.ketch.api/Checksum.Companion.parse|parse(kotlin.String){}[0]
         final fun parseOrNull(kotlin/String): com.linroid.ketch.api/Checksum? // com.linroid.ketch.api/Checksum.Companion.parseOrNull|parseOrNull(kotlin.String){}[0]
         final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/Checksum> // com.linroid.ketch.api/Checksum.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.linroid.ketch.api/CountryDatabaseStatus { // com.linroid.ketch.api/CountryDatabaseStatus|null[0]
+    constructor <init>(com.linroid.ketch.api/CountryDatabaseStatus.State, kotlin.time/Instant? = ..., kotlin/String? = ...) // com.linroid.ketch.api/CountryDatabaseStatus.<init>|<init>(com.linroid.ketch.api.CountryDatabaseStatus.State;kotlin.time.Instant?;kotlin.String?){}[0]
+
+    final val error // com.linroid.ketch.api/CountryDatabaseStatus.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.linroid.ketch.api/CountryDatabaseStatus.error.<get-error>|<get-error>(){}[0]
+    final val state // com.linroid.ketch.api/CountryDatabaseStatus.state|{}state[0]
+        final fun <get-state>(): com.linroid.ketch.api/CountryDatabaseStatus.State // com.linroid.ketch.api/CountryDatabaseStatus.state.<get-state>|<get-state>(){}[0]
+    final val updatedAt // com.linroid.ketch.api/CountryDatabaseStatus.updatedAt|{}updatedAt[0]
+        final fun <get-updatedAt>(): kotlin.time/Instant? // com.linroid.ketch.api/CountryDatabaseStatus.updatedAt.<get-updatedAt>|<get-updatedAt>(){}[0]
+
+    final fun component1(): com.linroid.ketch.api/CountryDatabaseStatus.State // com.linroid.ketch.api/CountryDatabaseStatus.component1|component1(){}[0]
+    final fun component2(): kotlin.time/Instant? // com.linroid.ketch.api/CountryDatabaseStatus.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.linroid.ketch.api/CountryDatabaseStatus.component3|component3(){}[0]
+    final fun copy(com.linroid.ketch.api/CountryDatabaseStatus.State = ..., kotlin.time/Instant? = ..., kotlin/String? = ...): com.linroid.ketch.api/CountryDatabaseStatus // com.linroid.ketch.api/CountryDatabaseStatus.copy|copy(com.linroid.ketch.api.CountryDatabaseStatus.State;kotlin.time.Instant?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/CountryDatabaseStatus.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/CountryDatabaseStatus.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.linroid.ketch.api/CountryDatabaseStatus.toString|toString(){}[0]
+
+    final enum class State : kotlin/Enum<com.linroid.ketch.api/CountryDatabaseStatus.State> { // com.linroid.ketch.api/CountryDatabaseStatus.State|null[0]
+        enum entry DOWNLOADING // com.linroid.ketch.api/CountryDatabaseStatus.State.DOWNLOADING|null[0]
+        enum entry FAILED // com.linroid.ketch.api/CountryDatabaseStatus.State.FAILED|null[0]
+        enum entry MISSING // com.linroid.ketch.api/CountryDatabaseStatus.State.MISSING|null[0]
+        enum entry READY // com.linroid.ketch.api/CountryDatabaseStatus.State.READY|null[0]
+
+        final val entries // com.linroid.ketch.api/CountryDatabaseStatus.State.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.linroid.ketch.api/CountryDatabaseStatus.State> // com.linroid.ketch.api/CountryDatabaseStatus.State.entries.<get-entries>|<get-entries>#static(){}[0]
+
+        final fun valueOf(kotlin/String): com.linroid.ketch.api/CountryDatabaseStatus.State // com.linroid.ketch.api/CountryDatabaseStatus.State.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.linroid.ketch.api/CountryDatabaseStatus.State> // com.linroid.ketch.api/CountryDatabaseStatus.State.values|values#static(){}[0]
+
+        final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/CountryDatabaseStatus.State.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/CountryDatabaseStatus.State> // com.linroid.ketch.api/CountryDatabaseStatus.State.Companion.serializer|serializer(){}[0]
+            final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/CountryDatabaseStatus.State.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        }
+    }
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.linroid.ketch.api/CountryDatabaseStatus> { // com.linroid.ketch.api/CountryDatabaseStatus.$serializer|null[0]
+        final val descriptor // com.linroid.ketch.api/CountryDatabaseStatus.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.linroid.ketch.api/CountryDatabaseStatus.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.linroid.ketch.api/CountryDatabaseStatus.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.linroid.ketch.api/CountryDatabaseStatus // com.linroid.ketch.api/CountryDatabaseStatus.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.linroid.ketch.api/CountryDatabaseStatus) // com.linroid.ketch.api/CountryDatabaseStatus.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.linroid.ketch.api.CountryDatabaseStatus){}[0]
+    }
+
+    final object Companion { // com.linroid.ketch.api/CountryDatabaseStatus.Companion|null[0]
+        final val $childSerializers // com.linroid.ketch.api/CountryDatabaseStatus.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/CountryDatabaseStatus> // com.linroid.ketch.api/CountryDatabaseStatus.Companion.serializer|serializer(){}[0]
     }
 }
 
@@ -1967,6 +2032,8 @@ final object com.linroid.ketch.api/KetchFeatures { // com.linroid.ketch.api/Ketc
         final fun <get-CATEGORY_FOLDERS>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.CATEGORY_FOLDERS.<get-CATEGORY_FOLDERS>|<get-CATEGORY_FOLDERS>(){}[0]
     final const val CHECKSUM // com.linroid.ketch.api/KetchFeatures.CHECKSUM|{}CHECKSUM[0]
         final fun <get-CHECKSUM>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.CHECKSUM.<get-CHECKSUM>|<get-CHECKSUM>(){}[0]
+    final const val COUNTRIES // com.linroid.ketch.api/KetchFeatures.COUNTRIES|{}COUNTRIES[0]
+        final fun <get-COUNTRIES>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.COUNTRIES.<get-COUNTRIES>|<get-COUNTRIES>(){}[0]
     final const val FILE_SELECTION // com.linroid.ketch.api/KetchFeatures.FILE_SELECTION|{}FILE_SELECTION[0]
         final fun <get-FILE_SELECTION>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.FILE_SELECTION.<get-FILE_SELECTION>|<get-FILE_SELECTION>(){}[0]
     final const val FINITE_DASH // com.linroid.ketch.api/KetchFeatures.FINITE_DASH|{}FINITE_DASH[0]

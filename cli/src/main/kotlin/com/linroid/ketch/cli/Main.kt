@@ -33,6 +33,7 @@ import com.linroid.ketch.config.defaultConfigPath
 import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.geo.DbIpCountryDatabase
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.torrent.TorrentConfig
@@ -568,6 +569,7 @@ private fun runServer(args: Array<String>): Int {
       torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
     ),
+    countries = DbIpCountryDatabase(File(defaultConfigDir(), COUNTRY_DATABASE_FILE)),
   )
   val server = KetchServer(
     ketch,
@@ -1644,3 +1646,6 @@ internal fun formatBytes(bytes: Long): String {
       String.format(Locale.getDefault(), "%.2f GB", bytes / (1024.0 * 1024 * 1024))
   }
 }
+
+/** The IP to country database `ketch server` downloads on request, in the config directory. */
+private const val COUNTRY_DATABASE_FILE = "dbip-country-lite.csv.gz"

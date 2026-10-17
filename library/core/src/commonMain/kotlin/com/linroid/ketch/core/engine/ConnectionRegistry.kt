@@ -142,7 +142,8 @@ internal class ConnectionSample(
  * atomic add per chunk; [samples] reads the counters once per [interval], only while collected.
  *
  * Holds at most [maxRegistered] connections at once: past that, [ConnectionReporter.open]
- * returns [ConnectionHandle.None] and counts the connection as dropped.
+ * returns [ConnectionHandle.None] and counts the connection as dropped. [countryOf] names each
+ * connection's country as it is sampled.
  */
 internal class ConnectionRegistry(
   scope: CoroutineScope,
@@ -150,6 +151,7 @@ internal class ConnectionRegistry(
   private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
   private val maxRegistered: Int = MAX_REGISTERED,
   private val interval: Duration = 1.seconds,
+  private val countryOf: (String) -> String? = { null },
 ) {
   private val log = KetchLogger("Connections")
   private val nextId = AtomicLong(0)
@@ -304,6 +306,7 @@ internal class ConnectionRegistry(
           uploadedBytes = sent,
           openedAt = entry.openedAt,
           peer = spec.peer,
+          country = countryOf(spec.host),
         )
       }
       history.keys.retainAll(entries.keys)

@@ -36,6 +36,9 @@ graalvmNative {
         // as in the Docker image, would even ignore `docker stop`'s SIGTERM.
         "--install-exit-handlers",
         "-H:+ReportExceptionStackTraces",
+        // `ketch server`'s country database downloads over HttpURLConnection, which a native
+        // image only opens https: URLs with when built in.
+        "--enable-url-protocols=https",
         "--initialize-at-build-time=io.ktor,kotlin,kotlinx.coroutines,kotlinx.serialization,kotlinx.io,okio",
         // kotlinx.coroutines' scheduler reads these as it initializes, which is here, at build
         // time, so setting them in main is too late for the binary: Dispatchers.IO at 16 threads

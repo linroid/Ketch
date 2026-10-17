@@ -75,6 +75,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
   and `resolve(bytes, fileName)` extensions build them),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
+  `CountryDatabase` (its `Key` is a `ControlKey`) and `CountryDatabaseStatus`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
   follows: `Interest.Segments(taskIds)`, `Interest.Stats` (`KetchStats`) and
@@ -130,6 +131,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `platformFileSystem` (expect/actual), `FileNameResolver`, `DefaultFileNameResolver`,
   `sanitizeFileName()`, `OutputPathReservations`, `partialPathFor()` and
   `movePartialToFinal()` (`PartialFiles.kt`), `DestinationPathPolicy`, `PathRejectedException`
+- `com.linroid.ketch.core.geo` -- `CountryLookup` (a `CountryDatabase` `Ketch(countries = ...)`
+  names `ActiveConnection.country` with), internal `CountryTable`, and `DbIpCountryDatabase`
+  (jvmAndAndroidMain)
 - `com.linroid.ketch.core.digest` -- `MessageDigest`, `Md5`, `Sha1`, `Sha256`, `Sha512` (pure
   Kotlin, on every engine target) and `ChecksumAlgorithm.newDigest()`, which gives the platform's
   digest where there is one (`platformDigest`, expect/actual: `java.security.MessageDigest` on the
@@ -464,6 +468,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
   `close` close what a source leaked. Its sampler reads the counters once a second, rates over
   the last two samples, and runs only while collected; idle repeats are not sent
+- Countries: `ActiveConnection.country` is the ISO code an engine given a `CountryLookup` names
+  for the host, listed as `KetchFeatures.COUNTRIES` (`net.countries`) with
+  `controller(CountryDatabase)`. `DbIpCountryDatabase` (desktop app, Android app, `ketch server`)
+  downloads DB-IP's monthly IP to Country Lite (CC BY 4.0, about 5 MB) only when asked
+  (`download()`, REST `POST /api/countries/download`; `GET /api/countries` is the status) into
+  `dbip-country-lite.csv.gz` of the config directory (Android: `noBackupFilesDir`), and reads it
+  into memory (about 10 MB) at start. Host names resolve through the system, then Cloudflare's
+  DNS over HTTPS when the system only answers with addresses without a country (a proxy's fake-IP
+  198.18.0.0/15). Each device downloads its own: the Connections page's Show countries button asks
+  every shown device lacking one, then shows flags before endpoints and the DB-IP attribution;
+  `RemoteKetch` fails the controller's calls closed against servers without the feature. iOS has
+  no database
 - HTTP: one connection per segment request (the unknown-size stream is one), with the URL's host
   and port until the engine reports more. Sources run each GET under an `HttpExchangeObserver`
   (a coroutine context element, so wrapping engines pass it on unchanged); `KtorHttpEngine`
@@ -1814,7 +1830,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "TorrentControls", "Connections", "RemoteKetch", "RemoteTask", "RemotePairing",
   "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
-  "ConnectionRoutes", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
+  "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
   "GitHubReleases", "Hooks";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and

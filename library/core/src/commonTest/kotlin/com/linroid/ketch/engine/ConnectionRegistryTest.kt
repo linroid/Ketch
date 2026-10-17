@@ -49,6 +49,22 @@ class ConnectionRegistryTest {
   }
 
   @Test
+  fun samples_nameEachHostsCountry() = runTest {
+    val registry = ConnectionRegistry(
+      scope = backgroundScope,
+      clock = FixedClock,
+      timeSource = testScheduler.timeSource,
+      countryOf = { host -> "DE".takeIf { host == "cdn.example.com" } },
+    )
+    registry.reporter("task").open(spec)
+    registry.reporter("task").open(spec.copy(host = "192.0.2.1"))
+    val samples = collectSamples(registry)
+    runCurrent()
+
+    assertEquals(listOf("DE", null), samples.last().connections.map { it.country })
+  }
+
+  @Test
   fun samples_uploadAndDownloadCountedApart() = runTest {
     val registry = registry()
     val handle = registry.reporter("task").open(spec)

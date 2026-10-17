@@ -1,7 +1,7 @@
 public final class com/linroid/ketch/api/ActiveConnection {
 	public static final field Companion Lcom/linroid/ketch/api/ActiveConnection$Companion;
-	public fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;)V
-	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;)V
+	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()J
 	public final fun component11 ()J
@@ -9,6 +9,7 @@ public final class com/linroid/ketch/api/ActiveConnection {
 	public final fun component13 ()J
 	public final fun component14 ()Lkotlin/time/Instant;
 	public final fun component15 ()Lcom/linroid/ketch/api/PeerDetails;
+	public final fun component16 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -17,9 +18,10 @@ public final class com/linroid/ketch/api/ActiveConnection {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/Integer;
 	public final fun component9 ()Lcom/linroid/ketch/api/ConnectionRoute;
-	public final fun copy (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;)Lcom/linroid/ketch/api/ActiveConnection;
-	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ActiveConnection;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;ILjava/lang/Object;)Lcom/linroid/ketch/api/ActiveConnection;
+	public final fun copy (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;)Lcom/linroid/ketch/api/ActiveConnection;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/ActiveConnection;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Boolean;Lcom/linroid/ketch/api/ConnectionDirection;Ljava/lang/String;Ljava/lang/Integer;Lcom/linroid/ketch/api/ConnectionRoute;JJJJLkotlin/time/Instant;Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/ActiveConnection;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCountry ()Ljava/lang/String;
 	public final fun getDirection ()Lcom/linroid/ketch/api/ConnectionDirection;
 	public final fun getDownloadBps ()J
 	public final fun getDownloadedBytes ()J
@@ -166,6 +168,63 @@ public final class com/linroid/ketch/api/ConnectionRoute$Companion {
 
 public abstract interface class com/linroid/ketch/api/ControlKey {
 	public abstract fun getName ()Ljava/lang/String;
+}
+
+public abstract interface class com/linroid/ketch/api/CountryDatabase {
+	public static final field Key Lcom/linroid/ketch/api/CountryDatabase$Key;
+	public abstract fun download (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/CountryDatabase$Key : com/linroid/ketch/api/ControlKey {
+	public fun getName ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/CountryDatabaseStatus {
+	public static final field Companion Lcom/linroid/ketch/api/CountryDatabaseStatus$Companion;
+	public fun <init> (Lcom/linroid/ketch/api/CountryDatabaseStatus$State;Lkotlin/time/Instant;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/CountryDatabaseStatus$State;Lkotlin/time/Instant;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public final fun component2 ()Lkotlin/time/Instant;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lcom/linroid/ketch/api/CountryDatabaseStatus$State;Lkotlin/time/Instant;Ljava/lang/String;)Lcom/linroid/ketch/api/CountryDatabaseStatus;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/CountryDatabaseStatus;Lcom/linroid/ketch/api/CountryDatabaseStatus$State;Lkotlin/time/Instant;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/CountryDatabaseStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Ljava/lang/String;
+	public final fun getState ()Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public final fun getUpdatedAt ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/CountryDatabaseStatus$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/CountryDatabaseStatus$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/CountryDatabaseStatus;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/CountryDatabaseStatus;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/CountryDatabaseStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/CountryDatabaseStatus$State : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/CountryDatabaseStatus$State$Companion;
+	public static final field DOWNLOADING Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public static final field FAILED Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public static final field MISSING Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public static final field READY Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+	public static fun values ()[Lcom/linroid/ketch/api/CountryDatabaseStatus$State;
+}
+
+public final class com/linroid/ketch/api/CountryDatabaseStatus$State$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/linroid/ketch/api/Destination {
@@ -1237,6 +1296,7 @@ public final class com/linroid/ketch/api/KetchFeatures {
 	public static final field AWAIT_FILE_SELECTION Ljava/lang/String;
 	public static final field CATEGORY_FOLDERS Ljava/lang/String;
 	public static final field CHECKSUM Ljava/lang/String;
+	public static final field COUNTRIES Ljava/lang/String;
 	public static final field FILE_SELECTION Ljava/lang/String;
 	public static final field FINITE_DASH Ljava/lang/String;
 	public static final field FINITE_HLS Ljava/lang/String;

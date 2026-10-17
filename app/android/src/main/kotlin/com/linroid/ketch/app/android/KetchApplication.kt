@@ -10,8 +10,6 @@ import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.UnreadableFiles
 import com.linroid.ketch.app.i18n.initAppLanguage
 import com.linroid.ketch.app.log.FileLogger
-import com.linroid.ketch.app.platform.CountryLookup
-import com.linroid.ketch.app.platform.DbIpCountryLookup
 import com.linroid.ketch.app.state.DiscoverHistoryStore
 import com.linroid.ketch.app.state.FileDiscoverHistoryStore
 import com.linroid.ketch.app.state.IncomingDownloads
@@ -87,15 +85,6 @@ class KetchApplication : Application() {
     )
   }
 
-  /** The country database the Connections page's flags come from, downloaded on request. */
-  val countryLookup: CountryLookup by lazy {
-    DbIpCountryLookup(
-      fileSystem = FileSystem.SYSTEM,
-      path = noBackupFilesDir.toOkioPath() / COUNTRY_DATABASE_FILE,
-      dispatcher = Dispatchers.IO,
-    )
-  }
-
   // Reads outlive the activity that received the file, so a rotation cannot cancel them.
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -165,4 +154,3 @@ class KetchApplication : Application() {
 
 /** File of the Discover history in `filesDir`; the backup rules in `res/xml` name it too. */
 private const val DISCOVER_HISTORY_FILE = "discover-history.json"
-private const val COUNTRY_DATABASE_FILE = "dbip-country-lite.csv.gz"

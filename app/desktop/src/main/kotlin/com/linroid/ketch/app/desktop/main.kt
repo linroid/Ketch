@@ -66,9 +66,7 @@ import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.AwtFilePicker
 import com.linroid.ketch.app.platform.FileActionException
 import com.linroid.ketch.app.platform.FileActions
-import com.linroid.ketch.app.platform.DbIpCountryLookup
 import com.linroid.ketch.app.platform.LocalAppUpdates
-import com.linroid.ketch.app.platform.LocalCountryLookup
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberFileActions
@@ -103,6 +101,7 @@ import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.geo.DbIpCountryDatabase
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.dash.DashDownloadSource
@@ -474,13 +473,6 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     settingsStateStore.saveChanges(settingsWindowState, savedSettingsBounds)
   }
   val updater = remember { createUpdater(launch, controller, behavior, scope) }
-  val countryLookup = remember {
-    DbIpCountryLookup(
-      fileSystem = FileSystem.SYSTEM,
-      path = launch.configDir.toOkioPath() / COUNTRY_DATABASE_FILE,
-      dispatcher = Dispatchers.IO,
-    )
-  }
   LaunchedEffect(updater) {
     val appSettings = controller.appSettings
     val lastVersion = appSettings.ui.lastVersion
@@ -637,7 +629,6 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
           LocalWindowChrome provides windowChrome(fullWindowContent, windowState.placement),
           LocalHostShortcuts provides shellSkips,
           LocalAppUpdates provides updater,
-          LocalCountryLookup provides countryLookup,
         ) {
           val app = @Composable {
             windowStates.SaveableStateProvider(MAIN_WINDOW_STATE) {
@@ -716,6 +707,7 @@ private fun createInstanceManager(
             FtpDownloadSource(), torrentSource,
             HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
           ),
+          countries = DbIpCountryDatabase(File(configDir, COUNTRY_DATABASE_FILE)),
         ).also { ketch ->
           launch.localApiServer.attach(ketch)
           // The app runs this computer's downloads, so it runs the hooks of config.toml; for the

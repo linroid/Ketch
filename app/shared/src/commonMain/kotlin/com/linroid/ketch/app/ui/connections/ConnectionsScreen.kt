@@ -26,8 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.ConnectionRoute
+import com.linroid.ketch.api.CountryDatabaseStatus
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -61,9 +64,6 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DeviceScope
-import com.linroid.ketch.app.platform.CountryLookupState
-import com.linroid.ketch.app.platform.LocalCountryLookup
-import com.linroid.ketch.app.platform.flagOf
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.TrafficDirection
@@ -118,8 +118,12 @@ import ketch.app.shared.generated.resources.pulse_connection_upload_slot
 import ketch.app.shared.generated.resources.pulse_connections_none
 import ketch.app.shared.generated.resources.pulse_connections_unsupported
 import ketch.app.shared.generated.resources.shell_destination_connections
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Connections page (`⌘7`): every live connection of the shown devices, the fastest
@@ -198,34 +202,63 @@ fun ConnectionsScreen(state: AppState) {
       }
     }
     Footer(grid, listed = all.size)
-    CountryFooter()
+    CountryFooter(state, grid.devices.map { it.deviceId })
   }
 }
 
-/**
- * [row]'s endpoint, after its country's flag once the country database is loaded; a host name's
- * is its address's, as this device resolves it.
- */
-@Composable
+/** [row]'s endpoint, after the flag of the country its device names for it. */
 private fun endpointText(row: ConnectionRow): String {
-  val countries = LocalCountryLookup.current ?: return row.endpoint
-  val state by countries.state.collectAsState()
-  if (state != CountryLookupState.Ready) return row.endpoint
-  // Read so that rows draw again as host names resolve.
-  countries.resolved.collectAsState().value
-  val code = countries.countryOf(row.connection.host) ?: return row.endpoint
+  val code = row.connection.country ?: return row.endpoint
   return "${flagOf(code)} ${row.endpoint}"
 }
 
+/** The flag emoji of a two-letter country [code], from its regional indicator symbols. */
+internal fun flagOf(code: String): String = buildString {
+  for (letter in code.uppercase()) {
+    if (letter !in 'A'..'Z') return code
+    appendCodePoint(0x1F1E6 + (letter - 'A'))
+  }
+}
+
+private fun StringBuilder.appendCodePoint(point: Int) {
+  append(Char(0xD800 + ((point - 0x10000) shr 10)))
+  append(Char(0xDC00 + ((point - 0x10000) and 0x3FF)))
+}
+
 /**
- * The button that downloads the country database for the endpoints' flags, or the database's
- * attribution, which its licence asks for, once it is loaded.
+ * The button that has the shown devices download their country databases, which name the
+ * endpoints' countries, or the databases' attribution, which their licence asks for, once they
+ * are loaded. Each device downloads its own, as it names its own connections' countries.
  */
 @Composable
-private fun CountryFooter() {
-  val countries = LocalCountryLookup.current ?: return
-  LaunchedEffect(countries) { countries.load() }
-  val state by countries.state.collectAsState()
+private fun CountryFooter(state: AppState, deviceIds: List<String>) {
+  val databases = deviceIds.mapNotNull { id -> state.countryDatabaseOf(id)?.let { id to it } }
+  if (databases.isEmpty()) return
+  var statuses by remember { mutableStateOf<Map<String, CountryDatabaseStatus>>(emptyMap()) }
+  var requests by remember { mutableIntStateOf(0) }
+  val scope = rememberCoroutineScope()
+  LaunchedEffect(deviceIds, requests) {
+    while (true) {
+      statuses = databases.mapNotNull { (id, database) ->
+        try {
+          id to database.status()
+        } catch (e: CancellationException) {
+          throw e
+        } catch (_: Exception) {
+          null
+        }
+      }.toMap()
+      if (statuses.values.none { it.state == CountryDatabaseStatus.State.DOWNLOADING }) break
+      delay(STATUS_POLL)
+    }
+  }
+  val all = statuses.values
+  val downloading = all.any { it.state == CountryDatabaseStatus.State.DOWNLOADING }
+  val failed = all.firstNotNullOfOrNull { status ->
+    status.error.takeIf { status.state == CountryDatabaseStatus.State.FAILED }
+  }
+  val missing = all.any { it.state in NotLoaded }
+  if (all.isEmpty()) return
   val spacing = KetchTheme.spacing
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -234,11 +267,11 @@ private fun CountryFooter() {
       .fillMaxWidth()
       .padding(horizontal = KetchTheme.density.pagePadding, vertical = spacing.s2),
   ) {
-    val note = when (val current = state) {
-      CountryLookupState.Ready -> stringResource(Res.string.connections_countries_attribution)
-      is CountryLookupState.Failed ->
-        stringResource(Res.string.connections_countries_failed, current.reason)
-      else -> stringResource(Res.string.connections_countries_hint)
+    val note = when {
+      failed != null && !downloading ->
+        stringResource(Res.string.connections_countries_failed, failed)
+      missing || downloading -> stringResource(Res.string.connections_countries_hint)
+      else -> stringResource(Res.string.connections_countries_attribution)
     }
     Text(
       text = note,
@@ -248,18 +281,38 @@ private fun CountryFooter() {
       overflow = TextOverflow.Ellipsis,
       modifier = Modifier.weight(1f),
     )
-    if (state != CountryLookupState.Ready) {
+    if (missing || downloading) {
       KetchButton(
         text = stringResource(Res.string.connections_countries_download),
-        onClick = countries::download,
+        onClick = {
+          scope.launch {
+            for ((id, database) in databases) {
+              if (statuses[id]?.state !in NotLoaded) continue
+              try {
+                database.download()
+              } catch (e: CancellationException) {
+                throw e
+              } catch (_: Exception) {
+                // The device answers with its status on the next poll.
+              }
+            }
+            requests++
+          }
+        },
         variant = KetchButtonVariant.Ghost,
         size = KetchButtonSize.Small,
-        loading = state == CountryLookupState.Loading,
-        enabled = state != CountryLookupState.Loading,
+        loading = downloading,
+        enabled = !downloading,
       )
     }
   }
 }
+
+private val STATUS_POLL = 1.seconds
+
+/** The states in which a device's database still needs downloading. */
+private val NotLoaded =
+  setOf(CountryDatabaseStatus.State.MISSING, CountryDatabaseStatus.State.FAILED)
 
 /** "Connections" and how many are open, with their speeds. */
 @Composable

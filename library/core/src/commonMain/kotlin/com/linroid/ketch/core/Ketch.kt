@@ -1,6 +1,7 @@
 package com.linroid.ketch.core
 
 import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.CountryDatabase
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -53,6 +54,7 @@ import com.linroid.ketch.core.engine.TokenBucket
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.geo.CountryLookup
 import com.linroid.ketch.core.file.requireDownloadDirectory
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
@@ -119,6 +121,8 @@ import kotlin.uuid.Uuid
  * @param additionalSources extra [DownloadSource] implementations
  *   (e.g., FTP, media). HTTP is always included as a fallback. A source may contribute typed
  *   controllers and lifecycle hooks through [DownloadSource.attach].
+ * @param countries names the countries of [com.linroid.ketch.api.ActiveConnection]s, offered through [controller] as
+ *   the [CountryDatabase]; `null` for none
  * @param logger logging backend
  * @param dispatchers dispatchers for task management, network operations and file I/O; by
  *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
@@ -136,6 +140,7 @@ class Ketch(
   additionalSources: List<DownloadSource<*>> = emptyList(),
   logger: Logger = Logger.None,
   internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
+  private val countries: CountryLookup? = null,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -168,6 +173,7 @@ class Ketch(
     add(KetchFeatures.TRANSFER_TIMEOUTS)
     add(KetchFeatures.ACTIVE_CONNECTIONS)
     add(KetchFeatures.CHECKSUM)
+    if (countries != null) add(KetchFeatures.COUNTRIES)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)
@@ -182,7 +188,10 @@ class Ketch(
   private val scope = CoroutineScope(SupervisorJob() + dispatchers.main.limitedParallelism(1))
 
   /** Live connections of every task, sampled on [scope] while observed. */
-  private val connectionRegistry = ConnectionRegistry(scope)
+  private val connectionRegistry = ConnectionRegistry(
+    scope,
+    countryOf = { host -> countries?.countryOf(host) },
+  )
 
   private val coordinator = DownloadCoordinator(
     sourceResolver = sourceResolver,
@@ -577,8 +586,11 @@ class Ketch(
     extensions.firstOrNull { it.first == sourceType }?.second
 
   /** The controller the first source extension offering one for [key] contributes. */
-  override fun <T : Any> controller(key: ControlKey<T>): T? =
-    extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? {
+    if (key === CountryDatabase.Key) return countries as T?
+    return extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
+  }
 
   /**
    * Validates, saves and applies a file selection; the caller holds the task's control lock.

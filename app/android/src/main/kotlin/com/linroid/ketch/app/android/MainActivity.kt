@@ -45,7 +45,6 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.LocalAppUpdates
-import com.linroid.ketch.app.platform.LocalCountryLookup
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -139,10 +138,7 @@ class MainActivity : ComponentActivity() {
         controller.state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
         sharingRequested = false
       }
-      CompositionLocalProvider(
-        LocalAppUpdates provides model.updates,
-        LocalCountryLookup provides ketchApplication.countryLookup,
-      ) {
+      CompositionLocalProvider(LocalAppUpdates provides model.updates) {
         App(
           controller,
           activityEvents = svc.activityEvents,
