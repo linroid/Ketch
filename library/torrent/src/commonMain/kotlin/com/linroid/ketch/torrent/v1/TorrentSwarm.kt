@@ -701,6 +701,15 @@ internal class TorrentSwarm(
             }
             val alias = result.alias
             if (failure is DuplicatePeerException) {
+              // What our dial brought counts where the connection kept dials the peer again, also
+              // when that one took over before this payload arrived, or closed first.
+              if (!result.incoming && result.attempt.payload > 0) {
+                if (endpoint in pending) {
+                  redial(endpoint, broughtPayload = true, lasted)
+                } else {
+                  delivered += endpoint
+                }
+              }
               // The connection kept to the peer dials it again once it closes, unless it closed
               // first. Until then, or until forgotten 5 minutes from now, it is given up on.
               if (!result.incoming && endpoint !in pending) attemptedAt[endpoint] = now()
