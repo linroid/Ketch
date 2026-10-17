@@ -311,6 +311,8 @@ internal class KotlinTorrentEngine(
   private val active: Int get() = entries.values.count { !it.closing }
   private val running = AtomicBoolean(false)
   private var closed = false
+  /** When every `stopped` announce must have ended, once [stop] began; null until then. */
+  private val stoppedDeadline = AtomicReference<TimeSource.Monotonic.ValueTimeMark?>(null)
   internal val advertisedPort = TorrentAdvertisedPort()
   val listenPort: Int get() = advertisedPort.listenPort
   private var nodes: List<DhtNode>? = null
@@ -504,24 +506,32 @@ internal class KotlinTorrentEngine(
       }
     }
     log.i { "Stopping torrent engine with ${owners.size} session(s)" }
+    stoppedDeadline.store(TimeSource.Monotonic.markNow() + STOPPED_ANNOUNCE_TIME)
     withContext(NonCancellable) {
       try {
-        // v1, v2 and hybrid owners alike; a v2 close joins its discovery before admission returns.
-        for (owner in owners) {
-          try {
-            owner.pause()
-            owner.close(deleteFiles = false)
-          } catch (e: Exception) {
-            val hash = logHash(owner.session.infoHash)
-            log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
+        coroutineScope {
+          // Owners stop side by side, so their `stopped` announces share one window rather than
+          // queue up past a host's shutdown. v1, v2 and hybrid owners alike; a v2 close joins its
+          // discovery before admission returns.
+          for (owner in owners) launch {
+            try {
+              owner.pause()
+              owner.close(deleteFiles = false)
+            } catch (e: Exception) {
+              val hash = logHash(owner.session.infoHash)
+              log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
+            }
+          }
+          // Meanwhile the router forgets our ports rather than forward them to whoever gets this
+          // address. Announces still name the mapped port, which stopping leaves as it was.
+          launch {
+            mapperMutex.withLock {
+              portMapper?.stop()
+              portMapper = null
+            }
           }
         }
         nodes?.forEach { it.close() }
-        // The router forgets our ports rather than forward them to whoever gets this address.
-        mapperMutex.withLock {
-          portMapper?.stop()
-          portMapper = null
-        }
         udpMutex.withLock {
           udpPorts.values.forEach { it.close() }
           udpPorts.clear()
@@ -541,6 +551,13 @@ internal class KotlinTorrentEngine(
       }
     }
   }
+
+  /**
+   * How long `stopped` announces may take: [STOPPED_ANNOUNCE_TIME], and once the engine stops,
+   * what is left of the one such window every torrent's announces share.
+   */
+  private fun stoppedAnnounceTime(): Duration =
+    stoppedDeadline.load()?.let { -it.elapsedNow() } ?: STOPPED_ANNOUNCE_TIME
 
   /** The key [lookupPeers] keeps a swarm's peers under: its wire tag. */
   private fun lookupTag(topic: TrackerTopic): String = topic.wireBytes().toByteString().hex()
@@ -716,7 +733,7 @@ internal class KotlinTorrentEngine(
             }
           } finally {
             if (started) withContext(NonCancellable) {
-              withTimeoutOrNull(2000) {
+              withTimeoutOrNull(stoppedAnnounceTime()) {
                 attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
                   advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED)) }
               }
@@ -783,7 +800,7 @@ internal class KotlinTorrentEngine(
           }
         } finally {
           if (contacted) withContext(NonCancellable) {
-            withTimeoutOrNull(2000) {
+            withTimeoutOrNull(stoppedAnnounceTime()) {
               attempt {
                 tiers.announce(TrackerAnnounce(magnet.infoHash, peerId,
                   advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED))
@@ -1146,7 +1163,7 @@ internal class KotlinTorrentEngine(
         }
       } finally {
         withContext(NonCancellable) {
-          withTimeoutOrNull(2000) {
+          withTimeoutOrNull(stoppedAnnounceTime()) {
             attempt {
               group.stop(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
             }
@@ -1170,7 +1187,7 @@ internal class KotlinTorrentEngine(
         }
       } finally {
         withContext(NonCancellable) {
-          withTimeoutOrNull(2000) {
+          withTimeoutOrNull(stoppedAnnounceTime()) {
             attempt { poll(discovery) }
             attempt { poll(discovery, stopped = true) }
           }
@@ -1278,7 +1295,7 @@ internal class KotlinTorrentEngine(
         discovery.observeStatus {}
         session.updateTrackerStatus(emptyList())
         withContext(NonCancellable) {
-          withTimeoutOrNull(2000) {
+          withTimeoutOrNull(stoppedAnnounceTime()) {
             if (session.state.value == TorrentSessionState.FINISHED ||
               session.state.value == TorrentSessionState.SEEDING) {
               attempt { discovery.poll(session.verifiedPieces(), session.receivedBytes,
@@ -1724,7 +1741,7 @@ internal class KotlinTorrentEngine(
       }
     } finally {
       withContext(NonCancellable) {
-        withTimeoutOrNull(2000) {
+        withTimeoutOrNull(stoppedAnnounceTime()) {
           for (discovery in discoveries) attempt { poll(discovery, true) }
         }
       }
@@ -1739,6 +1756,12 @@ private val UDP_HOSTS = listOf(WILDCARD_IPV4, "::")
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128
 private const val DHT_REFRESH_MS = 15 * 60_000L
+
+/**
+ * How long a torrent's `stopped` announces may take. An engine that stops gives every torrent's
+ * the same window, which leaves most of a host's shutdown time (5 s in Ketch) for the rest.
+ */
+private val STOPPED_ANNOUNCE_TIME: Duration = 2_000.milliseconds
 
 /**
  * How long one magnet metadata lookup runs. The source starts another until the metadata is

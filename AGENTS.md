@@ -402,9 +402,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   background, in order (from `Dispatchers.Default`): once the cancelled executions have finished,
   with their final `store()` checkpoints and record writes, it awaits each source's
   `DownloadSource.stop()` (the torrent source's saves its seeders' checkpoints, then stops its
-  engine, whose sessions announce `stopped`), then closes the sources and the `HttpEngine`, and
-  closes dispatchers it was given only once every cancelled coroutine has finished, never under
-  them, and never
+  engine, whose sessions stop side by side and announce `stopped` within one shared 2 s window
+  while the router's port mappings are removed), then closes the sources and the `HttpEngine`,
+  and closes dispatchers it was given only once every cancelled coroutine has finished, never
+  under them, and never
   `KetchDispatchers.Default`, whose `close()` does nothing. `KetchApi.shutdown(timeout)` (5 s by
   default; `close()` for other implementations) does the same and waits for the sources and the
   `HttpEngine` to be released, at most `timeout`, leaving the rest to the background: `ketch

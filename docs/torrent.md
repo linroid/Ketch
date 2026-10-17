@@ -603,7 +603,10 @@ This section describes the engine's protocol behavior for people who debug swarm
 
 - **Trackers**: HTTP(S) and UDP trackers, with tiers, IPv4 and IPv6, lifecycle events and
   failover. Extra trackers are announced alongside the torrent's own rather than as a later tier.
-  Trackers of other schemes, such as WebTorrent's `wss://`, are skipped.
+  Trackers of other schemes, such as WebTorrent's `wss://`, are skipped. A torrent that stops
+  gives its trackers 2 seconds to hear it; when the engine stops, all its torrents stop at once and
+  share those 2 seconds, while the router removes the port mappings, so `Ketch.shutdown` is not
+  held up by slow trackers.
 - **DHT**: public torrents look up peers in the DHT. With a `stateDirectory`, routing candidates
   are saved, so a restart reaches known nodes even where the bootstrap names do not resolve. Peers
   of public torrents exchange DHT ports (BEP 5 `PORT`), and Ketch pings the nodes they name, so the
