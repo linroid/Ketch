@@ -23,6 +23,7 @@ import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 private val log = KetchLogger("ServerRoutes")
@@ -116,10 +117,20 @@ private suspend inline fun ApplicationCall.respondResolved(
     respond(HttpStatusCode.UnsupportedMediaType, ErrorResponse("unsupported", unsupported))
     return
   } catch (e: KetchError.SourceError) {
-    respond<KetchError>(HttpStatusCode.UnprocessableEntity, e)
+    respond(HttpStatusCode.UnprocessableEntity, refusalBody(e))
     return
   }
   respond(resolved)
+}
+
+/**
+ * [error] as task snapshots carry it, plus the `error` code of an [ErrorResponse]: clients that
+ * read every refusal as one, such as releases from before URL refusals were typed, keep its
+ * message. Clients that read the [KetchError] ignore the extra key.
+ */
+private fun refusalBody(error: KetchError.SourceError): JsonObject {
+  val typed = ServerJson.encodeToJsonElement(KetchError.serializer(), error).jsonObject
+  return JsonObject(typed + ("error" to JsonPrimitive("source_error")))
 }
 
 /** Upper bound for uploaded content ([ResolveInput.Content.MAX_CONTENT_BYTES]). */

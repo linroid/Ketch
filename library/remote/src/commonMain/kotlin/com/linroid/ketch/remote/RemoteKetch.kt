@@ -100,7 +100,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -357,15 +359,27 @@ class RemoteKetch internal constructor(
 
   /**
    * The error a resolve the server refused for its input throws, as [KetchApi.resolve] does: one
-   * no source takes, or a source's own, decoded with its reason.
+   * no source takes, or a source's own, decoded with its reason. A 422 whose body is no
+   * [KetchError], such as a proxy's page, is a [RemoteApiException].
    */
-  private suspend fun resolveRefusal(response: HttpResponse): KetchError? =
+  private suspend fun resolveRefusal(response: HttpResponse): Exception? =
     when (response.status) {
       HttpStatusCode.UnsupportedMediaType -> KetchError.Unsupported()
       HttpStatusCode.UnprocessableEntity ->
-        json.decodeFromString(KetchError.tolerantSerializer(), response.bodyAsText())
+        typedError(response.bodyAsText()) ?: response.toRemoteApiException()
       else -> null
     }
+
+  /** The [KetchError] [body] holds, or `null` when it is no JSON object with a `type`. */
+  private fun typedError(body: String): KetchError? {
+    val element = try {
+      json.parseToJsonElement(body)
+    } catch (e: SerializationException) {
+      return null
+    }
+    if (element !is JsonObject || "type" !in element) return null
+    return json.decodeFromJsonElement(KetchError.tolerantSerializer(), element)
+  }
 
   override suspend fun start() {
     log.i { "Connecting to $host:$port" }

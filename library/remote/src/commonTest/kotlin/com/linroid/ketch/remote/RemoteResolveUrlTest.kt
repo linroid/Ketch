@@ -9,6 +9,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,12 +33,28 @@ class RemoteResolveUrlTest {
   @Test
   fun resolveUrl_sourceRefusesIt_rethrowsTheServerSourceErrorWithItsReason() = runTest {
     val reason = "The torrent's pieces are 64 MiB, larger than the 16 MiB Ketch supports"
-    val body = Json.encodeToString<KetchError>(KetchError.SourceError("torrent", detail = reason))
+    val refusal: KetchError = KetchError.SourceError("torrent", detail = reason)
+    val typed = Json.encodeToJsonElement(refusal)
+    // The server adds an ErrorResponse's code for older clients.
+    val body = JsonObject(typed.jsonObject + ("error" to JsonPrimitive("source_error")))
     val error = assertFailsWith<KetchError.SourceError> {
-      resolveWith(HttpStatusCode.UnprocessableEntity, body)
+      resolveWith(HttpStatusCode.UnprocessableEntity, body.toString())
     }
     assertEquals("torrent", error.sourceType)
     assertEquals(reason, error.message)
+  }
+
+  @Test
+  fun resolveUrl_422WithoutATypedError_throwsRemoteApiException() = runTest {
+    val page = assertFailsWith<RemoteApiException> {
+      resolveWith(HttpStatusCode.UnprocessableEntity, "<html><body>Unprocessable</body></html>")
+    }
+    assertEquals(422, page.status)
+    val untyped = assertFailsWith<RemoteApiException> {
+      resolveWith(HttpStatusCode.UnprocessableEntity, """{"error":"invalid","message":"Nope"}""")
+    }
+    assertEquals("invalid", untyped.errorCode)
+    assertEquals("Nope", untyped.message)
   }
 
   @Test

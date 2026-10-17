@@ -16,7 +16,6 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
-import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -119,9 +118,15 @@ class ServerRoutesTest {
         setBody(ResolveUrlRequest("refuse:large"))
       }
       assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-      val error = assertIs<KetchError.SourceError>(response.body<KetchError>())
+      val body = response.bodyAsText()
+      val error = json.decodeFromString(KetchError.tolerantSerializer(), body)
+      assertIs<KetchError.SourceError>(error)
       assertEquals("refusing", error.sourceType)
       assertEquals("The pieces are too large", error.detail)
+      // Released clients read every refusal as an ErrorResponse, and keep its reason so.
+      val refusal = json.decodeFromString<ErrorResponse>(body)
+      assertEquals("source_error", refusal.error)
+      assertEquals("The pieces are too large", refusal.message)
     } finally {
       ketch.close()
     }
