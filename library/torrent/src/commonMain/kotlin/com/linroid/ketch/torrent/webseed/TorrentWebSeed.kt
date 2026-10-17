@@ -28,6 +28,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
@@ -255,6 +256,17 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private val corrupted = mutableSetOf<Int>()
   // Requests for other files a run sends at once, also kept.
   private var parallel = PARALLEL_REQUESTS
+  // Whether it was dropped and has neither verified nor refused a piece since, and whether it was
+  // then dropped again so; the swarm reads both.
+  private val quiet = AtomicBoolean(false)
+  private val gone = AtomicBoolean(false)
+
+  /**
+   * Whether this seed was dropped, started again and dropped again, without verifying or refusing
+   * a piece in between: its mirror looks down rather than briefly unavailable, so what it may
+   * serve is no evidence of anything until it verifies or refuses a piece.
+   */
+  val downAcrossRelaunch: Boolean get() = gone.load()
 
   /** Fetches until the transfer cancels it or it is dropped; never twice at once. */
   suspend fun run() {
@@ -267,6 +279,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         val claimed = pieces.claim()
         if (claimed.isEmpty() && refused && !served && !pieces.servable()) {
           // Every piece it could still be asked for failed: a mirror without the torrent.
+          dropped()
           stats.dropped.incrementAndFetch()
           log.i { "Dropped web seed $label of $logLabel: it served none of the pieces asked" }
           return
@@ -328,6 +341,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         if (unservable.isNotEmpty()) {
           refused = true
           withContext(NonCancellable) { pieces.unavailable(unservable) }
+          // Once the swarm can see the refusal, so it never sees the seed answered without it.
+          answered()
         }
         // A failure that may pass sends fewer requests at once before it counts.
         if (unservable.isEmpty() && failure !is CorruptWebSeedPiece && parallel > 1) {
@@ -336,6 +351,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
           strikes++
         }
         if (strikes >= MAX_FAILURES) {
+          dropped()
           stats.dropped.incrementAndFetch()
           log.i {
             "Dropped web seed $label of $logLabel after $failures failures: " +
@@ -525,6 +541,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     if (verified) {
       stats.pieces.incrementAndFetch()
       verifiedPieces.incrementAndFetch()
+      answered()
     }
     run[piece] = null
     withContext(NonCancellable) { pieces.release(claim, verified) }
@@ -566,6 +583,18 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private fun disconnect() {
     connection?.close()
     connection = null
+  }
+
+  /** The seed is dropped, before the swarm can see it stop: a second time if still [quiet]. */
+  private fun dropped() {
+    if (quiet.load()) gone.store(true)
+    quiet.store(true)
+  }
+
+  /** The seed verified or refused a piece: its mirror answers. */
+  private fun answered() {
+    quiet.store(false)
+    gone.store(false)
   }
 
   companion object {

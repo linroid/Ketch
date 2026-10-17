@@ -846,18 +846,20 @@ internal object TorrentV2SessionLoop {
         val published = swarm?.stall ?: return
         val stallWatchdog = watchdog ?: return
         val downloading = !complete && !seeding
-        // Web seeds that stopped after refusing pieces: one dropped for failures that may pass,
-        // such as a host that is down, refused nothing and says nothing of what it serves.
-        val refusing = mirrors?.let { seeds -> stoppedMirrors.filter(seeds::refusesAny) }.orEmpty()
+        // Web seeds that stopped and may serve again: one that was down across a relaunch says
+        // nothing of what it serves.
+        val returning = mirrors?.let { seeds ->
+          stoppedMirrors.filterNot(seeds::downAcrossRelaunch)
+        }.orEmpty()
         // Some source may still bring piece [index]: a connected peer or running web seed that
-        // has it, or a refusing web seed that stopped without finding it could not serve it.
+        // has it, or such a web seed that stopped without finding it could not serve it.
         fun obtainable(index: Int): Boolean = sourced(index) ||
-          mirrors != null && refusing.any { !mirrors.refuses(it, index) }
+          mirrors != null && returning.any { !mirrors.refuses(it, index) }
         // A piece is missing once no source may bring it, so those a stopped web seed may serve
-        // wait for it to start again. With nothing connected and no refusing web seed, nothing is
+        // wait for it to start again. With nothing connected and no such web seed, nothing is
         // known to be missing: the download waits for peers.
         val connected = peers.size + mirrorsRunning > 0
-        val missing = if (!downloading || !connected && refusing.isEmpty()) null else {
+        val missing = if (!downloading || !connected && returning.isEmpty()) null else {
           pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::obtainable)
         }
         // In this order, so no web seed byte looks kept before it is (see StallSignals).

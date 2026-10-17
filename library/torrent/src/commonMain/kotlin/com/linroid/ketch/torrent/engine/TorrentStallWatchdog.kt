@@ -10,9 +10,10 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property peers peers connected now.
  * @property unchokingPeers connected peers that let us download.
  * @property missingPieces wanted pieces that no connected peer or running web seed has and every
- *   web seed that stopped after refusing pieces found it could not serve, as the rest wait for a
- *   seed started again; none with nothing connected and no such seed, as they wait for peers. A
- *   seed dropped for failures that may pass refused nothing: it says nothing of what it serves.
+ *   web seed that stopped found it could not serve, as the rest wait for a seed started again;
+ *   none with nothing connected and no such seed, as they wait for peers. A seed dropped again
+ *   once started again, without verifying or refusing a piece in between, is left out: its mirror
+ *   is down, which says nothing of what it serves.
  * @property missingFileIds the files those pieces belong to.
  * @property lateBlocks requested blocks their peer is late with.
  * @property webSeeds web seeds running now, fetching or not.

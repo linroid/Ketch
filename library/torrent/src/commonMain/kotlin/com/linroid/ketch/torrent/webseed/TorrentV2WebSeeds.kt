@@ -149,8 +149,8 @@ internal class TorrentV2WebSeeds private constructor(
    */
   fun refuses(seed: Int, index: Int): Boolean = index in refused[seed].load()
 
-  /** Whether [seed] could not serve some piece since it last started, running or stopped. */
-  fun refusesAny(seed: Int): Boolean = refused[seed].load().isNotEmpty()
+  /** Whether [seed] is down across a relaunch ([WebSeedWorker.downAcrossRelaunch]). */
+  fun downAcrossRelaunch(seed: Int): Boolean = workers[seed].downAcrossRelaunch
 
   sealed interface Event {
     /** [seed] waits for a piece. */
