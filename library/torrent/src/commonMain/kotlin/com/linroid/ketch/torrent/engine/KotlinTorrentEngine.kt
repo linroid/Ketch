@@ -1642,6 +1642,8 @@ internal class KotlinTorrentEngine(
    */
   private suspend fun startPortMapping() = mapperMutex.withLock {
     if (!portMapping || listenHost != WILDCARD_IPV4 || portMapper != null) return@withLock
+    // Once stopRuntime has stopped the mapper, a new one's ports would stay on the router.
+    if (!running.load()) return@withLock
     portMapper = TorrentPortMapper(scope, advertisedPort.listenPort,
       // The socket DHT and uTP share on IPv4, once bound.
       udpPort = {
