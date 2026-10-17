@@ -44,6 +44,9 @@ internal class SelectableSource(
   /** Whether the source reports progress when it applies a selection, as a busy transfer does. */
   var reportsOnChange = true
 
+  /** Whether a run reports progress as it starts; when false the test reports for it. */
+  var reportsOnStart = true
+
   /** Holds metadata lookups until completed. */
   var resolveGate: CompletableDeferred<Unit>? = null
 
@@ -127,7 +130,7 @@ internal class SelectableSource(
     val run = Run(context, resumed, initial)
     runs.update { it + run }
     context.acknowledgeSelection(initial.revision)
-    publish(context, initial.fileIds)
+    if (reportsOnStart) publish(context, initial.fileIds)
     val collector = if (collects) {
       launch {
         context.selection.collect { update ->

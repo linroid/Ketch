@@ -104,12 +104,34 @@ internal class DownloadExecution(
   @Volatile
   private var progressHeld = false
 
+  // The transfer's last report, written before the hold is read.
+  @Volatile
+  private var lastReport: DownloadProgress? = null
+
   /**
-   * Holds back the transfer's progress reports while [held], so the task keeps the state shown
-   * meanwhile, as while Ketch saves and delivers a new selection, which the source reports only
-   * once it receives it.
+   * Drops the transfer's progress reports until [releaseProgress], so the task keeps the state
+   * shown meanwhile, as while Ketch saves and delivers a new selection, which the source reports
+   * only once it receives it.
    */
-  fun holdProgress(held: Boolean) { progressHeld = held }
+  fun holdProgress() { progressHeld = true }
+
+  /**
+   * Ends [holdProgress]. A started task that still shows [DownloadState.Queued] had its first
+   * report dropped, and a source may report only once while it waits, as a torrent waiting for an
+   * engine slot does: the task then shows its last report as [shown] makes it.
+   */
+  fun releaseProgress(shown: (DownloadProgress) -> DownloadProgress) {
+    progressHeld = false
+    // Read after the hold ends: a report that saw the hold had written itself before it looked.
+    val report = lastReport ?: return
+    handle.mutableState.update { current ->
+      if (current is DownloadState.Queued && reportsProgress.value) {
+        DownloadState.Downloading(shown(report))
+      } else {
+        current
+      }
+    }
+  }
 
   @Volatile
   private var discardsPartialFile = false
@@ -942,11 +964,11 @@ internal class DownloadExecution(
           lastBytes = downloaded
           lastMark = now
         }
+        val report = DownloadProgress(downloaded, total, reportedSpeed.value ?: speed)
+        lastReport = report
         // The hold is read on every attempt, so no report replaces a state shown once it began.
         handle.mutableState.update { current ->
-          if (reportsProgress.value && !progressHeld) DownloadState.Downloading(
-            DownloadProgress(downloaded, total, reportedSpeed.value ?: speed),
-          ) else current
+          if (reportsProgress.value && !progressHeld) DownloadState.Downloading(report) else current
         }
       },
       throttle = { bytes ->

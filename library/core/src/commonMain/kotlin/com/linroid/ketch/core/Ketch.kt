@@ -680,11 +680,16 @@ class Ketch(
       null
     }
     val now = Clock.System.now()
-    // Saving publishes the new request, so a running task shows the plan first, and its transfer,
-    // which reports the old selection until it receives the new one, is held back meanwhile: the
-    // request never comes with the old selection's progress. A save that fails shows that progress
-    // again.
-    val delivery = coordinator.withProgressHeld(taskId) {
+    // Saving publishes the new request, so a running task shows the plan first, and the reports of
+    // its transfer, which reports the old selection until it receives the new one, are dropped
+    // meanwhile: the request never comes with the old selection's progress. A save that fails
+    // shows that progress again. A started task still queued, as its first report was dropped,
+    // shows the last one as the plan once delivered, else as it was.
+    var delivered = false
+    val delivery = coordinator.withProgressHeld(
+      taskId,
+      shown = { report -> if (delivered) plan.shown(report) else report },
+    ) {
       val shown = handle.show(plan)
       try {
         handle.record.update { r ->
@@ -720,10 +725,12 @@ class Ketch(
       command?.afterSave()
       // Whether or not the task ran when it was planned: the queue may have started it since, its
       // execution built from the request it had then.
-      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
+      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes).also {
+        delivered = it == SelectionDelivery.DELIVERED
+      }
     }
     when {
-      // Shown before the save if the task downloads, and nothing was reported since.
+      // Shown before the save if the task downloads, else as the hold ended if it dropped a report.
       delivery == SelectionDelivery.DELIVERED -> Unit
       // Cannot happen while the lock is held, as an execution only starts finishing under it.
       delivery == SelectionDelivery.FINISHING -> return null
@@ -857,16 +864,18 @@ class Ketch(
   private fun TaskHandle.show(plan: SelectionPlan): Pair<DownloadState, DownloadState>? {
     while (true) {
       val current = mutableState.value as? DownloadState.Downloading ?: return null
-      val progress = current.progress
-      val downloaded = plan.segments?.sumOf { it.downloadedBytes }
-        ?: progress.downloadedBytes.coerceAtMost(plan.totalBytes)
-      val shown = current.copy(
-        progress = progress.copy(downloadedBytes = downloaded, totalBytes = plan.totalBytes),
-      )
+      val shown = current.copy(progress = plan.shown(current.progress))
       // A report that landed as the hold began is replaced too.
       if (mutableState.compareAndSet(current, shown)) return current to shown
     }
   }
+
+  /** [progress] with [this] plan's size, and its segments' progress when it has them. */
+  private fun SelectionPlan.shown(progress: DownloadProgress): DownloadProgress = progress.copy(
+    downloadedBytes = segments?.sumOf { it.downloadedBytes }
+      ?: progress.downloadedBytes.coerceAtMost(totalBytes),
+    totalBytes = totalBytes,
+  )
 
   /**
    * Shows a saved selection on a task that is not running: a completed task's new size, or a

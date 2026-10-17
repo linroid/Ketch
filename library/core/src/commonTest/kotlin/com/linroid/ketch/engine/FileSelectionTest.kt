@@ -281,6 +281,71 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_startedTaskFirstReportsDuringTheSave_showsThePlanDownloading() = runTest {
+    val source = SelectableSource().apply {
+      reportsOnStart = false
+      reportsOnChange = false
+    }
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      val run = source.runs.value.single()
+      assertEquals(DownloadState.Queued, task.state.value)
+      run.context.segments.value = listOf(Segment(0, 0, 99, 80), Segment(1, 100, 299, 50))
+      store.onSave = {
+        // The run's only report, as a torrent waiting for an engine slot sends.
+        if (it.request.selectedFileIds.size == 3) run.context.onProgress(130, 300)
+      }
+
+      task.selectFiles(setOf("0", "1", "2"))
+
+      val downloading = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(130, downloading.progress.downloadedBytes)
+      assertEquals(600, downloading.progress.totalBytes)
+      store.onSave = {}
+      run.finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_startedTaskFirstReportsDuringAFailedSave_showsTheReport() = runTest {
+    val source = SelectableSource().apply {
+      reportsOnStart = false
+      reportsOnChange = false
+    }
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      val run = source.runs.value.single()
+      assertEquals(DownloadState.Queued, task.state.value)
+      store.onSave = {
+        if (it.request.selectedFileIds.size == 3) {
+          run.context.onProgress(130, 300)
+          error("Disk full")
+        }
+      }
+
+      assertFailsWith<IllegalStateException> { task.selectFiles(setOf("0", "1", "2")) }
+
+      val downloading = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(130, downloading.progress.downloadedBytes)
+      assertEquals(300, downloading.progress.totalBytes)
+      store.onSave = {}
+      run.finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun selectFiles_unacknowledgedAtFinish_reruns() = runTest {
     val source = SelectableSource().apply { collects = false }
     val ketch = ketch(source)
