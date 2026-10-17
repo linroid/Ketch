@@ -1174,10 +1174,13 @@ class Ketch(
    * checkpoints saved, it [stops][DownloadSource.stop] the sources, then closes them and the
    * [HttpEngine], and closes [dispatchers] once its coroutines have finished;
    * [KetchDispatchers.Default] stays open for every other instance. [shutdown] waits for it.
+   * The sources hear it first ([DownloadSource.stopping]), so what they run beside the downloads
+   * can stop alongside them.
    */
   override fun close() {
     if (!closing.compareAndSet(false, true)) return
     log.i { "Closing Ketch" }
+    sourceResolver.stopping()
     val executions = coordinator.close()
     connectionRegistry.closeAll()
     scope.cancel()

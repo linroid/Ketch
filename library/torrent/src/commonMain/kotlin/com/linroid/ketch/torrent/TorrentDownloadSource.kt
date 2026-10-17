@@ -188,6 +188,8 @@ class TorrentDownloadSource(
   )
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
+  // Set once Ketch begins to close (stopping): the job stopping the seeders, which stop() awaits.
+  private val seedersStopping = AtomicReference<Job?>(null)
   // Set by the first close(), which closes http.
   private val released = AtomicBoolean(false)
   private val engineMutex = Mutex()
@@ -374,6 +376,8 @@ class TorrentDownloadSource(
         throw KetchError.Network(e)
       }
       engine.store(created)
+      // Started once Ketch began to close: its window opens now, as stopping() would have.
+      if (seedersStopping.load() != null) created.openStoppedWindow()
       if (closed.load()) {
         // Stopped under the mutex, which stop() waits for, so it never returns before this engine
         // released its listener and port mappings.
@@ -385,26 +389,62 @@ class TorrentDownloadSource(
   }
 
   /**
+   * Opens the engine's one window for `stopped` announces as Ketch begins to close, and stops
+   * the seeding sessions now, while Ketch pauses the downloads, so every torrent says it stopped
+   * within that window rather than the seeders in one of their own after the downloads; [stop]
+   * waits for them.
+   */
+  override fun stopping() {
+    if (seedersStopping.load() != null) return
+    val stopping = CoroutineScope(TorrentDispatchers.engine).launch(start = CoroutineStart.LAZY) {
+      stopSeeders()
+    }
+    if (!seedersStopping.compareAndSet(null, stopping)) return
+    engine.load()?.openStoppedWindow()
+    stopping.start()
+  }
+
+  /**
    * Stops the engine and returns once it has: its sessions, such as seeding ones, close and
    * announce that they stopped while the HTTP engine still runs. No engine starts after it.
    */
   override suspend fun stop() {
     shutDown()
-    saveSeeders()
+    engine.load()?.openStoppedWindow()
+    // What stopping() began, then seeders that started since, or every seeder without it.
+    seedersStopping.load()?.join()
+    stopSeeders()
     // Taken under the mutex, so an engine that was starting is stopped too.
     engineMutex.withLock { engine.exchange(null) }?.stop()
   }
 
   /**
-   * Saves each seeding session's state before the engine stops them, as no download run saves
-   * it; within [SHUTDOWN_SAVE_MS], so a session that cannot save never holds [stop] up.
+   * Stops the seeding sessions side by side, each once it saved its state, as no download run
+   * saves it: within [SHUTDOWN_SAVE_MS], so a session that cannot save never holds the rest up.
+   * Pausing a session sends its `stopped` announces.
    */
-  private suspend fun saveSeeders() {
-    val seeders = seedStates.getAndUpdate { emptyMap() }
-    if (seeders.isEmpty()) return
-    withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
-      for ((taskId, base) in seeders) {
-        tasks.session(taskId)?.let { saveSeedingState(taskId, it, base) }
+  private suspend fun stopSeeders() {
+    val watched = stateMutex.withLock {
+      seedWatchers.toMap().also {
+        seedWatchers.clear()
+        it.keys.forEach(::unmarkSeeding)
+      }
+    }
+    watched.values.forEach { it.cancel() }
+    val bases = seedStates.getAndUpdate { emptyMap() }
+    coroutineScope {
+      for (taskId in watched.keys + bases.keys) launch {
+        val session = tasks.session(taskId) ?: return@launch
+        bases[taskId]?.let { base ->
+          withTimeoutOrNull(SHUTDOWN_SAVE_MS) { saveSeedingState(taskId, session, base) }
+        }
+        try {
+          session.pause()
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          log.w { "Torrent taskId=$taskId did not stop seeding: ${e.describeCauses()}" }
+        }
       }
     }
   }

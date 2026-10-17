@@ -311,7 +311,7 @@ internal class KotlinTorrentEngine(
   private val active: Int get() = entries.values.count { !it.closing }
   private val running = AtomicBoolean(false)
   private var closed = false
-  /** When every `stopped` announce must have ended, once [stop] began; null until then. */
+  /** When every `stopped` announce must have ended, once [openStoppedWindow]; null until then. */
   private val stoppedDeadline = AtomicReference<TimeSource.Monotonic.ValueTimeMark?>(null)
   internal val advertisedPort = TorrentAdvertisedPort()
   val listenPort: Int get() = advertisedPort.listenPort
@@ -506,7 +506,7 @@ internal class KotlinTorrentEngine(
       }
     }
     log.i { "Stopping torrent engine with ${owners.size} session(s)" }
-    stoppedDeadline.store(TimeSource.Monotonic.markNow() + STOPPED_ANNOUNCE_TIME)
+    openStoppedWindow()
     withContext(NonCancellable) {
       try {
         coroutineScope {
@@ -552,9 +552,13 @@ internal class KotlinTorrentEngine(
     }
   }
 
+  override fun openStoppedWindow() {
+    stoppedDeadline.compareAndSet(null, TimeSource.Monotonic.markNow() + STOPPED_ANNOUNCE_TIME)
+  }
+
   /**
-   * How long `stopped` announces may take: [STOPPED_ANNOUNCE_TIME], and once the engine stops,
-   * what is left of the one such window every torrent's announces share.
+   * How long `stopped` announces may take: [STOPPED_ANNOUNCE_TIME], and once the host shuts down
+   * ([openStoppedWindow]), what is left of the one such window every torrent's announces share.
    */
   private fun stoppedAnnounceTime(): Duration =
     stoppedDeadline.load()?.let { -it.elapsedNow() } ?: STOPPED_ANNOUNCE_TIME
@@ -1760,8 +1764,9 @@ internal const val MAX_ADDITIONAL_TRACKERS = 128
 private const val DHT_REFRESH_MS = 15 * 60_000L
 
 /**
- * How long a torrent's `stopped` announces may take. An engine that stops gives every torrent's
- * the same window, which leaves most of a host's shutdown time (5 s in Ketch) for the rest.
+ * How long a torrent's `stopped` announces may take. A host that shuts down gives every torrent's
+ * the same window, from when Ketch begins to close or else the engine stops, which leaves most of
+ * its shutdown time (5 s in Ketch) for the rest.
  */
 private val STOPPED_ANNOUNCE_TIME: Duration = 2_000.milliseconds
 

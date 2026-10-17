@@ -28,6 +28,17 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
     for (source in sources) if (none { it === source }) add(source)
   }
 
+  /** Tells every source that Ketch begins to close ([DownloadSource.stopping]). */
+  fun stopping() {
+    for (source in uniqueSources) {
+      try {
+        source.stopping()
+      } catch (e: Exception) {
+        log.w(e) { "Failed to begin stopping source '${source.type}'" }
+      }
+    }
+  }
+
   /** [Stops][DownloadSource.stop] every source side by side and returns once each has. */
   suspend fun stop() = coroutineScope {
     for (source in uniqueSources) launch {

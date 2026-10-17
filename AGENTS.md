@@ -397,21 +397,24 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `awaiting_file_selection`) or `WaitingForCondition` (defined, not produced yet); unknown wire
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
-- `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
+- `Ketch.close()` first calls each source's `DownloadSource.stopping()` (non-suspending), then
+  pauses running tasks for `Shutdown`, keeping their partial files and their
   `DOWNLOADING` records, so the next `start()` resumes them, and releases the rest in the
   background, in order (from `Dispatchers.Default`): once the cancelled executions have finished,
   with their final `store()` checkpoints and record writes, it awaits each source's
-  `DownloadSource.stop()` (the torrent source's saves its seeders' checkpoints, then stops its
-  engine, whose remaining sessions, such as seeders, stop side by side and announce `stopped`
-  within one shared 2 s window while the router's port mappings are removed; downloads had 2 s of
-  their own as they paused), then closes the sources and the `HttpEngine`,
-  and closes dispatchers it was given only once every cancelled coroutine has finished, never
-  under them, and never
-  `KetchDispatchers.Default`, whose `close()` does nothing. `KetchApi.shutdown(timeout)` (5 s by
-  default; `close()` for other implementations) does the same and waits for the sources and the
-  `HttpEngine` to be released, at most `timeout`, leaving the rest to the background: `ketch
-  server`'s and `ketch mcp --standalone`'s shutdown hooks, `ketch <url>` and the desktop app's
-  quit (`InstanceManager.shutdown`) call it, as the process exits next
+  `DownloadSource.stop()`, then closes the sources and the `HttpEngine`. The torrent source's
+  `stopping()` opens its engine's one 2 s window for `stopped` announces
+  (`TorrentEngine.openStoppedWindow`) and stops its seeders side by side, each after saving its
+  checkpoint, while the downloads pause, so all of them announce within that window; its `stop()`
+  waits for them, stops seeders that started since, then stops the engine, whose remaining
+  sessions get what is left of the window while the router's port mappings are removed. Ketch
+  closes dispatchers it was given only once every cancelled coroutine has finished, never under
+  them, and never `KetchDispatchers.Default`, whose `close()` does nothing.
+  `KetchApi.shutdown(timeout)` (5 s by default; `close()` for other implementations) does the
+  same and waits for the sources and the `HttpEngine` to be released, at most `timeout`, leaving
+  the rest to the background: `ketch server`'s and `ketch mcp --standalone`'s shutdown hooks,
+  `ketch <url>` and the desktop app's quit (`InstanceManager.shutdown`) call it, as the process
+  exits next
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
@@ -867,11 +870,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`TorrentControlSource.saveSessionStates`, completed tasks of the source only, never while a
   run is active), which the source calls about every minute while a task seeds (its seed
   watcher), as a seeder stops (`stopSession`: Stop seeding, the watcher, a waiting download), and
-  as Ketch shuts down: `stop()` lets its seeders save, within 5 s, before it stops the engine
-  (`close()` alone saves nothing). A task's state from before (a lent seeder's last run, or the one
-  `startSeeding` restored) is what each save updates. Without a session, `countersOf` reports the
-  record's checkpoint (`TorrentControlSource.savedPayload`; `checkpointPayload` reads only the
-  counters)
+  as Ketch shuts down: `stopping()` (or `stop()` without it) saves each seeder, within 5 s,
+  before it pauses it (`close()` alone saves nothing). A task's state from before (a lent
+  seeder's last run, or the one `startSeeding` restored) is what each save updates. Without a
+  session, `countersOf` reports the record's checkpoint (`TorrentControlSource.savedPayload`;
+  `checkpointPayload` reads only the counters)
 - Paused uploads, orthogonal to the upload policy (the phone apps' Wi-Fi gate):
   `TorrentDownloadSource(uploadsPaused = ...)` (so hosts start paused before `Ketch.start()`
   restores seeding) and `setUploadsPaused(paused)` (applied under `engineMutex` like
