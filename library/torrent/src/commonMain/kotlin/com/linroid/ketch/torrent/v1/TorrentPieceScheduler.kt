@@ -91,6 +91,8 @@ internal class TorrentPieceScheduler(
   private var verifiedCount = 0
   /** Raised whenever a piece may have become openable, or a buffer freed. */
   private var openings = 0L
+  /** Raised for every block a peer comes to owe: the order owners were asked in. */
+  private var asks = 0L
   /** When idle partial pieces were last looked for. */
   private var sweptAt = 0L
   /** When each peer last looked for pieces to open and could not open all it wanted. */
@@ -152,6 +154,8 @@ internal class TorrentPieceScheduler(
     val owner = IntArray(blocks) { FREE }
     /** Per block asked for: when its first requester is late, so another may ask too. */
     val dueAt = LongArray(blocks)
+    /** Per block asked for: the [asks] count when the peer that owes it came to owe it. */
+    val askedAt = LongArray(blocks)
     /** Second requesters of blocks duplicated in the endgame. */
     var duplicates: MutableMap<Int, Int>? = null
     var free = blocks
@@ -639,6 +643,7 @@ internal class TorrentPieceScheduler(
       if (piece.owner[block] == FREE) {
         piece.owner[block] = peer
         piece.dueAt[block] = dueAt
+        piece.askedAt[block] = ++asks
         piece.free--
         requests += piece.request(block)
       }
@@ -806,12 +811,15 @@ internal class TorrentPieceScheduler(
 
   /**
    * The [capacity] blocks offered that are due last, latest first; of blocks due together, the
-   * one offered later, which its owner was asked for later.
+   * one asked for later ([OpenPiece.askedAt]), which its owner sends later. That is not always
+   * the one offered later: a piece whose blocks are free again is handed out after pieces that
+   * opened after it.
    */
   private class DueLast(capacity: Int) {
     private val pieces = arrayOfNulls<OpenPiece>(maxOf(0, capacity))
     private val blocks = IntArray(pieces.size)
     private val dues = LongArray(pieces.size)
+    private val asked = LongArray(pieces.size)
     var size = 0
       private set
 
@@ -821,22 +829,29 @@ internal class TorrentPieceScheduler(
 
     fun offer(piece: OpenPiece, block: Int) {
       val due = piece.dueAt[block]
-      // Its place: after the blocks due later, before those due with or before it. Held ones may
+      val askedAt = piece.askedAt[block]
+      // Its place: after the blocks due later, or due with it and asked for later. Held ones may
       // be hundreds, so the place is searched for and the rest moved down at once.
       var at = 0
       var end = size
       while (at < end) {
         val middle = (at + end) ushr 1
-        if (dues[middle] > due) at = middle + 1 else end = middle
+        if (dues[middle] > due || dues[middle] == due && asked[middle] > askedAt) {
+          at = middle + 1
+        } else {
+          end = middle
+        }
       }
       if (at == pieces.size) return
       val kept = minOf(size, pieces.size - 1)
       pieces.copyInto(pieces, at + 1, at, kept)
       blocks.copyInto(blocks, at + 1, at, kept)
       dues.copyInto(dues, at + 1, at, kept)
+      asked.copyInto(asked, at + 1, at, kept)
       pieces[at] = piece
       blocks[at] = block
       dues[at] = due
+      asked[at] = askedAt
       if (size < pieces.size) size++
     }
   }
@@ -851,6 +866,7 @@ internal class TorrentPieceScheduler(
       if (second != null) {
         piece.owner[block] = second
         piece.dueAt[block] = nowMs() + DEFAULT_LATE_MS
+        piece.askedAt[block] = ++asks
         piece.duplicates?.remove(block)
       } else {
         piece.owner[block] = FREE
