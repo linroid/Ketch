@@ -67,6 +67,7 @@ import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.TrafficDirection
+import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.TableColumn
 import com.linroid.ketch.app.ui.downloads.TablePadding
@@ -202,7 +203,11 @@ fun ConnectionsScreen(state: AppState) {
       }
     }
     Footer(grid, listed = all.size)
-    CountryFooter(state, grid.devices.map { it.deviceId })
+    // Every shown device, idle ones too, so their later connections carry countries; read with
+    // their presence, as a remote device lists its database once its status arrives.
+    val shown by state.shownInstances.collectAsState()
+    state.instanceManager.presence.collectAsState().value
+    CountryFooter(state, shown.map { it.deviceId })
   }
 }
 
