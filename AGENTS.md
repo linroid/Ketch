@@ -822,9 +822,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   brought payload again has it dialed `FOUND_AGAIN_MS` (30 s) after its last dial, at most once
   every `FOUND_AGAIN_EVERY_MS` (5 minutes), as the DHT names the same peers every minute. A revive
   dials every waiting or given-up endpoint at once and keeps its count; its dial of an endpoint
-  given up on leaves when that was (`PeerRedial.spent`), so a stall without a single peer, which
-  revives every minute (`LONELY_REVIVE_MS`, others every five), still forgets it. A complete swarm
-  dials nobody back
+  given up on leaves when that was (`PeerRedial.spent`), so a source naming it 5 minutes on still
+  starts it over during a stall, which revives every minute without a single peer
+  (`LONELY_REVIVE_MS`, others every five). v1 never forgets an endpoint for time alone, as a source
+  may name a peer only once (`x.pe`, the peers that sent the metadata): the longest known one given
+  up on makes room for a new one (`GIVEN_UP_MS` is when one named again starts over). A complete
+  swarm dials nobody back
 - One connection per peer, in v1 and v2 swarms (`PeerIdentity`): peers are told apart by the ID they
   claim and their host, where loopback, private, link-local and unique local hosts count as one
   (`localTorrentAddress`), as one client there is reached at several addresses (loopback from

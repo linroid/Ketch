@@ -234,8 +234,10 @@ internal class TorrentV2Candidates(
   }
 
   /**
-   * An incoming peer from [source] closed. Its source port is ephemeral and never dialed; its
-   * [listen] port, when the peer told us, becomes a candidate unless the session is restricted.
+   * An incoming peer from [source] closed. Its source port is never dialed for itself; its
+   * [listen] port, when the peer told us, becomes a candidate unless the session is restricted,
+   * also when it is the source port, as for a peer that dialed us over uTP from the socket it
+   * listens on.
    * One that [delivered] payload is dialed again as a dialed peer that brought payload is, known
    * already or not. A [complete] session does not dial it back: it is kept as tried until its
    * window passes.
@@ -247,7 +249,7 @@ internal class TorrentV2Candidates(
     complete: Boolean = false,
     delivered: Boolean = false,
   ) {
-    if (listen == null || listen == source) return
+    if (listen == null) return
     if (!complete && !delivered) {
       offer(listen, topic, PeerOrigin.INCOMING)
       return

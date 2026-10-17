@@ -138,12 +138,22 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun lonelyStall_keepsDialingAPeerNamedOnlyOnce() = swarmTest(stall = true) { rig ->
+    // The only source named it once, and it is gone for longer than its own dials last.
+    rig.dialedPeerSendsAPieceAndDrops()
+    // Given up on, it is still known: the stalled swarm dials it every minute until it is back.
+    val reached = rig.reachAgain(upAt = 2_700_000, step = 30_000)
+    val late = reached - 2_700_000
+    assertTrue(late <= 90_000, "Reached $late ms after it came back")
+  }
+
+  @Test
   fun lonelyStall_stillForgetsAPeerItGaveUpOn() = swarmTest(stall = true) { rig ->
     // It refuses from the start: dialed at 0, 10, 30 and 60 s on 10 s steps, then given up.
     rig.down.store(true)
     rig.peers.send(rig.listener.local)
     // Without a peer, the stalled swarm dials it again every minute from 60 s on. Those dials
-    // leave when it was given up, so it is forgotten five minutes after that all the same.
+    // leave when it was given up, so found again five minutes after that it starts over.
     rig.advanceTo(400_000, step = 10_000)
     val before = rig.dials.load()
     // Found again, it is dialed as a new endpoint is: at once, then 5, 15 and 30 s later.

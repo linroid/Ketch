@@ -265,8 +265,10 @@ internal class TorrentSwarm(
     }
     val active = mutableMapOf<PeerEndpoint, Job>()
     // Every endpoint the swarm knows, queued or not, with its dials since it last brought payload
-    // (PeerRedial); at most MAX_CANDIDATES. Those not queued are given up on until forgotten,
-    // found again or revived.
+    // (PeerRedial); at most MAX_CANDIDATES. Those not queued are given up on until a source names
+    // them again GIVEN_UP_MS after their last dial, or a stalled swarm revives them; they are
+    // never forgotten for time alone, as a source may name a peer only once (a magnet's, one
+    // that sent the metadata), but the longest known of them leave to make room for new ones.
     val attempts = linkedMapOf<PeerEndpoint, Int>()
     val attemptedAt = mutableMapOf<PeerEndpoint, Long>()
     // Endpoints that brought payload since they were last given up, dialed again for longer.
@@ -290,9 +292,28 @@ internal class TorrentSwarm(
     val now = nowMs
     var discoveryClosed = false
     var complete = false
-    // Queues [endpoint], found for the first time, unless the swarm knows enough already.
+    // Forgets everything about [endpoint].
+    fun forget(endpoint: PeerEndpoint) {
+      attempts.remove(endpoint)
+      attemptedAt.remove(endpoint)
+      retryAt.remove(endpoint)
+      faulty.remove(endpoint)
+      delivered.remove(endpoint)
+      broughtForwardAt.remove(endpoint)
+    }
+    // Queues [endpoint], which a source named: one found for the first time, or one given up on
+    // GIVEN_UP_MS or longer after its last dial, which starts over. When the swarm knows enough,
+    // the longest known endpoint given up on makes room.
     fun discover(endpoint: PeerEndpoint): Boolean {
-      if (endpoint in attempts || attempts.size >= MAX_CANDIDATES) return false
+      if (endpoint in attempts) {
+        if (endpoint in active || endpoint in pending) return false
+        val dialedAt = attemptedAt[endpoint] ?: return false
+        if (now() - dialedAt < GIVEN_UP_MS) return false
+        forget(endpoint)
+      } else if (attempts.size >= MAX_CANDIDATES) {
+        val oldest = attempts.keys.firstOrNull { it !in active && it !in pending } ?: return false
+        forget(oldest)
+      }
       attempts[endpoint] = 0
       pending.addLast(endpoint)
       return true
@@ -309,14 +330,14 @@ internal class TorrentSwarm(
       broughtForwardAt[endpoint] = now()
     }
     // A connection to the peer that listens at [endpoint], dialed there or not, ended while we
-    // download: it is dialed again after its delay, or given up until forgotten. One that brought
-    // payload, over it or a connection it replaced, or that [lasted], counts as its first dial.
+    // download: it is dialed again after its delay, or given up on. One that brought payload, over
+    // it or a connection it replaced, or that [lasted], counts as its first dial.
     fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean, lasted: Boolean) {
       if (endpoint in faulty || endpoint !in attempts && attempts.size >= MAX_CANDIDATES) return
       if (broughtPayload) delivered += endpoint
       val dials = if (broughtPayload || lasted) 1 else attempts[endpoint] ?: 1
       attempts[endpoint] = dials
-      // Never dialed, it is still forgotten once given up long enough.
+      // Never dialed, it still starts over once given up long enough and named again.
       attemptedAt.getOrPut(endpoint) { now() }
       val delay = PeerRedial.delayMs(dials, endpoint in delivered)
       if (delay == null) {
@@ -575,17 +596,6 @@ internal class TorrentSwarm(
           checkStall()
         }
         if (complete && policy != TorrentUploadPolicy.SEED_AFTER_COMPLETION) break
-        val expired = attemptedAt.filter { (endpoint, time) ->
-          now() - time >= 300_000 && endpoint !in active && endpoint !in pending
-        }.keys
-        expired.forEach {
-          attempts.remove(it)
-          attemptedAt.remove(it)
-          retryAt.remove(it)
-          faulty.remove(it)
-          delivered.remove(it)
-          broughtForwardAt.remove(it)
-        }
         val limit = connections().coerceIn(1, 512)
         active.entries.drop(limit).forEach { it.value.cancel() }
         var candidates = pending.size
@@ -661,8 +671,8 @@ internal class TorrentSwarm(
           if (!discoveryClosed) peers.onReceiveCatching { result ->
             val endpoint = result.getOrNull()
             if (endpoint == null) discoveryClosed = true
-            else if (endpoint in attempts) foundAgain(endpoint)
             else if (discover(endpoint)) discovered++
+            else foundAgain(endpoint)
           }
           results.onReceive { result ->
             val endpoint = result.endpoint
@@ -1525,6 +1535,9 @@ private const val PEER_WIRE_BYTES = 2 * PeerWire.MAX_FRAME_SIZE
 
 /** Endpoints a swarm keeps to dial, known and queued together. */
 private const val MAX_CANDIDATES = 4096
+
+/** How long after its last dial an endpoint given up on starts over when a source names it. */
+private const val GIVEN_UP_MS = 300_000L
 
 /** CONNECTs (BEP 55) one peer may send a minute; each names a host we dial. */
 private const val MAX_CONNECTS_PER_MINUTE = 8

@@ -222,6 +222,18 @@ class TorrentV2CandidatesTest {
   }
 
   @Test
+  fun incomingOverUtp_fromThePortItListensOn_isDialedBackWhenItSentPayload() {
+    // A peer dials uTP from the socket it listens on: its source is where it listens.
+    val peer = PeerEndpoint("10.0.0.9", 51413)
+    val book = book()
+    book.incomingClosed(peer, peer, PeerTopic.V2, delivered = true)
+    assertNull(book.next())
+    assertEquals(5_000L, book.nextDueMs())
+    now += 5_000
+    assertEquals(peer, assertNotNull(book.next()).endpoint)
+  }
+
+  @Test
   fun duplicate_isGivenUpUntilFoundAfterItsWindow() {
     val book = book()
     book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
