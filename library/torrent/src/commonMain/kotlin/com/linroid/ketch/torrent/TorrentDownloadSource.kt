@@ -1236,8 +1236,9 @@ class TorrentDownloadSource(
               store(context)
               // Seeding is optional: a download waiting for this slot takes precedence.
               if (keepSeeding && owned != null) {
-                // This run's limits end with it; a run that takes the seeder over sets its own.
-                owned.setTaskThrottle(NO_THROTTLE)
+                // The task's limit ends with this run, Ketch's global one still applies should
+                // the seeder fetch a piece again; a run that takes the seeder over sets its own.
+                owned.setTaskThrottle(context.globalThrottle)
                 lent = lendSlot(taskId, owned)
               }
               // A pause may stop this seeder before the completion can save its intent.
@@ -1724,9 +1725,6 @@ private val ADOPTABLE = setOf(TorrentSessionState.CHECKING_FILES,
  */
 private val CHECKED = setOf(TorrentSessionState.DOWNLOADING, TorrentSessionState.SEEDING,
   TorrentSessionState.FINISHED)
-
-/** The task limits of a seeder no run follows: none. */
-private val NO_THROTTLE: suspend (Int) -> Unit = {}
 
 /** How long the first engine start waits for the saved tracker list copy to be read. */
 private const val TRACKER_LIST_RESTORE_MS = 5_000L

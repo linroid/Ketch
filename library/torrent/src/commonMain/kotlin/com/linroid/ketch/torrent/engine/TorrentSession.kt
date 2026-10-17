@@ -55,8 +55,9 @@ internal interface TorrentSession {
   /**
    * Replaces the task's limits, which payload pays after the engine's and this torrent's: the
    * [throttle][com.linroid.ketch.core.engine.DownloadContext.throttle] of the run that follows
-   * the session now, such as a run that takes over a seeding session an earlier run opened.
-   * Payload already waiting keeps the limits it waits for.
+   * the session now, such as a run that takes over a seeding session an earlier run opened, or
+   * the [global limit][com.linroid.ketch.core.engine.DownloadContext.globalThrottle] alone for a
+   * seeder no run follows. Payload already waiting keeps the limits it waits for.
    */
   fun setTaskThrottle(throttle: suspend (Int) -> Unit) {}
 

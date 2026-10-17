@@ -132,6 +132,9 @@ internal class FakeTorrentSession(
     private set
   var sessionUploadRateLimit = 0L
     private set
+  /** The task's limits [setTaskThrottle] last set, null before any. */
+  var taskThrottle: (suspend (Int) -> Unit)? = null
+    private set
   var savedResumeData: ByteArray? = null
 
   override suspend fun pause() {
@@ -160,6 +163,10 @@ internal class FakeTorrentSession(
 
   override fun setUploadRateLimit(bytesPerSecond: Long) {
     sessionUploadRateLimit = bytesPerSecond
+  }
+
+  override fun setTaskThrottle(throttle: suspend (Int) -> Unit) {
+    taskThrottle = throttle
   }
 
   override suspend fun saveResumeData(): ByteArray? {

@@ -58,12 +58,14 @@ class TorrentSourceRunTest {
     files: Set<String>,
     segments: List<Segment> = emptyList(),
     throttle: suspend (Int) -> Unit = {},
+    globalThrottle: suspend (Int) -> Unit = {},
     onProgress: suspend (Long, Long) -> Unit = { _, _ -> },
   ) = DownloadContext(
     taskId = taskId, url = resolved.url,
     request = DownloadRequest(resolved.url, selectedFileIds = files), fileAccessor = NoIo,
     segments = MutableStateFlow(segments), onProgress = onProgress, throttle = throttle,
     headers = emptyMap(), preResolved = resolved, outputPath = output.toString(),
+    globalThrottle = globalThrottle,
   )
 
   @Test
@@ -199,6 +201,41 @@ class TorrentSourceRunTest {
           gate.complete(Unit)
           run.await()
           assertEquals(listOf(setOf("0", "1")), session.selectionChanges)
+          source.stopSeeding("task")
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_lendsItsSessionToSeed_leavesItTheGlobalLimitOnly() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val session = FakeTorrentSession(torrent.metadata.infoHash.hex)
+          engine.addTorrentResult = session
+          val taskPaid = AtomicLong(0)
+          val globalPaid = AtomicLong(0)
+          val taskLimit: suspend (Int) -> Unit = { taskPaid.addAndFetch(it.toLong()) }
+          val globalLimit: suspend (Int) -> Unit = { globalPaid.addAndFetch(it.toLong()) }
+          val context = context("task", resolved, "unused".toPath(), setOf("0"),
+            throttle = taskLimit, globalThrottle = globalLimit)
+          val seeds = launch {
+            eventually("the session to resume") { session.resumed }
+            assertSame(taskLimit, session.taskThrottle)
+            session.seed()
+          }
+          source.download(context, null)
+          seeds.join()
+          assertSame(session, source.sessionOf("task"))
+          // The task's limit ended with the run; should the seeder fetch a piece again, it still
+          // pays Ketch's global one.
+          assertSame(globalLimit, session.taskThrottle)
           source.stopSeeding("task")
           source.assertNoLeaks()
         } finally { source.close() }

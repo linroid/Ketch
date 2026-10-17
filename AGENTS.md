@@ -519,6 +519,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `KetchApi.updateConfig()`
 - Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`;
   it caps the task in addition to the global limit (the lower rate wins)
+- Sources pay both through `DownloadContext.throttle`; transfers a source keeps running after its
+  run, such as a lent torrent seeder, pay `DownloadContext.globalThrottle`, the global limit
+  alone, which holds nothing of the run
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper
 
 ### Download Scheduling (`DownloadScheduler`)
@@ -745,9 +748,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selected files, refuse one whose path holds a file they did not create, keep deselected
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more, the run that takes
-  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`; a lent seeder
-  holds none). Trackers hear `completed` only once every file is selected and complete;
-  admission charges every file
+  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). A lent seeder
+  pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again.
+  Trackers hear `completed` only once every file is selected and complete; admission charges
+  every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
   `TorrentSnapshot.seeding` whether the task is meant to seed (`KetchTorrentController`: the
   saved intent, a seeding session or the `SEEDING` activity), and `TorrentController.setSeeding`
