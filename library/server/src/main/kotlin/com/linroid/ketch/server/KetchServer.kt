@@ -1,5 +1,6 @@
 package com.linroid.ketch.server
 
+import com.linroid.ketch.api.CountryDatabase
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.file.PathRejectedException
@@ -8,6 +9,7 @@ import com.linroid.ketch.server.api.ConnectionStreams
 import com.linroid.ketch.server.api.PayloadTooLargeException
 import com.linroid.ketch.server.api.ServerJson
 import com.linroid.ketch.server.api.connectionRoutes
+import com.linroid.ketch.server.api.countryRoutes
 import com.linroid.ketch.server.api.downloadRoutes
 import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.healthRoutes
@@ -566,6 +568,7 @@ private fun Route.apiRoutes(
   serverRoutes(ketch, destinations)
   downloadRoutes(ketch, destinations)
   ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it) }
+  ketch.controller(CountryDatabase)?.let { countryRoutes(it) }
   connectionRoutes(ketch, connectionStreams)
   streamRoutes(events)
   eventRoutes(ketch)

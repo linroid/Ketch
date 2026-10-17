@@ -6,4 +6,6 @@ internal class DelegatingSpeedLimiter(
   @Volatile var delegate: SpeedLimiter = SpeedLimiter.Unlimited,
 ) : SpeedLimiter {
   override suspend fun acquire(bytes: Int) = delegate.acquire(bytes)
+
+  override suspend fun acquire(bytes: Int, owner: Any) = delegate.acquire(bytes, owner)
 }

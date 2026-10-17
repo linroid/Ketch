@@ -13,6 +13,7 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -92,7 +93,8 @@ class ReleaseDownloader(
         throw UpdateException("Couldn't download ${asset.name}: ${error.describeCauses()}", error)
       }
     } finally {
-      ketch.close()
+      // Returns once the engine and its HTTP engine are released, also when cancelled.
+      withContext(NonCancellable) { ketch.shutdown() }
     }
   }
 

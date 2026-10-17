@@ -46,4 +46,10 @@
     <item quantity="one">%1$d slower connection isn't listed</item>
     <item quantity="other">%1$d slower connections aren't listed</item>
   </plurals>
+  <!-- Under the list, beside the button that downloads the database the endpoints' flags come from. -->
+  <string name="connections_countries_hint">Show each endpoint's country with a flag. Downloads DB-IP's free database (about 5 MB).</string>
+  <string name="connections_countries_download">Show countries</string>
+  <string name="connections_countries_failed">Couldn't get the country database: %1$s</string>
+  <!-- The attribution the database's licence (CC BY 4.0) asks for. -->
+  <string name="connections_countries_attribution">IP geolocation by DB-IP (db-ip.com)</string>
 </resources>

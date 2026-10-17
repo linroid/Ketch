@@ -550,5 +550,23 @@ internal object ConnectionSamples {
     uploadedBytes = uploaded,
     openedAt = SampleData.NOW - age.seconds,
     peer = peer,
+    country = COUNTRIES[host],
+  )
+
+  /** The countries the sample devices name for their hosts; a few are left unknown. */
+  private val COUNTRIES = mapOf(
+    "releases.ubuntu.com" to "GB",
+    "image-net.org" to "US",
+    "ftp.debian.org" to "NL",
+    "cdimage.debian.org" to "SE",
+    "203.0.113.24" to "DE",
+    "198.51.100.7" to "JP",
+    "192.0.2.140" to "BR",
+    "203.0.113.88" to "FR",
+    "2001:db8:4c::17" to "CA",
+    "192.0.2.33" to "KR",
+    "203.0.113.5" to "ES",
+    "198.51.100.66" to "AU",
+    "203.0.113.150" to "IT",
   )
 }

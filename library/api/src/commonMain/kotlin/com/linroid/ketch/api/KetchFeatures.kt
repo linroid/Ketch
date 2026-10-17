@@ -43,10 +43,13 @@ object KetchFeatures {
   /** [Interest.Connections] reports live connections. */
   const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
 
+  /** [KetchApi.controller] offers a [CountryDatabase], for [ActiveConnection.country]. */
+  const val COUNTRIES: String = "net.countries"
+
   /** Every feature named here; other modules name their controllers' own. */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
     CATEGORY_FOLDERS, TRANSFER_TIMEOUTS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS,
-    CHECKSUM
+    CHECKSUM, COUNTRIES,
   )
 }

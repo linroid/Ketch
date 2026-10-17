@@ -909,6 +909,7 @@ internal class DownloadExecution(
     val request = handle.record.value.request
     // A local, so the global throttle keeps no reference to this execution.
     val global = globalLimiter
+    val owner = taskId
     return DownloadContext(
       taskId = taskId,
       url = request.url,
@@ -933,7 +934,8 @@ internal class DownloadExecution(
       },
       throttle = { bytes ->
         taskLimiter.acquire(bytes)
-        globalLimiter.acquire(bytes)
+        // Tasks share the global limit equally, however many connections each waits with.
+        globalLimiter.acquire(bytes, owner = taskId)
       },
       headers = request.headers,
       preResolved = preResolved,
@@ -943,7 +945,7 @@ internal class DownloadExecution(
       config = config,
       selection = selection,
       connections = connections,
-      globalThrottle = { bytes -> global.acquire(bytes) },
+      globalThrottle = { bytes -> global.acquire(bytes, owner) },
     )
   }
 

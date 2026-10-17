@@ -26,4 +26,8 @@
   <plurals name="connections_more">
     <item quantity="other">另有 %1$d 个较慢的连接未列出</item>
   </plurals>
+  <string name="connections_countries_hint">用国旗显示每个端点所在的国家或地区。需下载 DB-IP 的免费数据库（约 5 MB）。</string>
+  <string name="connections_countries_download">显示国家/地区</string>
+  <string name="connections_countries_failed">无法获取国家/地区数据库：%1$s</string>
+  <string name="connections_countries_attribution">IP 地理位置数据来自 DB-IP（db-ip.com）</string>
 </resources>

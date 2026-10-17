@@ -39,7 +39,7 @@ class ConfigurableNetworkHttpEngineTest {
       assertTrue(ketch.networkInterfaces().config.interfaceIds.isEmpty())
       assertTrue(provider.engines.dropLast(1).all { it.closed == 1 })
     } finally {
-      ketch.close()
+      ketch.shutdown()
     }
     assertTrue(provider.engines.all { it.closed == 1 })
   }

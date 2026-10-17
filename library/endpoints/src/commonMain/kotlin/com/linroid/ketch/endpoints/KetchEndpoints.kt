@@ -74,6 +74,19 @@ class Api {
   @Resource("config")
   data class Config(val parent: Api = Api())
 
+  /**
+   * The instance's IP to country database (`CountryDatabaseStatus`), served where the status
+   * lists `net.countries`.
+   */
+  @Serializable
+  @Resource("countries")
+  data class Countries(val parent: Api = Api()) {
+    /** `POST` starts downloading it and answers the status. */
+    @Serializable
+    @Resource("download")
+    data class Download(val parent: Countries = Countries())
+  }
+
   @Serializable
   @Resource("network-interfaces")
   data class NetworkInterfaces(val parent: Api = Api())

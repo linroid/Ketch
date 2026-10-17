@@ -120,6 +120,7 @@ interface KetchApi {
 
   suspend fun start()                         // core: restore saved tasks; remote: connect
   fun close()
+  suspend fun shutdown(timeout: Duration = 5.seconds) // close() and wait for it to finish
 
   suspend fun download(request: DownloadRequest): DownloadTask
   suspend fun resolve(input: ResolveInput): ResolvedSource
@@ -134,6 +135,9 @@ interface KetchApi {
 ```
 
 - Call `start()` once before use. Saved tasks only appear in `tasks` after it.
+- Before the process exits, call `shutdown()` rather than `close()`. It closes the instance and
+  waits, five seconds by default, while running downloads save where they stopped and sources such
+  as BitTorrent tell their trackers they stopped. `close()` does the same in the background.
 - `KetchApi.VERSION` and `KetchApi.REVISION` give the library version and its git revision.
 - Implementing `KetchApi` or `DownloadTask` yourself requires opting in to
   `KetchImplementationApi`.
