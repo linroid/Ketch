@@ -1465,7 +1465,8 @@ internal class TorrentSwarm(
         (2_000.0 * limit * PeerWire.BLOCK_SIZE / rate).toLong().coerceIn(MIN_LATE_MS, MAX_LATE_MS)
       } else TorrentPieceScheduler.DEFAULT_LATE_MS
       // Asked of every piece a search looks at: no boxed lookup while nothing is refused.
-      val grant = scheduler.request(id, need, lateAfter) { index ->
+      val grant = scheduler.request(id, need, lateAfter,
+        copies = TorrentPieceScheduler.endgameCopies(rate, limit)) { index ->
         (refused.isEmpty() || index !in refused) && (!state.choking || state.allowsFast(index))
       }
       // Waiting for a piece buffer is our doing, not the peer's.

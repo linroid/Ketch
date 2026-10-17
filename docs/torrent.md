@@ -792,10 +792,10 @@ answering anything, and a request it never answers is given up after four.
 - A block a peer has not delivered within twice the time its queue takes at its rate (4 to 30
   seconds) is late: a peer with room asks for it too, so a slow peer never holds the download up.
   Once every wanted piece left is being fetched or is one no connected peer or web seed has, a peer
-  that owes nothing of its own also asks for up to 16 blocks other peers owe, those they would
-  send last. A block has at most two requesters, and the first copy to arrive cancels the other:
-  a copy of a block far back in a peer's queue arrives before that peer gets to it, so little is
-  downloaded twice.
+  that owes nothing of its own also asks for blocks other peers owe, those they would send last:
+  about as many as it receives in a second, at least 16. A block has at most two requesters, and
+  the first copy to arrive cancels the other: a copy of a block far back in a peer's queue arrives
+  before that peer gets to it, so little is downloaded twice.
 - Ketch tells a peer it is interested only while the peer has a piece Ketch still wants. Once Ketch
   has every piece, it closes connections to peers that have every piece too.
 

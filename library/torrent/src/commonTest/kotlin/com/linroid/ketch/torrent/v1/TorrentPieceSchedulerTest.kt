@@ -280,6 +280,41 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun endgame_fastPeerCopiesMoreOfADeepQueueThanASlowOne() = runTest {
+    val fast = TorrentPieceScheduler.endgameCopies(2.0 * 1024 * 1024, pipeline = 500)
+    val slow = TorrentPieceScheduler.endgameCopies(64.0 * 1024, pipeline = 500)
+    // Peer 1 owes every block of a torrent the budget holds whole, more than both copy.
+    val pieces = (fast + slow) / 4 + 2
+    val budget = TorrentBufferBudget(pieces * piece)
+    val scheduler = scheduler(pieces, budget)
+    for (peer in 1..3) scheduler.availability(peer, all(pieces))
+    val owed = scheduler.request(1, max = pieces * 4).requests
+    assertEquals(pieces * 4, owed.size)
+    // From the end of its queue, a fast peer takes about a second of its rate, a slow one the
+    // fewest.
+    val fastCopies = scheduler.request(2, max = 500, copies = fast).requests
+    assertTrue(fastCopies.size > TorrentPieceScheduler.ENDGAME_DUPLICATES)
+    assertEquals(owed.reversed().take(fast), fastCopies)
+    assertEquals(owed.reversed().drop(fast).take(slow),
+      scheduler.request(3, max = 500, copies = slow).requests)
+    for (peer in 1..3) scheduler.remove(peer)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
+  fun endgameCopies_peerRate_aboutASecondOfItWithinThePipeline() {
+    val fewest = TorrentPieceScheduler.ENDGAME_DUPLICATES
+    // A second of 2 MiB/s is 128 blocks.
+    assertEquals(128, TorrentPieceScheduler.endgameCopies(2.0 * 1024 * 1024, pipeline = 500))
+    // A slow peer, or one whose rate is not known yet, holds the fewest.
+    assertEquals(fewest, TorrentPieceScheduler.endgameCopies(64.0 * 1024, pipeline = 500))
+    assertEquals(fewest, TorrentPieceScheduler.endgameCopies(0.0, pipeline = 500))
+    // Never more than the requests it keeps outstanding.
+    assertEquals(250, TorrentPieceScheduler.endgameCopies(100.0 * 1024 * 1024, pipeline = 250))
+    assertEquals(8, TorrentPieceScheduler.endgameCopies(0.0, pipeline = 8))
+  }
+
+  @Test
   fun corruptPiece_blamesItsOnlySender_andOtherwiseGoesToOnePeer() = runTest {
     val budget = TorrentBufferBudget(piece)
     val scheduler = scheduler(pieces = 1, budget)
