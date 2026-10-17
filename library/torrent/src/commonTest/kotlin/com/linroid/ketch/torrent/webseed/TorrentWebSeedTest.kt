@@ -511,6 +511,50 @@ class TorrentWebSeedTest {
   }
 
   @Test
+  fun droppedSeedWithoutPeers_reportsTheStaleFileAsMissing() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        // The one file wanted is another stale.bin at the only source, and no peer connects.
+        val mirror = MirrorEngine(mapOf(staleUrl to stale.reversedArray(),
+          "http://mirror.test/pub/set/good.bin" to good))
+        withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
+          val network = createTorrentNetwork()
+          // Discovery stays open, finding nobody.
+          val peers = Channel<PeerEndpoint>()
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              // Sent corrupt twice, the seed has nothing left to fetch and is dropped.
+              while (mirror.requests.count { it.first == staleUrl } < 2) delay(20)
+              delay(500)
+              // Nothing arrives for 40 s: a stall, and why.
+              clock = 40_000
+              delay(500)
+              clock = 80_000
+              val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+              assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
+              assertEquals(1, reported.missingPieces)
+              assertEquals(listOf("0"), reported.missingFileIds)
+              assertEquals(0, reported.peers)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   fun lostFile_isReportedAsAStallNamingIt() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(30_000) {

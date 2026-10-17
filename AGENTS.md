@@ -724,7 +724,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or
   no verified piece for four pieces' worth of time at its rate (1 to 10 minutes; time waiting on
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no
-  connected peer or web seed has and their files, no peers, all choking, slow peers) the session
+  connected peer or web seed has and their files, with nothing connected those a web seed could
+  not serve, kept 10 s after the last source leaves; no peers, all choking, slow peers) the session
   publishes (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm
   summary). After a minute it reannounces to trackers (5, 10, up to 30 minutes apart), revives
   peers it gave up on, and after two minutes relaunches dropped web seeds. The inspector says why

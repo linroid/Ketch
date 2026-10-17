@@ -308,12 +308,14 @@ class TorrentV2WebSeedTest {
   }
 
   /**
-   * Downloads [fixture] from the web seed [engine] serves, without any peer, its discovery open
-   * and its clock one the test moves on; [body] watches it before it is closed.
+   * Downloads the [selected] files of [fixture] (all when empty) from the web seed [engine]
+   * serves, without any peer, its discovery open and its clock one the test moves on; [body]
+   * watches it before it is closed.
    */
   private suspend fun stalling(
     fixture: TorrentV2Fixture,
     engine: HttpEngine,
+    selected: Set<String> = emptySet(),
     body: suspend (Stalling) -> Unit,
   ) = withContext(Dispatchers.Default) {
     withTimeout(15_000) {
@@ -322,14 +324,14 @@ class TorrentV2WebSeedTest {
       val buffers = TorrentBufferBudget(4 * 1024 * 1024)
       val state = TorrentBufferBudget(4 * 1024 * 1024)
       val network = createTorrentNetwork()
-      val store = TorrentV2PieceStore(fixture.document, output, emptySet(), "stall", buffers,
+      val store = TorrentV2PieceStore(fixture.document, output, selected, "stall", buffers,
         Semaphore(4))
       val clock = monotonicClock()
       val skipped = AtomicLong(0)
       val sinks = CompletableDeferred<TorrentV2DiscoverySink>()
       try {
         val session = TorrentV2DownloadSession.open(this, fixture.document, fixture.layout,
-          emptySet(), store,
+          selected, store,
           TorrentV2Runtime(network, ByteArray(20) { 1 }.toByteString(), buffers, state,
             webSeedHttp = TorrentHttp(engine)),
           TorrentV2SessionOptions(maxPeers = 4, webSeedRetryMs = 5,
@@ -408,12 +410,13 @@ class TorrentV2WebSeedTest {
       override fun close() = Unit
     }
     stalling(fixture, flaky) { run ->
-      // Every file is asked for and missing: the seed goes, and nothing else is there.
+      // Every file is asked for and missing: the seed goes, and the stall names every file.
       while (requests.load() < files.size) delay(10)
       delay(1_500)
       run.skip(40_000)
-      assertEquals(TorrentStallReason.NO_PEERS,
-        run.session.stall.first { it?.reason == TorrentStallReason.NO_PEERS }?.reason)
+      val stall = run.session.stall.first { it?.reason == TorrentStallReason.MISSING_PIECES }
+      assertEquals(fixture.layout.files.map { it.id }.toSet(), stall?.missingFileIds?.toSet())
+      assertEquals(0, stall?.peers)
       assertEquals(0L, run.sink.reannounceRequests())
       // Two minutes on, it is started again and finds the mirror back; the trackers are asked
       // for peers again too.
@@ -422,6 +425,28 @@ class TorrentV2WebSeedTest {
       run.session.downloadedBytes.first { it == files.sumOf { file -> file.second }.toLong() }
       assertTrue(run.sink.reannounceRequests() > 0)
       assertTrue(mirror.requests.isNotEmpty())
+    }
+  }
+
+  @Test
+  fun droppedSeedWithoutPeers_reportsTheCorruptFileAsMissing() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    // The one file wanted is another bad.bin at the only source, and no peer connects.
+    val mirror = MirrorEngine(mapOf(bad to fixture.payloads[0].reversedArray(),
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      // Sent corrupt twice, the seed has nothing left to fetch and is dropped.
+      while (mirror.requests.count { it.first == bad } < 2) delay(10)
+      delay(2_000)
+      run.skip(40_000)
+      val stall = assertNotNull(run.session.stall.first { it != null })
+      assertEquals(TorrentStallReason.MISSING_PIECES, stall.reason)
+      assertEquals(1, stall.missingPieces)
+      assertEquals(listOf(wanted), stall.missingFileIds)
+      assertEquals(0, stall.peers)
     }
   }
 

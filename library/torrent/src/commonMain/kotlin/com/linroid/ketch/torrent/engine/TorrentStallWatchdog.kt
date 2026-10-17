@@ -9,7 +9,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property downloading pieces are wanted and the swarm fetches them; only then can it stall.
  * @property peers peers connected now.
  * @property unchokingPeers connected peers that let us download.
- * @property missingPieces wanted pieces that no connected peer or running web seed has.
+ * @property missingPieces wanted pieces that no connected peer or running web seed has; with
+ *   nothing connected, those a web seed found it could not serve, as the rest wait for peers.
  * @property missingFileIds the files those pieces belong to.
  * @property lateBlocks requested blocks their peer is late with.
  * @property webSeeds web seeds running now.
@@ -52,7 +53,9 @@ internal enum class StallRecovery {
  * verified for four pieces' worth of time at its rate (at least [MIN_PIECE_MS], at most
  * [MAX_PIECE_MS]). Time spent waiting on speed limits counts as progress: a slow limit is no
  * stall. Recoveries start once it has lasted [RECOVER_AFTER_MS], each at most once per its own
- * cooldown, announcing to trackers less often each time it does not help.
+ * cooldown, announcing to trackers less often each time it does not help. Pieces missing while
+ * a peer or web seed was connected stay missing for [SOURCE_GRACE_MS] once the last one goes, so
+ * a peer that reconnects at once does not flip the reason.
  *
  * Not thread-safe: one swarm loop calls it.
  */
@@ -68,6 +71,10 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var reannounceEveryMs = REANNOUNCE_MS
   private var reviveAt = Long.MIN_VALUE
   private var relaunchAt = Long.MIN_VALUE
+  // When a peer or web seed was last connected, and what was missing then.
+  private var sourcedAt = Long.MIN_VALUE / 2
+  private var sourcedMissing = 0
+  private var sourcedFiles = emptyList<String>()
 
   /** Why the download makes no progress now; null while it does. */
   var stall: TorrentStall? = null
@@ -98,6 +105,16 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       progressAt = minOf(progressAt + throttled, now)
       payloadAt = minOf(payloadAt + throttled, now)
     }
+    var missing = signals.missingPieces
+    var missingFiles = signals.missingFileIds
+    if (signals.peers > 0 || signals.webSeeds > 0) {
+      sourcedAt = now
+      sourcedMissing = missing
+      sourcedFiles = missingFiles
+    } else if (missing == 0 && now - sourcedAt < SOURCE_GRACE_MS) {
+      missing = sourcedMissing
+      missingFiles = sourcedFiles
+    }
     if (!signals.downloading) {
       progressed()
       return emptySet()
@@ -110,7 +127,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       return emptySet()
     }
     val reason = when {
-      signals.missingPieces > 0 -> TorrentStallReason.MISSING_PIECES
+      missing > 0 -> TorrentStallReason.MISSING_PIECES
       signals.peers == 0 && signals.webSeeds == 0 -> TorrentStallReason.NO_PEERS
       signals.unchokingPeers == 0 && signals.webSeeds == 0 -> TorrentStallReason.CHOKED
       signals.lateBlocks > 0 -> TorrentStallReason.SLOW_PEERS
@@ -120,8 +137,8 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     stall = TorrentStall(
       reason = reason,
       seconds = lasted / 1000,
-      missingPieces = signals.missingPieces,
-      missingFileIds = signals.missingFileIds.take(TorrentStall.MAX_MISSING_FILES),
+      missingPieces = missing,
+      missingFileIds = missingFiles.take(TorrentStall.MAX_MISSING_FILES),
       peers = signals.peers,
       unchokingPeers = signals.unchokingPeers.coerceIn(0, signals.peers),
     )
@@ -170,6 +187,9 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     /** How long a stall lasts before dropped web seeds start again, and how often they do. */
     const val RELAUNCH_AFTER_MS = 120_000L
     const val RELAUNCH_MS = 600_000L
+
+    /** How long pieces missing while something was connected stay missing once nothing is. */
+    const val SOURCE_GRACE_MS = 10_000L
   }
 }
 

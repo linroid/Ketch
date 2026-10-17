@@ -91,6 +91,22 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun lastSourceLeaving_keepsWhatWasMissingAWhile() {
+    runTo(31_000) { signals(peers = 1, missingPieces = 2, missingFileIds = listOf("7")) }
+    assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
+    // The one peer drops and reconnects: what it lacked is still missing meanwhile.
+    runTo(34_000) { signals() }
+    val stall = assertNotNull(watchdog.stall)
+    assertEquals(TorrentStallReason.MISSING_PIECES, stall.reason)
+    assertEquals(2, stall.missingPieces)
+    assertEquals(listOf("7"), stall.missingFileIds)
+    assertEquals(0, stall.peers)
+    // Gone for longer, the download waits for peers.
+    runTo(45_000) { signals() }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+  }
+
+  @Test
   fun waitingOnSpeedLimits_isNoStall() {
     // Payload trickles in, every second of it spent waiting on a speed limit.
     runTo(600_000) { time -> signals(payloadBytes = time / 100, throttledMs = time, peers = 1) }

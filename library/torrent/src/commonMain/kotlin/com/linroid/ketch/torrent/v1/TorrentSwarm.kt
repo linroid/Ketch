@@ -394,8 +394,12 @@ internal class TorrentSwarm(
       val dropped = webSeeds.indices.count {
         !webSeeds[it].isActive && webSeedPieces[it].mayServe()
       }
-      // With nothing connected no piece is missing from what is: it waits for peers.
-      val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else null
+      // With nothing connected, only the pieces a web seed could not serve are known to be
+      // missing: the rest wait for peers.
+      val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else {
+        webSeedPieces.flatMapTo(HashSet()) { it.unservable }.takeIf { it.isNotEmpty() }
+          ?.let { scheduler.health(MAX_REPORTED_MISSING_PIECES, among = it) }
+      }
       val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
       }

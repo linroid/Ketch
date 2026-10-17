@@ -758,9 +758,13 @@ or no piece verified for four pieces' worth of time at its rate (between one and
 time spent waiting on a speed limit never counts. It then says why, in the most telling order:
 
 - **Missing pieces**: wanted pieces that no connected peer or web seed has, and the files they
-  belong to. The download waits for a peer that has them; skipping those files lets the rest
-  finish. A torrent whose files changed at its only web seed stops here.
-- **No peers**: no peer is connected and no web seed is fetching.
+  belong to; with nothing connected, the pieces a web seed could not serve. The download waits for
+  a peer that has them; skipping those files lets the rest finish. A torrent whose files changed
+  at its only web seed stops here, also once that seed was dropped. Pieces missing while a peer
+  was connected stay missing for 10 seconds after the last one leaves, so a peer that reconnects
+  at once does not change the reason.
+- **No peers**: no peer is connected, no web seed is fetching, and no web seed found a piece it
+  could not serve.
 - **Choked**: peers are connected, but none of them lets Ketch download yet.
 - **Slow peers**: peers are late with what was asked of them, which other peers are then asked
   for too.
