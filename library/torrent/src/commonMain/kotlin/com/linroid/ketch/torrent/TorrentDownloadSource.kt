@@ -653,12 +653,37 @@ class TorrentDownloadSource(
       requireOwnedPaths(request.taskId, table, state, output, added)
     }
     val saved = request.segments.orEmpty().associateBy { it.index }
+    fun whole(id: String) = request.completed && id in effective
+    // A file without a saved segment, such as one deselected and chosen again, counts what the
+    // saved checkpoint verified of it.
+    val kept = if (ids.any { !whole(it) && saved[it.toInt()] == null }) {
+      keptProgress(request.taskId, state, request.resolved)
+    } else {
+      emptyMap()
+    }
     val segments = table.segments(ids) { file ->
-      if (request.completed && file.id in effective) file.size
-      else saved[file.id.toInt()]?.downloadedBytes ?: 0
+      if (whole(file.id)) file.size
+      else saved[file.id.toInt()]?.downloadedBytes ?: kept[file.id] ?: 0
     }
     return SelectionPlan(ids, table.totalOf(ids), changed = ids != effective,
       expands = added.isNotEmpty(), segments = segments)
+  }
+
+  /** [savedFileProgress] of [state], or none when its checkpoint cannot be read. */
+  private suspend fun keptProgress(
+    taskId: String,
+    state: TorrentSourceState?,
+    resolved: ResolvedSource?,
+  ): Map<String, Long> {
+    if (state == null || state.resumeData.isEmpty()) return emptyMap()
+    return withContext(TorrentDispatchers.engine) {
+      try {
+        savedFileProgress(state, metainfoOf(resolved, state), config)
+      } catch (e: Exception) {
+        log.d { "Torrent taskId=$taskId saved no readable progress: ${e.describeCauses()}" }
+        emptyMap()
+      }
+    }
   }
 
   /**

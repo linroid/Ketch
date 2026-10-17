@@ -813,7 +813,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the run's own); until then the task shows each file's progress as Ketch restored or planned it,
   or as the session last reported it, over the files the run follows, which a selection changes
   as it arrives, so a recheck never shows 0 and a selection taken during one, or while a session
-  takes it, or a run Ketch repeats for a selection, shows its own files and size
+  takes it, or a run Ketch repeats for a selection, shows its own files and size. `planSelection`
+  plans a file without saved progress, such as one deselected and chosen again, with what the
+  saved checkpoint verified of it (`savedFileProgress`: each verified piece's bytes in the file,
+  from a v1 `TorrentCheckpoint` or a v2 `TorrentV2Checkpoint`'s hint), so a paused task shows
+  the verified pieces such a file kept
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
   verified pieces when they are deselected, copies verified spans of boundary pieces from the
