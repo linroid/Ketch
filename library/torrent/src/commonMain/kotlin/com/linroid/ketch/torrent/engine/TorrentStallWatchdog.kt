@@ -68,13 +68,15 @@ internal enum class StallRecovery {
  * as the gap was no slow piece, once nothing can throw that payload away any more and none was
  * meanwhile. It does so once until the next piece verifies, so payload that comes and goes never
  * keeps a stall from showing. Payload later thrown away is no payload: it takes back the checks
- * that counted it, newest first, but a gap is told from when any payload last arrived, so payload
- * thrown away never makes the next look back after one. Time spent waiting on speed limits counts
- * as progress: a slow limit is no stall. Recoveries start once it has lasted [RECOVER_AFTER_MS],
- * each at most once per its own cooldown, announcing to trackers less often each time it does not
- * help. Pieces missing while a peer or web seed was connected stay missing for [SOURCE_GRACE_MS]
- * once the last one goes, so a peer that reconnects at once does not flip the reason. Web seeds
- * never decide the reason otherwise: a stall stores nothing from them.
+ * before that counted it, newest first, and the check that finds it counts only the rest of what
+ * it brought, so the next piece's first bytes are never taken for it; but a gap is told from when
+ * any payload last arrived, so payload thrown away never makes the next look back after one.
+ * Time spent waiting on speed limits counts as progress: a slow limit is no stall. Recoveries
+ * start once it has lasted [RECOVER_AFTER_MS], each at most once per its own cooldown, announcing
+ * to trackers less often each time it does not help. Pieces missing while a peer or web seed was
+ * connected stay missing for [SOURCE_GRACE_MS] once the last one goes, so a peer that reconnects
+ * at once does not flip the reason. Web seeds never decide the reason otherwise: a stall stores
+ * nothing from them.
  *
  * Not thread-safe: one swarm loop calls it.
  */
@@ -145,8 +147,11 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     throttledMs = signals.throttledMs
     rate = (rate + (received - wasted).coerceAtLeast(0) * 1000.0 / elapsed) / 2
     if (throttled > 0) waited(throttled, now)
-    if (received > 0) took(received, now)
-    if (wasted > 0) takeBack(wasted)
+    // Payload thrown away came before the rest of what this check brings, such as the next
+    // piece's first bytes: it settles against the checks before, and only the rest is payload.
+    val thrownAway = if (wasted > 0) takeBack(wasted) else 0
+    if (received > thrownAway) took(received - thrownAway, now)
+    if (received > 0) seenAt = now
     kept(signals.payloadBytes - signals.unsettledBytes)
     var missing = signals.missingPieces
     var missingFiles = signals.missingFileIds
@@ -238,27 +243,28 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       next.restartAt = oldest.restartAt ?: next.restartAt
     }
     payloadAt = now
-    seenAt = now
   }
 
   /**
-   * [bytes] of payload were thrown away: they were the latest, so the newest checks go back. Which
-   * bytes they were is not known, so no payload still waiting to be kept gives a piece its time
-   * again.
+   * [bytes] of payload were thrown away: they were the latest before this check, so the newest
+   * checks before it go back. Which bytes they were is not known, so no payload still waiting to
+   * be kept gives a piece its time again. Returns the bytes those checks did not take, which
+   * arrived in this one.
    */
-  private fun takeBack(bytes: Long) {
+  private fun takeBack(bytes: Long): Long {
     for (credit in credits) credit.restartAt = null
     var left = bytes
     while (left > 0) {
-      val credit = credits.lastOrNull() ?: return
+      val credit = credits.lastOrNull() ?: return left
       if (credit.bytes > left) {
         credit.bytes -= left
-        return
+        return 0
       }
       left -= credit.bytes
       credits.removeLast()
       payloadAt = credit.payloadAt
     }
+    return 0
   }
 
   /**

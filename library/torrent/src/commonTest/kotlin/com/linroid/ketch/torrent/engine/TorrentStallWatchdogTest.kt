@@ -183,6 +183,43 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun wastedPieceAndTheNextOneInOneCheck_stallCountsFromThePayloadBefore() {
+    // A peer sends payload for 5 s and leaves.
+    runTo(5_000) { time -> signals(payloadBytes = time, peers = 1, unchokingPeers = 1) }
+    // From 11 s a web seed sends a piece over four checks. The fourth also brings the first
+    // 32 KiB of the next piece and finds the first corrupt; the next one is corrupt too.
+    val bySecond = listOf(65_536L, 131_072, 196_608, 294_912, 360_448, 425_984, 491_520, 524_288)
+    fun sent(time: Long) = if (time < 11_000) 0L else bySecond[minOf(time / 1_000 - 11, 7).toInt()]
+    fun wasted(time: Long) = when {
+      time < 14_000 -> 0L
+      time < 18_000 -> 262_144L
+      else -> 524_288L
+    }
+    val stalls = stallsTo(40_000) { time ->
+      signals(payloadBytes = 5_000 + sent(time), unsettledBytes = sent(time) - wasted(time),
+        wastedBytes = wasted(time), webSeeds = 1)
+    }
+    // Nothing kept since 5 s: a stall half a minute after, not after the first corrupt copy came.
+    assertTrue(stalls.take(29).all { it == null }, stalls.toString())
+    assertEquals(35, assertNotNull(stalls[29]).seconds)
+  }
+
+  @Test
+  fun payloadArrivingWithWastedPayload_staysPayload() {
+    // A web seed sends 10 KB a second for 20 s.
+    runTo(20_000) { time ->
+      signals(payloadBytes = time * 10, unsettledBytes = time * 10, webSeeds = 1)
+    }
+    // Its piece fails as a peer sends 50 KB, kept at once, and leaves.
+    val stalls = stallsTo(60_000) {
+      signals(payloadBytes = 250_000, wastedBytes = 200_000, webSeeds = 1)
+    }
+    // A stall half a minute after the peer's payload.
+    assertTrue(stalls.take(30).all { it == null }, stalls.toString())
+    assertEquals(51, assertNotNull(stalls[30]).seconds)
+  }
+
+  @Test
   fun missingPieces_comeFirstAndNameTheirFiles() {
     runTo(31_000) {
       signals(peers = 5, unchokingPeers = 5, missingPieces = 2, missingFileIds = listOf("7"),
