@@ -470,6 +470,69 @@ class TorrentSwarmPipelineTest {
 
   @OptIn(ExperimentalAtomicApi::class)
   @Test
+  fun choke_withAllowedFastBlocksLeftUnanswered_leavesThePeersRate() = pipelineTest {
+    // Pieces of 16 blocks: the first two time the peer, which is then asked for the other six.
+    val fixture = Fixture(pieces = 8, pieceLength = 16 * block)
+    val clock = AtomicLong(0)
+    val peers = Channel<PeerEndpoint>(1)
+    val measured = CompletableDeferred<Unit>()
+    val choked = CompletableDeferred<Unit>()
+    val expired = CompletableDeferred<Unit>()
+    val unchokeNow = CompletableDeferred<Unit>()
+    val reasked = CompletableDeferred<Int>()
+    val server = seed(fixture, peers, fast = true) { wire ->
+      wire.send(unchoke)
+      val owed = wire.measure(fixture, measured, owed = 96)
+      // Choked, it may send piece 7, which we still want, but leaves those requests unanswered.
+      wire.send(PeerMessage.AllowedFast(7))
+      wire.send(choke)
+      choked.complete(Unit)
+      val allowed = owed.filter { it.index == 7 }
+      var canceled = 0
+      while (canceled < owed.size - allowed.size) if (wire.read() is PeerMessage.Cancel) canceled++
+      expired.complete(Unit)
+      unchokeNow.await()
+      wire.send(unchoke)
+      val again = wire.requestsWithin(owed.size - allowed.size, 2_000)
+      reasked.complete(again.size)
+      for (request in allowed + again) wire.send(fixture.block(request))
+      wire.serve(fixture)
+    }
+    peers.close()
+    val budget = budget(fixture, pieces = 8, peers = 1)
+    val swarm = launch {
+      TorrentSwarm(fixture.store, fixture.network, budget, nowMs = { clock.load() }).run(peers)
+    }
+    try {
+      measured.await()
+      // 32 blocks in half a second: 1 MiB/s, 3 seconds of which is more than the 96 blocks left.
+      clock.store(500)
+      choked.await()
+      delay(200)
+      // Every pass through the 5 s grace and after it looks at its rate while piece 7 is owed.
+      while (!expired.isCompleted) {
+        clock.store(clock.load() + 500)
+        delay(150)
+      }
+      repeat(4) {
+        clock.store(clock.load() + 500)
+        delay(150)
+      }
+      unchokeNow.complete(Unit)
+      // Unchoked, it is asked for the 80 blocks canceled again, as deep as before the choke.
+      assertEquals(80, reasked.await())
+      swarm.join()
+      assertContentEquals(fixture.payload, fixture.output())
+      assertEquals(0, budget.allocated)
+    } finally {
+      swarm.cancelAndJoin()
+      server.cancelAndJoin()
+      fixture.close()
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
   fun unchoke_timeThePeerChokedUs_isNoSampleOfItsRate() = pipelineTest {
     // Pieces of 16 blocks: the first two time the peer, which is then asked for 192 more.
     val fixture = Fixture(pieces = 16, pieceLength = 16 * block)

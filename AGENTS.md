@@ -1053,12 +1053,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   peers transferring. A worker keeps `QUEUE_TIME_MS` (3 s) of its peer's measured rate
   outstanding (4 to `MAX_PIPELINE` 500, within the peer's `reqq`, 250 when it names none; until
   the first sample it starts at `INITIAL_PIPELINE` 16 and adds one per block received; time the
-  peer chokes us owing no allowed-fast block is never sampled), across piece ends, asked for in
-  batches (`request`, `PeerWire.sendAll`); we advertise `reqq` 500. Choke, reject, cancel and
-  disconnect free only the
-  blocks still owed; a partial piece nobody fetches from gives its buffer up after 10 s when
-  another piece needs it, after 60 s anyway and at once when no connected peer has it, and `close`
-  frees the rest when the swarm stops. The peer that delivers the last block commits the piece
+  peer chokes us sending nothing is never sampled), across piece ends, asked for in batches
+  (`request`, `PeerWire.sendAll`); we advertise `reqq` 500. Choke, reject, cancel and disconnect
+  free only the blocks still owed; a partial piece nobody fetches from gives its buffer up after
+  10 s when another piece needs it, after 60 s anyway and at once when no connected peer has it,
+  and `close` frees the rest when the swarm stops. The peer that delivers the last block commits the piece
   (`Arrival.Complete`, then `finish`): a failed hash check blames it only when it sent every block,
   else one peer fetches the piece alone next. Once every wanted piece is open, idle peers also ask
   for blocks one other peer owes: any it is late with, and, once they owe none of their own, about

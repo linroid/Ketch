@@ -784,8 +784,8 @@ answering anything, and a request it never answers is given up after four.
 - Each peer is kept about 3 seconds of its own rate in outstanding requests, between 4 and 500,
   within the request queue it announces (BEP 10 `reqq`, 250 when it names none). Until its rate is
   known, a peer starts at 16 and gets one more request for each block it delivers. Its rate counts
-  only time it could send: not the time it chokes Ketch, unless it owes an allowed-fast block.
-  Requests run on across piece ends. Ketch announces a queue of 500.
+  only time it could send: not the time it chokes Ketch without sending anything, allowed-fast
+  blocks included. Requests run on across piece ends. Ketch announces a queue of 500.
 - A peer that chokes, rejects or disconnects gives back the blocks it still owes; the blocks it sent
   stay with their piece. A partial piece nobody fetches gives its buffer up after 10 seconds when
   another piece needs it, and after a minute in any case.
