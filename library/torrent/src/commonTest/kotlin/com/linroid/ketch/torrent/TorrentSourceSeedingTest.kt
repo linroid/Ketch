@@ -44,7 +44,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
@@ -407,7 +406,7 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
-  fun restoredSeeder_shrunkWhileItChecks_seedsTheSmallerSelection() = runTest {
+  fun restoredSeeder_shrunkWhileItChecks_checksAndSeedsTheSmallerSelection() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(10_000) {
         val engine = FakeTorrentEngine()
@@ -435,13 +434,14 @@ class TorrentSourceSeedingTest {
         val ketch = Ketch(UnusedHttpEngine(), taskStore = store, additionalSources = listOf(source))
         try {
           ketch.start()
-          // The restored seeder checks its files, and a file is dropped meanwhile.
+          // The restored seeder checks its files, and a file, deleted maybe, is dropped meanwhile.
           eventually { session.resumed }
           ketch.tasks.value.single().selectFiles(setOf("1"))
-          assertEquals(emptyList(), session.selectionChanges)
+          // The check takes the smaller selection, which no longer needs that file.
+          assertEquals(listOf(setOf("1")), session.selectionChanges)
 
           session.seed()
-          withTimeoutOrNull(5_000) { eventually { session.selectionChanges.isNotEmpty() } }
+          eventually { "seeder" in source.seedingTaskIds.value }
 
           assertEquals(listOf(setOf("1")), session.selectionChanges)
           source.stopSeeding("seeder")
@@ -732,6 +732,28 @@ class TorrentSourceSeedingTest {
       assertEquals(emptySet(), engine().incomingTags())
       assertEquals(0, engine().admittedSessionBytes)
     }
+
+  @Test
+  fun startSeeding_deletedFileDroppedSinceTheTaskWasRead_seeds() = v2Seeding { source, _, root ->
+    val output = root / "seeding"
+    val checkpoint = fixture.preseed(output, "seeder")
+    val resolved = source.resolveMetainfo(fixture.metainfo)
+    val ids = resolved.files.map { it.id }.toSet()
+    val dropped = resolved.files.single { it.name.substringAfterLast('/') == "c" }.id
+    // The owner deleted a file and then dropped it, after the restore read the task.
+    torrentFileSystem.delete(output / "c")
+    val state = TorrentSourceState(fixture.document.info.hash.hex, resolved.totalBytes,
+      encodeBase64(checkpoint.encode()), ids, output.toString(), encodeBase64(fixture.metainfo),
+      version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+
+    val outcome = source.startSeeding(SeedingTask("seeder", "http://fixture/pack.torrent",
+      state.saved(), null, output.toString(), ids, selection = { ids - dropped }))
+
+    assertEquals(SeedingOutcome.SEEDING, outcome)
+    assertEquals(ids - dropped, source.sessionOf("seeder")?.selectedFileIds)
+    source.stopSeeding("seeder")
+    source.assertNoLeaks()
+  }
 
   @Test
   fun taskUploadLimitAppliesToV2Seeder() = v2Seeding { source, engine, root ->

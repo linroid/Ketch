@@ -98,8 +98,9 @@ internal interface TorrentControlSource {
 
   /**
    * Applies [fileIds], a completed task's new selection that adds no files, to the task's
-   * seeding session, if any, so it shares and announces that selection and a removed file it can
-   * no longer read does not stop it. Returns whether a session took the change.
+   * seeding session, if any, also one still checking its files, so it shares and announces that
+   * selection and a removed file it can no longer read does not stop it. Returns whether a
+   * session took the change.
    */
   suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean = false
 
@@ -142,8 +143,8 @@ internal class LiveTorrent(
  * @property selectedFileIds the task's files; empty for every file
  * @property connections opens the task's live network connections while it seeds, as
  *   [DownloadContext.connections] does while it downloads
- * @property selection reads the task's files now: a selection saved while the seeder checked
- *   its files differs from [selectedFileIds]
+ * @property selection reads the task's files now: a selection saved since [selectedFileIds]
+ *   was read differs from it
  */
 internal class SeedingTask(
   val taskId: String,

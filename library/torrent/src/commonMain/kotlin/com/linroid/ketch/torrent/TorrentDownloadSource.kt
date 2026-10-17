@@ -204,6 +204,9 @@ class TorrentDownloadSource(
   // The state each seeding session saves its checkpoint into, by task ([saveSeedingState]): set
   // once it seeds, removed once it stops or a run of the task takes it over.
   private val seedStates = MutableStateFlow<Map<String, TorrentSourceState>>(emptyMap())
+  // The seed-only sessions [startSeeding] lent a slot to while they check their files, by task:
+  // a smaller selection saved meanwhile reaches them ([changeSeedingSelection]).
+  private val checkingSeeders = MutableStateFlow<Map<String, CheckingSeeder>>(emptyMap())
   // Where seeding sessions save their state: the task records, once attached.
   private val sessionStates =
     AtomicReference<(suspend (taskId: String, state: SourceState) -> Unit)?>(null)
@@ -882,8 +885,11 @@ class TorrentDownloadSource(
   internal suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
     val taskId = task.taskId
     seedingAvailability(taskId)?.let { return it }
+    // A smaller selection saved since the task was read: a file dropped, deleted maybe, is never
+    // opened or checked.
+    val opened = smallerSelection(task, task.selectedFileIds) ?: task.selectedFileIds
     val plan = try {
-      seedPlan(task)
+      seedPlan(task, opened)
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
@@ -918,6 +924,10 @@ class TorrentDownloadSource(
         outcome = SeedingOutcome.NO_SLOT
         return outcome
       }
+      // From here a smaller selection saved meanwhile reaches the session, which checks its
+      // files again with it; one saved as it opened is read before the check.
+      checkingSeeders.update { it + (taskId to CheckingSeeder(session, opened)) }
+      seedLatestSelection(task, opened)
       log.i { "Torrent taskId=$taskId checks its files to seed (${logHash(plan.hash)})" }
       session.resume()
       val reached = session.state.first {
@@ -941,11 +951,17 @@ class TorrentDownloadSource(
         else -> if (pausedUploads.load()) SeedingOutcome.UPLOADS_PAUSED else SeedingOutcome.FAILED
       }
       if (outcome == SeedingOutcome.SEEDING) {
-        seedStates.update { it + (taskId to plan.state) }
+        // The state its checkpoint saves into takes the selection it seeds.
+        val seeded = checkingSeeders.value[taskId]?.selection ?: opened
+        val state = if (seeded == task.selectedFileIds) plan.state else {
+          plan.state.copy(selectedFileIds = seeded, totalBytes = session.totalBytes)
+        }
+        seedStates.update { it + (taskId to state) }
         markSeeding(taskId)
+        checkingSeeders.update { it - taskId }
         watchSeeder(taskId, session)
         log.i { "Torrent taskId=$taskId seeds again" }
-        seedLatestSelection(task)
+        seedLatestSelection(task, seeded)
       } else {
         log.i { "Torrent taskId=$taskId does not seed: $outcome" }
       }
@@ -957,6 +973,8 @@ class TorrentDownloadSource(
       outcome = SeedingOutcome.FAILED
       return outcome
     } finally {
+      // Only the reservation's holder adds one.
+      if (reserved) checkingSeeders.update { it - taskId }
       if (outcome != SeedingOutcome.SEEDING) withContext(NonCancellable) {
         if (lent) {
           stopSeeder(taskId)
@@ -973,16 +991,12 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Applies to a seeder that now seeds the smaller selection its task saved while the seeder
-   * checked its files: [changeSeedingSelection] only changes a seeder once it is marked seeding,
-   * so a selection saved from then on reaches it, and one saved before is read here. A selection
-   * that adds files reopens the task instead, whose run takes the seeder over.
+   * Applies to [task]'s seeder, which seeds [from], the smaller selection its task saved since:
+   * [changeSeedingSelection] changes a seeder only while it checks or seeds, so one saved from
+   * then on reaches it, and one saved before is read here, before the check and once it seeds.
    */
-  private suspend fun seedLatestSelection(task: SeedingTask) {
-    val latest = task.selection()
-    val seeded = task.selectedFileIds
-    if (latest.isEmpty() || latest == seeded) return
-    if (seeded.isNotEmpty() && !seeded.containsAll(latest)) return
+  private suspend fun seedLatestSelection(task: SeedingTask, from: Set<String>) {
+    val latest = smallerSelection(task, from) ?: return
     try {
       changeSeedingSelection(task.taskId, latest)
     } catch (e: CancellationException) {
@@ -995,6 +1009,20 @@ class TorrentDownloadSource(
   }
 
   /**
+   * [task]'s current selection when it only drops files from [seeded], which a seeder can take;
+   * else `null`. A selection that adds files reopens the task instead, whose run takes the seeder
+   * over.
+   */
+  private fun smallerSelection(task: SeedingTask, seeded: Set<String>): Set<String>? {
+    val latest = task.selection()
+    if (latest.isEmpty() || latest == seeded) return null
+    return latest.takeIf { seeded.isEmpty() || seeded.containsAll(it) }
+  }
+
+  /** A seed-only session that checks its files, and the selection it checks them for. */
+  private class CheckingSeeder(val session: TorrentSession, val selection: Set<String>)
+
+  /**
    * A completed task's seed-only session: its identity, the state it saves its checkpoint into,
    * and how to open it.
    */
@@ -1004,7 +1032,7 @@ class TorrentDownloadSource(
     val open: suspend () -> TorrentSession,
   )
 
-  private suspend fun seedPlan(task: SeedingTask): SeedPlan {
+  private suspend fun seedPlan(task: SeedingTask, selection: Set<String>): SeedPlan {
     val state = decodeState(task.sourceState)
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
@@ -1017,7 +1045,7 @@ class TorrentDownloadSource(
     val table = withContext(TorrentDispatchers.engine) {
       fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     }
-    val selected = selectionOf(table, task.selectedFileIds, state)
+    val selected = selectionOf(table, selection, state)
     val magnet = task.url.takeIf { it.startsWith("magnet:", true) }
     val resumeData = state.resumeData.takeIf { it.isNotEmpty() }
     if (table.v2) {
@@ -1083,11 +1111,23 @@ class TorrentDownloadSource(
     }
   }
 
-  /** Applies a completed task's smaller selection to its seeding session, if it seeds. */
+  /**
+   * Applies a completed task's smaller selection to its seeding session, if it seeds or checks
+   * its files to seed: the check starts again with it, so a file dropped meanwhile, deleted
+   * maybe, no longer keeps it from seeding.
+   */
   internal suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean {
-    if (taskId !in seedingTaskIds.value) return false
-    val session = tasks.session(taskId) ?: return false
+    // Not once a download took a checking seeder's slot, or the task's own run took it over.
+    val checking = if (taskId in seedingTaskIds.value) null else {
+      checkingSeeders.value[taskId]?.session
+        ?.takeIf { slots.isLent(taskId) && tasks.session(taskId) === it } ?: return false
+    }
+    val session = checking ?: tasks.session(taskId) ?: return false
     val live = session.changeSelection(fileIds)
+    checkingSeeders.update { seeders ->
+      if (checking == null || seeders[taskId]?.session !== checking) return@update seeders
+      seeders + (taskId to CheckingSeeder(checking, fileIds))
+    }
     stateMutex.withLock {
       states[taskId]?.let {
         states[taskId] = it.copy(selectedFileIds = fileIds, totalBytes = session.totalBytes)
