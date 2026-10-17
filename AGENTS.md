@@ -959,8 +959,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
   2 s, which the engine starts as its stopped window opens; UPnP tries other ports on 718 and
   permanent leases on 725. `stop` logs once (info, the port and layer counts only) how many layers
-  confirmed the removal (UPnP fault 714, no such entry, counts) and, if not all, that the rest
-  forward the port until their lease ends, or until the router drops a permanent one.
+  confirmed removing every mapping asked for, also those of a pass it cut short (UPnP fault 714,
+  no such entry, counts) and, if not all, that the rest may still forward the port until their
+  lease ends, or until the router drops one asked for with lease 0.
   `PortMappingTest` and
   `NatLayersTest` run them against scripted gateways on loopback, and `TorrentShutdownTest` an
   engine's (`portMapGateways`)

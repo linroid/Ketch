@@ -426,7 +426,7 @@ class PortMappingTest {
       withInfoLog { lines ->
         mapThroughNatPmp(network, scope, port).stop(timeoutMs = stopMs)
         assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 0 of 1 NAT " +
-          "layer(s) confirmed it; the others forward the port until their lease ends"),
+          "layer(s) confirmed it; the others may still forward the port until their lease ends"),
           removals(lines))
       }
     }
@@ -438,8 +438,8 @@ class PortMappingTest {
     withInfoLog { lines ->
       mapThroughNatPmp(network, scope, port).stop(timeoutMs = 300)
       assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881 timed out after " +
-        "300ms: 0 of 1 NAT layer(s) confirmed it; the others forward the port until their " +
-        "lease ends"), removals(lines))
+        "300ms: 0 of 1 NAT layer(s) confirmed it; the others may still forward the port until " +
+        "their lease ends"), removals(lines))
       assertEquals(listOf(2 to 3600, 2 to 0), requests.first { it.size == 2 })
     }
   }
@@ -458,13 +458,36 @@ class PortMappingTest {
           mapThroughUpnp(network, scope, ssdp, silent.local.port).stop(timeoutMs = stopMs)
           // A lease of 0 never ends.
           assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 0 of 1 NAT " +
-            "layer(s) confirmed it; the others forward the port until the router drops it, as " +
-            "UPnP leased it for good"), removals(lines))
+            "layer(s) confirmed it; the others may still forward the port until the router drops " +
+            "it, as UPnP leased it for good"), removals(lines))
         }
         assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping TCP 6881",
           "GetExternalIPAddress null null", "DeletePortMapping TCP 6881"), igd.actions.value)
       } finally {
         silent.close()
+      }
+    }
+
+  @Test
+  fun mapper_stop_duringTheFirstPass_saysTheGatewayMayStillForwardThePort() =
+    gateways { network, scope ->
+      val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
+      val port = natPmpGateway(network, scope, silentGrants = true, silentRemovals = true,
+        requests = requests)
+      withInfoLog { lines ->
+        val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
+          onMapped = {},
+          natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
+          upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+          networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
+        mapper.start()
+        // The gateway mapped TCP, but no reply says so before the engine stops, nor after.
+        requests.first { it.isNotEmpty() }
+        mapper.stop(timeoutMs = stopMs)
+        assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 0 of 1 NAT " +
+          "layer(s) confirmed it; the others may still forward the port until their lease ends"),
+          removals(lines))
+        assertEquals(listOf(2 to 3600, 2 to 0), requests.value)
       }
     }
 

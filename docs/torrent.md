@@ -700,10 +700,10 @@ directly; it is asked to forward the port the router got to the router's externa
 external port; when another device holds that port, UPnP picks another. Only engines listening on
 every interface map ports.
 
-When Ketch shuts down, the routers get 2 seconds to remove the mappings, and the log says once
-how many of them confirmed it; a router that already lost a mapping counts. One that did not
-confirm keeps forwarding the port until the mapping's lease ends, or, when the router only takes
-permanent UPnP leases, until the router itself drops it.
+When Ketch shuts down, the routers get 2 seconds to remove the mappings, also those Ketch was
+still asking for, and the log says once how many of them confirmed it; a router that already lost
+a mapping counts. One that did not confirm may keep forwarding the port until the mapping's lease
+ends, or, when the router only takes permanent UPnP leases, until the router itself drops it.
 
 ### Local discovery details
 
