@@ -494,6 +494,12 @@ internal class DownloadExecution(
       currentCoroutineContext().ensureActive()
       val (prepared, ctx) = handle.controlLock.withLock {
         val prepared = prepare() ?: return
+        // The run starts with the selection saved last, also one saved after this execution was
+        // built from the task's request as it was then.
+        val saved = handle.record.value.request.selectedFileIds
+        if (selection.value.fileIds != saved) {
+          selection.value = SelectionUpdate(saved, selection.value.revision + 1)
+        }
         val accessor = if (selfManagedIo) {
           NoOpFileAccessor
         } else {

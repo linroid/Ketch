@@ -50,6 +50,9 @@ internal class SelectableSource(
   /** Holds every [store], the periodic and the final save's, until completed. */
   var saveGate: CompletableDeferred<Unit>? = null
 
+  /** Holds every [planSelection] until completed. */
+  var planGate: CompletableDeferred<Unit>? = null
+
   var resolves = 0
 
   val runs = MutableStateFlow<List<Run>>(emptyList())
@@ -90,6 +93,7 @@ internal class SelectableSource(
 
   override suspend fun planSelection(request: SelectionRequest<Unit>): SelectionPlan {
     check(request.resolved != null) { "The file list is not known yet" }
+    planGate?.await()
     planned += request.fileIds
     val chosen = request.fileIds ?: ids
     require(chosen.isNotEmpty() && chosen.all { it in ids }) { "Unknown file id" }

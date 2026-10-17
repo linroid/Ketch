@@ -717,11 +717,9 @@ class Ketch(
       throw e
     }
     command?.afterSave()
-    val delivery = if (running) {
-      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
-    } else {
-      SelectionDelivery.NOT_RUNNING
-    }
+    // Whether or not the task ran when it was planned: the queue may have started it since, its
+    // execution built from the request it had then.
+    val delivery = coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes)
     when {
       delivery == SelectionDelivery.DELIVERED -> {
         // Shown again: a transfer that moves no bytes reports no progress to carry the new size,

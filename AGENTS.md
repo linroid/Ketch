@@ -633,9 +633,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selection's progress), then delivers it: a running task takes it live as a new
   `DownloadContext.selection` revision, which the source acknowledges (a run that ends with an
   unacknowledged selection runs again through `resume`, so completion covers the latest one);
-  paused, queued, scheduled and failed tasks use it when they start; a completed task that gains
-  files reopens into the same folder, adopting its live seeding session, while one that only
-  drops files changes its size, and its seeding session shares the smaller selection
+  paused, queued, scheduled and failed tasks use it when they start (it goes to whatever
+  execution runs once it is saved, and an execution reads the saved selection again under the
+  control lock, so one the queue starts during the planning runs it too); a completed task that
+  gains files reopens into the same folder, adopting its live seeding session, while one that
+  only drops files changes its size, and its seeding session shares the smaller selection
   (`SourceExtension.selectionChanged`). Re-selecting the current files does nothing
 - `DownloadRequest.awaitFileSelection`: a download added without a selection, as the apps' "Add
   anyway" adds a magnet, parks as `Paused(AwaitingFileSelection)` once it lists several files or

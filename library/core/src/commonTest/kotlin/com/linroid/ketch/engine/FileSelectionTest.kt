@@ -538,6 +538,47 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_queueStartsTheTaskWhilePlanning_runsTheSavedSelection() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(
+      source,
+      config = DownloadConfig(retryCount = 0, saveIntervalMs = 60_000, maxConcurrentDownloads = 1),
+    )
+    try {
+      val other = ketch.download(request("0"))
+      runCurrent()
+      val client = source.resolved("pick:files", "client")
+      val task = ketch.download(request("0", "1").copy(resolvedSource = client))
+      runCurrent()
+      assertEquals(DownloadState.Queued, task.state.value)
+      val gate = CompletableDeferred<Unit>()
+      source.planGate = gate
+      val selecting = async { task.selectFiles(setOf("0", "1", "2")) }
+      runCurrent()
+
+      // The slot frees while the selection is planned: the queue starts the task, whose
+      // execution is built from the request it had then.
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+      assertIs<DownloadState.Completed>(other.state.value)
+      gate.complete(Unit)
+      runCurrent()
+      selecting.await()
+
+      val run = source.runs.value.last()
+      assertEquals(2, source.runs.value.size)
+      val followed = (listOf(run.initial) + run.applied).last()
+      assertEquals(setOf("0", "1", "2"), followed.fileIds)
+      run.finish.complete(Unit)
+      runCurrent()
+      assertEquals(600, assertIs<DownloadState.Completed>(task.state.value).totalBytes)
+      assertEquals(2, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun periodicSave_concurrentSelection_neverRevertsTheRequest() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()
