@@ -440,7 +440,8 @@ internal class ConnectionRegistry(
       sampledAt = clock.now(),
       connections = connections,
       dropped = dropped.load(),
-      closed = recentClosed(now),
+      // One that closed since the live connections were read is listed as open until next time.
+      closed = recentClosed(now).filter { it.id !in entries },
       receivedBytes = totalReceived,
       sentBytes = totalSent,
     )

@@ -31,4 +31,11 @@
   <plurals name="connections_more">
     <item quantity="other">速度の遅い%1$d件の接続は表示されていません</item>
   </plurals>
+  <string name="connections_status_open">接続中</string>
+  <string name="connections_status_closed">切断済み</string>
+  <string name="connections_closed_ago">%1$s前</string>
+  <string name="connections_row_closed">%1$s前に切断</string>
+  <string name="connections_detail_was_open">接続していた時間</string>
+  <string name="connections_total_received">受信 %1$s</string>
+  <string name="connections_total_sent">送信 %1$s</string>
 </resources>
