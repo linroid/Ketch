@@ -1071,13 +1071,14 @@ class TorrentWebSeedTest {
                     .run(Channel(), selections = selections)
                 }
                 completions.receive()
-                // Seeding, the swarm has nothing left to fetch: its summary lists no web seed.
+                // Seeding, the swarm has nothing left to fetch: its summary shows no web seed
+                // running, and the two pieces the seed delivered.
                 clock = SWARM_SUMMARY_INTERVAL_MS
                 var summary: String
                 do {
                   summary = lines.receive()
                 } while ("peers connected=" !in summary)
-                assertFalse("webSeeds=" in summary, summary)
+                assertTrue("webSeeds=0/1 (dropped=0), webSeedPieces=2," in summary, summary)
                 // c.bin is wanted too: the seed starts again and fetches it.
                 store.changeSelection(setOf(0, 3))
                 CompletableDeferred<Unit>().also { selections.send(it) }.await()

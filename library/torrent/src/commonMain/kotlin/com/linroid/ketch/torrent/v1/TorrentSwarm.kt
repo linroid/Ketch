@@ -463,8 +463,9 @@ internal class TorrentSwarm(
           "corrupt=$corruptPieces, $uploads uploaded=${uploaded.load()}, " +
           "discovery=${if (discoveryClosed) "closed" else "open"}; ${diagnostics.summary()}; " +
           holepunch.summary() +
-          (if (webSeeds.isEmpty()) "" else
-            "; ${webSeedStats.summary(webSeeds.count { it.isActive }, webSeeds.size)}") +
+          // Seeds stopped once the swarm has every piece keep their totals here.
+          (if (webSeedUrls.isEmpty()) "" else
+            "; ${webSeedStats.summary(webSeeds.count { it.isActive }, webSeedUrls.size)}") +
           (stall?.value?.let { "; stall: ${it.describe()}" } ?: "")
       }
       discovered = 0
