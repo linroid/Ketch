@@ -101,6 +101,40 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun droppedPeer_foundWhileConnected_waitsAsUsualOnceItDropsAgain() = swarmTest { rig ->
+    rig.dialedPeerSendsAPieceAndDrops()
+    // Back for its next dial, it answers with nothing we want.
+    rig.down.store(false)
+    val accepted = async { rig.listener.accept() }
+    while (!accepted.isCompleted) rig.advanceTo(rig.clock.load() + 5_000)
+    val connection = accepted.await()
+    val wire = PeerWire(connection, metadata)
+    wire.handshake(rig.peerHandshake())
+    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(2))))
+    // The DHT names it while it is connected, which says nothing about whether it is back once
+    // it drops five minutes later.
+    rig.peers.send(rig.listener.local)
+    delay(300)
+    rig.advanceTo(rig.clock.load() + 300_000, step = 300_000)
+    val before = rig.dials.load()
+    rig.down.store(true)
+    connection.close()
+    val dropped = rig.clock.load()
+    // The connection lasted, so it counts as its first dial: it is dialed again 5 s later, not
+    // at once as if the naming had come after it dropped.
+    delay(600)
+    assertEquals(before, rig.dials.load(), "Dialed again at once")
+    rig.advanceTo(dropped + 5_000)
+    delay(300)
+    assertEquals(before + 1, rig.dials.load())
+    // Refused then and 20 and 50 s after it dropped, its next dial would come at 110 s. Named a
+    // minute after it dropped, it is dialed 30 s after its last dial instead: the naming while it
+    // was connected did not spend that.
+    val reached = rig.reachAgain(upAt = dropped + 60_000) { rig.peers.send(rig.listener.local) }
+    assertTrue(reached - dropped <= 100_000, "Reached ${reached - dropped} ms after it dropped")
+  }
+
+  @Test
   fun droppedPeer_foundAgainEveryMinute_isDialedSoonerOnlyEveryFiveMinutes() = swarmTest { rig ->
     rig.dialedPeerSendsAPieceAndDrops()
     val dropped = rig.dials.load()
