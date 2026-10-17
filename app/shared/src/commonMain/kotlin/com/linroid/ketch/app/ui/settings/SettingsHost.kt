@@ -137,6 +137,7 @@ internal fun SettingsContent(
     if (permission != null) add(SettingsFeature.BrowserNotifications)
     if (fileLogger != null) add(SettingsFeature.Logs)
     if (keepAwakeSupported) add(SettingsFeature.KeepAwake)
+    if (state.whenDownloadsFinish != null) add(SettingsFeature.WhenDownloadsFinish)
     if (state.instanceManager.followsUploadNetwork) add(SettingsFeature.UploadWifiOnly)
   }
   val index = rememberSettingsSearchIndex()

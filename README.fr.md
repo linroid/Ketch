@@ -186,6 +186,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **Éveillé pendant les téléchargements** — Les apps pour ordinateur et Android empêchent la mise
   en veille automatique du système pendant les téléchargements ; l'écran peut tout de même
   s'éteindre (**Réglages → Général**).
+- **À la fin des téléchargements** — L'application de bureau peut quitter Ketch, mettre
+  l'ordinateur en veille ou l'éteindre une fois ses téléchargements terminés, après un
+  avertissement d'une minute que l'on peut annuler (**Réglages → Général**).
 - **Votre style, votre langue** — Thèmes clair et sombre avec sept couleurs d'accent, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français et Русский
   ([traductions](docs/development/localization.md)).
@@ -273,8 +276,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Détection de ressources** — Trouver les fichiers téléchargeables d'une page web
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
   aux plus lentes pour ne plus attendre la connexion la plus lente
-- **À la fin des téléchargements** — Quitter Ketch, mettre l'ordinateur en veille ou l'éteindre,
-  au choix, une fois la file d'attente vide
 - **Transferts entre appareils** — Envoyer vers et Déplacer vers transmettent les données déjà
   téléchargées pour que l'autre appareil reprenne au lieu de recommencer
   ([plan](docs/plans/task-transfer.md))

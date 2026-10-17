@@ -143,6 +143,12 @@
   <string name="settings_general_power">Питание</string>
   <string name="settings_general_keep_awake">Не засыпать во время загрузок</string>
   <string name="settings_general_keep_awake_hint">%1$s не будет сам переходить в режим сна, пока идут загрузки. Экран при этом может выключаться.</string>
+  <string name="settings_general_when_done">После загрузок</string>
+  <string name="settings_general_when_done_hint">Выполняется, когда на этом компьютере ничего не загружается и не ждёт в очереди, после предупреждения за минуту. Срабатывает один раз и сбрасывается при выходе из Ketch.</string>
+  <string name="settings_general_when_done_nothing">Ничего не делать</string>
+  <string name="settings_general_when_done_quit">Выйти из Ketch</string>
+  <string name="settings_general_when_done_sleep">Режим сна</string>
+  <string name="settings_general_when_done_shut_down">Выключить</string>
 
   <string name="settings_notifications_downloads">Загрузки</string>
   <string name="settings_notifications_footer">«Уведомлять» использует системные уведомления. «Только в приложении» — сообщения внутри Ketch.</string>
@@ -747,6 +753,7 @@
   <string name="settings_search_badge">Что показывает значок в Dock или на панели задач</string>
   <string name="settings_search_badge_keywords">счётчик, наклейка, dock, панель задач</string>
   <string name="settings_search_keep_awake_keywords">сон, спящий режим, питание, батарея, не засыпать, wake lock</string>
+  <string name="settings_search_when_done_keywords">выключить, завершение работы, сон, выход, после загрузок, очередь, готово</string>
   <string name="settings_search_shortcuts">Все сочетания клавиш</string>
   <string name="settings_search_shortcuts_keywords">клавиши, горячие клавиши, быстрые клавиши</string>
   <string name="settings_search_finished_keywords">завершено, готово, оповещение</string>

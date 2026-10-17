@@ -38,6 +38,7 @@ import ketch.app.shared.generated.resources.settings_general_reduce_motion
 import ketch.app.shared.generated.resources.settings_general_shortcuts
 import ketch.app.shared.generated.resources.settings_general_start_hidden
 import ketch.app.shared.generated.resources.settings_general_theme
+import ketch.app.shared.generated.resources.settings_general_when_done
 import ketch.app.shared.generated.resources.settings_integration_clipboard_suggest
 import ketch.app.shared.generated.resources.settings_integration_extension
 import ketch.app.shared.generated.resources.settings_integration_magnet
@@ -79,6 +80,7 @@ import ketch.app.shared.generated.resources.settings_search_clipboard_keywords
 import ketch.app.shared.generated.resources.settings_search_close
 import ketch.app.shared.generated.resources.settings_search_close_keywords
 import ketch.app.shared.generated.resources.settings_search_keep_awake_keywords
+import ketch.app.shared.generated.resources.settings_search_when_done_keywords
 import ketch.app.shared.generated.resources.settings_search_code_keywords
 import ketch.app.shared.generated.resources.settings_search_connections_keywords
 import ketch.app.shared.generated.resources.settings_search_density
@@ -240,6 +242,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     title = Res.string.settings_general_keep_awake,
     keywords = Res.string.settings_search_keep_awake_keywords,
     needs = SettingsFeature.KeepAwake,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.General,
+    title = Res.string.settings_general_when_done,
+    keywords = Res.string.settings_search_when_done_keywords,
+    needs = SettingsFeature.WhenDownloadsFinish,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.General,

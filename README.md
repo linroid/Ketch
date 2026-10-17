@@ -166,6 +166,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   on the desktop; downloads that keep running in the background on Android and on iOS 26.
 - **Awake while it downloads** — The desktop and Android apps keep the system from going to sleep
   on its own while downloads run; the screen can still turn off (**Settings → General**).
+- **When downloads finish** — The desktop app can quit, put the computer to sleep or shut it down
+  once its downloads finish, after a minute's warning you can cancel (**Settings → General**).
 - **Your look, your language** — Light and dark themes with seven accent colors, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français and Русский
   ([translating](docs/development/localization.md)).
@@ -243,8 +245,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Resource sniffer** — Find the downloadable files on a web page
 - **Faster segmented downloads** — Connections that finish early take over the rest of the slower
   ones, so a download no longer waits on its slowest connection
-- **When downloads finish** — Optionally quit Ketch, put the computer to sleep or shut it down
-  once the queue is empty
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own

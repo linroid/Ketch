@@ -131,6 +131,12 @@
   <string name="settings_general_power">전원</string>
   <string name="settings_general_keep_awake">다운로드 중 잠자기 방지</string>
   <string name="settings_general_keep_awake_hint">다운로드하는 동안 %1$s의 자동 잠자기를 막습니다. 화면은 꺼질 수 있습니다.</string>
+  <string name="settings_general_when_done">다운로드가 끝나면</string>
+  <string name="settings_general_when_done_hint">이 컴퓨터에서 다운로드 중이거나 대기 중인 항목이 없어지면 1분 동안 알린 뒤 실행합니다. 한 번만 실행되며 Ketch를 종료하면 취소됩니다.</string>
+  <string name="settings_general_when_done_nothing">아무것도 안 함</string>
+  <string name="settings_general_when_done_quit">Ketch 종료</string>
+  <string name="settings_general_when_done_sleep">잠자기</string>
+  <string name="settings_general_when_done_shut_down">시스템 종료</string>
 
   <string name="settings_notifications_downloads">다운로드</string>
   <string name="settings_notifications_footer">‘알림’은 시스템 알림을 사용하고, ‘앱 내에서만’은 Ketch 안에서만 표시합니다.</string>
@@ -687,6 +693,7 @@
   <string name="settings_search_badge">Dock 또는 작업 표시줄 아이콘에 표시할 내용</string>
   <string name="settings_search_badge_keywords">개수, 배지, Dock, 독, 작업 표시줄</string>
   <string name="settings_search_keep_awake_keywords">잠자기, 절전, 전원, 배터리, 잠자기 방지</string>
+  <string name="settings_search_when_done_keywords">시스템 종료, 전원 끄기, 잠자기, 종료, 다운로드 후, 대기열, 완료</string>
   <string name="settings_search_shortcuts">모든 키보드 단축키</string>
   <string name="settings_search_shortcuts_keywords">키, 단축키, 핫키, 키 바인딩</string>
   <string name="settings_search_finished_keywords">완료, 끝남, 알림</string>
