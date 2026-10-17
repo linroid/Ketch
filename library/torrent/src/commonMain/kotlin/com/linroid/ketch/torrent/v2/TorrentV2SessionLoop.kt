@@ -315,8 +315,6 @@ internal object TorrentV2SessionLoop {
       val cancels = ArrayDeque<TorrentV2PieceScheduler.Cancel>()
       // Notices a download that stopped making progress, says why and recovers ([checkStall]).
       val watchdog = swarm?.stall?.let { TorrentStallWatchdog(nowMs) }
-      // Peers that ever became ready, for it: it sees arrivals while others leave.
-      var joinedPeers = 0L
       val payloadAtStart = store.receivedBytes()
       // Time requests waited on speed limits, which is never a stall.
       var throttledMs = 0L
@@ -848,19 +846,25 @@ internal object TorrentV2SessionLoop {
         val published = swarm?.stall ?: return
         val stallWatchdog = watchdog ?: return
         val downloading = !complete && !seeding
-        // Web seeds that stopped and may serve again: one that was down across a relaunch says
-        // nothing of what it serves.
-        val returning = mirrors?.let { seeds ->
-          stoppedMirrors.filterNot(seeds::downAcrossRelaunch)
+        // Web seeds that run, but those started again that have yet to answer: they offer every
+        // piece, so they count as stopped until they do.
+        val answering = mirrors?.let { seeds ->
+          seeds.urls.indices.filter { it !in stoppedMirrors && !seeds.unproven(it) }
         }.orEmpty()
-        // Some source may still bring piece [index]: a connected peer or running web seed that
-        // has it, or such a web seed that stopped without finding it could not serve it.
-        fun obtainable(index: Int): Boolean = sourced(index) ||
-          mirrors != null && returning.any { !mirrors.refuses(it, index) }
+        // The others may serve again: one that was down across a relaunch says nothing of what it
+        // serves.
+        val returning = mirrors?.let { seeds ->
+          seeds.urls.indices.filter { it !in answering && !seeds.downAcrossRelaunch(it) }
+        }.orEmpty()
+        // Some source may still bring piece [index]: a connected peer or answering web seed that
+        // has it, or another web seed that did not find it could not serve it.
+        fun obtainable(index: Int): Boolean = rarity.hasAny(index) || mirrors != null &&
+          (answering.any { mirrors.serves(it, index) } ||
+            returning.any { !mirrors.refuses(it, index) })
         // A piece is missing once no source may bring it, so those a stopped web seed may serve
-        // wait for it to start again. With nothing connected and no such web seed, nothing is
-        // known to be missing: the download waits for peers.
-        val connected = peers.size + mirrorsRunning > 0
+        // wait for it to start again and answer. With nothing connected and no such web seed,
+        // nothing is known to be missing: the download waits for peers.
+        val connected = peers.size + answering.size > 0
         val missing = if (!downloading || !connected && returning.isEmpty()) null else {
           pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::obtainable)
         }
@@ -871,17 +875,12 @@ internal object TorrentV2SessionLoop {
         val due = stallWatchdog.check(StallSignals(
           downloading = downloading,
           peers = peers.size,
-          joinedPeers = joinedPeers,
           unchokingPeers = peers.values.count { !it.choked },
           missingPieces = missing?.count ?: 0,
           missingFileIds = missing?.fileIds.orEmpty(),
           lateBlocks = if (downloading) pieces.lateCount() else 0,
-          webSeeds = mirrorsRunning,
+          webSeeds = answering.size,
           droppedWebSeeds = stoppedMirrors.size,
-          // Seeds started again that have yet to show whether their mirror is back.
-          unprovenWebSeeds = mirrors?.let { seeds ->
-            seeds.urls.indices.count { it !in stoppedMirrors && seeds.unproven(it) }
-          } ?: 0,
           payloadBytes = payload,
           unsettledBytes = unsettled,
           wastedBytes = wasted,
@@ -1196,7 +1195,6 @@ internal object TorrentV2SessionLoop {
                   val view = TorrentV2PeerView(peerEvent.commands, info, viewLease, nowMs,
                     traffic, layout.pieceLength)
                   peers[peerEvent.peer] = view
-                  joinedPeers++
                   if (uploads != null) {
                     // Our extension handshake comes first, then what we have.
                     val greeted = extensions?.ready(view) ?: true

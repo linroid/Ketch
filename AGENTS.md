@@ -745,8 +745,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the whole transfer, so a seed a stall starts again keeps what it learned: it is asked once more
   for every piece it could not serve, as its mirror may have fixed them, and a piece it sent
   corrupt before is given up again after one more corrupt copy. What each seed could not serve
-  stays known for stall reports (`SwarmWebSeedPieces.unservable`, `TorrentV2WebSeeds.refuses`),
-  as does a seed dropped again once started again without verifying or refusing a piece
+  as of its last answer (payload, or a piece verified or refused) stays known for stall reports
+  (`WebSeedWorker.refusals`), as does a seed dropped again once started again without answering
   (`WebSeedWorker.downAcrossRelaunch`).
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
   with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
@@ -781,12 +781,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
   back after a gap once none of it can be thrown away, once until the next piece; time waiting on
   speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
-  peer or running web seed has and every stopped one could not serve, one dropped again once
-  started again without verifying or refusing a piece aside, and their files, kept 10 s after the
-  last source leaves, and once dropped web seeds start again while one of them runs without having
-  verified or refused a piece (`StallSignals.unprovenWebSeeds`, 10 s to 10 minutes), unless a peer
-  connects (`StallSignals.joinedPeers`, also while another leaves); no peers, all choking,
-  whatever web seeds do; slow peers) the session publishes
+  peer or running web seed has and every stopped one could not serve, a seed started again
+  counting as stopped until it answers (`WebSeedWorker.unproven`) and one dropped again once
+  started again without answering aside, and their files, kept 10 s after the last source leaves;
+  no peers, all choking, whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
   seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may
   be until its piece is stored (`WebSeedStats.unsettled`, `StallSignals`); a gap is told from any

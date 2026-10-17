@@ -221,7 +221,8 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
  * One worker serves its seed for the whole transfer: [run] starts it again after it was
  * dropped, keeping what it learned. Started again, it is asked once more for what it could not
  * serve, as its mirror may have fixed it, and a piece it sent corrupt before is given up again
- * after one more corrupt copy.
+ * after one more corrupt copy. Until it answers again, sending payload or verifying or refusing a
+ * piece, stall checks judge it by what it could not serve before ([unproven], [refusals]).
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedWorker<P : WebSeedPiece>(
@@ -256,23 +257,34 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private val corrupted = mutableSetOf<Int>()
   // Requests for other files a run sends at once, also kept.
   private var parallel = PARALLEL_REQUESTS
-  // Whether it was dropped and has neither verified nor refused a piece since, and whether it was
-  // then dropped again so; the swarm reads both.
+  // Whether it was dropped and has not answered since, and whether it was then dropped again so;
+  // the swarm reads both.
   private val quiet = AtomicBoolean(false)
   private val gone = AtomicBoolean(false)
+  // Whether it stopped and has not answered since, and what it could not serve as of its last
+  // answer; the swarm reads both.
+  private val stale = AtomicBoolean(false)
+  private val refusedPieces = AtomicReference(emptySet<Int>())
 
   /**
-   * Whether this seed was dropped, started again and dropped again, without verifying or refusing
-   * a piece in between: its mirror looks down rather than briefly unavailable, so what it may
-   * serve is no evidence of anything until it verifies or refuses a piece.
+   * Whether this seed was dropped, started again and dropped again, without answering in between
+   * (sending payload, or verifying or refusing a piece): its mirror looks down rather than briefly
+   * unavailable, so what it may serve is no evidence of anything until it answers.
    */
   val downAcrossRelaunch: Boolean get() = gone.load()
 
   /**
-   * Whether this seed was dropped and has neither verified nor refused a piece since: started
-   * again, it has yet to show whether its mirror is back, while it offers every piece.
+   * Whether this seed stopped, dropped or no longer needed, and has not answered since: started
+   * again, it offers every piece but has yet to show what its mirror serves, so stall checks take
+   * it as stopped, by its [refusals], until it does.
    */
-  val unproven: Boolean get() = quiet.load()
+  val unproven: Boolean get() = stale.load()
+
+  /**
+   * The pieces this seed could not serve as of its last answer: since it last started, or, while
+   * it is [unproven], before. Stall checks read them, also once it stopped.
+   */
+  val refusals: Set<Int> get() = refusedPieces.load()
 
   /** Fetches until the transfer cancels it or it is dropped; never twice at once. */
   suspend fun run() {
@@ -348,7 +360,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
           refused = true
           withContext(NonCancellable) { pieces.unavailable(unservable) }
           // Once the swarm can see the refusal, so it never sees the seed answered without it.
-          answered()
+          answered(unservable)
         }
         // A failure that may pass sends fewer requests at once before it counts.
         if (unservable.isEmpty() && failure !is CorruptWebSeedPiece && parallel > 1) {
@@ -381,6 +393,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         delay(backoff)
       }
     } finally {
+      // Before the swarm can see it stop: started again, it counts as stopped until it answers.
+      stale.store(true)
       disconnect()
       withContext(NonCancellable) { pieces.stop() }
     }
@@ -493,6 +507,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
           try {
             if (bytes.size > length - total) throw IOException("Web seed sent more than asked")
             total += bytes.size
+            // A mirror that sends data is not down.
+            answered()
             handle.received(bytes.size)
             // At risk until its piece is stored, which counts before it is payload.
             arrived.addAndFetch(bytes.size.toLong())
@@ -597,8 +613,17 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     quiet.store(true)
   }
 
-  /** The seed verified or refused a piece: its mirror answers. */
-  private fun answered() {
+  /**
+   * The seed sent payload, verified a piece or could not serve [refused]: its mirror answers.
+   * Started again, what it could not serve before no longer counts.
+   */
+  private fun answered(refused: Set<Int> = emptySet()) {
+    // Every chunk answers: one that changes nothing writes nothing. [gone] implies [quiet].
+    if (refused.isEmpty() && !stale.load() && !quiet.load()) return
+    // [refusals] before [unproven], so the swarm never sees the seed answered without them.
+    if (stale.load()) refusedPieces.store(refused)
+    else if (refused.isNotEmpty()) refusedPieces.update { it + refused }
+    stale.store(false)
     quiet.store(false)
     gone.store(false)
   }
@@ -651,12 +676,11 @@ private val UNSERVABLE_STATUSES = setOf(404, 410, 416)
 /**
  * A v1 swarm's pieces for one web seed: to the [scheduler] it is a peer with every piece but those
  * it cannot serve that claims runs of them in order ([TorrentPieceScheduler.claimRun]), so it
- * never fetches what a peer or another seed fetches, except a single piece in the endgame. It
- * outlives the seed's worker: what the seed could not serve is kept when the worker stops.
+ * never fetches what a peer or another seed fetches, except a single piece in the endgame. Its
+ * [id] is the seed's in the [scheduler].
  */
-@OptIn(ExperimentalAtomicApi::class)
 internal class SwarmWebSeedPieces(
-  private val id: Int,
+  val id: Int,
   url: String,
   private val store: TorrentPieceStore,
   private val scheduler: TorrentPieceScheduler,
@@ -664,24 +688,14 @@ internal class SwarmWebSeedPieces(
 ) : WebSeedPieces<TorrentPieceScheduler.Claim> {
   private val layout = WebSeedLayout(store.metadata, url)
   private var joined = false
-  // The pieces the seed could not serve since it last joined: the swarm reads them while it
-  // checks for a stall, also once the seed stopped.
-  private val refused = AtomicReference(emptySet<Int>())
-
-  /**
-   * The pieces this seed could not serve since it last started, whether it runs or stopped: its
-   * files are missing there or not the torrent's.
-   */
-  val unservable: Set<Int> get() = refused.load()
 
   /**
    * Tells the [scheduler] of this seed, which has every piece; [claim] does if it was not. Joining
-   * again, it is asked once more for the pieces it could not serve, and forgets that it could not
-   * until it fails again: its mirror may have them by now.
+   * again, it is asked once more for the pieces it could not serve: its mirror may have them by
+   * now.
    */
   suspend fun join() {
     if (joined) return
-    refused.store(emptySet())
     scheduler.availability(id, BooleanArray(store.pieceCount) { true })
     joined = true
   }
@@ -708,10 +722,7 @@ internal class SwarmWebSeedPieces(
     scheduler.release(id, piece.index)
   }
 
-  override suspend fun unavailable(indices: Set<Int>) {
-    refused.update { it + indices }
-    scheduler.withdraw(id, indices)
-  }
+  override suspend fun unavailable(indices: Set<Int>) = scheduler.withdraw(id, indices)
 
   override fun piecesOf(url: String): Set<Int> = layout.piecesOf(url)
 

@@ -120,10 +120,8 @@ internal class TorrentV2WebSeeds private constructor(
   }
 
   // The pieces each seed cannot serve, which its workers report and the loop reads: those it is
-  // not asked for until it starts again, and all it could not serve since it last started, kept
-  // once it stops.
+  // not asked for until it starts again.
   private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
-  private val refused = urls.indices.map { AtomicReference(emptySet<Int>()) }
 
   // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
   private val workers = urls.indices.map { seed ->
@@ -144,15 +142,18 @@ internal class TorrentV2WebSeeds private constructor(
   fun serves(seed: Int, index: Int): Boolean = index !in unservable[seed].load()
 
   /**
-   * Whether [seed] could not serve piece [index] since it last started, whether it runs or
-   * stopped.
+   * Whether [seed] could not serve piece [index] as of its last answer, whether it runs or stopped
+   * ([WebSeedWorker.refusals]).
    */
-  fun refuses(seed: Int, index: Int): Boolean = index in refused[seed].load()
+  fun refuses(seed: Int, index: Int): Boolean = index in workers[seed].refusals
 
   /** Whether [seed] is down across a relaunch ([WebSeedWorker.downAcrossRelaunch]). */
   fun downAcrossRelaunch(seed: Int): Boolean = workers[seed].downAcrossRelaunch
 
-  /** Whether [seed] has yet to show its mirror is back ([WebSeedWorker.unproven]). */
+  /**
+   * Whether [seed] stopped and has not answered since ([WebSeedWorker.unproven]): started again,
+   * it counts as stopped for stalls until it does.
+   */
   fun unproven(seed: Int): Boolean = workers[seed].unproven
 
   sealed interface Event {
@@ -196,7 +197,6 @@ internal class TorrentV2WebSeeds private constructor(
    */
   fun relaunch(seed: Int): Boolean {
     unservable[seed].store(emptySet())
-    refused[seed].store(emptySet())
     return relaunches.trySend(seed).isSuccess
   }
 
@@ -272,7 +272,6 @@ internal class TorrentV2WebSeeds private constructor(
     }
 
     override suspend fun unavailable(indices: Set<Int>) {
-      refused[seed].update { it + indices }
       unservable[seed].update { it + indices }
     }
 

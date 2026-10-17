@@ -42,9 +42,9 @@ enum class TorrentStallReason(val wireName: String) {
  * @property reason the most telling reason.
  * @property seconds how long the download has made no progress.
  * @property missingPieces wanted pieces that no connected peer or running web seed has and every
- *   web seed that stopped could not serve, as it may serve the rest once started again; a web
- *   seed still down once started again says nothing of what it serves. With nothing connected
- *   and no other web seed stopped, none: the download waits for peers.
+ *   web seed that stopped, or started again and has yet to answer, could not serve, as it may
+ *   serve the rest; a web seed still down once started again says nothing of what it serves.
+ *   With nothing connected and no other web seed stopped, none: the download waits for peers.
  * @property missingFileIds files those pieces belong to, at most [MAX_MISSING_FILES]: skipping
  *   them lets the download finish.
  * @property peers peers connected now.

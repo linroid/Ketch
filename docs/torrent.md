@@ -811,20 +811,20 @@ the most telling order:
 
 - **Missing pieces**: wanted pieces that no connected peer or running web seed has and every web
   seed that stopped could not serve, as it may serve the rest once started again, and the files
-  they belong to; with nothing connected and no such seed, none. A web seed dropped only for
+  they belong to; with nothing connected and no such seed, none. A web seed started again counts
+  as it did while stopped until it answers, by sending data or by serving or refusing a piece, as
+  it offers every piece meanwhile: a dead mirror retried for minutes hides nothing, a peer that
+  has the missing pieces clears them at once and one that lacks them does not, and a mirror that
+  has them back clears them as soon as its first bytes arrive. A web seed dropped only for
   failures that may pass, such as a host that is down or busy, counts as one that may serve
   every piece it did not refuse until it has been started again, two minutes into the stall, and
-  dropped again without serving or refusing a piece, so a mirror down for a while never makes
-  Ketch offer to skip a file it serves once back. From then on it counts for nothing until it
-  serves or refuses a piece, so a dead mirror hides missing pieces only until its first restart
-  fails. The download waits for a peer that has them; skipping those files lets the rest finish.
-  A torrent whose files changed at its only web seed stops here, also once that seed was
-  dropped. Pieces missing while a peer was connected stay missing for 10 seconds after the last
-  one leaves, so a peer that reconnects at once does not change the reason. Those missing when
-  dropped web seeds start again stay missing while one of those seeds runs without having served
-  or refused a piece yet (at least 10 seconds, at most 10 minutes), as it offers every piece until
-  then, unless a peer connects meanwhile, also while another leaves: a dead mirror retried for
-  minutes does not hide them.
+  dropped again without answering, so a mirror down for a while never makes Ketch offer to skip
+  a file it serves once back. From then on it counts for nothing until it answers, so a dead
+  mirror hides missing pieces only until its first restart fails. The download waits for a peer
+  that has them; skipping those files lets the rest finish. A torrent whose files changed at its
+  only web seed stops here, also once that seed was dropped. Pieces missing while a peer was
+  connected stay missing for 10 seconds after the last one leaves, so a peer that reconnects at
+  once does not change the reason.
 - **No peers**: no peer is connected, and no wanted piece is missing. A stalled download stores
   nothing from its web seeds either, so whether they are fetching or waiting to retry never
   changes the reason.

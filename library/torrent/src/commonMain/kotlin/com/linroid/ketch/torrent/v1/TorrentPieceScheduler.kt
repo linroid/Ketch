@@ -295,15 +295,23 @@ internal class TorrentPieceScheduler(
 
   /**
    * The swarm's [Health] now, naming at most [limit] missing pieces; with [among], only those of
-   * its pieces can be missing.
+   * its pieces can be missing. The web seeds in [ignoring] count as having and fetching none.
    */
-  suspend fun health(limit: Int, among: Set<Int>? = null): Health = mutex.withLock {
+  suspend fun health(
+    limit: Int,
+    among: Set<Int>? = null,
+    ignoring: Set<Int> = emptySet(),
+  ): Health = mutex.withLock {
     val now = nowMs()
+    val ignored = ignoring.mapNotNull { availability[it] }
+    // A peer or seed not ignored has piece [index], or such a seed fetches it.
+    fun sourced(index: Int): Boolean = rarity[index] > ignored.count { it[index] } ||
+      seedOwned[index] > (seedOwners[index]?.count { it in ignoring } ?: 0)
     val missing = ArrayList<Int>()
     var count = 0
     for (index in among?.sorted() ?: (0 until pieceCount)) {
       if (index !in 0 until pieceCount) continue
-      if (wanted[index] && !verified[index] && seedOwned[index] == 0 && rarity[index] == 0) {
+      if (wanted[index] && !verified[index] && !sourced(index)) {
         count++
         if (missing.size < limit) missing += index
       }

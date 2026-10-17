@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.FileSystem
 import okio.IOException
 import okio.Path
@@ -579,7 +580,7 @@ class TorrentWebSeedTest {
           pieces.join()
           // Dropped while the mirror is down, knowing piece 0 is not the torrent's there.
           worker.run()
-          assertEquals(setOf(0), pieces.unservable)
+          assertEquals(setOf(0), worker.refusals)
           restored.store(true)
           coroutineScope {
             val started = launch {
@@ -592,7 +593,7 @@ class TorrentWebSeedTest {
           // Started again, it fetched the rest and asked once more for stale.bin: one more stale
           // copy was enough to give it up again.
           assertEquals(3, mirror.requests.count { it.first == staleUrl })
-          assertEquals(setOf(0), pieces.unservable)
+          assertEquals(setOf(0), worker.refusals)
         }
       }
     }
@@ -656,7 +657,7 @@ class TorrentWebSeedTest {
 
   @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun relaunchedSeed_keepsWhatWasMissingUntilItAnswers() = runTest {
+  fun relaunchedSeed_keepsWhatWasMissingUntilItsBytesArrive() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         var clock = 0L
@@ -664,25 +665,18 @@ class TorrentWebSeedTest {
         val (stale, good) = staleSet
         val staleUrl = "http://mirror.test/pub/set/stale.bin"
         val goodUrl = "http://mirror.test/pub/set/good.bin"
-        // The only source lacks stale.bin, the one file wanted, until it is fixed; once it is
-        // started again it answers only when the test lets it, and no peer connects.
+        // The only source lacks stale.bin, the one file wanted, until it is fixed; started again,
+        // it sends it slowly, a part when the test lets it, and no peer connects.
         val lacking = MirrorEngine(mapOf(goodUrl to good))
-        val fixed = MirrorEngine(mapOf(staleUrl to stale, goodUrl to good))
+        val fixed = Stepped(MirrorEngine(mapOf(staleUrl to stale, goodUrl to good)))
         val holding = AtomicBoolean(false)
-        val asked = CompletableDeferred<Unit>()
-        val answer = CompletableDeferred<Unit>()
         val mirror = object : HttpEngine by lacking {
           override suspend fun download(
             url: String,
             range: LongRange?,
             headers: Map<String, String>,
             onData: suspend (ByteArray) -> Unit,
-          ) {
-            if (!holding.load()) return lacking.download(url, range, headers, onData)
-            asked.complete(Unit)
-            answer.await()
-            fixed.download(url, range, headers, onData)
-          }
+          ) = (if (holding.load()) fixed else lacking).download(url, range, headers, onData)
         }
         withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
           val network = createTorrentNetwork()
@@ -700,11 +694,11 @@ class TorrentWebSeedTest {
               val reported = withTimeout(5_000) { stall.filterNotNull().first() }
               assertEquals(TorrentStallReason.MISSING_PIECES, reported.reason)
               // Two minutes into the stall the seed starts again and asks once more: it offers
-              // every piece, but has yet to show it has stale.bin, so it stays missing as long as
-              // the answer takes.
+              // every piece, but has yet to answer, so stale.bin stays missing as long as the
+              // answer takes.
               holding.store(true)
               clock = 130_000
-              asked.await()
+              fixed.asked.await()
               for (time in listOf(145_000L, 400_000L)) {
                 clock = time
                 delay(500)
@@ -713,9 +707,20 @@ class TorrentWebSeedTest {
                 assertEquals(1, waiting.missingPieces)
                 assertEquals(listOf("0"), waiting.missingFileIds)
               }
-              // The mirror has it now: the download finishes.
-              answer.complete(Unit)
-              while (!store.completed()) delay(20)
+              // The first bytes of stale.bin arrive: the mirror serves it, so it is not missing
+              // while the rest of its piece comes.
+              fixed.steps.send(Unit)
+              while (fixed.delivered == 0) delay(20)
+              clock = 401_000
+              delay(500)
+              val streaming = assertNotNull(stall.value)
+              assertEquals(TorrentStallReason.NO_PEERS, streaming.reason)
+              assertEquals(0, streaming.missingPieces)
+              // The rest arrives: the download finishes.
+              while (!store.completed()) {
+                fixed.steps.trySend(Unit)
+                delay(20)
+              }
               swarm.cancel()
             }
           } finally {
@@ -728,7 +733,7 @@ class TorrentWebSeedTest {
 
   @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun peerConnectingAfterARelaunch_clearsWhatWasMissingThoughAnotherLeft() = runTest {
+  fun peerReconnectingAfterARelaunch_clearsWhatWasMissingOnlyWithThosePieces() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
         var clock = 0L
@@ -754,7 +759,8 @@ class TorrentWebSeedTest {
         withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
           val network = createTorrentNetwork()
           val first = network.listen(PeerEndpoint("127.0.0.1", 0))
-          val second = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val again = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val holder = network.listen(PeerEndpoint("127.0.0.1", 0))
           val peers = Channel<PeerEndpoint>(1)
           // Steps the clock a second at a time until the stall says [done].
           suspend fun awaitStall(done: (TorrentStall) -> Boolean): TorrentStall {
@@ -777,6 +783,8 @@ class TorrentWebSeedTest {
             wire.send(PeerMessage.Bitfield(pieceBitfield(held)))
             return connection
           }
+          val lackingStale = booleanArrayOf(false, true, true, true)
+          val connections = mutableListOf<TorrentConnection>()
           try {
             coroutineScope {
               val swarm = launch {
@@ -788,7 +796,7 @@ class TorrentWebSeedTest {
               delay(500)
               // Late into the stall a peer with good.bin alone connects: stale.bin is missing.
               clock = 100_000
-              val leaving = connect(first, booleanArrayOf(false, true, true, true))
+              val leaving = connect(first, lackingStale)
               val missing = awaitStall { it.peers == 1 }
               assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
               assertEquals(1, missing.missingPieces)
@@ -796,24 +804,120 @@ class TorrentWebSeedTest {
               holding.store(true)
               clock = 130_000
               asked.await()
-              // The peer leaves, and one with stale.bin connects: as many peers as at the restart,
-              // one of them new, which has its say at once.
+              // The peer leaves and comes back, as the swarm drops a peer that brings nothing for
+              // 90 s and dials it again: still without stale.bin, it changes nothing.
               leaving.close()
               first.close()
               awaitStall { it.peers == 0 }
-              val staying = connect(second, booleanArrayOf(true, true, true, true))
+              connections += connect(again, lackingStale)
+              val back = awaitStall { it.peers == 1 }
+              assertEquals(TorrentStallReason.MISSING_PIECES, back.reason)
+              assertEquals(1, back.missingPieces)
+              assertEquals(listOf("0"), back.missingFileIds)
+              // A peer with stale.bin connects: nothing is missing now.
+              connections += connect(holder, booleanArrayOf(true, true, true, true))
+              val heard = awaitStall { it.peers == 2 }
+              assertEquals(TorrentStallReason.CHOKED, heard.reason)
+              assertEquals(0, heard.missingPieces)
+              swarm.cancel()
+            }
+          } finally {
+            connections.forEach { it.close() }
+            first.close()
+            again.close()
+            holder.close()
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun deadRelaunchedSeed_keepsWhatWasMissingThroughItsRetriesAndOnceDropped() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val goodUrl = "http://mirror.test/pub/set/good.bin"
+        // The only web seed lacks stale.bin, the one file wanted, and once started again it is
+        // down: each request fails when the test lets it.
+        val lacking = MirrorEngine(mapOf(goodUrl to staleSet.second))
+        val holding = AtomicBoolean(false)
+        val asked = AtomicInt(0)
+        val failures = Channel<Unit>(Channel.UNLIMITED)
+        val mirror = object : HttpEngine by lacking {
+          override suspend fun download(
+            url: String,
+            range: LongRange?,
+            headers: Map<String, String>,
+            onData: suspend (ByteArray) -> Unit,
+          ) {
+            if (!holding.load()) return lacking.download(url, range, headers, onData)
+            asked.incrementAndFetch()
+            failures.receive()
+            throw KetchError.Network()
+          }
+        }
+        withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
+          val network = createTorrentNetwork()
+          val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val peers = Channel<PeerEndpoint>(1)
+          // Steps the clock a second and returns the stall a check then publishes.
+          suspend fun checked(): TorrentStall {
+            clock += 1_000
+            delay(300)
+            return assertNotNull(stall.value)
+          }
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              while (lacking.requests.isEmpty()) delay(20)
+              delay(500)
+              // Late into the stall a peer with good.bin alone connects: stale.bin is missing.
+              clock = 100_000
+              peers.send(listener.local)
+              val connection = listener.accept()
               try {
-                val heard = awaitStall { it.peers == 1 }
-                assertEquals(TorrentStallReason.CHOKED, heard.reason)
-                assertEquals(0, heard.missingPieces)
+                val wire = PeerWire(connection, store.metadata)
+                wire.handshake(PeerHandshake(store.metadata.infoHash, torrentRandomBytes(20),
+                  extensions = false, dht = false))
+                wire.send(PeerMessage.Bitfield(pieceBitfield(booleanArrayOf(false, true, true,
+                  true))))
+                var connected = checked()
+                while (connected.peers != 1) connected = checked()
+                assertEquals(TorrentStallReason.MISSING_PIECES, connected.reason)
+                // Two minutes into the stall the seed starts again, and every request it sends
+                // fails: stale.bin stays missing while it tries, and once it is dropped again.
+                holding.store(true)
+                clock = 130_000
+                var failed = 0
+                while (true) {
+                  withTimeoutOrNull(1_000) { while (asked.load() == failed) delay(10) } ?: break
+                  val trying = checked()
+                  assertEquals(TorrentStallReason.MISSING_PIECES, trying.reason)
+                  assertEquals(listOf("0"), trying.missingFileIds)
+                  failures.send(Unit)
+                  failed++
+                }
+                assertEquals(2 + WebSeedWorker.MAX_FAILURES, failed)
+                val dropped = checked()
+                assertEquals(TorrentStallReason.MISSING_PIECES, dropped.reason)
+                assertEquals(1, dropped.missingPieces)
+                assertEquals(listOf("0"), dropped.missingFileIds)
+                assertEquals(1, dropped.peers)
                 swarm.cancel()
               } finally {
-                staying.close()
+                connection.close()
               }
             }
           } finally {
-            first.close()
-            second.close()
+            listener.close()
             network.close()
           }
         }
@@ -1378,24 +1482,60 @@ class TorrentWebSeedTest {
     }
   }
 
+  @OptIn(ExperimentalAtomicApi::class)
   @Test
-  fun refusals_areForgottenWhenASeedStartsAgain() = runTest {
+  fun refusals_standUntilASeedStartedAgainAnswers() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(15_000) {
-        withStore(multiFile("http://mirror.test/pub")) { store, _ ->
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        val goodUrl = "http://mirror.test/pub/set/good.bin"
+        // The mirror lacks stale.bin, the one file wanted, until it has it; then it sends it a part
+        // at a time.
+        val lacking = MirrorEngine(mapOf(goodUrl to good))
+        val fixed = Stepped(MirrorEngine(mapOf(staleUrl to stale, goodUrl to good)))
+        val back = AtomicBoolean(false)
+        val mirror = object : HttpEngine by lacking {
+          override suspend fun download(
+            url: String,
+            range: LongRange?,
+            headers: Map<String, String>,
+            onData: suspend (ByteArray) -> Unit,
+          ) = (if (back.load()) fixed else lacking).download(url, range, headers, onData)
+        }
+        withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
           store.initialize()
           val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
             store.verifiedPieces(), store::pieceSize, TorrentBufferBudget(4 * 1024 * 1024))
           val pieces = SwarmWebSeedPieces(-1, "http://mirror.test/pub/", store, scheduler)
+          val worker = WebSeedWorker("http://mirror.test/pub/", pieces, TorrentHttp(mirror),
+            WebSeedStats(), "test", retryMs = 5)
           pieces.join()
-          pieces.unavailable(setOf(3, 4))
-          // Stopped, it still says what it could not serve, for the stall check.
-          pieces.stop()
-          assertEquals(setOf(3, 4), pieces.unservable)
-          // Started again, it is asked again before it refuses them: its mirror may have them now.
-          pieces.join()
-          assertEquals(emptySet(), pieces.unservable)
-          pieces.stop()
+          // Dropped once it found it cannot serve stale.bin, which it still says once stopped.
+          worker.run()
+          assertEquals(setOf(0), worker.refusals)
+          assertTrue(worker.unproven)
+          back.store(true)
+          coroutineScope {
+            val started = launch {
+              pieces.join()
+              worker.run()
+            }
+            // Started again, it asks for stale.bin and has yet to answer: what it said stands.
+            fixed.asked.await()
+            assertTrue(worker.unproven)
+            assertEquals(setOf(0), worker.refusals)
+            // Its first bytes answer: it serves stale.bin now.
+            fixed.steps.send(Unit)
+            while (fixed.delivered == 0) delay(10)
+            assertFalse(worker.unproven)
+            assertEquals(emptySet(), worker.refusals)
+            while (!store.verifiedPieces()[0]) {
+              fixed.steps.trySend(Unit)
+              delay(10)
+            }
+            started.cancel()
+          }
         }
       }
     }

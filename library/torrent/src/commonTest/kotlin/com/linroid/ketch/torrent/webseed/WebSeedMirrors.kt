@@ -143,11 +143,14 @@ internal class Gate(private val engine: HttpEngine) : HttpEngine by engine {
 
 /**
  * Sends what [engine] answers a part at a time: each part waits until [steps] lets it through;
- * [asked] once a request comes.
+ * [asked] once a request comes, and [delivered] counts the parts the caller took.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class Stepped(private val engine: HttpEngine) : HttpEngine by engine {
   val steps = Channel<Unit>()
   val asked = CompletableDeferred<Unit>()
+  private val parts = AtomicInt(0)
+  val delivered: Int get() = parts.load()
 
   override suspend fun download(
     url: String,
@@ -159,6 +162,7 @@ internal class Stepped(private val engine: HttpEngine) : HttpEngine by engine {
     engine.download(url, range, headers) { part ->
       steps.receive()
       onData(part)
+      parts.incrementAndFetch()
     }
   }
 }

@@ -213,8 +213,6 @@ internal class TorrentSwarm(
   private val connectedMutex = Mutex()
   // Guarded by connectedMutex. Each worker publishes only its own contact.
   private val connected = mutableMapOf<Int, PexContact>()
-  // Peers ever added to [connected], guarded like it: the stall check sees arrivals in churn.
-  private var joinedPeers = 0L
   // Connected peers that unchoke us, guarded like [connected].
   private val unchoking = mutableSetOf<Int>()
   // The one connection kept to each peer, guarded like [connected].
@@ -490,22 +488,23 @@ internal class TorrentSwarm(
     }
     suspend fun checkStall() {
       val published = stall ?: return
-      val (peers, unchoked, joined) = connectedMutex.withLock {
-        Triple(connected.size, unchoking.size, joinedPeers)
-      }
-      val running = webSeeds.count { it.isActive }
-      // Seeds started again that have yet to show whether their mirror is back.
-      val unproven = webSeeds.indices.count { webSeeds[it].isActive && webSeedWorkers[it].unproven }
+      val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
+      val active = webSeeds.indices.filter { webSeeds[it].isActive }
+      // Seeds started again offer every piece, so they count as stopped until they answer: by
+      // what they could not serve before, their pieces left out.
+      val unproven = active.filter { webSeedWorkers[it].unproven }
+      val running = active.size - unproven.size
       // A piece no connected peer or running web seed has is missing only once every web seed
       // that stopped could not serve it either: the rest wait for a seed started again. One that
       // was down across a relaunch says nothing of what it serves. With nothing connected and no
       // other stopped seed, nothing is known to be missing: it waits for peers.
       val refused = webSeeds.indices
-        .filter { !webSeeds[it].isActive && !webSeedWorkers[it].downAcrossRelaunch }
-        .map { webSeedPieces[it].unservable }
+        .filter { (it !in active || it in unproven) && !webSeedWorkers[it].downAcrossRelaunch }
+        .map { webSeedWorkers[it].refusals }
         .reduceOrNull { others, seed -> others intersect seed }
       val health = if (peers + running == 0 && refused == null) null else {
-        scheduler.health(MAX_REPORTED_MISSING_PIECES, among = refused)
+        scheduler.health(MAX_REPORTED_MISSING_PIECES, among = refused,
+          ignoring = unproven.mapTo(HashSet()) { webSeedPieces[it].id })
       }
       val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }
@@ -515,11 +514,10 @@ internal class TorrentSwarm(
       val unsettled = webSeedStats.unsettled.load()
       val wasted = webSeedStats.wasted.load()
       val due = watchdog.check(StallSignals(
-        downloading = !complete, peers = peers, joinedPeers = joined, unchokingPeers = unchoked,
+        downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
-        droppedWebSeeds = webSeeds.size - running, unprovenWebSeeds = unproven,
-        payloadBytes = payload,
+        droppedWebSeeds = webSeeds.size - active.size, payloadBytes = payload,
         unsettledBytes = unsettled, wastedBytes = wasted, throttledMs = throttledMs.load(),
         pieceLength = store.metadata.pieceLength,
       ))
@@ -1083,9 +1081,7 @@ internal class TorrentSwarm(
     private suspend fun publishContact() {
       val contact = PexContact(listen, pexFlags(reachedOutgoing = !incoming, connection,
         extensions), fast)
-      connectedMutex.withLock {
-        if (connected.put(id, contact) == null) joinedPeers++
-      }
+      connectedMutex.withLock { connected[id] = contact }
     }
 
     private suspend fun receive(message: PeerMessage) {
