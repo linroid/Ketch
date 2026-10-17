@@ -28,6 +28,11 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  *   seeds count it before the first and settle it after the second, so no byte looks kept early.
  * @property wastedBytes of that payload, what was thrown away so far: web seed bytes of pieces
  *   that failed their hash check or that a failed request cut off.
+ * @property recentWastedBytes of that, what was thrown away before any check after it arrived,
+ *   so no check counted it as payload: a failed run's bytes are taken as the last it received,
+ *   and those since the check before are recent. Swarms read it with [wastedBytes] as one value
+ *   ([com.linroid.ketch.torrent.webseed.WebSeedStats.checked]), which also marks the check, so
+ *   web seeds tell what arrives after it.
  * @property throttledMs time spent so far waiting on speed limits, which is never a stall: the
  *   waits of every peer added up, of which a check counts at most the time since the last.
  * @property pieceLength the torrent's piece length.
@@ -44,6 +49,7 @@ internal data class StallSignals(
   val payloadBytes: Long,
   val unsettledBytes: Long,
   val wastedBytes: Long,
+  val recentWastedBytes: Long,
   val throttledMs: Long,
   val pieceLength: Long,
 )
@@ -67,16 +73,17 @@ internal enum class StallRecovery {
  * [MAX_PIECE_MS]), counted from the last verified piece or from payload coming back after a gap,
  * as the gap was no slow piece, once nothing can throw that payload away any more and none was
  * meanwhile. It does so once until the next piece verifies, so payload that comes and goes never
- * keeps a stall from showing. Payload later thrown away is no payload: it takes back the checks
- * before that counted it, newest first, and the check that finds it counts only the rest of what
- * it brought, so the next piece's first bytes are never taken for it; but a gap is told from when
- * any payload last arrived, so payload thrown away never makes the next look back after one.
- * Time spent waiting on speed limits counts as progress: a slow limit is no stall. Recoveries
- * start once it has lasted [RECOVER_AFTER_MS], each at most once per its own cooldown, announcing
- * to trackers less often each time it does not help. Pieces missing while a peer or web seed was
- * connected stay missing for [SOURCE_GRACE_MS] once the last one goes, so a peer that reconnects
- * at once does not flip the reason. Web seeds never decide the reason otherwise: a stall stores
- * nothing from them.
+ * keeps a stall from showing. Payload later thrown away is no payload. Swarms say how much of it
+ * arrived since the check before ([StallSignals.recentWastedBytes]): that part is none of the
+ * payload of the check that finds it, and the rest takes back as much from the checks before
+ * whose payload may still be thrown away, newest first. But a gap is told from when any payload
+ * last arrived, so payload thrown away never makes the next look back after one. Time spent
+ * waiting on speed limits counts as progress: a slow limit is no stall. Recoveries start once it
+ * has lasted [RECOVER_AFTER_MS], each at most once per its own cooldown, announcing to trackers
+ * less often each time it does not help. Pieces missing while a peer or web seed was connected
+ * stay missing for [SOURCE_GRACE_MS] once the last one goes, so a peer that reconnects at once
+ * does not flip the reason. Web seeds never decide the reason otherwise: a stall stores nothing
+ * from them.
  *
  * Not thread-safe: one swarm loop calls it.
  */
@@ -92,6 +99,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var restarted = false
   private var payloadBytes = 0L
   private var wastedBytes = 0L
+  private var recentWastedBytes = 0L
   private var throttledMs = 0L
   // The checks whose payload may still be thrown away, oldest first: payload found wasted takes
   // them back.
@@ -141,16 +149,19 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     payloadBytes = signals.payloadBytes
     val wasted = (signals.wastedBytes - wastedBytes).coerceAtLeast(0)
     wastedBytes = signals.wastedBytes
+    // Of that, what arrived since the last check, which none counted as payload.
+    val recent = (signals.recentWastedBytes - recentWastedBytes).coerceIn(0, wasted)
+    recentWastedBytes = signals.recentWastedBytes
     // Peers wait on the limits side by side, each adding its own wait: at most the time that
     // passed counts.
     val throttled = (signals.throttledMs - throttledMs).coerceIn(0, elapsed)
     throttledMs = signals.throttledMs
     rate = (rate + (received - wasted).coerceAtLeast(0) * 1000.0 / elapsed) / 2
     if (throttled > 0) waited(throttled, now)
-    // Payload thrown away came before the rest of what this check brings, such as the next
-    // piece's first bytes: it settles against the checks before, and only the rest is payload.
-    val thrownAway = if (wasted > 0) takeBack(wasted) else 0
-    if (received > thrownAway) took(received - thrownAway, now)
+    // Payload thrown away that checks before counted takes theirs back; what arrived since is none
+    // of this check's, whatever else it brought, such as the next piece's first bytes.
+    if (wasted > 0) takeBack(wasted - recent)
+    if (received > recent) took(received - recent, now)
     if (received > 0) seenAt = now
     kept(signals.payloadBytes - signals.unsettledBytes)
     var missing = signals.missingPieces
@@ -246,25 +257,24 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   }
 
   /**
-   * [bytes] of payload were thrown away: they were the latest before this check, so the newest
-   * checks before it go back. Which bytes they were is not known, so no payload still waiting to
-   * be kept gives a piece its time again. Returns the bytes those checks did not take, which
-   * arrived in this one.
+   * Payload was thrown away, [bytes] of it what checks before this one counted: taken as the
+   * latest of theirs that may still be, the newest of those checks go back, as far as they reach.
+   * Which payload waiting to be kept is settled is no longer known, as payload thrown away settles
+   * too, so none of it gives a piece its time again.
    */
-  private fun takeBack(bytes: Long): Long {
+  private fun takeBack(bytes: Long) {
     for (credit in credits) credit.restartAt = null
     var left = bytes
     while (left > 0) {
-      val credit = credits.lastOrNull() ?: return left
+      val credit = credits.lastOrNull() ?: return
       if (credit.bytes > left) {
         credit.bytes -= left
-        return 0
+        return
       }
       left -= credit.bytes
       credits.removeLast()
       payloadAt = credit.payloadAt
     }
-    return 0
   }
 
   /**

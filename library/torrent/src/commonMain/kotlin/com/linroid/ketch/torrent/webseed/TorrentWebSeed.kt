@@ -33,6 +33,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.fetchAndUpdate
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.atomics.update
 
@@ -133,22 +134,54 @@ private const val HEX = "0123456789ABCDEF"
  * Web seed counters of one swarm, for its periodic summary and stall checks; any worker may
  * count. [wasted] is the part of [payload] thrown away: bytes of pieces that failed their hash
  * check or that a failed request cut off. [unsettled] is the part that may still be: bytes of
- * pieces not stored yet, counted before [payload] as they arrive and settled after [wasted].
+ * pieces not stored yet, counted before [payload] as they arrive and settled after [wasted]. Stall
+ * checks read what was thrown away through [checked], which counts them ([checks]), so a failed
+ * run tells how much of what it throws away arrived since the latest one.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedStats {
   val payload = AtomicLong(0)
-  val wasted = AtomicLong(0)
   val unsettled = AtomicLong(0)
   val pieces = AtomicInt(0)
   val failures = AtomicInt(0)
   val dropped = AtomicInt(0)
+  // One value, so a stall check reads what was thrown away and starts the next check at once.
+  private val waste = AtomicReference(WebSeedWaste(checks = 0, bytes = 0, recent = 0))
+
+  /** The part of [payload] thrown away so far. */
+  val wasted: Long get() = waste.load().bytes
+
+  /**
+   * The stall checks so far ([checked]): bytes arriving between the same two checks see the same
+   * count.
+   */
+  val checks: Long get() = waste.load().checks
+
+  /**
+   * [bytes] were thrown away. Of them, [recent] gives those that arrived since stall check
+   * [checks] when no check came after it: no check counted them as payload.
+   */
+  fun throwAway(bytes: Long, recent: (checks: Long) -> Long) {
+    if (bytes <= 0) return
+    waste.update {
+      it.copy(bytes = it.bytes + bytes, recent = it.recent + recent(it.checks).coerceIn(0, bytes))
+    }
+  }
+
+  /** What was thrown away so far, for a stall check: the bytes arriving next come after it. */
+  fun checked(): WebSeedWaste = waste.fetchAndUpdate { it.copy(checks = it.checks + 1) }
 
   fun summary(running: Int, total: Int): String =
     "webSeeds=$running/$total (dropped=${dropped.load()}), webSeedPieces=${pieces.load()}, " +
-      "webSeedPayload=${payload.load()}, webSeedWasted=${wasted.load()}, " +
+      "webSeedPayload=${payload.load()}, webSeedWasted=$wasted, " +
       "webSeedFailures=${failures.load()}"
 }
+
+/**
+ * Web seed payload thrown away as of [checks] stall checks: [bytes] in all, of which [recent]
+ * were thrown away before any check after they arrived, so no check counted them as payload.
+ */
+internal data class WebSeedWaste(val checks: Long, val bytes: Long, val recent: Long)
 
 /**
  * A piece one web seed fetches into [bytes], which it owns until it releases the piece. They
@@ -404,6 +437,32 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   /** The [length] bytes of a response that fill run piece [piece] from [offset]. */
   private class Part(val piece: Int, val offset: Int, val length: Int)
 
+  /**
+   * The [bytes] a run received, which its requests add side by side, and how many of them came
+   * before the latest stall check ([WebSeedStats.checks]) that came before its last bytes: those
+   * since are in no check's payload yet.
+   */
+  private class Arrivals(checks: Long) {
+    private class Since(val checks: Long, val before: Long)
+
+    private val total = AtomicLong(0)
+    private val since = AtomicReference(Since(checks, 0))
+
+    val bytes: Long get() = total.load()
+
+    /** [count] bytes arrived after [checks] stall checks. */
+    fun add(count: Int, checks: Long) {
+      val seen = since.load()
+      // The first bytes after a check: those before them came before it.
+      if (checks > seen.checks) since.compareAndSet(seen, Since(checks, total.load()))
+      total.addAndFetch(count.toLong())
+    }
+
+    /** What arrived after [checks] stall checks, none once another check came. */
+    fun since(checks: Long): Long =
+      since.load().let { if (it.checks == checks) total.load() - it.before else 0 }
+  }
+
   /** One range request of a run, from [first]; [last] grows as following spans join it. */
   private class Request(val url: String, val first: Long, var last: Long) {
     val parts = mutableListOf<Part>()
@@ -433,8 +492,10 @@ internal class WebSeedWorker<P : WebSeedPiece>(
    * run of many small files spent most of its time waiting for answers, and on mirrors that
    * redirect each file, as archive.org does, for two of them per file. A mirror that fails sees
    * one request per run. What arrived for the pieces a failed run gives back unstored counts as
-   * [WebSeedStats.wasted]; until stored or thrown away, it is [WebSeedStats.unsettled]. Once the
-   * run ends, whatever arrived that no verified piece keeps goes to [discardPayload].
+   * [WebSeedStats.wasted], taken as the last bytes the run received, so the part that arrived
+   * since the latest stall check is the part no check counted as payload; until stored or thrown
+   * away, it is [WebSeedStats.unsettled]. Once the run ends, whatever arrived that no verified
+   * piece keeps goes to [discardPayload].
    */
   private suspend fun fetch(run: MutableList<P?>) {
     val handle = connection ?: open().also { connection = it }
@@ -445,7 +506,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     val asked = missing.copyOf()
     // What arrived for the run, of it what was stored and so settled, and of that what verified
     // pieces keep.
-    val arrived = AtomicLong(0)
+    val arrived = Arrivals(stats.checks)
     val stored = AtomicLong(0)
     val verified = AtomicLong(0)
     try {
@@ -471,16 +532,18 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         }
       }
     } catch (e: Throwable) {
-      // Every piece stored had all its bytes; the rest of what arrived is thrown away.
+      // Every piece stored had all its bytes; the rest of what arrived is thrown away, taken as
+      // the last bytes the run received.
       val kept = run.indices.sumOf { if (run[it] == null) asked[it].toLong() else 0L }
-      stats.wasted.addAndFetch((arrived.load() - kept).coerceAtLeast(0))
+      val wasted = (arrived.bytes - kept).coerceAtLeast(0)
+      stats.throwAway(wasted) { checks -> minOf(wasted, arrived.since(checks)) }
       throw e
     } finally {
       // The rest is settled once counted as wasted, so none of it looks kept meanwhile.
-      stats.unsettled.addAndFetch(stored.load() - arrived.load())
+      stats.unsettled.addAndFetch(stored.load() - arrived.bytes)
       // Counted as it arrived, before the throttle, so a run stopped while it waits still counts
       // the chunk; a piece the selection dropped is discarded too.
-      val discarded = arrived.load() - verified.load()
+      val discarded = arrived.bytes - verified.load()
       if (discarded > 0) discardPayload(discarded)
     }
   }
@@ -493,7 +556,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     handle: ConnectionHandle,
     request: Request,
     run: List<P?>,
-    arrived: AtomicLong,
+    arrived: Arrivals,
     received: suspend (piece: Int, length: Int) -> Unit,
   ) {
     val length = request.last - request.first + 1
@@ -512,7 +575,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
             answered()
             handle.received(bytes.size)
             // At risk until its piece is stored, which counts before it is payload.
-            arrived.addAndFetch(bytes.size.toLong())
+            arrived.add(bytes.size, stats.checks)
             stats.unsettled.addAndFetch(bytes.size.toLong())
             stats.payload.addAndFetch(bytes.size.toLong())
             downloadPayload(bytes.size)

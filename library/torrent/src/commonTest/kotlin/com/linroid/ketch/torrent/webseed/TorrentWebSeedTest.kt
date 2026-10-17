@@ -399,6 +399,74 @@ class TorrentWebSeedTest {
     }
   }
 
+  /** A worker for the one seed at [url] of [store], counting into [stats]: a failure backs it off. */
+  private suspend fun soleWorker(
+    store: TorrentPieceStore,
+    url: String,
+    engine: HttpEngine,
+    stats: WebSeedStats,
+  ): WebSeedWorker<TorrentPieceScheduler.Claim> {
+    val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
+      store.verifiedPieces(), store::pieceSize, TorrentBufferBudget(4 * 1024 * 1024))
+    return WebSeedWorker(url, SwarmWebSeedPieces(-1, url, store, scheduler), TorrentHttp(engine),
+      stats, "test", retryMs = 60_000)
+  }
+
+  @Test
+  fun corruptPiece_isRecentWasteOnlyForWhatArrivedSinceTheLastStallCheck() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(PIECE) { (it * 3 + 7).toByte() }
+        val url = "http://mirror.test/data"
+        // A corrupt copy, sent a part at a time: 7,001 bytes, 7,001, then 2,382.
+        val mirror = Stepped(MirrorEngine(mapOf(url to payload), corrupt = true))
+        withStore(singleFile(payload, url)) { store, _ ->
+          store.initialize()
+          val stats = WebSeedStats()
+          coroutineScope {
+            val running = launch { soleWorker(store, url, mirror, stats).run() }
+            // The first part arrives before a stall check, the rest after it.
+            mirror.steps.send(Unit)
+            while (mirror.delivered == 0) delay(10)
+            assertEquals(WebSeedWaste(checks = 0, bytes = 0, recent = 0), stats.checked())
+            mirror.steps.send(Unit)
+            mirror.steps.send(Unit)
+            while (stats.wasted == 0L) delay(10)
+            // The check counted the first part as payload, and no check the rest.
+            assertEquals(WebSeedWaste(checks = 1, bytes = PIECE.toLong(), recent = PIECE - 7_001L),
+              stats.checked())
+            running.cancel()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun corruptPieceAfterAVerifiedOne_isAllTheRecentWaste() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val payload = ByteArray(2 * PIECE) { (it * 17 + 3).toByte() }
+        val url = "http://mirror.test/data"
+        // Both pieces in one response, the second corrupt.
+        val mirror = MirrorEngine(mapOf(url to payload), damage = mapOf(url to PIECE + 100L))
+        withStore(singleFile(payload, url)) { store, _ ->
+          store.initialize()
+          val stats = WebSeedStats()
+          coroutineScope {
+            val running = launch { soleWorker(store, url, mirror, stats).run() }
+            while (stats.wasted == 0L) delay(10)
+            // No check came meanwhile: of what arrived, the first piece is kept.
+            assertTrue(store.verifiedPieces()[0])
+            assertEquals(WebSeedWaste(checks = 0, bytes = PIECE.toLong(), recent = PIECE.toLong()),
+              stats.checked())
+            running.cancel()
+          }
+        }
+      }
+    }
+  }
+
   @Test
   fun selectionHole_splitsTheRun() = runTest {
     withContext(Dispatchers.Default) {

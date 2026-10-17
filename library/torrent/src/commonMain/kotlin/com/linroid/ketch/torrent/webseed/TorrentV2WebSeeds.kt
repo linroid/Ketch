@@ -103,8 +103,11 @@ internal class TorrentV2WebSeeds private constructor(
   private val log = KetchLogger("TorrentWebSeed")
   val stats = WebSeedStats()
 
-  /** Payload the seeds received and threw away so far ([WebSeedStats.wasted]). */
-  val wastedBytes: Long get() = stats.wasted.load()
+  /**
+   * Payload the seeds received and threw away so far, for a stall check, which the bytes arriving
+   * next come after ([WebSeedStats.checked]).
+   */
+  fun checkWaste(): WebSeedWaste = stats.checked()
 
   /** Payload the seeds received that may still be thrown away ([WebSeedStats.unsettled]). */
   val unsettledBytes: Long get() = stats.unsettled.load()

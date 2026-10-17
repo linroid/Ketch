@@ -520,14 +520,14 @@ internal class TorrentSwarm(
       // In this order, so no web seed byte looks kept before it is (see StallSignals).
       val payload = payloadReceived.load()
       val unsettled = webSeedStats.unsettled.load()
-      val wasted = webSeedStats.wasted.load()
+      val wasted = webSeedStats.checked()
       val due = watchdog.check(StallSignals(
         downloading = !complete, peers = peers, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
         droppedWebSeeds = webSeeds.size - active.size, payloadBytes = payload,
-        unsettledBytes = unsettled, wastedBytes = wasted, throttledMs = throttledMs.load(),
-        pieceLength = store.metadata.pieceLength,
+        unsettledBytes = unsettled, wastedBytes = wasted.bytes, recentWastedBytes = wasted.recent,
+        throttledMs = throttledMs.load(), pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall
       val previous = published.value
