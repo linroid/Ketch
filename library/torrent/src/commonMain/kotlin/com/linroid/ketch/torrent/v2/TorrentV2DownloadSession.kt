@@ -7,11 +7,13 @@ import com.linroid.ketch.torrent.TorrentUploadPolicy
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.engine.IncompleteSeedException
+import com.linroid.ketch.torrent.engine.ThrottleClock
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
 import com.linroid.ketch.torrent.engine.TorrentSession
 import com.linroid.ketch.torrent.engine.TorrentSessionState
+import com.linroid.ketch.torrent.engine.waiting
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
@@ -634,17 +636,17 @@ internal class TorrentV2DownloadSession private constructor(
       for (done in selections) loopControls.send(TorrentV2SessionLoop.Control.Select(done))
     }
     // Mirrors pay the same limits as peers: the engine's, this owner's, then the task's. The
-    // time they wait for them is no stall.
-    val webSeedThrottled = AtomicLong(0)
+    // time they wait for them is no stall, nor is the time peers' requests wait (the loop's).
+    val throttle = ThrottleClock(nowMs)
     val webSeeds = TorrentV2WebSeeds.of(document, layout, store, runtime.webSeedHttp, reporter,
       label, webSeedRetryMs) { bytes ->
       // Received before it waits, so a stop meanwhile leaves it to be counted as discarded.
       store.recordReceived(bytes)
-      val start = clock()
-      globalRate.acquire(bytes)
-      downloadRate.acquire(bytes)
-      taskThrottle.load()(bytes)
-      webSeedThrottled.addAndFetch(clock() - start)
+      throttle.waiting {
+        globalRate.acquire(bytes)
+        downloadRate.acquire(bytes)
+        taskThrottle.load()(bytes)
+      }
     }
     val mirrors = webSeeds?.let { launch { it.run() } }
     try {
@@ -711,7 +713,7 @@ internal class TorrentV2DownloadSession private constructor(
                   onRoom = room::store, onIncomplete = ::incomplete,
                   incomingFailures = incomingFailures, webSeeds = webSeeds,
                   stall = mutableStall, reannounce = { reannounces.addAndFetch(1) },
-                  webSeedThrottledMs = webSeedThrottled::load))
+                  throttle = throttle))
             }
           }
         }

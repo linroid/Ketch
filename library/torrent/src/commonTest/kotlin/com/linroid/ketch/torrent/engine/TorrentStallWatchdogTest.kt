@@ -453,6 +453,52 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun blocksHeldByALowLimit_areNoStall() {
+    // A 3 KiB/s limit holds each 16 KiB block for over 5 s, longer than the second between
+    // checks; the block counts once its wait ends. The waits count as they pass, so 256 KiB
+    // pieces that take 85 s each never look stalled.
+    val throttle = ThrottleClock { now }
+    val holdMs = 16_384 * 1_000L / 3_072
+    var received = 0L
+    var blocks = 0
+    var heldUntil = holdMs
+    throttle.enter()
+    while (now < 600_000) {
+      now += 100
+      if (now >= heldUntil) {
+        throttle.exit()
+        received += 16_384
+        if (++blocks % 16 == 0) watchdog.progressed()
+        throttle.enter()
+        heldUntil = now + holdMs
+      }
+      if (now % 1_000 != 0L) continue
+      watchdog.check(signals(peerBytes = received, throttledMs = throttle.throttledMs(), peers = 1,
+        unchokingPeers = 1))
+      assertNull(watchdog.stall, "Stalled at $now ms")
+    }
+  }
+
+  @Test
+  fun oneLongWaitOnALimit_isNoStallUntilItEnds() {
+    // A block waits five minutes on a limit, across three hundred checks.
+    val throttle = ThrottleClock { now }
+    throttle.enter()
+    runTo(300_000) { signals(throttledMs = throttle.throttledMs(), peers = 1, unchokingPeers = 1) }
+    assertNull(watchdog.stall)
+    // It ends and counts, and the peer sends nothing more: a stall half a minute later.
+    throttle.exit()
+    val after = { _: Long ->
+      signals(peerBytes = 16_384, throttledMs = throttle.throttledMs(), peers = 1,
+        unchokingPeers = 1)
+    }
+    runTo(330_000, after)
+    assertNull(watchdog.stall)
+    runTo(331_000, after)
+    assertEquals(TorrentStallReason.UNKNOWN, watchdog.stall?.reason)
+  }
+
+  @Test
   fun trickleWithoutAPiece_stallsOnceFourPiecesAtSixteenKibAreDue() {
     // 1 KiB a second and no speed limit: four 256 KiB pieces at 16 KiB/s take 64 s.
     runTo(63_000) { time -> signals(peerBytes = time, peers = 1, unchokingPeers = 1) }

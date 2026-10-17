@@ -826,9 +826,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   discovery (v1, and v2 as `PeerOrigin.EXPLICIT` in the swarm they answered in)
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or no
   verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
-  back after a gap once some of it is kept, once until the next piece; time waiting on speed
-  limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
-  peer or running web seed has and every stopped one could not serve, a seed started again
+  back after a gap once some of it is kept, once until the next piece; time payload waits on
+  speed limits never counts, as it passes and overlapping waits once: `ThrottleClock`), is a
+  stall, whose reason (`TorrentStall`: missing pieces no connected peer or running web seed has
+  and every stopped one could not serve, a seed started again
   counting as stopped until it answers (`WebSeedWorker.unproven`) and one dropped again once
   started again without answering aside until a later relaunch finds it answering, and their
   files, kept 10 s after the last source leaves;

@@ -28,8 +28,8 @@ import com.linroid.ketch.torrent.webseed.WebSeedLedger
  *   ([com.linroid.ketch.torrent.webseed.WebSeedStats.checked], which also marks this check): what
  *   arrived since, and what was stored or thrown away of what arrived before, by the check that
  *   counted it.
- * @property throttledMs time spent so far waiting on speed limits, which is never a stall: the
- *   waits of every peer added up, of which a check counts at most the time since the last.
+ * @property throttledMs time so far during which payload waited on speed limits, which is never
+ *   a stall ([ThrottleClock]): waits that overlap count once, and a wait counts as it passes.
  * @property pieceLength the torrent's piece length.
  */
 internal data class StallSignals(
@@ -148,8 +148,8 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     val seeds = signals.webSeedPayload
     val received = fromPeers + seeds.arrived
     val wasted = seeds.wasted.values.sum()
-    // Peers wait on the limits side by side, each adding its own wait: at most the time that
-    // passed counts.
+    // Waits count as they pass, so this is the time since the last check that something waited;
+    // never more than the time that passed.
     val throttled = (signals.throttledMs - throttledMs).coerceIn(0, elapsed)
     throttledMs = signals.throttledMs
     rate = (rate + (received - wasted).coerceAtLeast(0) * 1000.0 / elapsed) / 2

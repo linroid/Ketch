@@ -9,10 +9,12 @@ import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.describeWithoutUrls
 import com.linroid.ketch.torrent.engine.StallRecovery
 import com.linroid.ketch.torrent.engine.StallSignals
+import com.linroid.ketch.torrent.engine.ThrottleClock
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRateLimiter
 import com.linroid.ketch.torrent.engine.TorrentStallWatchdog
 import com.linroid.ketch.torrent.engine.describe
+import com.linroid.ketch.torrent.engine.waiting
 import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.magnet.TorrentMetadataExchange
 import com.linroid.ketch.torrent.metainfo.Bencode
@@ -217,10 +219,10 @@ internal class TorrentSwarm(
   private val unchoking = mutableSetOf<Int>()
   // The one connection kept to each peer, guarded like [connected].
   private val identities = mutableMapOf<PeerIdentity, PeerWorker>()
-  // Payload received from peers (web seeds count theirs in their stats), and time spent waiting
-  // on speed limits for peers' and web seeds'.
+  // Payload received from peers (web seeds count theirs in their stats), and the time peers' and
+  // web seeds' payload spent waiting on speed limits, counted as it passes.
   private val payloadReceived = AtomicLong(0)
-  private val throttledMs = AtomicLong(0)
+  private val throttle = ThrottleClock(nowMs)
   private val uploaded = AtomicLong(0)
 
   /** Hole punching (BEP 55) runs for public torrents while uTP is on. */
@@ -404,9 +406,7 @@ internal class TorrentSwarm(
     }
     // Payload from web seeds is throttled as peers' is; stall checks count it in [webSeedStats].
     val webSeedPayload: suspend (Int) -> Unit = { size ->
-      val at = nowMs()
-      downloadPayload(size)
-      throttledMs.addAndFetch(nowMs() - at)
+      throttle.waiting { downloadPayload(size) }
     }
     // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
     val webSeedWorkers = webSeedUrls.mapIndexed { number, url ->
@@ -522,7 +522,7 @@ internal class TorrentSwarm(
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
         droppedWebSeeds = webSeeds.size - active.size, peerPayloadBytes = payloadReceived.load(),
-        webSeedPayload = webSeedStats.checked(), throttledMs = throttledMs.load(),
+        webSeedPayload = webSeedStats.checked(), throttledMs = throttle.throttledMs(),
         pieceLength = store.metadata.pieceLength,
       ))
       val current = watchdog.stall
@@ -1110,11 +1110,9 @@ internal class TorrentSwarm(
         traffic?.received(message.bytes.size)
         if (attempt.payload == 0L) broughtPayload.store(true)
         attempt.payload += message.bytes.size
-        downloadPayload(message.bytes.size)
+        throttle.waiting { downloadPayload(message.bytes.size) }
         lastBlock += throttling.elapsedNow()
-        val throttled = nowMs() - throttledAt
-        lastUsefulPayload += throttled
-        throttledMs.addAndFetch(throttled)
+        lastUsefulPayload += nowMs() - throttledAt
         payloadReceived.addAndFetch(message.bytes.size.toLong())
       }
       require(fast || !message.isFastExtension()) { "Fast extension message without BEP 6" }

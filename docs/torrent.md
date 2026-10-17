@@ -826,7 +826,8 @@ answering anything, and a request it never answers is given up after four.
 
 Each download checks itself every second. It has stalled once no payload arrived for 30 seconds,
 or no piece verified for four pieces' worth of time at its rate (between one and ten minutes);
-time spent waiting on a speed limit never counts. Payload thrown away, such as a web seed's piece
+time spent waiting on a speed limit never counts, also while a low limit holds a block for longer
+than a check. Payload thrown away, such as a web seed's piece
 that fails its hash check, is no payload. Ketch notes which check counted each byte a web seed
 sends, so the bytes of a piece it throws away are taken back from the checks they arrived in, and
 never another source's payload. What arrives with them, such as the next piece's first bytes,
