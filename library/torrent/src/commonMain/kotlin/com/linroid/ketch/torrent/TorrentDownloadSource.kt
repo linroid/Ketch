@@ -352,7 +352,12 @@ class TorrentDownloadSource(
         throw KetchError.Network(e)
       }
       engine.store(created)
-      if (closed.load()) { engine.exchange(null)?.close(); error("Torrent source is closed") }
+      if (closed.load()) {
+        // Stopped under the mutex, which stop() waits for, so it never returns before this engine
+        // released its listener and port mappings.
+        withContext(NonCancellable) { engine.exchange(null)?.stop() }
+        error("Torrent source is closed")
+      }
       created
     } catch (e: Throwable) { created.close(); throw e }
   }

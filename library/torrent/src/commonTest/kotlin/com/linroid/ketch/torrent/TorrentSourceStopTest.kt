@@ -44,6 +44,29 @@ class TorrentSourceStopTest {
   }
 
   @Test
+  fun stop_whileTheEngineStarts_returnsOnceItStopped() = runTest {
+    val started = CompletableDeferred<Unit>()
+    val stopped = CompletableDeferred<Unit>()
+    val engine = StoppingEngine(onStop = { stopped.await() }, onStart = { started.await() })
+    val source = TorrentDownloadSource().also { it.engineFactory = { engine } }
+    // Starts the engine, which is still binding its listener.
+    val resolve = async { runCatching { source.resolve(magnet) } }
+    runCurrent()
+
+    val stop = async { source.stop() }
+    runCurrent()
+    started.complete(Unit)
+    runCurrent()
+    assertTrue(engine.stopCalled)
+    assertFalse(stop.isCompleted)
+
+    stopped.complete(Unit)
+    stop.await()
+    assertTrue(resolve.await().isFailure)
+    source.close()
+  }
+
+  @Test
   fun ketchShutdown_stopsTheEngineWhileTheHttpEngineStillRuns() = runTest {
     val http = RecordingHttpEngine()
     val engine = StoppingEngine(onStop = { http.get(STOPPED_ANNOUNCE) })
@@ -67,9 +90,13 @@ class TorrentSourceStopTest {
     trackers = listOf("http://tracker.example.com/announce"),
   )
 
-  /** Finds [metadata] for any magnet, and runs [onStop] as it stops, as sessions announce. */
+  /**
+   * Finds [metadata] for any magnet, runs [onStart] as it starts, as binding its listener takes
+   * a while, and [onStop] as it stops, as sessions announce.
+   */
   private inner class StoppingEngine(
     private val onStop: suspend () -> Unit,
+    private val onStart: suspend () -> Unit = {},
     private val fake: FakeTorrentEngine = FakeTorrentEngine(),
   ) : TorrentEngine by fake {
     var stopCalled = false
@@ -79,6 +106,11 @@ class TorrentSourceStopTest {
 
     init {
       fake.fetchMetadataResult = metadata()
+    }
+
+    override suspend fun start() {
+      onStart()
+      fake.start()
     }
 
     override suspend fun stop() {
