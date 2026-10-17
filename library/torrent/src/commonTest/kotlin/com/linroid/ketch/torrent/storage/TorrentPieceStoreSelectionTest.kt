@@ -228,6 +228,88 @@ class TorrentPieceStoreSelectionTest {
   }
 
   @Test
+  fun read_droppedFileDeletedLater_readsItsSpanFromTheSidecar() = runTest {
+    val root = root()
+    try {
+      val store = completeStore(root)
+      store.changeSelection(setOf(0, 2))
+      store.finish()
+      // Pieces 0 and 1 hold bytes of skip, which stays in place: each keeps a sidecar.
+      assertTrue(torrentFileSystem.exists(sidecar(root, 0)))
+      assertTrue(torrentFileSystem.exists(sidecar(root, 1)))
+      assertFalse(torrentFileSystem.exists(sidecar(root, 2)))
+      torrentFileSystem.delete(root / "pack/skip")
+      assertContentEquals(piece(0), store.read(0))
+      assertContentEquals(piece(1), store.read(1))
+      assertContentEquals(booleanArrayOf(true, true, true), store.verifiedPieces())
+      assertTrue(store.completed())
+      assertFalse(torrentFileSystem.exists(root / "pack/skip"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun recheck_droppedFileDeletedLater_healsFromTheSidecar() = runTest {
+    val root = root()
+    try {
+      val store = completeStore(root)
+      store.changeSelection(setOf(0, 2))
+      store.finish()
+      torrentFileSystem.delete(root / "pack/skip")
+      val restarted = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      restarted.initialize()
+      assertContentEquals(booleanArrayOf(true, true, true), restarted.recheck())
+      assertTrue(restarted.completed())
+      assertContentEquals(longArrayOf(3, 0, 3, 0), restarted.progress())
+      assertFalse(torrentFileSystem.exists(root / "pack/skip"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun recheck_dropSavedWhileStopped_keepsSidecarsForADeletionLater() = runTest {
+    val root = root()
+    try {
+      completeStore(root).finish()
+      // The selection shrank while no store ran: the next one finds skip in place.
+      val first = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      first.initialize()
+      assertContentEquals(booleanArrayOf(true, true, true), first.recheck())
+      assertTrue(torrentFileSystem.exists(sidecar(root, 0)))
+      assertTrue(torrentFileSystem.exists(sidecar(root, 1)))
+      torrentFileSystem.delete(root / "pack/skip")
+      val second = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      second.initialize()
+      assertContentEquals(booleanArrayOf(true, true, true), second.recheck())
+      assertTrue(second.completed())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun commit_droppedFileInPlace_keepsTheSharedPieceInTheSidecar() = runTest {
+    val root = root()
+    try {
+      val store = TorrentPieceStore(metadata, root / "pack", emptySet(), "test")
+      store.initialize()
+      // Dropped before any piece verified: skip stays in place, created for the selection.
+      store.changeSelection(setOf(0, 2))
+      for (index in 0..2) assertEquals(CommitOutcome.VERIFIED, store.commit(index, piece(index)))
+      store.finish()
+      assertTrue(torrentFileSystem.exists(sidecar(root, 0)))
+      assertTrue(torrentFileSystem.exists(sidecar(root, 1)))
+      torrentFileSystem.delete(root / "pack/skip")
+      assertContentEquals(piece(1), store.read(1))
+      assertContentEquals(booleanArrayOf(true, true, true), store.verifiedPieces())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
   fun recheck_changeWhilePaused_healsFromSidecar() = runTest {
     val root = root()
     try {

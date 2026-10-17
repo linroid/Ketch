@@ -883,8 +883,10 @@ peers that dial it before answering their handshake.
 
 In v1, a piece that spans a selected and a skipped file needs all its bytes to be verified. The
 skipped file's part is kept in a hidden sidecar for the task, not in the skipped file. When that
-file is chosen later, its verified bytes are copied from the sidecar and rechecked. A v2 or hybrid
-task refuses a newly chosen file whose path holds a file it did not create.
+file is chosen later, its verified bytes are copied from the sidecar and rechecked. A file you skip
+once it was written stays where it is, and the pieces it shares with the chosen files are copied
+to the sidecar too, so deleting it later loses nothing. A v2 or hybrid task refuses a newly chosen
+file whose path holds a file it did not create.
 
 ## Storage, restart and compatibility
 
