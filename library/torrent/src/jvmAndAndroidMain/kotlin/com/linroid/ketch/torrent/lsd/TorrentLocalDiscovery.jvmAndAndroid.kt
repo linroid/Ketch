@@ -34,33 +34,54 @@ private fun signature(ipv4: List<NetworkInterface>, ipv6: List<NetworkInterface>
   ipv4.flatMapTo(mutableSetOf()) { nif ->
     nif.inetAddresses.toList().filterIsInstance<Inet4Address>()
       .map { "${nif.name} ${it.hostAddress}" }
-  } + ipv6.flatMap { nif -> lanIpv6Addresses(nif).map { "${nif.name} ${it.hostAddress}" } }
+  } + ipv6.flatMap { nif ->
+    lanIpv6Addresses(nif.inetAddresses.toList()).map { "${nif.name} ${it.hostAddress}" }
+  }
 
 /**
- * Whether [nif] is up, with multicast, and neither loopback nor a point-to-point link: a VPN
- * tunnel has no LAN behind it, though it may have a private IPv4 or a link-local IPv6 address,
- * and peers heard through it carry the tunnel's address, which its proxy resets.
+ * What local service discovery reads of a network interface to choose it: the choice
+ * ([joinsIpv4Group], [joinsIpv6Group]) depends on these facts alone.
  */
-private fun lanMulticast(nif: NetworkInterface): Boolean = runCatching {
-  nif.isUp && !nif.isLoopback && !nif.isPointToPoint && nif.supportsMulticast()
-}.getOrDefault(false)
+internal class LsdInterfaceFacts(
+  val up: Boolean,
+  val loopback: Boolean,
+  val pointToPoint: Boolean,
+  val multicast: Boolean,
+  val addresses: List<InetAddress>,
+) {
+  /**
+   * Whether the interface is up, with multicast, and neither loopback nor a point-to-point link:
+   * a VPN tunnel has no LAN behind it, though it may have a private IPv4 or a link-local IPv6
+   * address, and peers heard through it carry the tunnel's address, which its proxy resets.
+   */
+  private val lanMulticast: Boolean get() = up && !loopback && !pointToPoint && multicast
 
-/** The LAN interfaces ([lanMulticast]) with a private or link-local IPv4 address. */
-internal fun lsdInterfaces(): List<NetworkInterface> =
+  /** Whether the IPv4 group is joined here: a LAN one with a private or link-local address. */
+  val joinsIpv4Group: Boolean
+    get() = lanMulticast && addresses.any { it is Inet4Address && lsdSenderAllowed(it.address) }
+
+  /** Whether the IPv6 group is joined here: a LAN one with a link-local or unique local address. */
+  val joinsIpv6Group: Boolean get() = lanMulticast && lanIpv6Addresses(addresses).isNotEmpty()
+}
+
+/** The interfaces that join the IPv4 group ([LsdInterfaceFacts.joinsIpv4Group]). */
+internal fun lsdInterfaces(): List<NetworkInterface> = systemInterfaces { it.joinsIpv4Group }
+
+/** The interfaces that join the IPv6 group ([LsdInterfaceFacts.joinsIpv6Group]). */
+internal fun lsdIpv6Interfaces(): List<NetworkInterface> = systemInterfaces { it.joinsIpv6Group }
+
+/** The system's interfaces whose facts [chosen] accepts; none whose facts cannot be read. */
+private fun systemInterfaces(chosen: (LsdInterfaceFacts) -> Boolean): List<NetworkInterface> =
   NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().filter { nif ->
-    lanMulticast(nif) &&
-      nif.inetAddresses.toList().any { it is Inet4Address && lsdSenderAllowed(it.address) }
+    runCatching {
+      LsdInterfaceFacts(up = nif.isUp, loopback = nif.isLoopback,
+        pointToPoint = nif.isPointToPoint, multicast = nif.supportsMulticast(),
+        addresses = nif.inetAddresses.toList())
+    }.getOrNull()?.let(chosen) == true
   }
 
-/** The LAN interfaces ([lanMulticast]) with a link-local or unique local IPv6 address. */
-internal fun lsdIpv6Interfaces(): List<NetworkInterface> =
-  NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().filter { nif ->
-    lanMulticast(nif) && lanIpv6Addresses(nif).isNotEmpty()
-  }
-
-private fun lanIpv6Addresses(nif: NetworkInterface): List<Inet6Address> =
-  nif.inetAddresses.toList().filterIsInstance<Inet6Address>()
-    .filter { lsdSenderAllowed(it.address) }
+private fun lanIpv6Addresses(addresses: List<InetAddress>): List<Inet6Address> =
+  addresses.filterIsInstance<Inet6Address>().filter { lsdSenderAllowed(it.address) }
 
 /**
  * A multicast socket on [port], shared with other clients (SO_REUSEADDR), that joined the IPv4

@@ -48,10 +48,22 @@ class JvmLsdTransportTest {
   }
 
   @Test
-  fun interfaces_leaveOutPointToPointLinks() {
-    // A VPN's tunnel may have a private IPv4 address, but peers heard through it carry the
-    // tunnel's own address, which its proxy resets.
-    for (nif in lsdInterfaces() + lsdIpv6Interfaces()) assertFalse(nif.isPointToPoint, nif.name)
+  fun interfaceFacts_tunnelBesideTheLan_onlyTheLanJoins() {
+    // A TUN proxy's utun beside the Wi-Fi it runs over: the tunnel has a private IPv4 address,
+    // but peers heard through it carry the tunnel's own address, which its proxy resets.
+    fun facts(pointToPoint: Boolean, vararg addresses: String) = LsdInterfaceFacts(up = true,
+      loopback = false, pointToPoint = pointToPoint, multicast = true,
+      addresses = addresses.map { InetAddress.getByName(it) })
+    val en0 = facts(pointToPoint = false, "192.168.31.11", "fe80::1c2b:3aff:fe4d:5e6f")
+    val utun4 = facts(pointToPoint = true, "172.19.0.1", "fe80::a1b2:c3d4:e5f6:1")
+    assertTrue(en0.joinsIpv4Group)
+    assertTrue(en0.joinsIpv6Group)
+    assertFalse(utun4.joinsIpv4Group)
+    assertFalse(utun4.joinsIpv6Group)
+    // Its addresses alone would have it join.
+    val lan = facts(pointToPoint = false, "172.19.0.1", "fe80::a1b2:c3d4:e5f6:1")
+    assertTrue(lan.joinsIpv4Group)
+    assertTrue(lan.joinsIpv6Group)
   }
 
   @Test
