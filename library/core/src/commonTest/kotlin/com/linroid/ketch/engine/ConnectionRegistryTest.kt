@@ -9,6 +9,8 @@ import com.linroid.ketch.core.engine.ConnectionRegistry
 import com.linroid.ketch.core.engine.ConnectionSample
 import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.httpConnectionSpec
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -22,6 +24,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -168,6 +171,72 @@ class ConnectionRegistryTest {
     runCurrent()
 
     assertEquals(2, clock.calls)
+  }
+
+  @Test
+  fun samples_freshCollection_idleConnection_reportsZero() = runTest {
+    val registry = registry()
+    val handle = registry.reporter("task").open(spec)
+    handle.received(100_000)
+    advanceTimeBy(10.seconds)
+
+    // A one-shot read, as GET /api/connections makes, while nothing else collects.
+    val first = async { registry.snapshots(10).first() }
+    runCurrent()
+    assertFalse(first.isCompleted)
+    tick()
+
+    val connection = first.await().connections.single()
+    assertEquals(0L, connection.downloadBps)
+    assertEquals(100_000L, connection.downloadedBytes)
+  }
+
+  @Test
+  fun samples_freshCollection_measuresOverOneInterval() = runTest {
+    val registry = registry()
+    val handle = registry.reporter("task").open(spec)
+    handle.received(100_000)
+    advanceTimeBy(10.seconds)
+
+    val first = async { registry.snapshots(10).first() }
+    runCurrent()
+    handle.received(3000)
+    tick()
+
+    assertEquals(3000L, first.await().connections.single().downloadBps)
+  }
+
+  @Test
+  fun samples_collectionSoonAfterAnother_measuresFromItsSamples() = runTest {
+    val registry = registry()
+    val handle = registry.reporter("task").open(spec)
+    advanceTimeBy(10.seconds)
+    val warmUp = async { registry.snapshots(10).first() }
+    tick()
+    warmUp.await()
+
+    handle.received(4000)
+    advanceTimeBy(1.seconds)
+    val next = async { registry.snapshots(10).first() }
+    runCurrent()
+
+    // Sent at once, measured over the 2 s since the first collection noted the counters.
+    assertTrue(next.isCompleted)
+    assertEquals(2000L, next.await().connections.single().downloadBps)
+  }
+
+  @Test
+  fun samples_newConnection_measuredSinceItOpenedAtOnce() = runTest {
+    val registry = registry()
+    val handle = registry.reporter("task").open(spec)
+    advanceTimeBy(500.milliseconds)
+    handle.received(1000)
+
+    val first = async { registry.snapshots(10).first() }
+    runCurrent()
+
+    assertTrue(first.isCompleted)
+    assertEquals(2000L, first.await().connections.single().downloadBps)
   }
 
   @Test

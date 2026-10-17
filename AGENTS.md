@@ -467,7 +467,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
   seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
   `close` close what a source leaked. Its sampler reads the counters once a second, rates over
-  the last two samples, and runs only while collected; idle repeats are not sent
+  the last two samples, and runs only while collected; idle repeats are not sent. Each
+  connection keeps its last two samples, so a collection starting within a few seconds of
+  another (a one-shot `GET /api/connections` included) measures from them; one with nothing
+  recent to measure from notes the counters and sends its first sample a second later, so an idle
+  connection reads 0 rather than its average since it opened
 - Countries: `ActiveConnection.country` is the ISO code an engine given a `CountryLookup` names
   for the host, listed as `KetchFeatures.COUNTRIES` (`net.countries`) with
   `controller(CountryDatabase)`. `DbIpCountryDatabase` (desktop app, Android app, `ketch server`)
@@ -530,7 +534,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `KetchApi.updateConfig()`
 - Per-task speed limit via `DownloadRequest.speedLimit` or `DownloadTask.setSpeedLimit()`;
   it caps the task in addition to the global limit (the lower rate wins)
-- Token-bucket algorithm (`TokenBucket`) with delegating wrapper
+- Token-bucket algorithm (`TokenBucket`) with delegating wrapper. Waiters queue by owner
+  (`SpeedLimiter.acquire(bytes, owner)`; the global limiter's owner is the task ID) and are served
+  in turns of at most 16 KiB by start-time fair queuing, so tasks share the global limit equally
+  by bytes, however many connections or peers each waits with; an owner that stops waiting gives
+  its turns up. Buckets read a monotonic `TimeSource`, so tests run them on virtual time
 
 ### Download Scheduling (`DownloadScheduler`)
 - `DownloadSchedule.Immediate`, `AtTime(Instant)`, `AfterDelay(Duration)`

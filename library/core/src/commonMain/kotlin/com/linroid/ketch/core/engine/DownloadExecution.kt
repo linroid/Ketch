@@ -931,7 +931,8 @@ internal class DownloadExecution(
       },
       throttle = { bytes ->
         taskLimiter.acquire(bytes)
-        globalLimiter.acquire(bytes)
+        // Tasks share the global limit equally, however many connections each waits with.
+        globalLimiter.acquire(bytes, owner = taskId)
       },
       headers = request.headers,
       preResolved = preResolved,

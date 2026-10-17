@@ -162,11 +162,27 @@ internal class ConnectionRegistry(
   private val droppedSinceLog = AtomicLong(0)
   private val lastLog = AtomicReference(timeSource.markNow())
 
-  /** A sample right away, then one each [interval], while anything collects. */
+  /** A point older than this is too old to measure a current rate from. */
+  private val maxAge = interval * (HISTORY + 1)
+
+  /** A rate measured over less than this is too noisy to start a collection with. */
+  private val minSpan = interval / 2
+
+  /**
+   * A sample each [interval] while anything collects. Rates cover the last two samples, which
+   * each connection keeps across collections, so a collection that starts soon after another
+   * measures from its samples and sends its first one at once. A collection that has nothing
+   * recent to measure some connection from, such as a one-shot read while nothing else collects,
+   * notes every connection's counters and sends its first sample one [interval] later, rather
+   * than an average since the connection opened.
+   */
   val samples: SharedFlow<ConnectionSample> = flow {
-    val sampler = Sampler()
+    if (!measurable()) {
+      markAll()
+      delay(interval)
+    }
     while (true) {
-      emit(sampler.sample())
+      emit(sample())
       delay(interval)
     }
   }.shareIn(scope, SharingStarted.WhileSubscribed(replayExpirationMillis = 0), replay = 1)
@@ -250,6 +266,9 @@ internal class ConnectionRegistry(
     val sentBytes = AtomicLong(0)
     private val closed = AtomicBoolean(false)
 
+    /** The counters at the last samples, oldest first; only the sampler running reads them. */
+    @Volatile var points: List<Point> = emptyList()
+
     override fun received(bytes: Int) {
       if (bytes > 0) receivedBytes.addAndFetch(bytes.toLong())
     }
@@ -265,57 +284,83 @@ internal class ConnectionRegistry(
     override fun close() {
       if (closed.compareAndSet(false, true)) remove(this)
     }
+
+    /** The oldest point at most [maxAge] before [now], else the latest one. */
+    fun base(now: ComparableTimeMark): Point? =
+      points.firstOrNull { now - it.mark <= maxAge } ?: points.lastOrNull()
+
+    /** Adds the counters at [now], keeping the last [HISTORY] points. */
+    fun record(now: ComparableTimeMark, received: Long, sent: Long) {
+      points = (points + Point(now, received, sent)).takeLast(HISTORY)
+    }
   }
 
   /** The counters of one connection at one sample. */
   private class Point(val mark: ComparableTimeMark, val received: Long, val sent: Long)
 
   /**
-   * Turns counters into rates over the last two samples, or since the connection opened while
-   * it has fewer. Used by one collection of [samples] at a time.
+   * Whether a rate can be measured now for every connection: from a point at least [minSpan] and
+   * at most [maxAge] old, or, with no points yet, since it opened at most [maxAge] ago.
    */
-  private inner class Sampler {
-    private val history = HashMap<Long, ArrayList<Point>>()
-
-    fun sample(): ConnectionSample {
-      val now = timeSource.markNow()
-      val entries = live.load()
-      val connections = ArrayList<ActiveConnection>(entries.size)
-      for (entry in entries.values) {
-        val received = entry.receivedBytes.load()
-        val sent = entry.sentBytes.load()
-        val points = history.getOrPut(entry.id) { ArrayList(HISTORY + 1) }
-        val base = points.firstOrNull() ?: Point(entry.openedMark, 0, 0)
-        val elapsedMs = (now - base.mark).inWholeMilliseconds
-        points.add(Point(now, received, sent))
-        if (points.size > HISTORY) points.removeAt(0)
-        val spec = entry.spec
-        connections += ActiveConnection(
-          id = entry.id,
-          taskId = entry.taskId,
-          source = spec.source,
-          protocol = spec.protocol,
-          secure = spec.secure,
-          direction = spec.direction,
-          host = spec.host,
-          port = spec.port,
-          route = spec.route,
-          downloadBps = rate(received - base.received, elapsedMs),
-          uploadBps = rate(sent - base.sent, elapsedMs),
-          downloadedBytes = received,
-          uploadedBytes = sent,
-          openedAt = entry.openedAt,
-          peer = spec.peer,
-          country = countryOf(spec.host),
-        )
+  private fun measurable(): Boolean {
+    val now = timeSource.markNow()
+    return live.load().values.all { entry ->
+      val base = entry.points.firstOrNull { now - it.mark <= maxAge }
+      when {
+        base != null -> now - base.mark >= minSpan
+        entry.points.isNotEmpty() -> false
+        else -> now - entry.openedMark <= maxAge
       }
-      history.keys.retainAll(entries.keys)
-      return ConnectionSample(clock.now(), connections, dropped.load())
     }
-
-    private fun rate(bytes: Long, elapsedMs: Long): Long =
-      if (elapsedMs <= 0 || bytes <= 0) 0 else bytes * 1000 / elapsedMs
   }
+
+  /** Starts every connection's points afresh from its counters now. */
+  private fun markAll() {
+    val now = timeSource.markNow()
+    for (entry in live.load().values) {
+      entry.points = listOf(Point(now, entry.receivedBytes.load(), entry.sentBytes.load()))
+    }
+  }
+
+  /**
+   * Every connection with its rates since its [Entry.base], or since it opened while it has no
+   * points. Run by one collection of [samples] at a time.
+   */
+  private fun sample(): ConnectionSample {
+    val now = timeSource.markNow()
+    val entries = live.load()
+    val connections = ArrayList<ActiveConnection>(entries.size)
+    for (entry in entries.values) {
+      val received = entry.receivedBytes.load()
+      val sent = entry.sentBytes.load()
+      val base = entry.base(now) ?: Point(entry.openedMark, 0, 0)
+      val elapsedMs = (now - base.mark).inWholeMilliseconds
+      entry.record(now, received, sent)
+      val spec = entry.spec
+      connections += ActiveConnection(
+        id = entry.id,
+        taskId = entry.taskId,
+        source = spec.source,
+        protocol = spec.protocol,
+        secure = spec.secure,
+        direction = spec.direction,
+        host = spec.host,
+        port = spec.port,
+        route = spec.route,
+        downloadBps = rate(received - base.received, elapsedMs),
+        uploadBps = rate(sent - base.sent, elapsedMs),
+        downloadedBytes = received,
+        uploadedBytes = sent,
+        openedAt = entry.openedAt,
+        peer = spec.peer,
+        country = countryOf(spec.host),
+      )
+    }
+    return ConnectionSample(clock.now(), connections, dropped.load())
+  }
+
+  private fun rate(bytes: Long, elapsedMs: Long): Long =
+    if (elapsedMs <= 0 || bytes <= 0) 0 else bytes * 1000 / elapsedMs
 
   companion object {
     /** The most connections one instance tracks at once. */

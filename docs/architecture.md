@@ -360,8 +360,10 @@ DownloadContext.throttle(bytes)   (called by the source before writing each chun
 ```
 
 Each chunk takes tokens from the task's bucket and then from the global bucket, so a task runs at
-no more than the lower of the two limits. The `DelegatingSpeedLimiter` wrappers let a limit change
-or disappear while a download runs. Set them with `DownloadConfig.speedLimit` through
+no more than the lower of the two limits. The global bucket serves the tasks waiting for it in
+turns, always the one granted the fewest bytes next, so tasks share it equally however many
+connections or torrent peers each waits with. The `DelegatingSpeedLimiter` wrappers let a limit
+change or disappear while a download runs. Set them with `DownloadConfig.speedLimit` through
 `KetchApi.updateConfig()` (global) or `DownloadTask.setSpeedLimit()` (per task).
 
 ## Daemon server
