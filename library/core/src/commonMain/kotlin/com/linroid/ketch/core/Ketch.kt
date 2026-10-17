@@ -644,10 +644,13 @@ class Ketch(
     val ledger = command?.let { openLedger(record, it) }
     ledger?.replay?.let { return it }
     val source = selectionSource(record)
+    val running = coordinator.isActive(taskId)
     val plan = source.planFor(
       record,
       choiceFor(record, fileIds),
       completed = state is DownloadState.Completed,
+      // A running download's progress is newer than the record's, saved every save interval.
+      segments = if (running) handle.mutableSegments.value else record.segments,
     )
     val awaiting = record.awaitsFileSelection()
     if (!plan.changed && !awaiting) {
@@ -668,7 +671,6 @@ class Ketch(
         control.selectionGeneration, control.sharing, revision, replayed = false,
       )
     }
-    val running = coordinator.isActive(taskId)
     val reopen = !running && state is DownloadState.Completed && plan.expands
     val generation = control.selectionGeneration + if (plan.changed) 1 else 0
     val revision = command?.reserve(generation, control.sharing)
@@ -817,11 +819,15 @@ class Ketch(
     return fileIds
   }
 
-  /** [DownloadSource.planSelection] of [fileIds] for [record], with the state it saved. */
+  /**
+   * [DownloadSource.planSelection] of [fileIds] for [record], with the state it saved and the
+   * task's [segments].
+   */
   private suspend fun <S : Any> DownloadSource<S>.planFor(
     record: TaskRecord,
     fileIds: Set<String>?,
     completed: Boolean,
+    segments: List<Segment>?,
   ): SelectionPlan = planSelection(
     SelectionRequest(
       taskId = record.taskId,
@@ -829,7 +835,7 @@ class Ketch(
       current = record.request.selectedFileIds,
       sourceState = record.sourceState?.let { decodeState(it) },
       resolved = record.resolvedSource ?: record.request.resolvedSource,
-      segments = record.segments,
+      segments = segments,
       outputPath = record.outputPath,
       completed = completed,
     )

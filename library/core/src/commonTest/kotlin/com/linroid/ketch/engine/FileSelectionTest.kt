@@ -149,6 +149,39 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_runningTaskAfterASave_plansFromTheLatestProgress() = runTest {
+    val source = SelectableSource().apply { reportsOnChange = false }
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store, DownloadConfig(retryCount = 0, saveIntervalMs = 1_000))
+    try {
+      val task = ketch.download(request("0", "1"))
+      runCurrent()
+      val context = source.runs.value.single().context
+      context.segments.value = listOf(Segment(0, 0, 99, 30), Segment(1, 100, 299))
+      context.onProgress(30, 300)
+      advanceTimeBy(1_001)
+      runCurrent()
+      assertEquals(30, store.saves.last().segments?.sumOf { it.downloadedBytes })
+      // The download moved on since the record was saved.
+      context.segments.value = listOf(Segment(0, 0, 99, 80), Segment(1, 100, 299, 50))
+      context.onProgress(130, 300)
+
+      task.selectFiles(setOf("0", "1", "2"))
+      runCurrent()
+
+      val downloading = assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(130, downloading.progress.downloadedBytes)
+      assertEquals(600, downloading.progress.totalBytes)
+      val saved = assertNotNull(store.load(task.taskId))
+      assertEquals(listOf(80L, 50L, 0L), saved.segments?.map { it.downloadedBytes })
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun selectFiles_unacknowledgedAtFinish_reruns() = runTest {
     val source = SelectableSource().apply { collects = false }
     val ketch = ketch(source)
