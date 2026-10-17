@@ -1558,7 +1558,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `RemoteKetch.resolve` throws `KetchError.Unsupported` for a 415 `unsupported`, caused by a
   `NoDownloadSourceException` for the servers' "No download source" wordings and else by the
   reason after "Not supported: ", and the 422's error again; other bodies are a
-  `RemoteApiException`, as older servers' 500 for a URL's refusals
+  `RemoteApiException`, as older servers' 500 for a URL's refusals. The apps' add sheet
+  (`toIntakeProblem`) calls a link one Ketch can't download only when no source takes it, and
+  otherwise says it couldn't check it, with the cause's reason
 - Event stream (`StreamRoutes`, `EventHub`; `/api/status` lists `events.stream`): `GET
   /api/stream` opens one SSE stream per client (at most 32, 429 `too_many_streams` beyond; a
   comment every 15 s, which also frees the streams of clients that left). It sends `hello` (the
