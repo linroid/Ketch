@@ -746,7 +746,9 @@ internal object TorrentV2SessionLoop {
           val topic = if (info.mode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1 else PeerTopic.V2
           // Its source port is ephemeral; only a listen port it told us may be dialed back.
           if (!violation) book.incomingClosed(origin.remote, listen, topic, complete)
-        } else if (listen != null) book.closed(listen, violation, complete)
+        } else if (listen != null) {
+          book.closed(listen, violation, complete, delivered = member.attempt.payload > 0)
+        }
         resets.removeAll { reset ->
           reset.peers.remove(peer)
           if (reset.peers.isEmpty()) reset.done.complete(Unit)

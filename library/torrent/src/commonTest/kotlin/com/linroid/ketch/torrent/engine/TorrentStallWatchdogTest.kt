@@ -245,9 +245,10 @@ class TorrentStallWatchdogTest {
     assertTrue(early.isEmpty())
     val first = runTo(61_000) { signals(droppedWebSeeds = 1) }
     assertEquals(setOf(StallRecovery.REANNOUNCE, StallRecovery.REVIVE_PEERS), first)
-    // Dropped web seeds start again once the stall has lasted two minutes.
+    // Dropped web seeds start again once the stall has lasted two minutes; with a peer connected,
+    // peers are revived only every five.
     assertEquals(setOf(StallRecovery.RELAUNCH_WEB_SEEDS),
-      runTo(121_000) { signals(droppedWebSeeds = 1) })
+      runTo(121_000) { signals(peers = 1, droppedWebSeeds = 1) })
     // The next reannounce waits five minutes, the one after it ten.
     val reannounces = mutableListOf<Long>()
     while (now < 1_000_000) {
@@ -255,6 +256,18 @@ class TorrentStallWatchdogTest {
       if (StallRecovery.REANNOUNCE in watchdog.check(signals())) reannounces += now
     }
     assertEquals(listOf(360_000L, 960_000L), reannounces)
+  }
+
+  @Test
+  fun withoutPeers_peersAreRevivedEveryMinute() {
+    val revives = mutableListOf<Long>()
+    while (now < 600_000) {
+      now += 1_000
+      // No peer for five minutes, then two that choke us.
+      val peers = if (now < 300_000) 0 else 2
+      if (StallRecovery.REVIVE_PEERS in watchdog.check(signals(peers = peers))) revives += now
+    }
+    assertEquals(listOf(60_000L, 120_000L, 180_000L, 240_000L, 540_000L), revives)
   }
 
   @Test

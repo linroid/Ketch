@@ -622,6 +622,13 @@ This section describes the engine's protocol behavior for people who debug swarm
   both hashes looks for peers under each, as a hybrid's peers may announce only one. The download
   that follows dials the peers that sent the metadata first, rather than waiting for trackers and
   the DHT to name them again.
+- **Dialing again**: while a torrent downloads, a peer that refuses or drops is dialed again 5, 15
+  and 30 seconds later, then after one, two and five minutes, and every five minutes from then on.
+  One that never sent data is given up after four dials in a row, until a source names it again
+  five minutes later; one that sent data is never given up, so a peer that restarts is reached
+  again, and a tracker, the DHT, peer exchange or local discovery naming it again has it dialed
+  30 seconds after its last dial. A stalled download with no peer at all dials every peer it knows
+  again every minute. A seeding torrent dials nobody back.
 
 ### Encryption details
 

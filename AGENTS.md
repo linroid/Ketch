@@ -807,6 +807,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   router's while it maps our port, and the one the DHT voted (behind a second NAT the router's
   is private); an IPv4-mapped IPv6 peer (`::ffff:a.b.c.d`) is read as the
   IPv4 one (`numericHost`), so no peer is dialed under two hosts
+- Dialing again (`PeerRedial`, in `TorrentSwarm` and `TorrentV2Candidates`): while a torrent
+  downloads, an endpoint whose dial failed or whose connection closed is dialed again after 5, 15
+  and 30 s, then 1, 2 and 5 minutes, and every 5 minutes on. One that never brought payload is
+  retried `RETRIES` (3) times, then given up until found again 5 minutes later or revived; one
+  that brought payload is never given up, its count starting over with each connection that
+  brings payload, and a source naming it again has it dialed `FOUND_AGAIN_MS` (30 s) after its
+  last dial. A revive dials every waiting or given-up endpoint at once and keeps its count; a
+  stall without a single peer revives every minute (`LONELY_REVIVE_MS`), others every five. A
+  complete swarm dials nobody back
 - Port mapping, `TorrentConfig.portMapping` (on; only engines whose `KotlinTorrentEngine`
   `portMapping` argument allows it, as `TorrentDownloadSource` always does, map ports, so engines
   built directly in tests never reach the router): `TorrentPortMapper` maps through every NAT

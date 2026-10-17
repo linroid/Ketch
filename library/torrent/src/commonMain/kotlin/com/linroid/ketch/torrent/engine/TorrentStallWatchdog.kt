@@ -93,7 +93,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var checkedAt = progressAt
   private var reannounceAt = Long.MIN_VALUE
   private var reannounceEveryMs = REANNOUNCE_MS
-  private var reviveAt = Long.MIN_VALUE
+  private var revivedAt: Long? = null
   private var relaunchAt = Long.MIN_VALUE
   // When a peer or web seed was last connected, and what was missing then.
   private var sourcedAt = Long.MIN_VALUE / 2
@@ -188,9 +188,11 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
         reannounceAt = now + reannounceEveryMs
         reannounceEveryMs = minOf(reannounceEveryMs * 2, MAX_REANNOUNCE_MS)
       }
-      if (now >= reviveAt) {
+      // Without a single peer, nothing is lost by dialing every known one again soon.
+      val reviveEvery = if (signals.peers == 0) LONELY_REVIVE_MS else REVIVE_MS
+      if (revivedAt.let { it == null || now - it >= reviveEvery }) {
         due += StallRecovery.REVIVE_PEERS
-        reviveAt = now + REVIVE_MS
+        revivedAt = now
       }
     }
     if (signals.droppedWebSeeds > 0 && lasted >= RELAUNCH_AFTER_MS && now >= relaunchAt) {
@@ -283,8 +285,9 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     const val REANNOUNCE_MS = 300_000L
     private const val MAX_REANNOUNCE_MS = 1_800_000L
 
-    /** How often peers given up on are dialed again. */
+    /** How often peers given up on are dialed again; every [LONELY_REVIVE_MS] without a peer. */
     const val REVIVE_MS = 300_000L
+    const val LONELY_REVIVE_MS = 60_000L
 
     /** How long a stall lasts before dropped web seeds start again, and how often they do. */
     const val RELAUNCH_AFTER_MS = 120_000L
