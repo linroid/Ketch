@@ -75,7 +75,10 @@ internal class TorrentV2Candidates(
     var dialedAt = 0L
     /** When a connection to it, dialed or learned, last came up. */
     var connectedAt = 0L
-    /** When a source naming it again last brought its dial forward. */
+    /**
+     * When a source naming it again last brought its dial forward; forgotten once a connection
+     * to it counts as its first dial.
+     */
     var broughtForwardAt: Long? = null
     /** A source named it again while it was being dialed; applied should the dial fail. */
     var namedWhileDialing = false
@@ -222,8 +225,12 @@ internal class TorrentV2Candidates(
     if (delivered) entry.delivered = true
     val lasted = entry.status == Status.CONNECTED &&
       nowMs() - entry.connectedAt >= PeerRedial.LASTING_MS
-    // Its dials start over: the connection counts as the first of them.
-    if (delivered || lasted) entry.attempts = 1
+    // Its dials start over: the connection counts as the first of them. It was back, so a source
+    // naming it again may bring its dial forward at once.
+    if (delivered || lasted) {
+      entry.attempts = 1
+      entry.broughtForwardAt = null
+    }
     retry(entry, complete)
   }
 
@@ -271,6 +278,7 @@ internal class TorrentV2Candidates(
     }
     entry.delivered = true
     entry.attempts = 1
+    entry.broughtForwardAt = null
     retry(entry, complete = false)
   }
 

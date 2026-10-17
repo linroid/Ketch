@@ -53,10 +53,11 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentSwarmRedialTest {
-  private val pieces = listOf(byteArrayOf(1, 2, 3, 4), byteArrayOf(5, 6, 7, 8))
+  private val pieces = listOf(byteArrayOf(1, 2, 3, 4), byteArrayOf(5, 6, 7, 8),
+    byteArrayOf(9, 10, 11, 12))
   private val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
-    "name" to "data", "length" to 8L, "piece length" to 4L,
-    "pieces" to sha1Digest(pieces[0]) + sha1Digest(pieces[1])))))
+    "name" to "data", "length" to 12L, "piece length" to 4L,
+    "pieces" to pieces.fold(ByteArray(0)) { hashes, piece -> hashes + sha1Digest(piece) }))))
 
   @Test
   fun droppedPeer_isDialedAgainUntilItIsBack() = swarmTest { rig ->
@@ -110,7 +111,7 @@ class TorrentSwarmRedialTest {
     val connection = accepted.await()
     val wire = PeerWire(connection, metadata)
     wire.handshake(rig.peerHandshake())
-    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(2))))
+    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(pieces.size))))
     // The DHT names it while it is connected, which says nothing about whether it is back once
     // it drops five minutes later.
     rig.peers.send(rig.listener.local)
@@ -150,6 +151,36 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun droppedPeer_backAfterBeingBroughtForward_isBroughtForwardAgainOnceItDropsAgain() =
+    swarmTest { rig ->
+      rig.dialedPeerSendsAPieceAndDrops()
+      // Refused 5, 20, 50 and 110 s after it dropped. Named as it comes back, it is dialed 30 s
+      // after its last dial, and sends a piece before it restarts again.
+      rig.advanceTo(115_000)
+      rig.down.store(false)
+      val accepted = async { rig.listener.accept() }
+      rig.peers.send(rig.listener.local)
+      while (!accepted.isCompleted) rig.advanceTo(rig.clock.load() + 5_000)
+      val connection = accepted.await()
+      try {
+        serve(PeerWire(connection, metadata).also { it.handshake(rig.peerHandshake()) }, 1)
+        rig.down.store(true)
+      } finally {
+        connection.close()
+      }
+      val dropped = rig.clock.load()
+      // Refused again 5, 20, 50 and 110 s after it dropped, it would next be dialed at 230 s.
+      // Named at 120 s, under five minutes after it was brought forward, it is dialed 30 s after
+      // its last dial: the connection that bring-forward made showed it back.
+      val upAt = dropped + 120_000
+      val reached = rig.reachAgain(upAt = upAt, served = intArrayOf(2)) {
+        rig.peers.send(rig.listener.local)
+      }
+      // 20 s, and a step or two for the swarm's tick.
+      assertTrue(reached - upAt <= 45_000, "Reached ${reached - upAt} ms after it came back")
+    }
+
+  @Test
   fun droppedPeer_isGivenUpAfterTenDials() = swarmTest { rig ->
     rig.dialedPeerSendsAPieceAndDrops()
     val dropped = rig.dials.load()
@@ -179,7 +210,7 @@ class TorrentSwarmRedialTest {
     val connection = accepted.await()
     val wire = PeerWire(connection, metadata)
     wire.handshake(rig.peerHandshake())
-    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(2))))
+    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(pieces.size))))
     // It drops five minutes later. Its fourth dial would have spent its retries, but a
     // connection that lasted counts as its first dial: it is dialed again 5 s later.
     rig.advanceTo(rig.clock.load() + 300_000, step = 300_000)
@@ -192,7 +223,7 @@ class TorrentSwarmRedialTest {
       rig.advanceTo(rig.clock.load() + 5_000)
     }
     assertEquals(before + 1, rig.dials.load())
-    rig.reachAgain(upAt = rig.clock.load(), served = intArrayOf(0, 1))
+    rig.reachAgain(upAt = rig.clock.load(), served = intArrayOf(0, 1, 2))
   }
 
   @Test
@@ -234,7 +265,7 @@ class TorrentSwarmRedialTest {
     rig.awaitDials(before + 4)
     val dials = rig.dials.load() - before
     assertTrue(dials >= 4, "Dialed $dials times in the 90 s after it was found again")
-    rig.reachAgain(upAt = rig.clock.load(), step = 10_000, served = intArrayOf(0, 1))
+    rig.reachAgain(upAt = rig.clock.load(), step = 10_000, served = intArrayOf(0, 1, 2))
   }
 
   @Test
@@ -292,7 +323,7 @@ class TorrentSwarmRedialTest {
     try {
       val wire = PeerWire(connection, metadata)
       wire.handshake(rig.peerHandshake())
-      wire.send(PeerMessage.Bitfield(pieceBitfield(booleanArrayOf(true, true))))
+      wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(pieces.size) { true })))
       wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
       try {
         while (true) {
@@ -385,7 +416,7 @@ class TorrentSwarmRedialTest {
     suspend fun reachAgain(
       upAt: Long,
       step: Long = 5_000,
-      served: IntArray = intArrayOf(1),
+      served: IntArray = intArrayOf(1, 2),
       onUp: suspend () -> Unit = {},
     ): Long {
       val reached = CompletableDeferred<Long>()
@@ -427,7 +458,7 @@ class TorrentSwarmRedialTest {
 
   /** Answers as a peer that has only the [served] pieces, and sends each once asked. */
   private suspend fun serve(wire: PeerWire, vararg served: Int) {
-    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(2) { it in served })))
+    wire.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(pieces.size) { it in served })))
     wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
     var left = served.size
     while (left > 0) {
@@ -488,7 +519,7 @@ class TorrentSwarmRedialTest {
           try {
             body(rig)
             swarm.join()
-            assertContentEquals(pieces[0] + pieces[1],
+            assertContentEquals(pieces.reduce { data, piece -> data + piece },
               torrentFileSystem.read(root / "data") { readByteArray() })
           } finally {
             swarm.cancelAndJoin()

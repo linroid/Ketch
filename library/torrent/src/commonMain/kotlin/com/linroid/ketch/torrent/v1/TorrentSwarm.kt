@@ -348,10 +348,12 @@ internal class TorrentSwarm(
     }
     // A connection to the peer that listens at [endpoint], dialed there or not, ended while we
     // download: it is dialed again after its delay, or given up on. One that brought payload, over
-    // it or a connection it replaced, or that [lasted], counts as its first dial.
+    // it or a connection it replaced, or that [lasted], counts as its first dial, and a source
+    // naming the peer again may bring its dial forward at once: it was back.
     fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean, lasted: Boolean) {
       if (endpoint in faulty || endpoint !in attempts && attempts.size >= MAX_CANDIDATES) return
       if (broughtPayload) delivered += endpoint
+      if (broughtPayload || lasted) broughtForwardAt.remove(endpoint)
       val dials = if (broughtPayload || lasted) 1 else attempts[endpoint] ?: 1
       attempts[endpoint] = dials
       // Never dialed, it still starts over once given up long enough and named again.
