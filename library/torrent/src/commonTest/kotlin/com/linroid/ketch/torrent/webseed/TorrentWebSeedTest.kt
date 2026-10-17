@@ -789,6 +789,70 @@ class TorrentWebSeedTest {
     }
   }
 
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun pieceTheRunningSeedLacks_isMissingOnlyOnceTheStoppedSeedLacksItToo() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val (stale, good) = staleSet
+        val staleUrl = "http://mirror.test/pub/set/stale.bin"
+        val files = mapOf(staleUrl to stale, "http://mirror.test/pub/set/good.bin" to good)
+        // The first seed lacks stale.bin and serves good.bin, so it keeps running; the second is
+        // down, so it is dropped, and lacks stale.bin too once back. No peer connects.
+        val lacking = MirrorEngine(files - staleUrl)
+        val second = MirrorEngine(files - staleUrl)
+        val back = AtomicBoolean(false)
+        val down = Outage(second) { !back.load() }
+        val seeds = listOf("http://mirror0.test/pub/", "http://mirror1.test/pub/")
+        withStore(staleSetMetadata(seeds)) { store, _ ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>()
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirrorHosts(lacking, down)), webSeedRetryMs = 5,
+                  nowMs = { clock }, stall = stall).run(peers)
+              }
+              while (lacking.requests.none { it.first == staleUrl } ||
+                !(1..3).all { store.verifiedPieces()[it] } ||
+                down.refused < 2 + WebSeedWorker.MAX_FAILURES) {
+                delay(20)
+              }
+              delay(500)
+              // Payload stopped 40 s ago: the dropped seed may still serve stale.bin once started
+              // again, so it is not missing while the other seed runs, and the download waits for
+              // a source.
+              clock = 40_000
+              delay(500)
+              clock = 80_000
+              val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+              assertEquals(TorrentStallReason.NO_PEERS, reported.reason)
+              assertEquals(0, reported.missingPieces)
+              // Two minutes into the stall the dropped seed starts again, without stale.bin
+              // either: missing.
+              back.store(true)
+              clock = 130_000
+              while (second.requests.none { it.first == staleUrl }) delay(20)
+              delay(500)
+              clock = 131_000
+              val missing = withTimeout(5_000) {
+                stall.filterNotNull().first { it.reason == TorrentStallReason.MISSING_PIECES }
+              }
+              assertEquals(1, missing.missingPieces)
+              assertEquals(listOf("0"), missing.missingFileIds)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
   @Test
   fun corruptPieceAfterAStall_isNoProgress() = runTest {
     withContext(Dispatchers.Default) {

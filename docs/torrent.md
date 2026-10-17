@@ -795,13 +795,14 @@ next piece its full time again once none of it can still be thrown away, but onl
 until a piece verifies, so payload that comes and goes does not hide a stall. It then says why, in
 the most telling order:
 
-- **Missing pieces**: wanted pieces that no connected peer or web seed has, and the files they
-  belong to; with nothing connected, the pieces every web seed could not serve, as another one
-  may serve the rest once started again. The download waits for a peer that has them; skipping
-  those files lets the rest finish. A torrent whose files changed at its only web seed stops
-  here, also once that seed was dropped. Pieces missing while a peer was connected stay missing
-  for 10 seconds after the last one leaves, so a peer that reconnects at once does not change the
-  reason, and so do those missing when dropped web seeds start again, while they ask once more.
+- **Missing pieces**: wanted pieces that no connected peer or running web seed has and every web
+  seed that stopped could not serve, as it may serve the rest once started again, and the files
+  they belong to; with nothing connected and no web seed, none. The download waits for a peer
+  that has them; skipping those files lets the rest finish. A torrent whose files changed at its
+  only web seed stops here, also once that seed was dropped. Pieces missing while a peer was
+  connected stay missing for 10 seconds after the last one leaves, so a peer that reconnects at
+  once does not change the reason, and so do those missing when dropped web seeds start again,
+  while they ask once more.
 - **No peers**: no peer is connected, and no wanted piece is missing. A stalled download stores
   nothing from its web seeds either, so whether they are fetching or waiting to retry never
   changes the reason.

@@ -846,16 +846,16 @@ internal object TorrentV2SessionLoop {
         val published = swarm?.stall ?: return
         val stallWatchdog = watchdog ?: return
         val downloading = !complete && !seeding
-        // Some web seed may serve piece [index]: one that runs, or one that stopped without
-        // finding it could not.
-        fun unrefused(index: Int): Boolean = mirrors == null ||
-          mirrors.urls.indices.any { it !in stoppedMirrors || !mirrors.refuses(it, index) }
-        // With nothing connected, only the pieces every web seed found it could not serve are
-        // known to be missing: the rest wait for peers, or for a seed started again.
+        // Some source may still bring piece [index]: a connected peer or running web seed that
+        // has it, or a web seed that stopped without finding it could not serve it.
+        fun obtainable(index: Int): Boolean = sourced(index) ||
+          mirrors != null && stoppedMirrors.any { !mirrors.refuses(it, index) }
+        // A piece is missing once no source may bring it, so those a stopped web seed may serve
+        // wait for it to start again. With nothing connected and no web seed, nothing is known to
+        // be missing: the download waits for peers.
         val connected = peers.size + mirrorsRunning > 0
         val missing = if (!downloading || !connected && mirrors == null) null else {
-          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES,
-            if (connected) ::sourced else ::unrefused)
+          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::obtainable)
         }
         // In this order, so no web seed byte looks kept before it is (see StallSignals).
         val payload = store.receivedBytes() - payloadAtStart

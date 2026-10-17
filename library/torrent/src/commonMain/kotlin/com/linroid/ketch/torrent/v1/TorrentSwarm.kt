@@ -480,12 +480,14 @@ internal class TorrentSwarm(
       val published = stall ?: return
       val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
       val running = webSeeds.count { it.isActive }
-      // With nothing connected, only the pieces every web seed found it could not serve are
-      // known to be missing: the rest wait for peers, or for a seed started again.
-      val health = if (peers + running > 0) scheduler.health(MAX_REPORTED_MISSING_PIECES) else {
-        webSeedPieces.map { it.unservable }.reduceOrNull { refused, seed -> refused intersect seed }
-          ?.takeIf { it.isNotEmpty() }
-          ?.let { scheduler.health(MAX_REPORTED_MISSING_PIECES, among = it) }
+      // A piece no connected peer or running web seed has is missing only once every web seed
+      // that stopped found it could not serve it: the rest wait for a seed started again. With
+      // nothing connected and no web seed, nothing is known to be missing: it waits for peers.
+      val refused = webSeeds.indices.filter { !webSeeds[it].isActive }
+        .map { webSeedPieces[it].unservable }
+        .reduceOrNull { others, seed -> others intersect seed }
+      val health = if (peers + running == 0 && refused == null) null else {
+        scheduler.health(MAX_REPORTED_MISSING_PIECES, among = refused)
       }
       val files = if (health == null || health.missing.isEmpty()) emptyList() else {
         store.filesHolding(health.missing, TorrentStall.MAX_MISSING_FILES).map { it.toString() }

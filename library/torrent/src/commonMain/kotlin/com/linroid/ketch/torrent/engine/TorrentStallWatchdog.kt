@@ -9,9 +9,9 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  * @property downloading pieces are wanted and the swarm fetches them; only then can it stall.
  * @property peers peers connected now.
  * @property unchokingPeers connected peers that let us download.
- * @property missingPieces wanted pieces that no connected peer or running web seed has; with
- *   nothing connected, those every web seed found it could not serve, as the rest wait for peers
- *   or for a seed started again.
+ * @property missingPieces wanted pieces that no connected peer or running web seed has and every
+ *   web seed that stopped found it could not serve, as the rest wait for a seed started again;
+ *   none with nothing connected and no web seed, as they wait for peers.
  * @property missingFileIds the files those pieces belong to.
  * @property lateBlocks requested blocks their peer is late with.
  * @property webSeeds web seeds running now, fetching or not.
