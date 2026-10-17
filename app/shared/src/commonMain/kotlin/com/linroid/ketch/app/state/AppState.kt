@@ -640,7 +640,7 @@ class AppState(
     val embedded = instanceManager.embedded
     if (whenDownloadsFinish != null && embedded != null) {
       scope.launch {
-        whenDownloadsFinish.follow(ForegroundPolicy.observe(embedded.tasks, serverState))
+        whenDownloadsFinish.follow(ForegroundPolicy.statuses(embedded.tasks, serverState))
       }
     }
     scope.launch { announcePairingRequests() }

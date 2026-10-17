@@ -11,7 +11,10 @@ class DesktopFinishActionsTest {
 
   @Test
   fun commands_sleepAndShutDownPerSystem() {
-    assertEquals(listOf("pmset", "sleepnow"), finishCommand(DesktopOs.MAC, FinishAction.Sleep))
+    assertEquals(
+      listOf("osascript", "-e", "tell application \"System Events\" to sleep"),
+      finishCommand(DesktopOs.MAC, FinishAction.Sleep),
+    )
     assertEquals(
       listOf("systemctl", "suspend"),
       finishCommand(DesktopOs.LINUX, FinishAction.Sleep),

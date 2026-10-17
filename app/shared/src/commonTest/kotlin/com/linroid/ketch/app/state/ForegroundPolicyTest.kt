@@ -89,6 +89,22 @@ class ForegroundPolicyTest {
   }
 
   @Test
+  fun statuses_downloadWithinOneSample_reportsBusyThenIdle() = runTest {
+    val task = fakeTask(DownloadState.Queued, position = 1)
+    val emitted = mutableListOf<ForegroundStatus>()
+    backgroundScope.launch {
+      ForegroundPolicy.statuses(MutableStateFlow(listOf(task)), MutableStateFlow(stopped))
+        .collect { emitted += it }
+    }
+    runCurrent()
+    task.state.value = DownloadState.Completed("/downloads/file.iso", totalBytes = 1000)
+    task.queuePosition.value = null
+    runCurrent()
+
+    assertEquals(listOf(true, false), emitted.map { it.keepsAwake })
+  }
+
+  @Test
   fun observe_taskAddedLater_followsItsState() = runTest {
     val tasks = MutableStateFlow(emptyList<DownloadTask>())
     val emitted = observe(tasks, MutableStateFlow(stopped))

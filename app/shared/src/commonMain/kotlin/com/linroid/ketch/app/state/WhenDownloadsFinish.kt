@@ -83,6 +83,7 @@ class WhenDownloadsFinish(
 ) {
   private val log = KetchLogger("WhenDownloadsFinish")
   private var countdown: Job? = null
+  private var busy = false
   private var warning: AppMessage? = null
 
   /** The choices, [FinishAction.Nothing] first. */
@@ -113,10 +114,12 @@ class WhenDownloadsFinish(
 
   /**
    * Runs the chosen action once the latest of [statuses], those of the embedded device, goes
-   * from busy to idle; returns only when cancelled.
+   * from busy to idle; returns only when cancelled. They must not be sampled, so a download that
+   * starts and ends within a moment still counts, and one starting during the grace period puts
+   * the action off at once.
    */
   suspend fun follow(statuses: Flow<ForegroundStatus>) {
-    var busy = false
+    busy = false
     statuses.map { it.keepsAwake }.distinctUntilChanged().collect { now ->
       if (now) {
         // Downloads that start again put the action off until they finish too.
@@ -158,6 +161,8 @@ class WhenDownloadsFinish(
   }
 
   private suspend fun run(action: FinishAction) {
+    // A download that started meanwhile puts it off; its end starts the countdown again.
+    if (busy) return
     withdrawWarning()
     pending = false
     // It runs once: a computer that wakes from sleep goes on as usual.

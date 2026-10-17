@@ -178,6 +178,29 @@ class WhenDownloadsFinishTest {
   }
 
   @Test
+  fun briefDownloadDuringGrace_restartsTheCountdown() = runTest {
+    val f = fixture()
+    f.whenDone.choose(FinishAction.ShutDown)
+    f.statuses.value = busy
+    runCurrent()
+    f.statuses.value = idle
+    advanceTimeBy(59.seconds)
+    runCurrent()
+
+    f.statuses.value = busy
+    runCurrent()
+    f.statuses.value = idle
+    advanceTimeBy(30.seconds)
+    runCurrent()
+    assertEquals(emptyList(), f.actions.performed)
+    assertTrue(f.whenDone.pending)
+
+    advanceTimeBy(31.seconds)
+    runCurrent()
+    assertEquals(listOf(FinishAction.ShutDown), f.actions.performed)
+  }
+
+  @Test
   fun serverOnly_neverCountsAsDownloading() = runTest {
     val f = fixture()
     f.whenDone.choose(FinishAction.Quit)

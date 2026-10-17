@@ -1372,8 +1372,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   not in front) offers Cancel and running it at once for `GRACE` (1 minute); downloads starting
   again withdraw it until they finish too. The choice is never saved and runs once, so no later
   launch or wake shuts the computer down unasked; a failure posts an error. The desktop's
-  `DesktopFinishActions` quits through `CloseBehavior.quitWithoutAsking` and runs `pmset
-  sleepnow` and System Events' `shut down` (macOS asks once to let Ketch control it),
+  `DesktopFinishActions` quits through `CloseBehavior.quitWithoutAsking` and runs System Events'
+  `sleep` and `shut down` (macOS asks once to let Ketch control it; `pmset sleepnow` needs root),
   `SetSuspendState` and `shutdown /s` (Windows), `systemctl suspend`/`poweroff` (Linux)
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start

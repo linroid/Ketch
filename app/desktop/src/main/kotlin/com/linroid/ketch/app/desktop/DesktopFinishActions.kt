@@ -11,9 +11,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Quits Ketch, puts this computer to sleep or shuts it down once downloads finish
  * (`WhenDownloadsFinish`). Sleep and shut down ask the system as the user would, without an
- * administrator: macOS through `pmset` and System Events (which asks the user once to let Ketch
- * control it), Windows through `SetSuspendState` and `shutdown`, Linux through logind's
- * `systemctl`. Shutting down lets the system quit Ketch as it quits every app.
+ * administrator: macOS through System Events (which asks the user once to let Ketch control it;
+ * `pmset sleepnow` needs root), Windows through `SetSuspendState` and `shutdown`, Linux through
+ * logind's `systemctl`. Shutting down lets the system quit Ketch as it quits every app.
  *
  * @param os the system this runs on.
  * @param quit quits Ketch without asking, as installing an update does.
@@ -45,17 +45,20 @@ internal class DesktopFinishActions(
 /** The command that carries out [action] on [os], other than sleep on Windows. */
 internal fun finishCommand(os: DesktopOs, action: FinishAction): List<String> = when (action) {
   FinishAction.Sleep -> when (os) {
-    DesktopOs.MAC -> listOf("pmset", "sleepnow")
+    DesktopOs.MAC -> systemEvents("sleep")
     DesktopOs.WINDOWS -> error("Windows sleeps through SetSuspendState")
     DesktopOs.LINUX -> listOf("systemctl", "suspend")
   }
   FinishAction.ShutDown -> when (os) {
-    DesktopOs.MAC -> listOf("osascript", "-e", "tell application \"System Events\" to shut down")
+    DesktopOs.MAC -> systemEvents("shut down")
     DesktopOs.WINDOWS -> listOf("shutdown", "/s", "/t", "0")
     DesktopOs.LINUX -> listOf("systemctl", "poweroff")
   }
   FinishAction.Nothing, FinishAction.Quit -> error("$action runs no command")
 }
+
+private fun systemEvents(command: String) =
+  listOf("osascript", "-e", "tell application \"System Events\" to $command")
 
 /**
  * `SetSuspendState(FALSE, FALSE, FALSE)`: sleep rather than hibernate, letting applications
