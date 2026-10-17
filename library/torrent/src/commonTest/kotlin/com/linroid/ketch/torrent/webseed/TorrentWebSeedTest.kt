@@ -17,7 +17,9 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.TorrentConnection
 import com.linroid.ketch.torrent.net.TorrentHttp
+import com.linroid.ketch.torrent.net.TorrentListener
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.peer.PeerHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
@@ -717,6 +719,101 @@ class TorrentWebSeedTest {
               swarm.cancel()
             }
           } finally {
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
+  @OptIn(ExperimentalAtomicApi::class)
+  @Test
+  fun peerConnectingAfterARelaunch_clearsWhatWasMissingThoughAnotherLeft() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val goodUrl = "http://mirror.test/pub/set/good.bin"
+        // The only web seed lacks stale.bin, the one file wanted, and once started again its
+        // request waits.
+        val lacking = MirrorEngine(mapOf(goodUrl to staleSet.second))
+        val holding = AtomicBoolean(false)
+        val asked = CompletableDeferred<Unit>()
+        val mirror = object : HttpEngine by lacking {
+          override suspend fun download(
+            url: String,
+            range: LongRange?,
+            headers: Map<String, String>,
+            onData: suspend (ByteArray) -> Unit,
+          ) {
+            if (!holding.load()) return lacking.download(url, range, headers, onData)
+            asked.complete(Unit)
+            awaitCancellation()
+          }
+        }
+        withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
+          val network = createTorrentNetwork()
+          val first = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val second = network.listen(PeerEndpoint("127.0.0.1", 0))
+          val peers = Channel<PeerEndpoint>(1)
+          // Steps the clock a second at a time until the stall says [done].
+          suspend fun awaitStall(done: (TorrentStall) -> Boolean): TorrentStall {
+            while (true) {
+              stall.value?.takeIf(done)?.let { return it }
+              clock += 1_000
+              delay(200)
+            }
+          }
+          // Connects as a peer holding [held] that never unchokes.
+          suspend fun connect(
+            listener: TorrentListener,
+            held: BooleanArray,
+          ): TorrentConnection {
+            peers.send(listener.local)
+            val connection = listener.accept()
+            val wire = PeerWire(connection, store.metadata)
+            wire.handshake(PeerHandshake(store.metadata.infoHash, torrentRandomBytes(20),
+              extensions = false, dht = false))
+            wire.send(PeerMessage.Bitfield(pieceBitfield(held)))
+            return connection
+          }
+          try {
+            coroutineScope {
+              val swarm = launch {
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              while (lacking.requests.isEmpty()) delay(20)
+              delay(500)
+              // Late into the stall a peer with good.bin alone connects: stale.bin is missing.
+              clock = 100_000
+              val leaving = connect(first, booleanArrayOf(false, true, true, true))
+              val missing = awaitStall { it.peers == 1 }
+              assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
+              assertEquals(1, missing.missingPieces)
+              // Two minutes into the stall the seed starts again, and asks once more.
+              holding.store(true)
+              clock = 130_000
+              asked.await()
+              // The peer leaves, and one with stale.bin connects: as many peers as at the restart,
+              // one of them new, which has its say at once.
+              leaving.close()
+              first.close()
+              awaitStall { it.peers == 0 }
+              val staying = connect(second, booleanArrayOf(true, true, true, true))
+              try {
+                val heard = awaitStall { it.peers == 1 }
+                assertEquals(TorrentStallReason.CHOKED, heard.reason)
+                assertEquals(0, heard.missingPieces)
+                swarm.cancel()
+              } finally {
+                staying.close()
+              }
+            }
+          } finally {
+            first.close()
+            second.close()
             network.close()
           }
         }

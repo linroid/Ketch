@@ -784,8 +784,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   peer or running web seed has and every stopped one could not serve, one dropped again once
   started again without verifying or refusing a piece aside, and their files, kept 10 s after the
   last source leaves, and once dropped web seeds start again while one of them runs without having
-  verified or refused a piece (`StallSignals.unprovenWebSeeds`, 10 s to 10 minutes), unless more
-  peers connect; no peers, all choking, whatever web seeds do; slow peers) the session publishes
+  verified or refused a piece (`StallSignals.unprovenWebSeeds`, 10 s to 10 minutes), unless a peer
+  connects (`StallSignals.joinedPeers`, also while another leaves); no peers, all choking,
+  whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
   seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may
   be until its piece is stored (`WebSeedStats.unsettled`, `StallSignals`); a gap is told from any

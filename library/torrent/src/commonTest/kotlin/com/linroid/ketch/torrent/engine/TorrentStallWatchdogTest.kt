@@ -19,6 +19,7 @@ class TorrentStallWatchdogTest {
     wastedBytes: Long = 0,
     throttledMs: Long = 0,
     peers: Int = 0,
+    joinedPeers: Long = peers.toLong(),
     unchokingPeers: Int = 0,
     missingPieces: Int = 0,
     missingFileIds: List<String> = emptyList(),
@@ -27,9 +28,9 @@ class TorrentStallWatchdogTest {
     droppedWebSeeds: Int = 0,
     unprovenWebSeeds: Int = 0,
     downloading: Boolean = true,
-  ) = StallSignals(downloading, peers, unchokingPeers, missingPieces, missingFileIds, lateBlocks,
-    webSeeds, droppedWebSeeds, unprovenWebSeeds, payloadBytes, unsettledBytes, wastedBytes,
-    throttledMs, pieceLength = 262_144)
+  ) = StallSignals(downloading, peers, joinedPeers, unchokingPeers, missingPieces, missingFileIds,
+    lateBlocks, webSeeds, droppedWebSeeds, unprovenWebSeeds, payloadBytes, unsettledBytes,
+    wastedBytes, throttledMs, pieceLength = 262_144)
 
   /** Checks once a second up to [until], as a swarm does. */
   private fun runTo(until: Long, signals: (Long) -> StallSignals): Set<StallRecovery> {
@@ -301,6 +302,24 @@ class TorrentStallWatchdogTest {
     assertEquals(TorrentStallReason.CHOKED, stall.reason)
     assertEquals(0, stall.missingPieces)
     assertEquals(emptyList(), stall.missingFileIds)
+  }
+
+  @Test
+  fun peerConnectingAfterARelaunch_isHeardThoughAnotherLeft() {
+    // Two connected peers lack two pieces, as did every web seed, which was dropped.
+    val due = runTo(121_000) {
+      signals(peers = 2, missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
+    }
+    assertTrue(StallRecovery.RELAUNCH_WEB_SEEDS in due)
+    runTo(122_000) { signals(peers = 2, webSeeds = 1, unprovenWebSeeds = 1) }
+    assertEquals(TorrentStallReason.MISSING_PIECES, watchdog.stall?.reason)
+    // One leaves and a third, with those pieces, connects: as many peers as before, one of them
+    // new, and nothing is missing now.
+    runTo(123_000) { signals(peers = 2, joinedPeers = 3, webSeeds = 1, unprovenWebSeeds = 1) }
+    val stall = assertNotNull(watchdog.stall)
+    assertEquals(TorrentStallReason.CHOKED, stall.reason)
+    assertEquals(0, stall.missingPieces)
+    assertEquals(2, stall.peers)
   }
 
   @Test

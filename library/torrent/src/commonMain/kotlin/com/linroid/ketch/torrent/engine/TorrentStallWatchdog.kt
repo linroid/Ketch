@@ -8,6 +8,8 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
  *
  * @property downloading pieces are wanted and the swarm fetches them; only then can it stall.
  * @property peers peers connected now.
+ * @property joinedPeers peers that completed their handshake so far, those gone since included: a
+ *   peer that connects raises it, also while another leaves.
  * @property unchokingPeers connected peers that let us download.
  * @property missingPieces wanted pieces that no connected peer or running web seed has and every
  *   web seed that stopped found it could not serve, as the rest wait for a seed started again;
@@ -34,6 +36,7 @@ import com.linroid.ketch.torrent.api.TorrentStallReason
 internal data class StallSignals(
   val downloading: Boolean,
   val peers: Int,
+  val joinedPeers: Long,
   val unchokingPeers: Int,
   val missingPieces: Int,
   val missingFileIds: List<String>,
@@ -76,7 +79,7 @@ internal enum class StallRecovery {
  * once the last one goes, so a peer that reconnects at once does not flip the reason, and those
  * missing when dropped web seeds start again stay missing while a seed started again runs without
  * having verified or refused a piece (at least [SOURCE_GRACE_MS], at most [RELAUNCH_MS]), as it
- * offers every piece until then, unless more peers connect meanwhile or a piece verifies. Web seeds
+ * offers every piece until then, unless a peer connects meanwhile or a piece verifies. Web seeds
  * never decide the reason otherwise: a stall stores nothing from them.
  *
  * Not thread-safe: one swarm loop calls it.
@@ -108,10 +111,10 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
   private var sourcedAt = Long.MIN_VALUE / 2
   private var sourcedMissing = 0
   private var sourcedFiles = emptyList<String>()
-  // When dropped web seeds were last started again, the peers connected and what was missing
-  // then.
+  // When dropped web seeds were last started again, the peers that had joined by then and what was
+  // missing then.
   private var relaunchedAt = Long.MIN_VALUE / 2
-  private var relaunchPeers = 0
+  private var relaunchJoined = 0L
   private var relaunchMissing = 0
   private var relaunchFiles = emptyList<String>()
 
@@ -176,7 +179,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
     val sinceRelaunch = now - relaunchedAt
     val unproven = sinceRelaunch < SOURCE_GRACE_MS || signals.unprovenWebSeeds > 0
     if (missing == 0 && sinceRelaunch < RELAUNCH_MS && unproven &&
-      signals.peers <= relaunchPeers) {
+      signals.joinedPeers == relaunchJoined) {
       missing = relaunchMissing
       missingFiles = relaunchFiles
     }
@@ -229,7 +232,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
       due += StallRecovery.RELAUNCH_WEB_SEEDS
       relaunchAt = now + RELAUNCH_MS
       relaunchedAt = now
-      relaunchPeers = signals.peers
+      relaunchJoined = signals.joinedPeers
       relaunchMissing = missing
       relaunchFiles = missingFiles
     }
@@ -332,7 +335,7 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
 
     /**
      * How long pieces missing while something was connected stay missing once nothing is, and the
-     * least they do once dropped web seeds start again and no more peers connect.
+     * least they do once dropped web seeds start again and no peer connects.
      */
     const val SOURCE_GRACE_MS = 10_000L
 

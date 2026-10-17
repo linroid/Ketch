@@ -20,6 +20,7 @@ import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.monotonicClock
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentHttp
+import com.linroid.ketch.torrent.net.TorrentListener
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
@@ -490,6 +491,87 @@ class TorrentV2WebSeedTest {
       // The mirror has it now: the download finishes.
       answer.complete(Unit)
       run.session.downloadedBytes.first { it == 20_000L }
+    }
+  }
+
+  @Test
+  fun peerConnectingAfterARelaunch_clearsWhatWasMissingThoughAnotherLeft() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    // The only web seed lacks bad.bin, the one file wanted, and once started again its request
+    // waits.
+    val lacking = MirrorEngine(mapOf("http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
+    val holding = AtomicBoolean(false)
+    val asked = CompletableDeferred<Unit>()
+    val mirror = object : HttpEngine by lacking {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        if (!holding.load()) return lacking.download(url, range, headers, onData)
+        asked.complete(Unit)
+        awaitCancellation()
+      }
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      val network = createTorrentNetwork()
+      val first = network.listen(PeerEndpoint("127.0.0.1", 0))
+      val second = network.listen(PeerEndpoint("127.0.0.1", 0))
+      try {
+        coroutineScope {
+          // A peer with [bitfield] (bad.bin is piece 0, good.bin pieces 1 and 2) that never
+          // unchokes, until [leave] completes.
+          fun peer(
+            listener: TorrentListener,
+            id: Byte,
+            bitfield: Byte,
+            leave: CompletableDeferred<Unit>,
+          ) = launch {
+            val connection = listener.accept()
+            try {
+              PeerIdentityHandshake(fixture.document.identity).respond(connection,
+                ByteArray(20) { id }.toByteString(), TorrentBufferBudget(1024 * 1024))
+              PeerWire(connection, pieceCount = 3).send(PeerMessage.Bitfield(byteArrayOf(bitfield)))
+              leave.await()
+            } finally {
+              connection.close()
+            }
+          }
+          while (lacking.requests.none { it.first == bad }) delay(10)
+          delay(2_000)
+          // A peer with good.bin alone connects; nothing arrives for 40 s: bad.bin is missing.
+          val leave = CompletableDeferred<Unit>()
+          peer(first, 2, 0x60, leave)
+          run.sink.offer(first.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          run.skip(40_000)
+          val missing = assertNotNull(run.session.stall.first { it?.peers == 1 })
+          assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
+          // Two minutes into the stall the seed starts again, and asks once more.
+          holding.store(true)
+          run.skip(90_000)
+          asked.await()
+          // The peer leaves, and one with bad.bin connects: as many peers as at the restart, one
+          // of them new, which has its say at once.
+          leave.complete(Unit)
+          first.close()
+          run.session.stall.first { it?.peers == 0 }
+          val stay = CompletableDeferred<Unit>()
+          peer(second, 3, 0xE0.toByte(), stay)
+          run.sink.offer(second.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          val heard = assertNotNull(run.session.stall.first { it?.peers == 1 })
+          assertEquals(TorrentStallReason.CHOKED, heard.reason)
+          assertEquals(0, heard.missingPieces)
+          stay.complete(Unit)
+        }
+      } finally {
+        first.close()
+        second.close()
+        network.close()
+      }
     }
   }
 

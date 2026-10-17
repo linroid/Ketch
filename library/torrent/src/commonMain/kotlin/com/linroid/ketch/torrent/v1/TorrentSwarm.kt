@@ -213,6 +213,8 @@ internal class TorrentSwarm(
   private val connectedMutex = Mutex()
   // Guarded by connectedMutex. Each worker publishes only its own contact.
   private val connected = mutableMapOf<Int, PexContact>()
+  // Peers ever added to [connected], guarded like it: the stall check sees arrivals in churn.
+  private var joinedPeers = 0L
   // Connected peers that unchoke us, guarded like [connected].
   private val unchoking = mutableSetOf<Int>()
   // The one connection kept to each peer, guarded like [connected].
@@ -488,7 +490,9 @@ internal class TorrentSwarm(
     }
     suspend fun checkStall() {
       val published = stall ?: return
-      val (peers, unchoked) = connectedMutex.withLock { connected.size to unchoking.size }
+      val (peers, unchoked, joined) = connectedMutex.withLock {
+        Triple(connected.size, unchoking.size, joinedPeers)
+      }
       val running = webSeeds.count { it.isActive }
       // Seeds started again that have yet to show whether their mirror is back.
       val unproven = webSeeds.indices.count { webSeeds[it].isActive && webSeedWorkers[it].unproven }
@@ -511,7 +515,7 @@ internal class TorrentSwarm(
       val unsettled = webSeedStats.unsettled.load()
       val wasted = webSeedStats.wasted.load()
       val due = watchdog.check(StallSignals(
-        downloading = !complete, peers = peers, unchokingPeers = unchoked,
+        downloading = !complete, peers = peers, joinedPeers = joined, unchokingPeers = unchoked,
         missingPieces = health?.missingCount ?: 0, missingFileIds = files,
         lateBlocks = health?.lateBlocks ?: 0, webSeeds = running,
         droppedWebSeeds = webSeeds.size - running, unprovenWebSeeds = unproven,
@@ -1079,7 +1083,9 @@ internal class TorrentSwarm(
     private suspend fun publishContact() {
       val contact = PexContact(listen, pexFlags(reachedOutgoing = !incoming, connection,
         extensions), fast)
-      connectedMutex.withLock { connected[id] = contact }
+      connectedMutex.withLock {
+        if (connected.put(id, contact) == null) joinedPeers++
+      }
     }
 
     private suspend fun receive(message: PeerMessage) {

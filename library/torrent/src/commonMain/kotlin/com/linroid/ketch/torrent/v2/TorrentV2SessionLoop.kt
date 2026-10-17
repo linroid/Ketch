@@ -315,6 +315,8 @@ internal object TorrentV2SessionLoop {
       val cancels = ArrayDeque<TorrentV2PieceScheduler.Cancel>()
       // Notices a download that stopped making progress, says why and recovers ([checkStall]).
       val watchdog = swarm?.stall?.let { TorrentStallWatchdog(nowMs) }
+      // Peers that ever became ready, for it: it sees arrivals while others leave.
+      var joinedPeers = 0L
       val payloadAtStart = store.receivedBytes()
       // Time requests waited on speed limits, which is never a stall.
       var throttledMs = 0L
@@ -869,6 +871,7 @@ internal object TorrentV2SessionLoop {
         val due = stallWatchdog.check(StallSignals(
           downloading = downloading,
           peers = peers.size,
+          joinedPeers = joinedPeers,
           unchokingPeers = peers.values.count { !it.choked },
           missingPieces = missing?.count ?: 0,
           missingFileIds = missing?.fileIds.orEmpty(),
@@ -1193,6 +1196,7 @@ internal object TorrentV2SessionLoop {
                   val view = TorrentV2PeerView(peerEvent.commands, info, viewLease, nowMs,
                     traffic, layout.pieceLength)
                   peers[peerEvent.peer] = view
+                  joinedPeers++
                   if (uploads != null) {
                     // Our extension handshake comes first, then what we have.
                     val greeted = extensions?.ready(view) ?: true
