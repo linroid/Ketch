@@ -722,11 +722,15 @@ class Ketch(
         shown?.let { (previous, planned) -> handle.mutableState.compareAndSet(planned, previous) }
         throw e
       }
-      command?.afterSave()
       // Whether or not the task ran when it was planned: the queue may have started it since, its
-      // execution built from the request it had then.
-      coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes).also {
-        delivered = it == SelectionDelivery.DELIVERED
+      // execution built from the request it had then. Once saved, the selection reaches it also
+      // when the caller is cancelled, as while it waits for the coordinator, which every task
+      // shares: the execution would download the files it had and complete at their size.
+      withContext(NonCancellable) {
+        command?.afterSave()
+        coordinator.deliverSelection(taskId, plan.fileIds, plan.totalBytes).also {
+          delivered = it == SelectionDelivery.DELIVERED
+        }
       }
     }
     when {

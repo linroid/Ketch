@@ -685,6 +685,49 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_cancelledWhileTheCoordinatorIsBusy_deliversTheSavedSelection() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0", "1"))
+      val other = ketch.download(request("0"))
+      runCurrent()
+      val run = source.runs.value.single { it.context.taskId == task.taskId }
+      // Another task's pause holds the coordinator, which every task shares, while it saves.
+      val pausing = CompletableDeferred<Unit>()
+      val paused = CompletableDeferred<Unit>()
+      store.onSave = { record ->
+        if (record.taskId == other.taskId && record.state == TaskState.PAUSED) {
+          pausing.complete(Unit)
+          paused.await()
+        } else if (record.request.selectedFileIds.size == 3 && !pausing.isCompleted) {
+          launch { other.pause() }
+          pausing.await()
+        }
+      }
+      val selecting = launch { task.selectFiles(setOf("0", "1", "2")) }
+      runCurrent()
+      // Saved, the selection waits for the coordinator to deliver it, and its caller goes away.
+      assertEquals(setOf("0", "1", "2"), task.request.selectedFileIds)
+      assertTrue(run.applied.isEmpty())
+      selecting.cancel()
+      runCurrent()
+
+      paused.complete(Unit)
+      runCurrent()
+
+      assertEquals(setOf("0", "1", "2"), run.applied.single().fileIds)
+      store.onSave = {}
+      run.finish.complete(Unit)
+      runCurrent()
+      assertEquals(600, assertIs<DownloadState.Completed>(task.state.value).totalBytes)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun periodicSave_concurrentSelection_neverRevertsTheRequest() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()
