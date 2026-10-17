@@ -181,6 +181,8 @@ class TorrentDownloadSource(
   )
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
+  // Set by the first close(), which closes http.
+  private val released = AtomicBoolean(false)
   private val engineMutex = Mutex()
   private val tasks = TorrentSessionRegistry()
   private val slots = TorrentActiveSlots(config.maxActiveTorrents)
@@ -355,13 +357,29 @@ class TorrentDownloadSource(
     } catch (e: Throwable) { created.close(); throw e }
   }
 
+  /**
+   * Stops the engine and returns once it has: its sessions, such as seeding ones, close and
+   * announce that they stopped while the HTTP engine still runs. No engine starts after it.
+   */
+  override suspend fun stop() {
+    shutDown()
+    // Taken under the mutex, so an engine that was starting is stopped too.
+    engineMutex.withLock { engine.exchange(null) }?.stop()
+  }
+
   override fun close() {
+    shutDown()
+    // Not awaited: an engine stop() already took is gone.
+    engine.exchange(null)?.close()
+    if (released.compareAndSet(false, true) && httpDelegate.isInitialized()) http.close()
+  }
+
+  /** Refuses new engines and work, and cancels the seed watchers; once. */
+  private fun shutDown() {
     if (closed.compareAndSet(false, true)) {
       slots.close()
       scope.cancel()
       seeding.value = emptySet()
-      engine.exchange(null)?.close()
-      if (httpDelegate.isInitialized()) http.close()
     }
   }
 

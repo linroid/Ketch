@@ -859,20 +859,37 @@ private class AppResources(
   private var closed = false
 
   fun close() {
-    if (closed) return
+    if (!closeApp()) return
+    controller.instanceManager.close()
+    launch.singleInstance.close()
+  }
+
+  /**
+   * Closes them as [close] does, and waits a few seconds for the engine to stop, as the app
+   * exits next: downloads save their progress and torrents tell their trackers they stopped.
+   */
+  suspend fun shutdown() {
+    if (!closeApp()) return
+    controller.instanceManager.shutdown()
+    launch.singleInstance.close()
+  }
+
+  // What comes before the engine; false when it is closed already.
+  private fun closeApp(): Boolean {
+    if (closed) return false
     closed = true
     controller.close()
     localSpeed.close()
     launch.localApiServer.close()
-    controller.instanceManager.close()
-    launch.singleInstance.close()
+    return true
   }
 }
 
 /**
  * Quits on the main thread: waits for the pending operations behind Undo, such as removals, to
- * commit, closes the engine, waits for [history] to save the Discover sessions the controller
- * stopped, then exits, through [response] when macOS asked to quit.
+ * commit, stops the engine and waits for its downloads to save their progress, waits for
+ * [history] to save the Discover sessions the controller stopped, then exits, through [response]
+ * when macOS asked to quit.
  */
 private suspend fun quit(
   controller: AppController,
@@ -885,7 +902,7 @@ private suspend fun quit(
     controller.state.pendingOps.flush().join()
   }
   if (committed == null) log.w { "Quitting before every pending operation committed" }
-  resources.close()
+  resources.shutdown()
   val saved = withTimeoutOrNull(QUIT_COMMIT_TIMEOUT) { history.close() }
   if (saved == null) log.w { "Quitting before the Discover history was saved" }
   if (response != null) response.performQuit() else exit()

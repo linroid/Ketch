@@ -246,6 +246,7 @@ interface DownloadSource<S : Any> {
   val managesOwnFileIo: Boolean get() = false        // true: the source writes its own files
   suspend fun planSelection(request: SelectionRequest<S>): SelectionPlan // sources with files
   fun attach(host: SourceHost): SourceExtension? = null // controllers and lifecycle hooks
+  suspend fun stop() {}                              // stops what outlived the downloads
   fun close() {}
 }
 ```
@@ -271,6 +272,10 @@ interface DownloadSource<S : Any> {
    is usually `null`, so ask the server again if you need fresh details.
 7. **Removing.** `cleanup(context, state, deleteFiles)` runs after the download stopped. The
    default deletes the file Ketch opened, which suits a source that writes one file.
+8. **Closing.** When Ketch closes, it pauses every download as in step 5. Once they have
+   stopped, it calls `stop()`, where a source stops what outlived its downloads and returns once
+   it has (the torrent source stops seeding and its sessions announce `stopped`), while the
+   `HttpEngine` still works. Only then does it call `close()` and close the `HttpEngine`.
 
 ### Example: files behind your app's API
 

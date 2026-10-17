@@ -855,6 +855,8 @@ public abstract interface class com/linroid/ketch/api/KetchApi {
 	public fun networkInterfaces (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun resolve (Lcom/linroid/ketch/api/ResolveInput;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun selectNetworkInterfaces (Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun shutdown-VtjQ1oo (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun shutdown-VtjQ1oo$default (Lcom/linroid/ketch/api/KetchApi;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun start (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun status (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun subscribe-HG0u8IE (Lcom/linroid/ketch/api/Interest;J)Lkotlinx/coroutines/flow/Flow;
@@ -871,6 +873,8 @@ public final class com/linroid/ketch/api/KetchApi$DefaultImpls {
 	public static fun controller (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/ControlKey;)Ljava/lang/Object;
 	public static fun networkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun selectNetworkInterfaces (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/NetworkInterfaceConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun shutdown-VtjQ1oo (Lcom/linroid/ketch/api/KetchApi;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun shutdown-VtjQ1oo$default (Lcom/linroid/ketch/api/KetchApi;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun subscribe-HG0u8IE$default (Lcom/linroid/ketch/api/KetchApi;Lcom/linroid/ketch/api/Interest;JILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 }
 

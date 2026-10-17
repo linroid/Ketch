@@ -233,7 +233,7 @@ private fun runDownload(args: DownloadArgs.Download) {
       }
     )
 
-    ketch.close()
+    ketch.shutdown()
   }
 }
 
@@ -590,7 +590,9 @@ private fun runServer(args: Array<String>): Int {
   Runtime.getRuntime().addShutdownHook(Thread {
     println("Shutting down Ketch server...")
     server.stop()
-    ketch.close()
+    // The process exits once this returns: downloads save where they stopped and torrents tell
+    // their trackers before the HTTP engine closes.
+    runBlocking { ketch.shutdown() }
     hooks?.close()
     instance.close()
   })
@@ -1167,7 +1169,7 @@ private fun runStandaloneMcp(
 
   Runtime.getRuntime().addShutdownHook(Thread {
     apiServer.stop()
-    ketch.close()
+    runBlocking { ketch.shutdown() }
     hooks?.close()
     instance.close()
   })

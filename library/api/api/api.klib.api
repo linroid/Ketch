@@ -309,6 +309,7 @@ abstract interface com.linroid.ketch.api/KetchApi { // com.linroid.ketch.api/Ket
     open fun <#A1: kotlin/Any> controller(com.linroid.ketch.api/ControlKey<#A1>): #A1? // com.linroid.ketch.api/KetchApi.controller|controller(com.linroid.ketch.api.ControlKey<0:0>){0§<kotlin.Any>}[0]
     open suspend fun networkInterfaces(): com.linroid.ketch.api/NetworkInterfaces // com.linroid.ketch.api/KetchApi.networkInterfaces|networkInterfaces(){}[0]
     open suspend fun selectNetworkInterfaces(com.linroid.ketch.api/NetworkInterfaceConfig): com.linroid.ketch.api/NetworkInterfaces // com.linroid.ketch.api/KetchApi.selectNetworkInterfaces|selectNetworkInterfaces(com.linroid.ketch.api.NetworkInterfaceConfig){}[0]
+    open suspend fun shutdown(kotlin.time/Duration = ...) // com.linroid.ketch.api/KetchApi.shutdown|shutdown(kotlin.time.Duration){}[0]
 
     final object Companion { // com.linroid.ketch.api/KetchApi.Companion|null[0]
         final val REVISION // com.linroid.ketch.api/KetchApi.Companion.REVISION|{}REVISION[0]

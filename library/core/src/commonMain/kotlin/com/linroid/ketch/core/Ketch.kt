@@ -70,6 +70,7 @@ import com.linroid.ketch.core.task.TaskStore
 import com.linroid.ketch.core.task.awaitsFileSelection
 import com.linroid.ketch.core.task.savedProgress
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +98,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -158,6 +160,12 @@ class Ketch(
 
   /** Set once [start] started the sources' extensions. */
   private val extensionsStarted = AtomicBoolean(false)
+
+  /** Set by the first [close]. */
+  private val closing = AtomicBoolean(false)
+
+  /** Completes once [close] released the sources and the [HttpEngine]. */
+  private val released = CompletableDeferred<Unit>()
 
   private val features: Set<String> = buildSet {
     add(KetchFeatures.AUTO_CONNECTIONS)
@@ -1084,31 +1092,63 @@ class Ketch(
   }.distinctUntilChanged()
 
   /**
-   * Stops every task and releases the engine, then closes [dispatchers] once its coroutines have
-   * finished; [KetchDispatchers.Default] stays open for every other instance.
+   * Stops every task, pausing running ones for [PauseReason.Shutdown], and releases the engine
+   * in the background, in order: once the downloads finished stopping, with their final
+   * checkpoints saved, it [stops][DownloadSource.stop] the sources, then closes them and the
+   * [HttpEngine], and closes [dispatchers] once its coroutines have finished;
+   * [KetchDispatchers.Default] stays open for every other instance. [shutdown] waits for it.
    */
   override fun close() {
+    if (!closing.compareAndSet(false, true)) return
     log.i { "Closing Ketch" }
     val executions = coordinator.close()
     connectionRegistry.closeAll()
     scope.cancel()
-    sourceResolver.close()
-    httpEngine.close()
-    if (!dispatchers.isDefault) {
-      closeDispatchersAfter(listOf(scope.coroutineContext.job, executions))
-    }
+    release(executions)
   }
 
   /**
-   * Closes [dispatchers] once [jobs] have finished: cancelled coroutines still complete on their
-   * dispatcher, and a closed pool throws when they do. Waits on [Dispatchers.Default], as a
-   * Native pool cannot close from one of its own threads.
+   * [Closes][close] this instance and waits at most [timeout] for the sources and the
+   * [HttpEngine] to be released, as a process that exits next must: until then, downloads save
+   * their final checkpoints and sources say goodbye, such as a torrent's `stopped` announces.
+   * What has not finished by then goes on in the background. [timeout] is wall-clock time,
+   * also under a test dispatcher's virtual time.
+   */
+  override suspend fun shutdown(timeout: Duration) {
+    close()
+    val stopped = withContext(Dispatchers.Default) {
+      withTimeoutOrNull(timeout) { released.await() }
+    }
+    if (stopped == null) log.w { "Ketch did not stop within $timeout; the rest goes on" }
+  }
+
+  /**
+   * Releases the sources and the [HttpEngine] once [executions] finished stopping, which still
+   * save their state and pause their tasks while cancelled, then closes [dispatchers] once every
+   * cancelled coroutine has finished: they complete on their dispatcher, and a closed pool throws
+   * when they do. Runs on [Dispatchers.Default], as a Native pool cannot close from one of its
+   * own threads.
    */
   @OptIn(DelicateCoroutinesApi::class)
-  private fun closeDispatchersAfter(jobs: List<Job>) {
+  private fun release(executions: Job) {
     GlobalScope.launch(Dispatchers.Default) {
-      jobs.joinAll()
-      dispatchers.close()
+      try {
+        executions.join()
+        // Before the HTTP engine closes, which a source may still need to stop.
+        sourceResolver.stop()
+      } finally {
+        sourceResolver.close()
+        try {
+          httpEngine.close()
+        } catch (e: Exception) {
+          log.w(e) { "Failed to close the HTTP engine" }
+        }
+        released.complete(Unit)
+      }
+      if (!dispatchers.isDefault) {
+        joinAll(scope.coroutineContext.job, executions)
+        dispatchers.close()
+      }
     }
   }
 }

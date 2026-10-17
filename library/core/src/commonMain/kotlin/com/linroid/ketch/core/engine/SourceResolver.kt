@@ -4,6 +4,9 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -20,12 +23,27 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
   private val log = KetchLogger("SourceResolver")
   private val closed = AtomicBoolean(false)
 
+  /** Each source once, though one may be registered twice. */
+  private val uniqueSources: List<DownloadSource<*>> = buildList {
+    for (source in sources) if (none { it === source }) add(source)
+  }
+
+  /** [Stops][DownloadSource.stop] every source side by side and returns once each has. */
+  suspend fun stop() = coroutineScope {
+    for (source in uniqueSources) launch {
+      try {
+        source.stop()
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w(e) { "Failed to stop source '${source.type}'" }
+      }
+    }
+  }
+
   fun close() {
     if (!closed.compareAndSet(false, true)) return
-    val uniqueSources = mutableListOf<DownloadSource<*>>()
-    for (source in sources) {
-      if (uniqueSources.any { it === source }) continue
-      uniqueSources.add(source)
+    for (source in uniqueSources) {
       try {
         source.close()
       } catch (e: Exception) {

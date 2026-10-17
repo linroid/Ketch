@@ -434,7 +434,7 @@ val task = ketch.download(
   ),
 )
 task.await().getOrThrow()
-ketch.close()
+ketch.shutdown() // waits while seeding sessions tell their trackers they stopped
 ```
 
 An empty `selectedFileIds` downloads every file. File IDs keep their index in the metainfo, so the

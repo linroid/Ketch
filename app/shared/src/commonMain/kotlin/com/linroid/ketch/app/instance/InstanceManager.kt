@@ -49,6 +49,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Manages the list of configured instances, the currently active
@@ -416,10 +417,24 @@ class InstanceManager(
 
   /** Close every instance and release all resources. */
   fun close() {
+    closeAllButEmbedded()
+    embeddedInstance?.instance?.close()
+  }
+
+  /**
+   * Closes every instance as [close] does, and waits at most [timeout] for the embedded one to
+   * stop ([KetchApi.shutdown]): its downloads save their progress and its torrents tell their
+   * trackers they stopped. For an app that quits next.
+   */
+  suspend fun shutdown(timeout: Duration = 5.seconds) {
+    closeAllButEmbedded()
+    embeddedInstance?.instance?.shutdown(timeout)
+  }
+
+  private fun closeAllButEmbedded() {
     scope.cancel()
     factory.stopServer()
     _instances.value.filterIsInstance<RemoteInstance>().forEach { it.instance.close() }
-    embeddedInstance?.instance?.close()
   }
 
   // Pauses the embedded device's uploads while it is on a metered network, if the factory says

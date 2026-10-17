@@ -388,9 +388,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
 - `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
-  `DOWNLOADING` records, so the next `start()` resumes them. It closes dispatchers it was given
-  only once the cancelled coroutines have finished (from `Dispatchers.Default`), never under
-  them, and never `KetchDispatchers.Default`, whose `close()` does nothing
+  `DOWNLOADING` records, so the next `start()` resumes them, and releases the rest in the
+  background, in order (from `Dispatchers.Default`): once the cancelled executions have finished,
+  with their final `store()` checkpoints and record writes, it awaits each source's
+  `DownloadSource.stop()` (the torrent source's stops its engine, whose sessions announce
+  `stopped`), then closes the sources and the `HttpEngine`, and closes dispatchers it was given
+  only once every cancelled coroutine has finished, never under them, and never
+  `KetchDispatchers.Default`, whose `close()` does nothing. `KetchApi.shutdown(timeout)` (5 s by
+  default; `close()` for other implementations) does the same and waits for the sources and the
+  `HttpEngine` to be released, at most `timeout`, leaving the rest to the background: `ketch
+  server`'s and `ketch mcp --standalone`'s shutdown hooks, `ketch <url>` and the desktop app's
+  quit (`InstanceManager.shutdown`) call it, as the process exits next
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and

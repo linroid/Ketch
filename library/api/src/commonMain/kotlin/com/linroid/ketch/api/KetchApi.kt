@@ -3,6 +3,7 @@ package com.linroid.ketch.api
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Manages downloads. Implemented in-process by `Ketch` and over HTTP and SSE by `RemoteKetch`,
@@ -20,6 +21,15 @@ interface KetchApi {
 
   /** Releases the instance's resources. */
   fun close()
+
+  /**
+   * Releases the instance's resources as [close] does, and waits at most [timeout] for what it
+   * stops to finish, such as an in-process instance's downloads saving their progress. Call it
+   * when the process exits next; by default it only [close]s.
+   */
+  suspend fun shutdown(timeout: Duration = 5.seconds) {
+    close()
+  }
 
   // Tasks
 
