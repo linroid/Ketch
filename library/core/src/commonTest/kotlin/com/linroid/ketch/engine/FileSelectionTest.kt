@@ -738,6 +738,110 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_awaitingTaskCanceledWhileSaving_staysCanceled() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request().copy(awaitFileSelection = true))
+      runCurrent()
+      val waiting = assertIs<DownloadState.Paused>(task.state.value)
+      assertEquals(PauseReason.AwaitingFileSelection, waiting.reason)
+      val saving = CompletableDeferred<Unit>()
+      val release = CompletableDeferred<Unit>()
+      store.onSave = {
+        if (it.request.selectedFileIds.isNotEmpty() && !release.isCompleted) {
+          saving.complete(Unit)
+          release.await()
+        }
+      }
+      val selecting = launch { task.selectFiles(setOf("1")) }
+      runCurrent()
+      assertTrue(saving.isCompleted)
+
+      val canceling = launch { task.cancel() }
+      runCurrent()
+      release.complete(Unit)
+      selecting.join()
+      canceling.join()
+      runCurrent()
+
+      assertIs<DownloadState.Canceled>(task.state.value)
+      assertEquals(TaskState.CANCELED, store.load(task.taskId)?.state)
+      assertTrue(source.runs.value.isEmpty())
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_awaitingTaskCanceledWhilePlanning_staysCanceled() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request().copy(awaitFileSelection = true))
+      runCurrent()
+      assertIs<DownloadState.Paused>(task.state.value)
+      val gate = CompletableDeferred<Unit>()
+      source.planGate = gate
+      val selecting = launch { task.selectFiles(setOf("1")) }
+      runCurrent()
+
+      task.cancel()
+      runCurrent()
+      gate.complete(Unit)
+      selecting.join()
+      runCurrent()
+
+      assertIs<DownloadState.Canceled>(task.state.value)
+      // Saved after the cancel, the selection keeps the record canceled, so no restart starts it.
+      assertEquals(TaskState.CANCELED, store.load(task.taskId)?.state)
+      assertTrue(source.runs.value.isEmpty())
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun selectFiles_completedExpandRemovedWhileSaving_staysRemoved() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      source.runs.value.single().finish.complete(Unit)
+      runCurrent()
+      assertIs<DownloadState.Completed>(task.state.value)
+      val saving = CompletableDeferred<Unit>()
+      val release = CompletableDeferred<Unit>()
+      store.onSave = {
+        if (it.request.selectedFileIds.size == 2 && !release.isCompleted) {
+          saving.complete(Unit)
+          release.await()
+        }
+      }
+      val selecting = launch { task.selectFiles(setOf("0", "1")) }
+      runCurrent()
+      assertTrue(saving.isCompleted)
+
+      val removing = launch { task.remove(deleteFiles = true) }
+      runCurrent()
+      release.complete(Unit)
+      selecting.join()
+      removing.join()
+      runCurrent()
+
+      assertTrue(ketch.tasks.value.none { it.taskId == task.taskId })
+      assertNull(store.load(task.taskId))
+      assertEquals(1, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun selectFiles_unknownId_failsBeforeSaving() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()

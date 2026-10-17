@@ -73,6 +73,12 @@ internal class DownloadQueue(
   ) {
     mutex.withLock {
       try {
+        // Canceled or removed (which cancels) meanwhile, as while its file selection was saved:
+        // queueing it would undo that.
+        if (handle.mutableState.value is DownloadState.Canceled) {
+          log.d { "Not queueing canceled taskId=${handle.taskId}" }
+          return
+        }
         // A task paused for preemption still waits here, which makes resume() a no-op for it.
         if (queuedEntries.any { it.taskId == handle.taskId }) return
         if (activeEntries.containsKey(handle.taskId)) {

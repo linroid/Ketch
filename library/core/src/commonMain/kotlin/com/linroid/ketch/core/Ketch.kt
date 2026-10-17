@@ -624,9 +624,9 @@ class Ketch(
    * Validates, saves and applies a file selection; the caller holds the task's control lock.
    * Saves the selection, its size, the new segment layout and the next generation in one record
    * write, then, even if the caller is cancelled meanwhile, hands it to the running execution,
-   * starts a task that waited for it or that gains files after it completed, or updates the state
-   * a stopped task shows. Returns `null` when the execution is finishing and the caller must join
-   * it and try again.
+   * starts a task that waited for it or that gains files after it completed (unless the task was
+   * canceled or removed meanwhile), or updates the state a stopped task shows. Returns `null` when
+   * the execution is finishing and the caller must join it and try again.
    */
   private suspend fun applySelection(
     handle: TaskHandle,
@@ -704,7 +704,12 @@ class Ketch(
             request = r.request.copy(selectedFileIds = plan.fileIds),
             totalBytes = plan.totalBytes,
             segments = segmentsOf(r),
-            state = if (reopen || awaiting) TaskState.QUEUED else r.state,
+            // A cancel saved since the plan stays: the queue refuses the task below.
+            state = if ((reopen || awaiting) && r.state != TaskState.CANCELED) {
+              TaskState.QUEUED
+            } else {
+              r.state
+            },
             completedAt = if (reopen) null else r.completedAt,
             control = (r.control ?: TaskControl()).let { c ->
               c.copy(
@@ -745,7 +750,8 @@ class Ketch(
         // Shown before the save if it downloads, else as the hold ended if it dropped a report.
         delivery == SelectionDelivery.DELIVERED -> Unit
         reopen || awaiting -> {
-          // Completed or waiting until here; the queue shows it queued as it takes it.
+          // Completed or waiting until here; the queue shows it queued as it takes it, unless it
+          // was canceled or removed meanwhile, as cancel and remove never wait for the lock.
           queue.dequeue(taskId)
           queue.enqueue(handle, preferResume = true)
         }
