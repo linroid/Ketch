@@ -211,6 +211,34 @@ class TorrentStallWatchdogTest {
   }
 
   @Test
+  fun webSeedsStoringNothing_leaveTheReasonToPeers() {
+    // A web seed backs off from a failing mirror, and no peer is connected.
+    runTo(31_000) { signals(webSeeds = 1) }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+    // Peers that all choke us.
+    runTo(32_000) { signals(peers = 2, webSeeds = 1) }
+    assertEquals(TorrentStallReason.CHOKED, watchdog.stall?.reason)
+  }
+
+  @Test
+  fun relaunchedWebSeeds_keepWhatWasMissingWhileTheyAskAgain() {
+    // Every web seed found two pieces it could not serve, and was dropped.
+    val due = runTo(121_000) {
+      signals(missingPieces = 2, missingFileIds = listOf("7"), droppedWebSeeds = 1)
+    }
+    assertTrue(StallRecovery.RELAUNCH_WEB_SEEDS in due)
+    // Started again, a seed offers every piece until it finds again that it cannot serve them.
+    runTo(125_000) { signals(webSeeds = 1) }
+    val stall = assertNotNull(watchdog.stall)
+    assertEquals(TorrentStallReason.MISSING_PIECES, stall.reason)
+    assertEquals(2, stall.missingPieces)
+    assertEquals(listOf("7"), stall.missingFileIds)
+    // Ten seconds on, it has not refused them again: the download waits for a source.
+    runTo(131_000) { signals(webSeeds = 1) }
+    assertEquals(TorrentStallReason.NO_PEERS, watchdog.stall?.reason)
+  }
+
+  @Test
   fun waitingOnSpeedLimits_isNoStall() {
     // Payload trickles in, every second of it spent waiting on a speed limit.
     runTo(600_000) { time -> signals(payloadBytes = time / 100, throttledMs = time, peers = 1) }

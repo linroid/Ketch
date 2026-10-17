@@ -689,6 +689,45 @@ class TorrentWebSeedTest {
     }
   }
 
+  @Test
+  fun seedBackingOffWithoutPeers_isNoPeers() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        var clock = 0L
+        val stall = MutableStateFlow<TorrentStall?>(null)
+        val payload = ByteArray(2 * PIECE) { (it * 3 + 1).toByte() }
+        // The only source is down, and no peer connects.
+        val down = Outage(MirrorEngine(mapOf("http://mirror.test/data" to payload))) { true }
+        withStore(singleFile(payload, "http://mirror.test/data")) { store, _ ->
+          val network = createTorrentNetwork()
+          val peers = Channel<PeerEndpoint>()
+          try {
+            coroutineScope {
+              val swarm = launch {
+                // The seed backs off for a minute after its first failure, still running.
+                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                  webSeedHttp = TorrentHttp(down), webSeedRetryMs = 60_000, nowMs = { clock },
+                  stall = stall).run(peers)
+              }
+              while (down.refused == 0) delay(20)
+              delay(500)
+              // Nothing arrives for 40 s: the seed stores nothing, and the download waits for
+              // peers.
+              clock = 40_000
+              val reported = withTimeout(5_000) { stall.filterNotNull().first() }
+              assertEquals(TorrentStallReason.NO_PEERS, reported.reason)
+              assertEquals(0, reported.missingPieces)
+              assertEquals(1, down.refused)
+              swarm.cancel()
+            }
+          } finally {
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
   @OptIn(ExperimentalAtomicApi::class)
   @Test
   fun pieceOneSeedLacked_isMissingOnlyOnceEverySeedLacksIt() = runTest {
@@ -772,10 +811,10 @@ class TorrentWebSeedTest {
                     webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
                     stall = stall).run(peers)
                 }
-                // Nothing for longer than a piece may take: a stall.
+                // Nothing for longer than a piece may take: a stall, and no peer to help.
                 mirror.asked.await()
                 clock = 70_000
-                assertEquals(TorrentStallReason.UNKNOWN,
+                assertEquals(TorrentStallReason.NO_PEERS,
                   withTimeout(5_000) { stall.filterNotNull().first() }.reason)
                 // The piece arrives, corrupt, twice, a part a second: what may still be thrown
                 // away is no progress, and once thrown away it never was.
@@ -836,7 +875,7 @@ class TorrentWebSeedTest {
             }
           }
           val logged = lines.drain()
-          assertTrue(logged.any { "stalled: unknown" in it }, logged.toString())
+          assertTrue(logged.any { "stalled: no-peers" in it }, logged.toString())
           assertTrue(logged.none { "makes progress again" in it }, logged.toString())
         }
       }

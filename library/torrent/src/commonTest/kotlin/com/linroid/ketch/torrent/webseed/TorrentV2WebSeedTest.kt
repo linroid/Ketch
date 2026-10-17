@@ -501,10 +501,10 @@ class TorrentV2WebSeedTest {
       "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1])))
     val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
     stalling(fixture, mirror, selected = setOf(wanted)) { run ->
-      // Nothing for longer than a piece may take: a stall.
+      // Nothing for longer than a piece may take: a stall, and no peer to help.
       mirror.asked.await()
       run.skip(70_000)
-      assertEquals(TorrentStallReason.UNKNOWN, run.session.stall.first { it != null }?.reason)
+      assertEquals(TorrentStallReason.NO_PEERS, run.session.stall.first { it != null }?.reason)
       // The piece arrives, corrupt, twice, a part a second: what may still be thrown away is no
       // progress, and once thrown away it never was.
       val seen = AtomicReference(emptyList<TorrentStall?>())

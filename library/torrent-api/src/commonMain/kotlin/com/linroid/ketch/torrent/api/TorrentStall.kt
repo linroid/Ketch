@@ -23,7 +23,7 @@ enum class TorrentStallReason(val wireName: String) {
    */
   MISSING_PIECES("missing-pieces"),
 
-  /** No peer is connected and no web seed is fetching. */
+  /** No peer is connected, and web seeds, if any, deliver nothing either. */
   NO_PEERS("no-peers"),
 
   /** Peers are connected, but none of them lets us download (they all choke us). */
