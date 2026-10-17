@@ -1025,6 +1025,10 @@ final class com.linroid.ketch.api/NetworkInterfaces { // com.linroid.ketch.api/N
     }
 }
 
+final class com.linroid.ketch.api/NoDownloadSourceException : kotlin/Exception { // com.linroid.ketch.api/NoDownloadSourceException|null[0]
+    constructor <init>() // com.linroid.ketch.api/NoDownloadSourceException.<init>|<init>(){}[0]
+}
+
 final class com.linroid.ketch.api/PeerDetails { // com.linroid.ketch.api/PeerDetails|null[0]
     constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/String? = ...) // com.linroid.ketch.api/PeerDetails.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?){}[0]
 

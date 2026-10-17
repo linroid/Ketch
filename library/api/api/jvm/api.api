@@ -1515,6 +1515,10 @@ public final class com/linroid/ketch/api/NetworkKind$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/linroid/ketch/api/NoDownloadSourceException : java/lang/Exception {
+	public fun <init> ()V
+}
+
 public abstract class com/linroid/ketch/api/PauseReason {
 	public static final field Companion Lcom/linroid/ketch/api/PauseReason$Companion;
 }

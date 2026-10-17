@@ -4,12 +4,12 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.NetworkInterfaceConfig
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.resolve
-import com.linroid.ketch.core.engine.NoDownloadSourceException
 import com.linroid.ketch.endpoints.Api
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse

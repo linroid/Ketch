@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
@@ -110,12 +111,3 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
     throw KetchError.Unsupported()
   }
 }
-
-/**
- * The cause of the [KetchError.Unsupported] that resolving or downloading an input no
- * [DownloadSource] takes throws. It tells that apart from the one a source throws when it takes
- * the input but lacks something it needs, such as byte ranges or a usable proxy, so callers say
- * that no source handles an input only when none does.
- */
-class NoDownloadSourceException internal constructor() :
-  Exception("No download source takes this input")

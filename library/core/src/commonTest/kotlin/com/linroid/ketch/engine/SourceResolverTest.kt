@@ -2,12 +2,12 @@ package com.linroid.ketch.engine
 
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpDownloadSource
-import com.linroid.ketch.core.engine.NoDownloadSourceException
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.resolve

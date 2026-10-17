@@ -1,6 +1,7 @@
 package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.resolve
 import io.ktor.client.engine.mock.MockEngine
@@ -17,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class RemoteResolveContentTest {
   @Test
@@ -61,10 +63,11 @@ class RemoteResolveContentTest {
         remote.close()
       }
     }
-    assertFailsWith<KetchError.Unsupported> {
+    val unsupported = assertFailsWith<KetchError.Unsupported> {
       resolveWith(HttpStatusCode.UnsupportedMediaType,
         """{"error":"unsupported","message":"No download source recognizes this content"}""")
     }
+    assertIs<NoDownloadSourceException>(unsupported.cause)
     assertFailsWith<IllegalArgumentException> {
       resolveWith(HttpStatusCode.PayloadTooLarge)
     }

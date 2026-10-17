@@ -73,7 +73,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Proxy`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
-  and `resolve(bytes, fileName)` extensions build them),
+  and `resolve(bytes, fileName)` extensions build them; a `KetchError.Unsupported` it throws is
+  caused by a `NoDownloadSourceException` when no source takes the input, else by what the
+  source that does lacks, such as a usable proxy),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `CountryDatabase` (its `Key` is a `ControlKey`) and `CountryDatabaseStatus`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
@@ -116,7 +118,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`KetchDispatchers.Default`, shared by every instance)
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
-  `SourceResolver` (`NoDownloadSourceException`), `SourceState`, `DownloadContext`,
+  `SourceResolver`, `SourceState`, `DownloadContext`,
   `DownloadQueue`, `DownloadScheduler`,
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
   (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
@@ -1549,12 +1551,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `invalid_connections`, which `RemoteDownloadTask` turns into `UnsupportedOperationException`);
   status (with `KetchStatus.features`), config, network interfaces, and resolving URLs or
   uploaded file content. Both resolve routes (`respondResolved`) answer 415 `unsupported` for an
-  input no source takes (the `KetchError.Unsupported` core's `NoDownloadSourceException` causes)
+  input no source takes (the `KetchError.Unsupported` a `NoDownloadSourceException` causes)
   and, with its reason, for one a source lacks something for, such as a usable proxy; and a
   source's refusal with 422 and the typed `KetchError`, its `detail` saying why, plus
   `"error": "source_error"`, so clients that read an `ErrorResponse` keep its message.
-  `RemoteKetch.resolve` throws `KetchError.Unsupported` for a 415 `unsupported` and the 422's
-  error again; other bodies are a `RemoteApiException`, as older servers' 500 for a URL's refusals
+  `RemoteKetch.resolve` throws `KetchError.Unsupported` for a 415 `unsupported`, caused by a
+  `NoDownloadSourceException` for the servers' "No download source" wordings and else by the
+  reason after "Not supported: ", and the 422's error again; other bodies are a
+  `RemoteApiException`, as older servers' 500 for a URL's refusals
 - Event stream (`StreamRoutes`, `EventHub`; `/api/status` lists `events.stream`): `GET
   /api/stream` opens one SSE stream per client (at most 32, 429 `too_many_streams` beyond; a
   comment every 15 s, which also frees the streams of clients that left). It sends `hello` (the

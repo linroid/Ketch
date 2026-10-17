@@ -15,6 +15,7 @@ import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
@@ -359,16 +360,17 @@ class RemoteKetch internal constructor(
 
   /**
    * The error a resolve the server refused for its input throws, as [KetchApi.resolve] does: 415
-   * `unsupported` for one no source takes, or that its source lacks something for, and 422 with a
-   * source's own, decoded with its reason. Other bodies, such as a 415 for a request body that is
-   * not JSON or a proxy's page, are a [RemoteApiException].
+   * `unsupported` for one no source takes, or that its source lacks something for, with the
+   * [cause][unsupportedCause] that tells them apart, and 422 with a source's own, decoded with its
+   * reason. Other bodies, such as a 415 for a request body that is not JSON or a proxy's page, are
+   * a [RemoteApiException].
    */
   private suspend fun resolveRefusal(response: HttpResponse): Exception? =
     when (response.status) {
       HttpStatusCode.UnsupportedMediaType -> {
         val body = response.errorResponse()
         if (body?.error == "unsupported") {
-          KetchError.Unsupported()
+          KetchError.Unsupported(unsupportedCause(body.message))
         } else {
           response.toRemoteApiException(body)
         }
@@ -377,6 +379,18 @@ class RemoteKetch internal constructor(
         typedError(response.bodyAsText()) ?: response.toRemoteApiException()
       else -> null
     }
+
+  /**
+   * Why the server refused an input with 415 `unsupported` and [message]: a
+   * [NoDownloadSourceException] when no source takes it, which Ketch servers word "No download
+   * source ...", else what the source that takes it lacks, such as a usable proxy: the reason
+   * after the server's "Not supported: ", or none when it gave none.
+   */
+  private fun unsupportedCause(message: String): Exception {
+    if (message.startsWith("No download source")) return NoDownloadSourceException()
+    val reason = message.removePrefix("Not supported").removePrefix(":").trim()
+    return IllegalStateException(reason.ifEmpty { null })
+  }
 
   /** The [KetchError] [body] holds, or `null` when it is no JSON object with a `type`. */
   private fun typedError(body: String): KetchError? {

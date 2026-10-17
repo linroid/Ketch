@@ -1,6 +1,7 @@
 package com.linroid.ketch.remote
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.resolve
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -16,6 +17,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertIsNot
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class RemoteResolveUrlTest {
   private suspend fun resolveWith(status: HttpStatusCode, body: String = "") {
@@ -58,11 +63,31 @@ class RemoteResolveUrlTest {
   }
 
   @Test
-  fun resolveUrl_noSourceHandlesIt_throwsUnsupported() = runTest {
-    assertFailsWith<KetchError.Unsupported> {
+  fun resolveUrl_noSourceHandlesIt_throwsUnsupportedCausedByNoSource() = runTest {
+    val error = assertFailsWith<KetchError.Unsupported> {
       resolveWith(HttpStatusCode.UnsupportedMediaType,
         """{"error":"unsupported","message":"No download source handles this URL"}""")
     }
+    assertIs<NoDownloadSourceException>(error.cause)
+  }
+
+  @Test
+  fun resolveUrl_sourceLacksSomething_throwsUnsupportedCausedByTheServerReason() = runTest {
+    // Such as a proxy setting the server's HTTP engine cannot use.
+    val proxy = assertFailsWith<KetchError.Unsupported> {
+      resolveWith(HttpStatusCode.UnsupportedMediaType, """{"error":"unsupported",""" +
+        """"message":"Not supported: https_proxy is not an HTTP or SOCKS5 proxy URL"}""")
+    }
+    assertIsNot<NoDownloadSourceException>(proxy.cause)
+    assertEquals("https_proxy is not an HTTP or SOCKS5 proxy URL", proxy.cause?.message)
+    // The server leaves out a reason that quotes a URL.
+    val unexplained = assertFailsWith<KetchError.Unsupported> {
+      resolveWith(HttpStatusCode.UnsupportedMediaType,
+        """{"error":"unsupported","message":"Not supported"}""")
+    }
+    val cause = assertNotNull(unexplained.cause)
+    assertIsNot<NoDownloadSourceException>(cause)
+    assertNull(cause.message)
   }
 
   @Test
