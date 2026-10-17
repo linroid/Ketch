@@ -464,7 +464,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   database SQLite reports corrupt or not a database aside to `<name>.broken-<UTC time>`, with its
   journal, and starts an empty one (on Android also when corruption shows up later, instead of
   Android deleting it), telling its `onUnreadable` callback
-- Duplicate download guards in `DownloadCoordinator.start()` and `resume()`
+- Duplicate download guards in `DownloadCoordinator.start()` and `resume()`, which decide, save
+  and launch under the coordinator's lock and refuse a canceled task: `cancel` marks it there
+  (`canceling`) until it shows `Canceled`, so a cancel or remove landing while the queue starts a
+  task either finds the execution and stops it or keeps it from starting, and its slot is freed.
+  The queue's and a pause's saves keep a `CANCELED` record, and no state write or progress
+  report leaves `Canceled`
 - A source that writes its own files (torrents) resumes into the output path its task chose even
   when no segments were saved yet, as when the process exits right after a start: starting over
   would pick a new `name (n)` beside the files it already owns

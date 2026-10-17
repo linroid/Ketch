@@ -366,18 +366,20 @@ class Ketch(
       val state = handle.mutableState.value
       if (state !is DownloadState.Queued && state !is DownloadState.Paused) return
       // A task still waiting for a slot, or stopped before it saved any segments,
-      // must not restart on its own after a restart.
+      // must not restart on its own after a restart. A cancel landing meanwhile, which never
+      // waits for a pause, keeps the task canceled.
       val record = handle.record.value
       if (record.state != TaskState.PAUSED) {
         handle.record.update {
-          it.copy(state = TaskState.PAUSED, updatedAt = Clock.System.now())
+          if (it.state == TaskState.CANCELED) it
+          else it.copy(state = TaskState.PAUSED, updatedAt = Clock.System.now())
         }
       }
       if (state is DownloadState.Queued) {
-        handle.mutableState.value = DownloadState.Paused(record.savedProgress())
+        handle.mutableState.compareAndSet(state, DownloadState.Paused(record.savedProgress()))
       } else if (state is DownloadState.Paused && state.reason is PauseReason.Preempted) {
         // It waited in the queue; dequeue above took it out, so it now stays paused.
-        handle.mutableState.value = state.copy(reason = PauseReason.User)
+        handle.mutableState.compareAndSet(state, state.copy(reason = PauseReason.User))
       }
     }
 

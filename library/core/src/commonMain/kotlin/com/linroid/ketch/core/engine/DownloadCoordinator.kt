@@ -61,6 +61,9 @@ internal class DownloadCoordinator(
   private val activeDownloads = mutableMapOf<String, ActiveEntry>()
   private val stoppingDownloads = mutableMapOf<String, Job>()
 
+  // Tasks a cancel stopped that it has not shown canceled yet. Nothing starts them meanwhile.
+  private val canceling = mutableSetOf<String>()
+
   // Set by close(): executions cancelled from then on pause for PauseReason.Shutdown.
   @Volatile
   private var closing = false
@@ -71,14 +74,20 @@ internal class DownloadCoordinator(
     val job: Job,
   )
 
+  /**
+   * Starts the task's download from the beginning, unless it runs already or was canceled
+   * ([refusesToStart]).
+   */
   suspend fun start(handle: TaskHandle) {
     val taskId = handle.taskId
-    log.i { "Starting download: taskId=$taskId, url=${redactUrl(handle.request.url)}" }
-    handle.record.update {
-      it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
+    mutex.withLock {
+      if (refusesToStart(handle)) return
+      log.i { "Starting download: taskId=$taskId, url=${redactUrl(handle.request.url)}" }
+      handle.record.update {
+        it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
+      }
+      launchExecution(handle)
     }
-
-    launchExecution(handle)
   }
 
   /**
@@ -202,62 +211,81 @@ internal class DownloadCoordinator(
     }
   }
 
+  /**
+   * Resumes the task's download from its saved progress. Returns `false` when it has none it can
+   * continue from, and the caller starts it over; `true` when it resumed, runs already or was
+   * canceled ([refusesToStart]).
+   */
   suspend fun resume(
     handle: TaskHandle,
     destination: Destination? = null,
   ): Boolean {
     val taskId = handle.taskId
     mutex.withLock { stoppingDownloads[taskId] }?.join()
-    mutex.withLock {
-      if (activeDownloads.containsKey(taskId)) {
-        log.d {
-          "Download already active for taskId=$taskId, " +
-            "skipping resume"
-        }
-        return true
+    // Decided, saved and launched under the lock, so a cancel either finds the execution and
+    // stops it or comes first and is refused here.
+    return mutex.withLock {
+      if (refusesToStart(handle)) return@withLock true
+      val taskRecord = handle.record.value
+      // A source writing its own files may have created them before the first save, as when the
+      // process exits right after a start: it resumes into the path it chose, as starting over
+      // would pick a new `name (n)` beside the files it already owns.
+      val startedOwnFiles = taskRecord.outputPath != null && managesOwnFileIo(taskRecord)
+      val segments = taskRecord.segments
+        ?: if (startedOwnFiles) emptyList() else return@withLock false
+      if (segments.isEmpty() && taskRecord.totalBytes > 0 && !managesOwnFileIo(taskRecord)) {
+        // Older versions saved [] when a download stopped before its first segments.
+        log.i { "No saved progress for taskId=$taskId, starting it again" }
+        return@withLock false
       }
-    }
+      if (taskRecord.sourceState == null && !managesOwnFileIo(taskRecord)) {
+        // Nothing to check the saved bytes against, so they are not trusted.
+        log.w { "No saved state to check the progress of taskId=$taskId against; starting over" }
+        handle.mutableSegments.value = emptyList()
+        return@withLock false
+      }
+      log.d {
+        "Resume loaded record: taskId=$taskId, " +
+          "segments=${segments.size}, " +
+          "totalBytes=${taskRecord.totalBytes}"
+      }
 
-    val taskRecord = handle.record.value
-    // A source writing its own files may have created them before the first save, as when the
-    // process exits right after a start: it resumes into the path it chose, as starting over
-    // would pick a new `name (n)` beside the files it already owns.
-    val startedOwnFiles = taskRecord.outputPath != null && managesOwnFileIo(taskRecord)
-    val segments = taskRecord.segments ?: if (startedOwnFiles) emptyList() else return false
-    if (segments.isEmpty() && taskRecord.totalBytes > 0 && !managesOwnFileIo(taskRecord)) {
-      // Older versions saved [] when a download stopped before its first segments.
-      log.i { "No saved progress for taskId=$taskId, starting it again" }
-      return false
-    }
-    if (taskRecord.sourceState == null && !managesOwnFileIo(taskRecord)) {
-      // Nothing to check the saved bytes against, so they are not trusted.
-      log.w { "No saved state to check the progress of taskId=$taskId against; starting over" }
-      handle.mutableSegments.value = emptyList()
-      return false
-    }
-    log.d {
-      "Resume loaded record: taskId=$taskId, " +
-        "segments=${segments.size}, " +
-        "totalBytes=${taskRecord.totalBytes}"
-    }
+      handle.mutableState.value = DownloadState.Queued
+      handle.mutableSegments.value = segments
 
-    handle.mutableState.value = DownloadState.Queued
-    handle.mutableSegments.value = segments
+      handle.record.update {
+        it.copy(
+          state = TaskState.DOWNLOADING,
+          updatedAt = Clock.System.now(),
+        ).withDestination(destination)
+      }
 
-    handle.record.update {
-      it.copy(
-        state = TaskState.DOWNLOADING,
-        updatedAt = Clock.System.now(),
-      ).withDestination(destination)
+      val resumeInfo = DownloadExecution.ResumeInfo(
+        record = taskRecord.withDestination(destination),
+        segments = segments,
+      )
+
+      launchExecution(handle, resumeInfo)
+      true
     }
+  }
 
-    val resumeInfo = DownloadExecution.ResumeInfo(
-      record = taskRecord.withDestination(destination),
-      segments = segments,
-    )
-
-    launchExecution(handle, resumeInfo)
-    return true
+  /**
+   * Whether [handle] must not start now: it runs already, or it was canceled, also by a cancel
+   * still stopping it. The caller holds [mutex], under which [cancel] marks the task, so a start
+   * the queue makes as the task is canceled never runs it again.
+   */
+  private fun refusesToStart(handle: TaskHandle): Boolean {
+    val taskId = handle.taskId
+    if (taskId in canceling || handle.mutableState.value is DownloadState.Canceled) {
+      log.d { "Not starting canceled taskId=$taskId" }
+      return true
+    }
+    if (activeDownloads.containsKey(taskId)) {
+      log.d { "Download already active for taskId=$taskId, skipping" }
+      return true
+    }
+    return false
   }
 
   /**
@@ -271,6 +299,8 @@ internal class DownloadCoordinator(
     val taskId = handle.taskId
     log.i { "Canceling download for taskId=$taskId, deletePartialFile=$deletePartialFile" }
     val job = mutex.withLock {
+      // From here on nothing starts the task, also a start the queue is making now.
+      canceling += taskId
       val entry = activeDownloads[taskId]
       val stopping = entry?.job ?: stoppingDownloads[taskId]
       entry?.execution?.let { execution ->
@@ -281,18 +311,26 @@ internal class DownloadCoordinator(
       activeDownloads.remove(taskId)
       stopping
     }
-    // Await the job's finally chain (including FileAccessor.close)
-    // before returning, so callers can safely follow up with file
-    // cleanup. Joining must happen outside the mutex because the
-    // job's own finally re-acquires it to clean up activeDownloads.
-    job?.join()
-    handle.mutableState.value = DownloadState.Canceled
-    handle.record.update {
-      it.copy(
-        state = TaskState.CANCELED,
-        segments = null,
-        updatedAt = Clock.System.now(),
-      )
+    try {
+      // Await the job's finally chain (including FileAccessor.close)
+      // before returning, so callers can safely follow up with file
+      // cleanup. Joining must happen outside the mutex because the
+      // job's own finally re-acquires it to clean up activeDownloads.
+      job?.join()
+    } finally {
+      // Also when the caller stops waiting: the task is stopped and must show it.
+      withContext(NonCancellable) {
+        handle.mutableState.value = DownloadState.Canceled
+        handle.record.update {
+          it.copy(
+            state = TaskState.CANCELED,
+            segments = null,
+            updatedAt = Clock.System.now(),
+          )
+        }
+        // Shown canceled, which keeps it from starting from now on.
+        mutex.withLock { canceling -= taskId }
+      }
     }
     log.d { "Cancel record updated for taskId=$taskId" }
   }
@@ -316,69 +354,63 @@ internal class DownloadCoordinator(
     }
   }
 
-  private suspend fun launchExecution(
+  /** Launches the task's execution; the caller holds [mutex] and checked [refusesToStart]. */
+  private fun launchExecution(
     handle: TaskHandle,
     resumeInfo: DownloadExecution.ResumeInfo? = null,
   ) {
     val taskId = handle.taskId
-    mutex.withLock {
-      if (activeDownloads.containsKey(taskId)) {
-        log.d { "Download already active for taskId=$taskId, skipping" }
-        return
-      }
+    val execution = createExecution(handle)
 
-      val execution = createExecution(handle)
-
-      val job = scope.launch {
-        try {
-          execution.execute(resumeInfo)
-        } catch (e: CancellationException) {
-          // Thrown while this job is still active, it is not a pause, cancel or close of this
-          // task but a failure of the download, such as a timeout leaking from a library.
-          if (currentCoroutineContext().isActive) {
-            fail(handle, KetchError.Unknown(e))
-            return@launch
-          }
-          val s = handle.mutableState.value
-          when {
-            // A download that completed just before the cancellation keeps its state.
-            s.isTerminal || s is DownloadState.Paused -> Unit
-            // Closing keeps the task resumable, also one still starting in its slot: its
-            // record stays DOWNLOADING or QUEUED, so the next start() resumes it.
-            closing -> handle.mutableState.value = DownloadState.Paused(
-              if (s is DownloadState.Queued) {
-                // Not resolved yet: what the record saved from earlier runs.
-                handle.record.value.savedProgress()
-              } else {
-                DownloadProgress(
-                  handle.mutableSegments.value.sumOf { it.downloadedBytes },
-                  execution.totalBytes,
-                )
-              },
-              PauseReason.Shutdown,
-            )
-            // Put back in the queue, it waits for a slot again.
-            s is DownloadState.Queued -> Unit
-            else -> handle.mutableState.value = DownloadState.Canceled
-          }
-          throw e
-        } catch (e: Throwable) {
-          // Errors too, such as a class that fails to load: the task fails on its own and the
-          // other downloads keep running.
-          fail(handle, e as? KetchError ?: KetchError.Unknown(e))
-        } finally {
-          val finished = currentCoroutineContext()[Job]
-          withContext(NonCancellable) {
-            mutex.withLock {
-              if (activeDownloads[taskId]?.execution === execution) activeDownloads.remove(taskId)
-              if (stoppingDownloads[taskId] === finished) stoppingDownloads.remove(taskId)
-            }
+    val job = scope.launch {
+      try {
+        execution.execute(resumeInfo)
+      } catch (e: CancellationException) {
+        // Thrown while this job is still active, it is not a pause, cancel or close of this
+        // task but a failure of the download, such as a timeout leaking from a library.
+        if (currentCoroutineContext().isActive) {
+          fail(handle, KetchError.Unknown(e))
+          return@launch
+        }
+        val s = handle.mutableState.value
+        when {
+          // A download that completed just before the cancellation keeps its state.
+          s.isTerminal || s is DownloadState.Paused -> Unit
+          // Closing keeps the task resumable, also one still starting in its slot: its
+          // record stays DOWNLOADING or QUEUED, so the next start() resumes it.
+          closing -> handle.mutableState.value = DownloadState.Paused(
+            if (s is DownloadState.Queued) {
+              // Not resolved yet: what the record saved from earlier runs.
+              handle.record.value.savedProgress()
+            } else {
+              DownloadProgress(
+                handle.mutableSegments.value.sumOf { it.downloadedBytes },
+                execution.totalBytes,
+              )
+            },
+            PauseReason.Shutdown,
+          )
+          // Put back in the queue, it waits for a slot again.
+          s is DownloadState.Queued -> Unit
+          else -> handle.mutableState.value = DownloadState.Canceled
+        }
+        throw e
+      } catch (e: Throwable) {
+        // Errors too, such as a class that fails to load: the task fails on its own and the
+        // other downloads keep running.
+        fail(handle, e as? KetchError ?: KetchError.Unknown(e))
+      } finally {
+        val finished = currentCoroutineContext()[Job]
+        withContext(NonCancellable) {
+          mutex.withLock {
+            if (activeDownloads[taskId]?.execution === execution) activeDownloads.remove(taskId)
+            if (stoppingDownloads[taskId] === finished) stoppingDownloads.remove(taskId)
           }
         }
       }
-
-      activeDownloads[taskId] = ActiveEntry(handle, execution, job)
     }
+
+    activeDownloads[taskId] = ActiveEntry(handle, execution, job)
   }
 
   private suspend fun fail(handle: TaskHandle, error: KetchError) {

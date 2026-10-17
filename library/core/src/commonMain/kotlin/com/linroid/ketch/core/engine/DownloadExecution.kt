@@ -966,9 +966,14 @@ internal class DownloadExecution(
         }
         val report = DownloadProgress(downloaded, total, reportedSpeed.value ?: speed)
         lastReport = report
-        // The hold is read on every attempt, so no report replaces a state shown once it began.
+        // The hold is read on every attempt, so no report replaces a state shown once it began,
+        // and none undoes a cancel.
         handle.mutableState.update { current ->
-          if (reportsProgress.value && !progressHeld) DownloadState.Downloading(report) else current
+          if (reportsProgress.value && !progressHeld && current !is DownloadState.Canceled) {
+            DownloadState.Downloading(report)
+          } else {
+            current
+          }
         }
       },
       throttle = { bytes ->

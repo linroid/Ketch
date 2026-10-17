@@ -367,30 +367,44 @@ internal class DownloadQueue(
   private fun hasHostCapacity(host: String?): Boolean =
     host == null || hostConnectionCount.getOrElse(host) { 0 } < maxPerHost
 
+  /**
+   * Shows the task queued and saves it so. A cancel, which never waits for the queue, may land
+   * while the record saves: the task then stays canceled, and the coordinator refuses to start
+   * it.
+   */
   private suspend fun markQueued(handle: TaskHandle) {
     handle.record.update {
-      it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
+      if (it.state == TaskState.CANCELED) it
+      else it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
     }
-    handle.mutableState.value = DownloadState.Queued
+    handle.mutableState.update { state ->
+      if (state is DownloadState.Canceled) state else DownloadState.Queued
+    }
   }
 
   /**
    * Shows a task the queue keeps waiting as queued, unless it is paused for preemption, which
-   * it shows until it gets a slot again.
+   * it shows until it gets a slot again, or was canceled meanwhile.
    */
   private fun markWaiting(handle: TaskHandle) {
     handle.mutableState.update { state ->
-      if (state is DownloadState.Paused && state.reason is PauseReason.Preempted) state
-      else DownloadState.Queued
+      when {
+        state is DownloadState.Canceled -> state
+        state is DownloadState.Paused && state.reason is PauseReason.Preempted -> state
+        else -> DownloadState.Queued
+      }
     }
   }
 
   /**
    * Keeps a task the urgent [byTaskId] pushed out of its slot visibly paused, while its record
-   * stays QUEUED so a restart enqueues it again.
+   * stays QUEUED so a restart enqueues it again; one canceled meanwhile stays canceled.
    */
   private suspend fun markPreempted(handle: TaskHandle, byTaskId: String) {
-    handle.record.update { it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now()) }
+    handle.record.update {
+      if (it.state == TaskState.CANCELED) it
+      else it.copy(state = TaskState.QUEUED, updatedAt = Clock.System.now())
+    }
     val reason = PauseReason.Preempted(byTaskId)
     handle.mutableState.update { state ->
       when {
