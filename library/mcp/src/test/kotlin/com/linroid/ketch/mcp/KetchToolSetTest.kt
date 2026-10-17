@@ -16,8 +16,10 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
@@ -186,6 +188,34 @@ class KetchToolSetTest {
     KetchToolSet(ketch).resolveUrl("https://example.com/a.iso")
 
     assertEquals(listOf(emptyMap()), ketch.resolveProperties)
+  }
+
+  @Test
+  fun resolveUrl_noSourceTakesIt_saysSo() = runTest {
+    val ketch = RecordingKetchApi(
+      resolveError = KetchError.Unsupported(NoDownloadSourceException()),
+    )
+
+    val error = assertFailsWith<IllegalStateException> {
+      KetchToolSet(ketch).resolveUrl("gopher://example.com/a.iso")
+    }
+
+    assertEquals("No download source handles this URL", error.message)
+  }
+
+  @Test
+  fun resolveUrl_sourceLacksSomething_saysWhat() = runTest {
+    val ketch = RecordingKetchApi(
+      resolveError = KetchError.Unsupported(
+        IllegalStateException("https_proxy is not an HTTP or SOCKS5 proxy URL"),
+      ),
+    )
+
+    val error = assertFailsWith<IllegalStateException> {
+      KetchToolSet(ketch).resolveUrl("https://example.com/a.iso")
+    }
+
+    assertEquals("Not supported: https_proxy is not an HTTP or SOCKS5 proxy URL", error.message)
   }
 
   @Test
@@ -520,6 +550,7 @@ class KetchToolSetTest {
     private val torrents: TorrentController? = null,
     private val resolved: ResolvedSource? = null,
     private val config: DownloadConfig = DownloadConfig(),
+    private val resolveError: Throwable? = null,
   ) : KetchApi {
     override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
       flow { throw UnsupportedOperationException("Not followed in tests") }
@@ -542,6 +573,7 @@ class KetchToolSetTest {
     override suspend fun resolve(input: ResolveInput): ResolvedSource {
       val (url, headers) = input as ResolveInput.Url
       resolveProperties += headers
+      resolveError?.let { throw it }
       return resolved ?: ResolvedSource(
         url = url,
         sourceType = "http",
