@@ -728,6 +728,61 @@ class FileSelectionTest {
   }
 
   @Test
+  fun selectFiles_cancelledWhileTheQueueIsBusy_reopensTheCompletedTask() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      val other = ketch.download(request("0"))
+      runCurrent()
+      source.runs.value.single { it.context.taskId == task.taskId }.finish.complete(Unit)
+      other.pause()
+      runCurrent()
+      assertIs<DownloadState.Completed>(task.state.value)
+      assertIs<DownloadState.Paused>(other.state.value)
+      // Another task's resume holds the queue, which every task shares, while it saves.
+      val resuming = CompletableDeferred<Unit>()
+      val resumed = CompletableDeferred<Unit>()
+      store.onSave = { record ->
+        if (record.taskId == other.taskId && record.state == TaskState.QUEUED) {
+          resuming.complete(Unit)
+          resumed.await()
+        } else if (record.taskId == task.taskId && record.request.selectedFileIds.size == 2 &&
+          !resuming.isCompleted
+        ) {
+          launch { other.resume() }
+          resuming.await()
+        }
+      }
+      val selecting = launch { task.selectFiles(setOf("0", "1")) }
+      runCurrent()
+      // Saved, the selection waits for the queue to start the task, and its caller goes away.
+      assertEquals(setOf("0", "1"), task.request.selectedFileIds)
+      assertEquals(TaskState.QUEUED, store.load(task.taskId)?.state)
+      assertEquals(1, source.runs.value.count { it.context.taskId == task.taskId })
+      selecting.cancel()
+      runCurrent()
+
+      store.onSave = {}
+      resumed.complete(Unit)
+      runCurrent()
+
+      val runs = source.runs.value.filter { it.context.taskId == task.taskId }
+      assertEquals(2, runs.size)
+      val run = runs.last()
+      assertTrue(run.resumed)
+      assertEquals(setOf("0", "1"), run.initial.fileIds)
+      assertIs<DownloadState.Downloading>(task.state.value)
+      run.finish.complete(Unit)
+      runCurrent()
+      assertEquals(300, assertIs<DownloadState.Completed>(task.state.value).totalBytes)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun periodicSave_concurrentSelection_neverRevertsTheRequest() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()

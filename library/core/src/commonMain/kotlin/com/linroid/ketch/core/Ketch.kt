@@ -624,9 +624,10 @@ class Ketch(
   /**
    * Validates, saves and applies a file selection; the caller holds the task's control lock.
    * Saves the selection, its size, the new segment layout and the next generation in one record
-   * write, then hands it to the running execution, starts a task that waited for it or that
-   * gains files after it completed, or updates the state a stopped task shows. Returns `null`
-   * when the execution is finishing and the caller must join it and try again.
+   * write, then, even if the caller is cancelled meanwhile, hands it to the running execution,
+   * starts a task that waited for it or that gains files after it completed, or updates the state
+   * a stopped task shows. Returns `null` when the execution is finishing and the caller must join
+   * it and try again.
    */
   private suspend fun applySelection(
     handle: TaskHandle,
@@ -733,23 +734,29 @@ class Ketch(
         }
       }
     }
-    when {
-      // Shown before the save if the task downloads, else as the hold ended if it dropped a report.
-      delivery == SelectionDelivery.DELIVERED -> Unit
-      // Cannot happen while the lock is held, as an execution only starts finishing under it.
-      delivery == SelectionDelivery.FINISHING -> return null
-      reopen || awaiting -> {
-        queue.dequeue(taskId)
-        handle.mutableState.value = DownloadState.Queued
-        queue.enqueue(handle, preferResume = true)
-      }
-      else -> {
-        if (state is DownloadState.Completed && plan.changed) {
-          // What the source shares follows the smaller selection rather than reopening.
-          val task = handle as? DownloadTask
-          if (task != null) extensionOf(source.type)?.selectionChanged(task, plan.fileIds)
+    // Cannot happen while the lock is held, as an execution only starts finishing under it.
+    if (delivery == SelectionDelivery.FINISHING) return null
+    // Putting the saved selection to work is not cancellable either, and nothing suspends since
+    // the delivery. It waits for the queue and the store, which every task shares: a caller
+    // cancelled there would leave a reopened or waiting task unqueued, or a seeder sharing the old
+    // files, which selecting them again never repairs, as it finds nothing to change.
+    withContext(NonCancellable) {
+      when {
+        // Shown before the save if it downloads, else as the hold ended if it dropped a report.
+        delivery == SelectionDelivery.DELIVERED -> Unit
+        reopen || awaiting -> {
+          queue.dequeue(taskId)
+          handle.mutableState.value = DownloadState.Queued
+          queue.enqueue(handle, preferResume = true)
         }
-        showStopped(handle, plan, handle.record.value.segments)
+        else -> {
+          if (state is DownloadState.Completed && plan.changed) {
+            // What the source shares follows the smaller selection rather than reopening.
+            val task = handle as? DownloadTask
+            if (task != null) extensionOf(source.type)?.selectionChanged(task, plan.fileIds)
+          }
+          showStopped(handle, plan, handle.record.value.segments)
+        }
       }
     }
     log.i {
