@@ -24,11 +24,24 @@ internal object PeerClients {
    * rest is cut to [MAX_NAME] characters; `null` when nothing is left.
    */
   fun fromVersion(raw: ByteArray): String? {
+    val decoded = raw.copyOf(minOf(raw.size, MAX_NAME * 4)).decodeToString()
     val text = buildString {
-      for (char in raw.copyOf(minOf(raw.size, MAX_NAME * 4)).decodeToString()) when {
-        char.isISOControl() || char == ' ' || char == ' ' -> append(' ')
-        char.category == CharCategory.FORMAT || char == '�' -> Unit
-        else -> append(char)
+      var i = 0
+      while (i < decoded.length) {
+        val char = decoded[i]
+        // A surrogate pair is one code point outside the BMP, whose category the pair hides.
+        if (char.isHighSurrogate() && i + 1 < decoded.length && decoded[i + 1].isLowSurrogate()) {
+          val point = 0x10000 + ((char.code - 0xD800) shl 10) + (decoded[i + 1].code - 0xDC00)
+          if (SUPPLEMENTARY_FORMAT.none { point in it }) append(char).append(decoded[i + 1])
+          i += 2
+          continue
+        }
+        when {
+          char.isISOControl() || char == '\u2028' || char == '\u2029' -> append(' ')
+          char.category == CharCategory.FORMAT || char.isSurrogate() || char == '\uFFFD' -> Unit
+          else -> append(char)
+        }
+        i++
       }
     }.replace(WHITESPACE, " ").trim()
     if (text.isEmpty()) return null
@@ -70,6 +83,17 @@ internal object PeerClients {
   }
 
   private val WHITESPACE = Regex("\\s+")
+
+  /** The format (`Cf`) code points outside the BMP, such as the tag characters. */
+  private val SUPPLEMENTARY_FORMAT = listOf(
+    0x110BD..0x110BD,
+    0x110CD..0x110CD,
+    0x13430..0x1343F,
+    0x1BCA0..0x1BCA3,
+    0x1D173..0x1D17A,
+    0xE0001..0xE0001,
+    0xE0020..0xE007F,
+  )
   private val MAINLINE = Regex("""M(\d)-(\d{1,2})-(\d)--?""")
 
   private val SHADOW = mapOf(

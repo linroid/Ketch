@@ -53,6 +53,10 @@ class PeerClientsTest {
     assertEquals("Evil Client", PeerClients.fromVersion("Evil\n\u0000Client‮".bytes()))
     assertEquals("Spaced out", PeerClients.fromVersion("  Spaced \t  out  ".bytes()))
     assertNull(PeerClients.fromVersion("​\r\n".bytes()))
+    // Format characters outside the BMP go too, while other ones stay whole.
+    assertNull(PeerClients.fromVersion("\uDB40\uDC7F\uDB40\uDC01".bytes()))
+    assertEquals("Tag \uD83D\uDE00",
+      PeerClients.fromVersion("Tag \uDB40\uDC41\uD83D\uDE00".bytes()))
     assertNull(PeerClients.fromVersion(ByteArray(0)))
     val long = PeerClients.fromVersion("x".repeat(500).bytes())
     assertEquals(PeerClients.MAX_NAME, long?.length)
