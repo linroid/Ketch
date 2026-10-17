@@ -873,10 +873,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   run's starting recheck drops a deselected file's bits, and other states show no progress)
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
-  verified pieces when they are deselected, copies verified spans of boundary pieces from the
-  task's sidecar into newly selected files and rehashes them, discards pieces no longer wanted
-  without blaming the peer, and revokes rather than fails on an unreadable piece outside the
-  selection; a recheck heals a piece from its sidecar. v2 and hybrid create or recheck newly
+  verified pieces when they are deselected, never writes a deselected file (a piece stored while
+  one is deselected keeps that file's span in its sidecar, which reads use while it is owned,
+  `storedInPlace`), copies verified spans of boundary pieces from the task's sidecar into newly
+  selected files and rehashes them, discards pieces no longer wanted without blaming the peer,
+  and revokes rather than fails on an unreadable piece outside the selection; a recheck heals a
+  piece from its sidecar into selected files only. v2 and hybrid create or recheck newly
   selected files, refuse one whose path holds a file they did not create, keep deselected
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more, the run that takes
@@ -890,9 +892,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   missing a selected file fails as it opens, before any check (its checkpoint's ownership no
   longer holds), and keeps its intent: a drop saved between that read and the check takes effect
   the next time seeding is restored. A v1 seeder whose check misses only pieces it shares with
-  deselected files whose bytes are gone (deleted or cut short, the selected files whole) sets
-  them aside (`TorrentPieceStore.setAsideLostPieces`): neither wanted, verified nor offered, and
-  wanted again at the next check or once the selection adds a file. It seeds the rest, logs a
+  deselected files whose bytes are gone or changed (deleted, cut short or edited, the selected
+  files holding their part) sets them aside (`TorrentPieceStore.setAsideLostPieces`): neither
+  wanted, verified nor offered, and wanted again at the next check or once the selection adds a
+  file. It seeds the rest, logs a
   warning and keeps its intent. A lent seeder pays the global limit alone
   (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
   the spec fields it reads, so no finished run stays reachable.

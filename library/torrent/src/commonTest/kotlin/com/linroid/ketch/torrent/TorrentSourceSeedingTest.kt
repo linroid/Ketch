@@ -901,6 +901,46 @@ class TorrentSourceSeedingTest {
     }
   }
 
+  /**
+   * Has the engine create f1 for the task, as a download would, then writes its bytes in place:
+   * the task owns f1 from then on, and seeds every file of [torrent] at [output].
+   */
+  private suspend fun TorrentDownloadSource.seedWithF1Owned(
+    torrent: MultiFileTorrent,
+    output: Path,
+    ids: Set<String>,
+  ) {
+    torrentFileSystem.delete(output / "f1")
+    assertEquals(SeedingOutcome.CHANGED_ON_DISK,
+      startSeeding(v1SeedingTask(torrent, output, ids)))
+    torrentFileSystem.write(output / "f1") { write(torrent.payloads[1]) }
+    assertEquals(SeedingOutcome.SEEDING, startSeeding(v1SeedingTask(torrent, output, ids)))
+  }
+
+  @Test
+  fun startSeeding_v1DroppedFileEdited_seedsWithoutTheSharedPiecesAndLeavesIt() {
+    val torrent = MultiFileTorrent()
+    v1Seeding(torrent) { source, engine, output ->
+      val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+      source.seedWithF1Owned(torrent, output, ids)
+      assertTrue(source.changeSeedingSelection("seeder", ids - "1"))
+      source.stopSeeding("seeder")
+      // The owner edits the file it dropped in place, as a tag editor would.
+      val edited = ByteArray(torrent.sizes[1]) { 0x55 }
+      torrentFileSystem.write(output / "f1") { write(edited) }
+
+      val outcome = source.startSeeding(v1SeedingTask(torrent, output, ids - "1"))
+
+      assertEquals(SeedingOutcome.SEEDING, outcome)
+      val shared = setOf(torrent.piecesOf(1).first, torrent.piecesOf(1).last)
+      val kept = (torrent.piecesOf(0) + torrent.piecesOf(2)).toSet() - shared
+      val pieces = BooleanArray(torrent.pieceCount) { it in kept }
+      assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
+      source.stopSeeding("seeder")
+      assertContentEquals(edited, torrentFileSystem.read(output / "f1") { readByteArray() })
+    }
+  }
+
   @Test
   fun taskUploadLimitAppliesToV2Seeder() = v2Seeding { source, engine, root ->
     source.resumeSeeded("seeder", fixture, root / "seeding")

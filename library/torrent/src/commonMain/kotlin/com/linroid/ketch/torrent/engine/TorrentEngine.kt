@@ -126,7 +126,8 @@ internal data class TorrentTaskSpec(
   /**
    * Only seed: a recheck that finds the selection incomplete stops the session with
    * [IncompleteSeedException] instead of downloading, before any discovery, unless it only
-   * misses pieces it shares with deleted files outside the selection, which it seeds without.
+   * misses pieces it shares with deleted or changed files outside the selection, which it seeds
+   * without.
    */
   val seedOnly: Boolean = false,
   /** Reports the session's peers among the task's live connections. */

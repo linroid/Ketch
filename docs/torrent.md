@@ -119,8 +119,8 @@ hybrid torrents alike:
 What happens next depends on the task's state:
 
 - **Downloading**: the torrent switches without reconnecting to its peers. Newly chosen files are
-  created and downloaded. Files you deselect stop downloading but stay on disk as they are, with
-  their verified pieces.
+  created and downloaded. Files you deselect stop downloading and stay on disk as they are, with
+  their verified pieces: Ketch never writes to them again.
 - **Paused, queued, scheduled or failed**: the new selection applies when the task starts. On a
   paused task, a file you deselected after it last started and choose again shows at once the
   pieces that run verified; otherwise a file shows its pieces once the task starts and checks
@@ -133,9 +133,11 @@ What happens next depends on the task's state:
   torrent that still has a deleted file selected cannot start seeding again, though; removing
   that file then lets it seed the next time Ketch restores seeding, such as when it starts again.
   In a v1 torrent a file usually shares its first and last pieces with the files beside it, and
-  a file you removed keeps its part of them. Deleting it, before or after you removed it, takes
-  those pieces with it: the task seeds every other piece of the files you kept and never offers
-  those, until you add a file, which downloads them again.
+  a file you removed keeps its part of them. Deleting or changing it, before or after you removed
+  it, sets aside those of the shared pieces that no longer verify when the task checks its files
+  to seed: it seeds every other piece of the files you kept, never offers those, and keeps
+  seeding. The removed file is left as you left it. Adding a file again downloads those pieces,
+  keeping the removed file's part beside it rather than in it.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
@@ -891,7 +893,8 @@ peers that dial it before answering their handshake.
 ### Partial selections
 
 In v1, a piece that spans a selected and a skipped file needs all its bytes to be verified. The
-skipped file's part is kept in a hidden sidecar for the task, not in the skipped file. When that
+skipped file's part is kept in a hidden sidecar for the task, not in the skipped file, also when
+the skipped file was written before you skipped it: Ketch never writes a skipped file. When that
 file is chosen later, its verified bytes are copied from the sidecar and rechecked. A v2 or hybrid
 task refuses a newly chosen file whose path holds a file it did not create.
 
