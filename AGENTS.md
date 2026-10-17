@@ -681,8 +681,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   are private or resolved tracker-only, with no tracker left and no web seed, are refused
   (`requireDiscoverable`), as are pieces over 16 MiB (`MAX_PIECE_LENGTH`,
   `requireSupportedPieceLength`: the v1 parser, v2 and hybrid resolution and a v2 magnet's info
-  before its piece layers); a saved task's metainfo is read without those checks
-  (`resolveV2Metainfo(newInput = false)`), and admission refuses its pieces when it starts
+  before its piece layers); the metainfo a task saved is read without those checks when it
+  resumes and when its file table is built (`newInput = false`), and admission refuses its pieces
+  when it starts
 - Metadata that matches a magnet's hash but does not parse ends the lookup with
   `UnusableTorrentMetadataException`, a `MetadataLookupFailure` like
   `PrivateTorrentMagnetException`, which `resolve` reports as `KetchError.SourceError`; v2

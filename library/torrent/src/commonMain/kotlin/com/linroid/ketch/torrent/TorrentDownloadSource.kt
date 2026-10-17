@@ -599,11 +599,24 @@ class TorrentDownloadSource(
     privacy: TorrentDiscoveryPrivacy = config.discoveryPrivacy,
   ): ResolvedSource = parseMetainfo(bytes, privacy).logged("metainfo bytes")
 
-  private fun parseMetainfo(bytes: ByteArray, privacy: TorrentDiscoveryPrivacy): ResolvedSource {
+  /**
+   * Parses v2 or hybrid metainfo, else v1. A [newInput] is refused when Ketch could never download
+   * it (see [resolveV2Metainfo]); the metainfo a task saved is read as it was accepted.
+   */
+  private fun parseMetainfo(
+    bytes: ByteArray,
+    privacy: TorrentDiscoveryPrivacy,
+    newInput: Boolean = true,
+  ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
-    resolveV2Metainfo(null, bytes, config, privacy)?.let { return it }
+    resolveV2Metainfo(null, bytes, config, privacy, newInput = newInput)?.let { return it }
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
-    return resolvedMetainfo("torrent:${metadata.infoHash.hex}", metadata, privacy)
+    val url = "torrent:${metadata.infoHash.hex}"
+    return if (newInput) {
+      resolvedMetainfo(url, metadata, privacy)
+    } else {
+      resolved(url, metadata, privacy)
+    }
   }
 
   /** [resolved] for v1 metainfo a caller supplied, refusing one that could never find a peer. */
@@ -1186,7 +1199,9 @@ class TorrentDownloadSource(
     val privacy = state.privacy ?: config.discoveryPrivacy
     val metainfo = metainfoOf(context.preResolved, state)
     val resolved = when {
-      metainfo != null -> resolveMetainfo(metainfo, privacy)
+      // Saved with the task, which passed the checks of new inputs when it was added or predates
+      // them; admission still refuses pieces too large to assemble.
+      metainfo != null -> parseMetainfo(metainfo, privacy, newInput = false)
       checkpoint != null -> resolved(context.url, checkpoint.metadata, privacy)
       else -> resolveUntilFound(context.url, privacy, context.headers)
     }
