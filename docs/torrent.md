@@ -626,12 +626,12 @@ This section describes the engine's protocol behavior for people who debug swarm
 - **Dialing again**: while a torrent downloads, a peer that refuses or drops is dialed again 5, 15
   and 30 seconds later, then after one, two and five minutes, and every five minutes from then on.
   One that never sent data is given up after four dials in a row, until a source names it again five
-  minutes later. One that sent data is dialed again ten times, over about half an hour, so a peer
-  that restarts is reached again; then it is given up the same way. A connection that sent data
-  starts the count over. A tracker, the DHT, peer exchange or local discovery naming a peer that
-  sent data again has it dialed 30 seconds after its last dial, at most once every five minutes. A
-  stalled download with no peer at all dials every peer it knows again every minute. A seeding
-  torrent dials nobody back.
+  minutes later. One that sent data, over a connection either side opened, is dialed again ten
+  times, over about half an hour, so a peer that restarts is reached again; then it is given up the
+  same way. A connection that sent data starts the count over. A tracker, the DHT, peer exchange or
+  local discovery naming a peer that sent data again has it dialed 30 seconds after its last dial,
+  at most once every five minutes. A stalled download with no peer at all dials every peer it knows
+  again every minute. A seeding torrent dials nobody back.
 - **One connection per peer**: a peer reached at two addresses, such as loopback from a magnet's
   `x.pe` and its LAN address from local discovery, or dialed while it dials Ketch, keeps one
   connection, and both ends agree which: of two dialed the same way the first, otherwise the one the

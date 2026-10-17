@@ -194,8 +194,13 @@ internal object TorrentV2SessionLoop {
     var listen: PeerEndpoint? = null
     /** [listen] is an endpoint we dialed, so it returns to the candidates when this closes. */
     var listenDialed = false
+    /** A connection to the same peer that this one replaced brought payload. */
+    var inherited = false
     /** It broke the protocol; it is banned once it closes. */
     var violation = false
+
+    /** It brought payload, or the connection it replaced did. */
+    val delivered: Boolean get() = attempt.payload > 0 || inherited
   }
 
   private class PendingReset(
@@ -680,6 +685,7 @@ internal object TorrentV2SessionLoop {
         val key = PeerIdentity.of(host, info.peerId)
         val existing = byPeerId[key]
         var learned: PeerEndpoint? = null
+        var inherited = false
         if (existing != null) {
           val member = members.getValue(existing)
           val existingDialed = (existing.info?.origin as? PeerV2Origin.Outgoing)?.endpoint
@@ -710,6 +716,8 @@ internal object TorrentV2SessionLoop {
             member.listen = null
             member.listenDialed = false
           }
+          // Where the peer is dialed again once this one closes counts what that one brought.
+          inherited = member.delivered
           byPeerId.remove(key)
           stop(existing)
         }
@@ -720,6 +728,7 @@ internal object TorrentV2SessionLoop {
           attempt = attempt(PeerStage.CONNECTED), flags = flags)
         member.listen = dialed ?: learned
         member.listenDialed = member.listen != null
+        member.inherited = inherited
         members[peer] = member
         byPeerId[key] = peer
         member.listen?.let(book::connected)
@@ -746,9 +755,11 @@ internal object TorrentV2SessionLoop {
         if (info != null && origin is PeerV2Origin.Incoming && !member.listenDialed) {
           val topic = if (info.mode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1 else PeerTopic.V2
           // Its source port is ephemeral; only a listen port it told us may be dialed back.
-          if (!violation) book.incomingClosed(origin.remote, listen, topic, complete)
+          if (!violation) {
+            book.incomingClosed(origin.remote, listen, topic, complete, member.delivered)
+          }
         } else if (listen != null) {
-          book.closed(listen, violation, complete, delivered = member.attempt.payload > 0)
+          book.closed(listen, violation, complete, member.delivered)
         }
         resets.removeAll { reset ->
           reset.peers.remove(peer)

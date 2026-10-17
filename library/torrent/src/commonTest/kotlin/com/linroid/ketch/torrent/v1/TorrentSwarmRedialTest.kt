@@ -46,8 +46,9 @@ import kotlin.test.assertTrue
 
 /**
  * A v1 swarm dials a peer it downloaded from again after the peer drops, for about half an hour
- * while it downloads, so a peer that comes back is reached again. The swarm runs on a test clock,
- * moved on in steps longer than its loop's tick, so minutes of backoff pass in seconds.
+ * while it downloads, so a peer that comes back is reached again: one we dialed, one that dialed
+ * us, or one whose connection to us replaced ours. The swarm runs on a test clock, moved on in
+ * steps longer than its loop's tick, so minutes of backoff pass in seconds.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentSwarmRedialTest {
@@ -118,6 +119,45 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun peerThatDialedUs_isDialedWhereItListensUntilItIsBack() = swarmTest { rig ->
+    // It dials us, says where it listens, sends piece 0 and drops.
+    val (connection, wire) = rig.dialSwarm(listenPort = rig.listener.local.port)
+    serve(wire, 0)
+    rig.down.store(true)
+    connection.close()
+    // Dialed where it listens 5, 20 and 50 s after it dropped, then 110 s after.
+    val reached = rig.reachAgain(upAt = 70_000)
+    assertTrue(reached - 70_000 <= 60_000, "Reached ${reached - 70_000} ms after it came back")
+  }
+
+  @Test
+  fun peerKeptOverOurDial_isDialedThereAgainUntilItIsBack() = swarmTest(
+    // We listen on a port above the peer's, so both keep the connection the peer dialed.
+    listenPortFor = { it.port + 1 },
+  ) { rig ->
+    rig.peers.send(rig.listener.local)
+    val dialed = rig.listener.accept()
+    val dialedWire = PeerWire(dialed, metadata)
+    dialedWire.handshake(rig.peerHandshake())
+    serve(dialedWire, 0)
+    // It dials us too, without saying where it listens; that connection replaces ours.
+    val (connection, wire) = rig.dialSwarm()
+    assertTrue(wire.read() is PeerMessage.Bitfield)
+    assertNotNull(withTimeoutOrNull(5_000) {
+      try {
+        while (true) dialedWire.read()
+      } catch (_: IOException) {
+      }
+    }, "The connection we dialed was kept too")
+    dialed.close()
+    rig.down.store(true)
+    connection.close()
+    // Where we dialed it is dialed again as it would have been had that connection dropped.
+    val reached = rig.reachAgain(upAt = 70_000)
+    assertTrue(reached - 70_000 <= 60_000, "Reached ${reached - 70_000} ms after it came back")
+  }
+
+  @Test
   fun waitingEndpoints_leaveRoomForNewOnes() = swarmTest { rig ->
     // Over half the book refuses, and waits to be dialed again.
     val refusing = 2_100
@@ -152,9 +192,11 @@ class TorrentSwarmRedialTest {
     val clock: AtomicLong,
     val down: AtomicBoolean,
     val dials: AtomicInt,
+    val transport: TorrentNetwork,
     /** Where the peer listens; dials of other endpoints are refused. */
     val listener: TorrentListener,
     val peers: Channel<PeerEndpoint>,
+    val incoming: Channel<TorrentConnection>,
     private val scope: CoroutineScope,
   ) {
     val peerId: ByteArray = torrentRandomBytes(20)
@@ -173,6 +215,25 @@ class TorrentSwarmRedialTest {
       } finally {
         connection.close()
       }
+    }
+
+    /** The peer dials the swarm; with [listenPort], it says it listens there (BEP 10 `p`). */
+    suspend fun dialSwarm(listenPort: Int? = null): Pair<TorrentConnection, PeerWire> {
+      val ours = transport.listen(PeerEndpoint("127.0.0.1", 0))
+      val theirs = try {
+        val client = transport.connect(ours.local)
+        incoming.send(ours.accept())
+        client
+      } finally {
+        ours.close()
+      }
+      val wire = PeerWire(theirs, metadata)
+      wire.handshake(peerHandshake(extensions = listenPort != null))
+      if (listenPort != null) {
+        wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+          "m" to emptyMap<String, Long>(), "p" to listenPort.toLong()))))
+      }
+      return theirs to wire
     }
 
     /** Moves the clock on in [step]s, each longer than the swarm's tick, up to [until]. */
@@ -255,6 +316,7 @@ class TorrentSwarmRedialTest {
    */
   private fun swarmTest(
     stall: Boolean = false,
+    listenPortFor: (PeerEndpoint) -> Int = { 0 },
     body: suspend CoroutineScope.(Rig) -> Unit,
   ) = runTest {
     withContext(Dispatchers.Default) {
@@ -278,11 +340,13 @@ class TorrentSwarmRedialTest {
             }
           }
           val peers = Channel<PeerEndpoint>(Channel.UNLIMITED)
-          val rig = Rig(clock, down, dials, listener, peers, this)
+          val incoming = Channel<TorrentConnection>(4)
+          val rig = Rig(clock, down, dials, transport, listener, peers, incoming, this)
           val swarm = launch {
             TorrentSwarm(store, network, TorrentBufferBudget(1024 * 1024),
-              nowMs = { clock.load() },
-              stall = if (stall) MutableStateFlow<TorrentStall?>(null) else null).run(peers)
+              listenPortFor = listenPortFor, nowMs = { clock.load() },
+              stall = if (stall) MutableStateFlow<TorrentStall?>(null) else null)
+              .run(peers, incoming)
           }
           try {
             body(rig)

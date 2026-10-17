@@ -197,8 +197,9 @@ internal class TorrentV2Candidates(
   }
 
   /**
-   * The connection to a dialed or learned [endpoint] closed, having [delivered] payload or not. A
-   * [complete] session dials it again only once some source finds it after its window.
+   * The connection to a dialed or learned [endpoint] closed, having [delivered] payload or not,
+   * over it or a connection to the same peer it replaced. A [complete] session dials it again
+   * only once some source finds it after its window.
    */
   fun closed(
     endpoint: PeerEndpoint,
@@ -232,27 +233,37 @@ internal class TorrentV2Candidates(
   /**
    * An incoming peer from [source] closed. Its source port is ephemeral and never dialed; its
    * [listen] port, when the peer told us, becomes a candidate unless the session is restricted.
-   * A [complete] session does not dial it back: it is kept as tried until its window passes.
+   * One that [delivered] payload is dialed again as a dialed peer that brought payload is, known
+   * already or not. A [complete] session does not dial it back: it is kept as tried until its
+   * window passes.
    */
   fun incomingClosed(
     source: PeerEndpoint,
     listen: PeerEndpoint?,
     topic: PeerTopic,
     complete: Boolean = false,
+    delivered: Boolean = false,
   ) {
     if (listen == null || listen == source) return
-    if (!complete) {
+    if (!complete && !delivered) {
       offer(listen, topic, PeerOrigin.INCOMING)
       return
     }
-    if (listen.port == 0 || listen in bannedEndpoints) return
+    if (listen.port == 0 || listen in bannedEndpoints || !complete && restricted) return
     val entry = entries[listen] ?: run {
       if (entries.size >= MAX_CANDIDATES) prune()
       if (entries.size >= MAX_CANDIDATES) return
       Entry(listen).also { entries[listen] = it }
     }
+    if (topic == PeerTopic.V2) entry.v2 = true
     if (entry.status == Status.DIALING || entry.status == Status.CONNECTED) return
-    giveUp(entry)
+    if (complete) {
+      giveUp(entry)
+      return
+    }
+    entry.delivered = true
+    entry.attempts = 1
+    retry(entry, complete = false)
   }
 
   /**

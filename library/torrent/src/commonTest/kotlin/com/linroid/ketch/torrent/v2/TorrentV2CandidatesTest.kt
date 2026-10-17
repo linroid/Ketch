@@ -164,6 +164,39 @@ class TorrentV2CandidatesTest {
   }
 
   @Test
+  fun incomingPeerThatBroughtPayload_isDialedWhereItListensAsADialedOneIs() {
+    val source = PeerEndpoint("10.0.0.9", 51_234)
+    val listen = PeerEndpoint("10.0.0.9", 6881)
+    val book = book()
+    // Known and given up on already: a tracker named it, and every dial failed.
+    book.offer(listen, PeerTopic.V2, PeerOrigin.TRACKER)
+    var target = assertNotNull(book.next())
+    for (wait in listOf(5_000L, 15_000L, 30_000L)) {
+      book.failed(target, IOException("Connection refused"))
+      now += wait
+      target = assertNotNull(book.next())
+    }
+    book.failed(target, IOException("Connection refused"))
+    assertFalse(book.hasWork())
+    // It dialed us, sent payload and dropped: not dialed at once, but for about half an hour.
+    book.incomingClosed(source, listen, PeerTopic.V2, delivered = true)
+    val waits = listOf(5_000L, 15_000L, 30_000L, 60_000L, 120_000L) + List(5) { 300_000L }
+    for (wait in waits) {
+      assertNull(book.next())
+      assertEquals(wait, book.nextDueMs())
+      now += wait
+      target = assertNotNull(book.next())
+      assertEquals(listen, target.endpoint)
+      book.failed(target, IOException("Connection refused"))
+    }
+    assertFalse(book.hasWork())
+    // Restricted sessions dial only what trackers name.
+    val restricted = book(restricted = true)
+    restricted.incomingClosed(source, listen, PeerTopic.V2, delivered = true)
+    assertFalse(restricted.hasWork())
+  }
+
+  @Test
   fun duplicate_isGivenUpUntilFoundAfterItsWindow() {
     val book = book()
     book.offer(a, PeerTopic.V2, PeerOrigin.LSD)

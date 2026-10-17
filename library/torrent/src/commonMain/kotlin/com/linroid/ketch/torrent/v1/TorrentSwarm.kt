@@ -191,6 +191,10 @@ internal class TorrentSwarm(
     val flags: Int,
     /** Closed because both sides were seeds. */
     val redundant: Boolean = false,
+    /** Where we dialed the peer of an incoming connection kept over that dial. */
+    val alias: PeerEndpoint? = null,
+    /** A connection to the same peer that this one replaced brought payload. */
+    val inherited: Boolean = false,
   )
 
   private val log = KetchLogger("TorrentSwarm")
@@ -302,13 +306,16 @@ internal class TorrentSwarm(
       retryAt[endpoint] = due
       broughtForwardAt[endpoint] = now()
     }
-    // The connection to [endpoint], which we dialed, ended while we download: it is dialed again
-    // after its delay, or given up until forgotten. One that brought payload counts as its first
-    // dial.
+    // A connection to the peer that listens at [endpoint], dialed there or not, ended while we
+    // download: it is dialed again after its delay, or given up until forgotten. One that brought
+    // payload, over it or a connection it replaced, counts as its first dial.
     fun redial(endpoint: PeerEndpoint, broughtPayload: Boolean) {
+      if (endpoint in faulty || endpoint !in attempts && attempts.size >= MAX_CANDIDATES) return
       if (broughtPayload) delivered += endpoint
       val dials = if (broughtPayload) 1 else attempts[endpoint] ?: 1
       attempts[endpoint] = dials
+      // Never dialed, it is still forgotten once given up long enough.
+      attemptedAt.getOrPut(endpoint) { now() }
       val delay = PeerRedial.delayMs(dials, endpoint in delivered)
       if (delay == null) {
         // Its dials are spent: found again later, it starts over as any endpoint does.
@@ -507,14 +514,10 @@ internal class TorrentSwarm(
       val attempt = PeerAttempt(incoming, PeerIdentityHandshake.Mode.V1)
       active[endpoint] = launch(TorrentDispatchers.engine, start = CoroutineStart.ATOMIC) {
         var failure: Throwable? = null
-        var listen: PeerEndpoint? = if (incoming) null else endpoint
-        var redundant = false
+        var end = PeerEnd(listen = if (incoming) null else endpoint)
         try {
           peer(id, endpoint, flags, attempt, scheduler, progressEvents, pexEvents, holepunch,
-            punches, connection) { known, seeds ->
-            listen = known
-            redundant = seeds
-          }
+            punches, connection) { end = it }
         } catch (e: TimeoutCancellationException) {
           // A connect, handshake or idle deadline of this peer, not the swarm stopping it.
           failure = e
@@ -533,8 +536,8 @@ internal class TorrentSwarm(
           }
           connection?.close()
           overhead.close()
-          results.trySend(PeerResult(endpoint, failure, incoming, listen, attempt, flags,
-            redundant))
+          results.trySend(PeerResult(endpoint, failure, incoming, end.listen, attempt, flags,
+            end.redundant, end.alias, end.inherited))
         }
       }
     }
@@ -585,7 +588,11 @@ internal class TorrentSwarm(
         var candidates = pending.size
         while (active.size < limit && pending.isNotEmpty() && candidates-- > 0) {
           val endpoint = pending.removeFirst()
-          if (endpoint in active) continue
+          if (endpoint in active) {
+            // Dialed once its connection, or an incoming one from that port, ends.
+            pending.addLast(endpoint)
+            continue
+          }
           if (isOwnAddress(endpoint)) {
             // Known, as given up on, so its discovery does not queue it again.
             log.v { "Peer $endpoint for $logLabel left out: our own address" }
@@ -660,6 +667,7 @@ internal class TorrentSwarm(
             active.remove(endpoint)
             diagnostics.record(endpoint, result.attempt, failure, result.incoming, result.flags)
             if (failure is TorrentStorageException) throw failure
+            val broughtPayload = result.attempt.payload > 0 || result.inherited
             if (failure != null && failure !is DuplicatePeerException) {
               connectFailures++
               if (failure is CorruptPieceException) corruptPieces++
@@ -670,19 +678,33 @@ internal class TorrentSwarm(
                 log.v { "Peer $endpoint for $logLabel: asked its introducer to punch through" }
               }
             }
-            if (result.incoming) {
+            val alias = result.alias
+            if (failure is DuplicatePeerException) {
+              // The connection kept to the peer dials it again once it closes, unless it closed
+              // first. Until then, or until forgotten, it is given up on.
+              log.v { "Peer $endpoint for $logLabel is connected over another connection" }
+            } else if (result.incoming && alias != null) {
+              // It listens where we dialed it too, and was kept over that dial.
+              if (failure is IllegalArgumentException) {
+                if (alias in attempts) faulty += alias
+              } else if (!complete) {
+                redial(alias, broughtPayload)
+              }
+            } else if (result.incoming) {
               // Never redial a source port: a public torrent dials where the peer listens, unless
               // both of us were seeds.
               val listen = result.listen
-              if (listen != null && !trackerRestricted && !result.redundant &&
-                failure !is DuplicatePeerException && listen !in active) discover(listen)
+              if (listen != null && !trackerRestricted && !result.redundant) {
+                if (broughtPayload && !complete && failure !is IllegalArgumentException) {
+                  redial(listen, broughtPayload = true)
+                } else if (listen !in active) {
+                  discover(listen)
+                }
+              }
             } else if (failure is IllegalArgumentException) {
               faulty += endpoint
-            } else if (failure is DuplicatePeerException) {
-              // Given up on until forgotten: the peer is connected over another connection.
-              log.v { "Peer $endpoint for $logLabel is connected over another connection" }
             } else if (!complete) {
-              redial(endpoint, broughtPayload = result.attempt.payload > 0)
+              redial(endpoint, broughtPayload)
             }
           }
           pexEvents.onReceive { (source, update) -> acceptPex(source, update) }
@@ -728,10 +750,7 @@ internal class TorrentSwarm(
     }
   }
 
-  /**
-   * Runs one peer; [onEnd] learns where it listens once known, also when it fails, and whether
-   * it was closed because both sides were seeds.
-   */
+  /** Runs one peer; [onEnd] learns how it ended ([PeerEnd]), also when it fails. */
   private suspend fun peer(
     id: Int,
     endpoint: PeerEndpoint,
@@ -743,7 +762,7 @@ internal class TorrentSwarm(
     holepunch: SwarmHolepunch,
     punches: SendChannel<PeerEndpoint>,
     accepted: TorrentConnection?,
-    onEnd: (listen: PeerEndpoint?, redundant: Boolean) -> Unit,
+    onEnd: (PeerEnd) -> Unit,
   ) {
     val connection = accepted ?: network.connectPeer(endpoint, store.metadata.infoHash.toBytes())
     attempt.stage = PeerStage.HANDSHAKING
@@ -752,7 +771,9 @@ internal class TorrentSwarm(
     try {
       val worker = PeerWorker(id, endpoint, connection, accepted != null, receivedFlags, attempt,
         scheduler, progressEvents, pexEvents, holepunch, punches)
-      try { worker.run() } finally { onEnd(worker.listen, worker.redundant) }
+      try { worker.run() } finally {
+        onEnd(PeerEnd(worker.listen, worker.redundant, worker.alias, worker.inherited))
+      }
     } finally {
       connection.close()
     }
@@ -853,6 +874,17 @@ internal class TorrentSwarm(
     private var identity: PeerIdentity? = null
     /** Another connection to the same peer, one both ends keep, replaced this one. */
     private val displaced = AtomicBoolean(false)
+    /** The peer sent payload over this connection; read by one that replaces it. */
+    private val broughtPayload = AtomicBoolean(false)
+    /**
+     * Where we dialed the peer of this incoming connection, which it was kept over; written under
+     * [connectedMutex] while this is the connection kept, read once it ended.
+     */
+    var alias: PeerEndpoint? = null
+      private set
+    /** A connection to the same peer that this one replaced brought payload. */
+    var inherited = false
+      private set
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     suspend fun run() = supervisorScope {
@@ -962,9 +994,17 @@ internal class TorrentSwarm(
           !incoming == keepsOutgoing(listenPortFor(outgoing), outgoing, peerId.toByteString(),
             remoteId)
         if (existing == null || replaces) {
-          existing?.displaced?.store(true)
+          if (existing != null) {
+            existing.displaced.store(true)
+            // Where the peer is dialed again once this one closes counts what that one brought.
+            if (incoming) alias = existing.endpoint
+            inherited = existing.broughtPayload.load() || existing.inherited
+          }
           identities[key] = this
           identity = key
+        } else if (!incoming && existing.incoming && existing.alias == null) {
+          // The peer that dialed us listens where we just reached it.
+          existing.alias = endpoint
         }
         identity != null
       }
@@ -1006,6 +1046,7 @@ internal class TorrentSwarm(
         val throttling = TimeSource.Monotonic.markNow()
         val throttledAt = nowMs()
         traffic?.received(message.bytes.size)
+        if (attempt.payload == 0L) broughtPayload.store(true)
         attempt.payload += message.bytes.size
         downloadPayload(message.bytes.size)
         lastBlock += throttling.elapsedNow()
@@ -1525,6 +1566,18 @@ internal class CorruptPieceException : IllegalArgumentException("Peer sent a cor
 
 /** Closes a connection to a peer the swarm keeps another connection to. */
 internal class DuplicatePeerException : IOException("Peer is connected over another connection")
+
+/**
+ * How a peer worker ended: where the peer [listen]s, once known; whether it was closed as
+ * [redundant], both sides being seeds; where we dialed the peer of an incoming connection kept
+ * over that dial ([alias]); and whether a connection it replaced brought payload ([inherited]).
+ */
+private class PeerEnd(
+  val listen: PeerEndpoint?,
+  val redundant: Boolean = false,
+  val alias: PeerEndpoint? = null,
+  val inherited: Boolean = false,
+)
 
 private suspend fun <T> storage(block: suspend () -> T): T = try {
   block()

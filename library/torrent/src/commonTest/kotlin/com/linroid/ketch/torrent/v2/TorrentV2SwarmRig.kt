@@ -38,6 +38,7 @@ import okio.ByteString.Companion.toByteString
 import okio.FileHandle
 import okio.FileSystem
 import okio.ForwardingFileSystem
+import okio.IOException
 import okio.Path
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
@@ -92,6 +93,11 @@ internal class TorrentV2RemotePeer(
   override fun close() {
     closed.complete(Unit)
     input.cancel()
+  }
+
+  /** The peer hangs up: our reads fail as they do on a connection the peer reset. */
+  fun hangUp() {
+    input.close(IOException("Connection reset by peer"))
   }
 }
 

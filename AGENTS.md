@@ -815,12 +815,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   revived; one that brought payload is retried `DELIVERED_RETRIES` (10) times, about half an hour,
   then given up the same way, so peers gone for good never fill the swarm's dials or its book (at
   most 4096 endpoints, each counted once, queued or not). A connection that brings payload counts as
-  its endpoint's first dial when it closes. A source naming a peer that brought payload again has it
-  dialed `FOUND_AGAIN_MS` (30 s) after its last dial, at most once every `FOUND_AGAIN_EVERY_MS` (5
-  minutes), as the DHT names the same peers every minute. A revive dials every waiting or given-up
-  endpoint at once and keeps its count; its dial of an endpoint given up on leaves when that was
-  (`PeerRedial.spent`), so a stall without a single peer, which revives every minute
-  (`LONELY_REVIVE_MS`, others every five), still forgets it. A complete swarm dials nobody back
+  its endpoint's first dial when it closes. Payload over a connection the peer opened counts for
+  where it listens (BEP 10 `p`), and payload over a connection that another to the same peer
+  replaced counts for the one kept, dialed again where we dialed the peer (v1
+  `PeerResult.alias`/`inherited`, v2 `Member.inherited`). A source naming a peer that brought
+  payload again has it dialed `FOUND_AGAIN_MS` (30 s) after its last dial, at most once every
+  `FOUND_AGAIN_EVERY_MS` (5 minutes), as the DHT names the same peers every minute. A revive dials
+  every waiting or given-up endpoint at once and keeps its count; its dial of an endpoint given up
+  on leaves when that was (`PeerRedial.spent`), so a stall without a single peer, which revives
+  every minute (`LONELY_REVIVE_MS`, others every five), still forgets it. A complete swarm dials
+  nobody back
 - One connection per peer, in v1 and v2 swarms (`PeerIdentity`): peers are told apart by the ID they
   claim and their host, where loopback, private, link-local and unique local hosts count as one
   (`localTorrentAddress`), as one client there is reached at several addresses (loopback from
