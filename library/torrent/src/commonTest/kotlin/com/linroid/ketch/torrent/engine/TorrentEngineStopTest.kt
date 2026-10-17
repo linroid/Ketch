@@ -83,8 +83,10 @@ class TorrentEngineStopTest {
       requests.value.count { it.startsWith(tracker) && "event=stopped" in it }
   }
 
-  private fun root(): Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
-    "ketch-engine-stop-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+  /** A new folder: a v2 owner's output must be in one that exists. */
+  private fun root(): Path = (FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+    "ketch-engine-stop-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}")
+    .also { FileSystem.SYSTEM.createDirectories(it) }
 
   /** A one-piece v1 task announcing to [tracker], started. */
   private suspend fun KotlinTorrentEngine.addV1(index: Int, tracker: String, root: Path) {
