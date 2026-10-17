@@ -12,14 +12,19 @@ import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.FileSystem
 import okio.Path
+import okio.Path.Companion.toPath
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
@@ -31,7 +36,8 @@ import kotlin.test.assertTrue
 
 /**
  * Each run of a torrent task follows the task's session as Ketch runs it: the run pays its own
- * task limits, also on a session an earlier run opened.
+ * task limits, also on a session an earlier run opened, and the task shows the progress it
+ * started with until the session describes this run.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentSourceRunTest {
@@ -113,6 +119,89 @@ class TorrentSourceRunTest {
           }
           engines.forEach { it.assertNoLeaks() }
         }
+      }
+    }
+  }
+
+  /** A source over a fake engine, which runs whatever [FakeTorrentEngine.addTorrentResult] is. */
+  private fun fakeSource(engine: FakeTorrentEngine, policy: TorrentUploadPolicy) =
+    TorrentDownloadSource(TorrentConfig(dhtEnabled = false, uploadPolicy = policy))
+      .also { it.engineFactory = { engine } }
+
+  @Test
+  fun download_whileTheSessionChecksItsFiles_keepsTheRestoredProgress() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.DISABLED)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val hash = torrent.metadata.infoHash.hex
+          val all = setOf("0", "1", "2")
+          val session = FakeTorrentSession(hash)
+          session.stateOnResume = TorrentSessionState.CHECKING_FILES
+          engine.addTorrentResult = session
+          // What the task saved: f0 and part of f1 verified.
+          val restored = listOf(Segment(0, 0, 99_999, 100_000),
+            Segment(1, 100_000, 169_999, 35_000), Segment(2, 170_000, 256_143))
+          val state = TorrentSourceState(hash, torrent.sizeOf(0, 1, 2), "", all, "unused",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, segments = restored,
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val run = launch { source.download(context, state) }
+          // A check starts from nothing: the task keeps what it had, which is also what is saved.
+          repeat(2) { assertEquals(135_000L to torrent.sizeOf(0, 1, 2), reports.receive()) }
+          assertEquals(restored, context.segments.value)
+          session.finish()
+          run.join()
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_takesOverASeederForNewFiles_reportsTheNewSelectionFirst() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val session = FakeTorrentSession(torrent.metadata.infoHash.hex)
+          session.selectedFileIds = setOf("0")
+          engine.addTorrentResult = session
+          // The first run downloads f0 and keeps seeding it.
+          val first = context("task", resolved, "unused".toPath(), setOf("0"))
+          val seeds = launch {
+            eventually("the session to resume") { session.resumed }
+            session.seed()
+          }
+          source.download(first, null)
+          seeds.join()
+          val state = assertNotNull(source.store(first))
+          // Ketch reopens the task with f1 added, f0 counted as done, and the seeder takes the
+          // new selection only once its sidecar pieces are copied.
+          val gate = CompletableDeferred<Unit>()
+          session.changeSelectionGate = gate
+          val planned = listOf(Segment(0, 0, 99_999, 100_000), Segment(1, 100_000, 169_999))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val run = async {
+            source.download(context("task", resolved, "unused".toPath(), setOf("0", "1"),
+              segments = planned, onProgress = { downloaded, total ->
+                reports.send(downloaded to total)
+              }), state)
+          }
+          assertEquals(torrent.sizeOf(0) to torrent.sizeOf(0, 1), reports.receive())
+          gate.complete(Unit)
+          run.await()
+          assertEquals(listOf(setOf("0", "1")), session.selectionChanges)
+          source.stopSeeding("task")
+          source.assertNoLeaks()
+        } finally { source.close() }
       }
     }
   }

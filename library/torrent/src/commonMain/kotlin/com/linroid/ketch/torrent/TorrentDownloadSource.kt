@@ -1219,8 +1219,8 @@ class TorrentDownloadSource(
         // Payload pays this run's task limits, also on a session an earlier run opened.
         running.setTaskThrottle(context.throttle)
         // An adopted session applies the current selection first, whatever it ran with.
-        keepSeeding = track(context, running, table, state.selectedFileIds,
-          applied = if (adopted == null) initialRevision else -1, resume = adopted == null)
+        keepSeeding = track(context, running, table, state.selectedFileIds, initialRevision,
+          adopted = adopted != null)
         // Paused uploads finish a completed session that would have seeded.
         if (!keepSeeding) deferSharing(taskId, seeded = false)
         onTransferEnd(taskId)
@@ -1339,22 +1339,28 @@ class TorrentDownloadSource(
    * receives meanwhile without reconnecting, and returns whether it keeps seeding; a stopped
    * session fails the task. A revision is acknowledged only when the session takes it live and
    * this run still follows it: the gate closes before the run returns, so no acknowledgment can
-   * arrive after it decided to. [applied] is the revision the session already runs; [fallback]
-   * is the selection shown for sessions that report none.
+   * arrive after it decided to. [files] are the files this run starts with, selection revision
+   * [revision], also shown for sessions that report none. An [adopted] session, which an earlier
+   * run left running, applies the current selection first.
+   *
+   * Until the session has checked its files and runs this run's selection, the task keeps the
+   * progress it started with, the [DownloadContext.segments] Ketch restored or planned: a session
+   * checking its files reports none yet, and one taken over still describes the files an earlier
+   * run gave it. Should it check them again, the task keeps what the session reported last.
    */
   private suspend fun track(
     context: DownloadContext,
     session: TorrentSession,
     table: TorrentFileTable,
-    fallback: Set<String>,
-    applied: Int,
-    resume: Boolean,
+    files: Set<String>,
+    revision: Int,
+    adopted: Boolean,
   ): Boolean = coroutineScope {
     val taskId = context.taskId
     val gate = Mutex()
     // Both guarded by gate.
     var attached = true
-    var appliedRevision = applied
+    var appliedRevision = if (adopted) -1 else revision
     val collector = launch {
       context.selection.collect { update ->
         if (gate.withLock { update.revision <= appliedRevision }) return@collect
@@ -1390,8 +1396,10 @@ class TorrentDownloadSource(
     var lastReceived = (session as? TorrentV2DownloadSession)?.receivedBytes() ?: 0
     var v2Speed = 0L
     var seeding = false
+    // The size of what the segments describe: this run's files until the session reports its own.
+    var total = table.totalOf(files)
     try {
-      if (resume) session.resume()
+      if (!adopted) session.resume()
       var lastState: TorrentSessionState? = null
       while (true) {
         val status = session.state.value
@@ -1399,17 +1407,20 @@ class TorrentDownloadSource(
           log.d { "Torrent taskId=$taskId session state: $status" }
           lastState = status
         }
-        val chosen = session.selectedFileIds.ifEmpty { fallback }
-        context.segments.value = when (session) {
-          is KotlinTorrentSession -> {
-            val progress = session.fileProgress()
-            table.segments(chosen) { progress.getOrElse(it.id.toInt()) { 0 } }
+        if (status in CHECKED && gate.withLock { appliedRevision >= revision }) {
+          val chosen = session.selectedFileIds.ifEmpty { files }
+          context.segments.value = when (session) {
+            is KotlinTorrentSession -> {
+              val progress = session.fileProgress()
+              table.segments(chosen) { progress.getOrElse(it.id.toInt()) { 0 } }
+            }
+            is TorrentV2DownloadSession -> {
+              val progress = session.fileProgress()
+              table.segments(chosen) { progress[it.id] ?: 0 }
+            }
+            else -> table.segments(chosen) { 0 }
           }
-          is TorrentV2DownloadSession -> {
-            val progress = session.fileProgress()
-            table.segments(chosen) { progress[it.id] ?: 0 }
-          }
-          else -> table.segments(chosen) { 0 }
+          total = table.totalOf(chosen)
         }
         context.reportedSpeed.value = if (session is TorrentV2DownloadSession) {
           // Over a second or more, as v1 sessions sample theirs: blocks arrive in bursts, and
@@ -1423,8 +1434,7 @@ class TorrentDownloadSource(
           }
           v2Speed
         } else session.downloadSpeed
-        context.onProgress(context.segments.value.sumOf { it.downloadedBytes },
-          table.totalOf(chosen))
+        context.onProgress(context.segments.value.sumOf { it.downloadedBytes }, total)
         when (status) {
           // The task completes either way; a seeding session outlives it.
           TorrentSessionState.FINISHED -> {
@@ -1707,6 +1717,13 @@ private const val RELEASE_TIMEOUT_MS = 10_000L
 /** Session states a run takes over instead of starting its own session. */
 private val ADOPTABLE = setOf(TorrentSessionState.CHECKING_FILES,
   TorrentSessionState.DOWNLOADING, TorrentSessionState.SEEDING)
+
+/**
+ * Session states whose progress counts the verified bytes of their files; a session checking
+ * them, or about to, reports none yet.
+ */
+private val CHECKED = setOf(TorrentSessionState.DOWNLOADING, TorrentSessionState.SEEDING,
+  TorrentSessionState.FINISHED)
 
 /** The task limits of a seeder no run follows: none. */
 private val NO_THROTTLE: suspend (Int) -> Unit = {}

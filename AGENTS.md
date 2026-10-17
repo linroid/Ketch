@@ -732,7 +732,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentV2WebSeeds.relaunch`, `TorrentV2DiscoverySink.reannounceRequests`)
 - Verified selected-file storage, ownership journal, restart rehash, live limits, and upload and
   seeding (`[torrent] upload`, while downloading by default in the apps, the CLI and the server;
-  the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so)
+  the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so). A run
+  publishes its session's progress only once the session checked its files (`DOWNLOADING`,
+  `SEEDING` or `FINISHED`) and, when it took over a seeder, applied the run's selection; until
+  then the task keeps the segments Ketch restored or planned, so a recheck never shows 0
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
   verified pieces when they are deselected, copies verified spans of boundary pieces from the
