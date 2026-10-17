@@ -294,6 +294,10 @@ internal object ConnectionSamples {
   /** The torrent peer [mixed] selects: incoming over IPv6, downloading and uploading. */
   const val PEER_ID = 21L
 
+  /** What sample peers call their clients; `null` for one whose peer ID names nothing. */
+  private val PEER_CLIENTS = listOf("qBittorrent/5.0.2", "Transmission 4.0.6", null,
+    "libtorrent 2.0.10", "Deluge 2.1.1", "µTorrent 3.6.0")
+
   private val NAMES = mapOf(
     "ubuntu" to "ubuntu-24.04-desktop-amd64.iso",
     "imagenet-03" to "imagenet-part03.tar",
@@ -388,6 +392,7 @@ internal object ConnectionSamples {
               peerChoking = rates.first == 0L,
               uploadSlot = rates.second > 0,
               peerInterested = rates.second > 0,
+              client = PEER_CLIENTS[i % PEER_CLIENTS.size],
             ),
             uploaded = rates.second * 300,
           ),
@@ -418,6 +423,7 @@ internal object ConnectionSamples {
               peerChoking = true,
               uploadSlot = i % 3 != 0,
               peerInterested = true,
+              client = PEER_CLIENTS[(i + 2) % PEER_CLIENTS.size],
             ),
           ),
         )

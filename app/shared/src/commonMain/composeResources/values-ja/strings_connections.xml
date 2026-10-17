@@ -8,6 +8,7 @@
   <string name="connections_column_protocol">プロトコル</string>
   <string name="connections_column_route">経路</string>
   <string name="connections_column_peer">ピア</string>
+  <string name="connections_column_client">クライアント</string>
   <string name="connections_column_down">受信速度</string>
   <string name="connections_column_up">送信速度</string>
   <string name="connections_column_received">受信量</string>

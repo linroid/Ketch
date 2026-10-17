@@ -568,6 +568,7 @@ internal object TorrentV2SessionLoop {
                 if (view.info?.origin is PeerV2Origin.Incoming) {
                   view.extensions.listenPort?.let { view.traffic?.listenPort(it) }
                 }
+                view.extensions.client?.let { view.traffic?.client(it) }
               }
             }
             else -> Unit
@@ -1177,7 +1178,8 @@ internal object TorrentV2SessionLoop {
                   val traffic = info?.let {
                     PeerTraffic.open(reporter, it.link.remote,
                       incoming = it.origin is PeerV2Origin.Incoming,
-                      v1 = it.mode == PeerIdentityHandshake.Mode.V1)
+                      v1 = it.mode == PeerIdentityHandshake.Mode.V1,
+                      peerId = it.peerId.toByteArray())
                   }
                   val view = TorrentV2PeerView(peerEvent.commands, info, viewLease, nowMs,
                     traffic, layout.pieceLength)

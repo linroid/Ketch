@@ -55,6 +55,15 @@ class ConnectionRowsTest {
     assertEquals(listOf(1L, 2L), rows.matching(null, "UBUNTU http").map { it.connection.id })
     assertEquals(listOf(3L), rows.matching(null, "203.0.113 nas").map { it.connection.id })
     assertEquals(emptyList(), rows.matching("http", "sintel"))
+    // A torrent peer's client counts as a field.
+    assertEquals(listOf(3L), rows.matching(null, "qbittorrent").map { it.connection.id })
+  }
+
+  @Test
+  fun arranged_byClient_keepsUnknownClientsLast() {
+    val byClient = ConnectionArrangement().next(ConnectionSort.Client)
+    assertEquals(3L, rows.arranged(byClient).first().connection.id)
+    assertEquals(3L, rows.arranged(byClient.next(ConnectionSort.Client)).first().connection.id)
   }
 
   @Test
@@ -165,7 +174,11 @@ class ConnectionRowsTest {
     downloadBps = down,
     uploadBps = up,
     openedAt = NOW - opened.seconds,
-    peer = if (protocol == "BitTorrent") PeerDetails("v1", true, false, false) else null,
+    peer = if (protocol == "BitTorrent") {
+      PeerDetails("v1", true, false, false, client = "qBittorrent 4.6.3")
+    } else {
+      null
+    },
   )
 
   private companion object {

@@ -18,6 +18,7 @@
   <string name="connections_column_route">Route</string>
   <!-- A BitTorrent peer's state. -->
   <string name="connections_column_peer">Peer</string>
+  <string name="connections_column_client">Client</string>
   <!-- Speeds now: received ("Down") and sent ("Up"). -->
   <string name="connections_column_down">Down</string>
   <string name="connections_column_up">Up</string>

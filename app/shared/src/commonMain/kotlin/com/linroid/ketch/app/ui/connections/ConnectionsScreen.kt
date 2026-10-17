@@ -80,6 +80,7 @@ import com.linroid.ketch.app.ui.pulse.trafficLabel
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.ShellNavigation
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connections_column_client
 import ketch.app.shared.generated.resources.connections_column_device
 import ketch.app.shared.generated.resources.connections_column_down
 import ketch.app.shared.generated.resources.connections_column_endpoint
@@ -424,6 +425,7 @@ internal enum class ConnectionColumn(
   Device(Res.string.connections_column_device, 112.dp, ConnectionSort.Device),
   Task(Res.string.connections_column_task, 160.dp, ConnectionSort.Task),
   Protocol(Res.string.connections_column_protocol, 104.dp, ConnectionSort.Protocol),
+  Client(Res.string.connections_column_client, 120.dp, ConnectionSort.Client),
   Route(Res.string.connections_column_route, 96.dp, ConnectionSort.Route),
   Peer(Res.string.connections_column_peer, 136.dp, ConnectionSort.Peer),
   Down(Res.string.connections_column_down, 80.dp, ConnectionSort.Down, numeric = true),
@@ -435,12 +437,12 @@ internal enum class ConnectionColumn(
 
 /**
  * The columns that fit [available] beside the endpoint's [EndpointMinWidth], dropping the least
- * telling first. The device shows under All devices, the peer state while a torrent peer is
- * connected; speeds always show.
+ * telling first. The device shows under All devices, the peer client and state while a torrent
+ * peer is connected; speeds always show.
  */
 internal fun fitColumns(available: Dp, devices: Boolean, peers: Boolean): List<ConnectionColumn> {
   val columns = ConnectionColumn.entries.filter {
-    (it != ConnectionColumn.Device || devices) && (it != ConnectionColumn.Peer || peers)
+    (it != ConnectionColumn.Device || devices) && (it !in PeerColumns || peers)
   }.toMutableList()
   fun width() = LeadWidth + EndpointMinWidth + columns.fold(0.dp) { sum, it -> sum + it.width }
   for (column in HideOrder) {
@@ -584,6 +586,7 @@ private fun TableRow(
           ConnectionColumn.Device -> TextCell(row.deviceName, modifier)
           ConnectionColumn.Task -> TextCell(row.taskName ?: connection.taskId, modifier)
           ConnectionColumn.Protocol -> ProtocolCell(row, modifier)
+          ConnectionColumn.Client -> TextCell(row.client, modifier)
           ConnectionColumn.Route -> TextCell(routeText(row)?.resolve(), modifier)
           ConnectionColumn.Peer -> PeerCell(row, modifier)
           ConnectionColumn.Down -> NumberCell(
@@ -765,6 +768,8 @@ private fun ListRow(row: ConnectionRow, showDevices: Boolean, onShow: (Connectio
   val connection = row.connection
   val details = listOfNotNull(
     verbatim(row.deviceName).takeIf { showDevices },
+    // Ahead of the task, whose long name would otherwise cut it off.
+    row.client?.let(::verbatim),
     verbatim(row.taskName ?: connection.taskId),
     verbatim(row.protocol),
     routeText(row),
@@ -899,6 +904,7 @@ private const val PAGE_LIMIT = ActiveConnections.MAX_LIMIT
 private val HideOrder = listOf(
   ConnectionColumn.Peer,
   ConnectionColumn.Route,
+  ConnectionColumn.Client,
   ConnectionColumn.Sent,
   ConnectionColumn.Received,
   ConnectionColumn.Device,
@@ -906,6 +912,9 @@ private val HideOrder = listOf(
   ConnectionColumn.Protocol,
   ConnectionColumn.Task,
 )
+
+/** Columns only torrent peers fill. */
+private val PeerColumns = setOf(ConnectionColumn.Client, ConnectionColumn.Peer)
 
 private val LeadWidth = 24.dp
 private val EndpointMinWidth = 180.dp

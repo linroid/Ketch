@@ -8,6 +8,7 @@
   <string name="connections_column_protocol">通訊協定</string>
   <string name="connections_column_route">路由</string>
   <string name="connections_column_peer">對等端</string>
+  <string name="connections_column_client">用戶端</string>
   <string name="connections_column_down">下行</string>
   <string name="connections_column_up">上行</string>
   <string name="connections_column_received">已接收</string>

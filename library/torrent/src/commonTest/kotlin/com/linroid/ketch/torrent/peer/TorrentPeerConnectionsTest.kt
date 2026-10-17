@@ -82,6 +82,17 @@ class TorrentPeerConnectionsTest {
   }
 
   @Test
+  fun peerOpensWithTheClientItsPeerIdNames() {
+    val recorder = RecordingConnections()
+    PeerTraffic.open(recorder, peerAddress, incoming = false, v1 = true,
+      peerId = "-TR4060-".encodeToByteArray() + ByteArray(12) { '0'.code.toByte() })
+    PeerTraffic.open(recorder, peerAddress, incoming = false, v1 = true,
+      peerId = torrentRandomBytes(20).also { it[0] = 0 })
+    assertEquals("Transmission 4.0.6", recorder.opened[0].spec.peer?.client)
+    assertNull(recorder.opened[1].spec.peer?.client)
+  }
+
+  @Test
   fun peerStateIsDescribedOnlyWhenItChanges() {
     val recorder = RecordingConnections()
     val traffic = assertNotNull(PeerTraffic.open(recorder, peerAddress, incoming = true,
@@ -103,6 +114,11 @@ class TorrentPeerConnectionsTest {
     traffic.listenPort(51413)
     assertEquals(2, connection.describes)
     assertEquals(51413, connection.spec.port)
+    // The client its extension handshake names is described once.
+    traffic.client("Deluge 2.1.1")
+    traffic.client("Deluge 2.1.1")
+    assertEquals(3, connection.describes)
+    assertEquals("Deluge 2.1.1", connection.spec.peer?.client)
     traffic.received(16_384)
     traffic.sent(4)
     traffic.close()
@@ -166,13 +182,23 @@ class TorrentPeerConnectionsTest {
             val client = network.connect(inbound.local).also { joiner = it }
             val server = inbound.accept().also { joined = it }
             incoming.send(server)
-            PeerWire(client, metadata).handshake(PeerHandshake(metadata.infoHash,
-              torrentRandomBytes(20), false, false))
+            val joinerWire = PeerWire(client, metadata)
+            joinerWire.handshake(PeerHandshake(metadata.infoHash,
+              "-qB4630-".encodeToByteArray() + torrentRandomBytes(12), true, false))
             eventually("the incoming peer") { recorder.opened.size == 2 }
             val dialedUs = recorder.opened[1]
             assertEquals(ConnectionDirection.INCOMING, dialedUs.spec.direction)
             assertEquals(server.remote.port, dialedUs.spec.port)
             assertEquals("v1", dialedUs.spec.peer?.wire)
+            // Its peer ID names its client until its extension handshake says more.
+            assertEquals("qBittorrent 4.6.3", dialedUs.spec.peer?.client)
+            joinerWire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+              "m" to emptyMap<String, Long>(), "v" to "qBittorrent/4.6.3"))))
+            eventually("the incoming peer's client") {
+              dialedUs.spec.peer?.client == "qBittorrent/4.6.3"
+            }
+            // The dialed peer's random ID names nothing.
+            assertNull(dialed.spec.peer?.client)
             // It leaves; the other peer stays.
             client.close()
             eventually("the incoming peer to close") { dialedUs.closed }

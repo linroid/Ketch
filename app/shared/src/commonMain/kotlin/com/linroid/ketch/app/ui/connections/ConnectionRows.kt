@@ -24,6 +24,9 @@ internal class ConnectionRow(
 
   /** Its protocol, such as `HTTP/2` or `BitTorrent`. */
   val protocol: String = connection.protocol ?: connection.source.uppercase()
+
+  /** A torrent peer's client, as the peer names it; `null` when unknown or not a peer. */
+  val client: String? get() = connection.peer?.client
 }
 
 /** Every connection of [grid], each with its task's and device's names. */
@@ -57,7 +60,7 @@ internal fun sourceFilters(rows: List<ConnectionRow>): List<SourceFilter> =
 
 /**
  * The rows of [source] (every source with `null`) that match every word of [query] in their
- * endpoint, task, protocol or device, ignoring case.
+ * endpoint, task, protocol, peer client or device, ignoring case.
  */
 internal fun List<ConnectionRow>.matching(source: String?, query: String): List<ConnectionRow> {
   val words = query.trim().lowercase().split(Whitespace).filter { it.isNotEmpty() }
@@ -66,6 +69,7 @@ internal fun List<ConnectionRow>.matching(source: String?, query: String): List<
       row.endpoint.lowercase().contains(word) ||
         row.taskName?.lowercase()?.contains(word) == true ||
         row.protocol.lowercase().contains(word) ||
+        row.client?.lowercase()?.contains(word) == true ||
         row.deviceName.lowercase().contains(word)
     }
   }
@@ -82,6 +86,7 @@ internal enum class ConnectionSort(
   Device(numeric = false),
   Task(numeric = false),
   Protocol(numeric = false),
+  Client(numeric = false),
   Route(numeric = false),
   Peer(numeric = false),
   Down(numeric = true),
@@ -124,6 +129,10 @@ internal fun List<ConnectionRow>.arranged(arrangement: ConnectionArrangement): L
     ConnectionSort.Device -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.deviceName }
     ConnectionSort.Task -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.taskName.orEmpty() }
     ConnectionSort.Protocol -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.protocol }
+    // Unknown clients last, whichever way.
+    ConnectionSort.Client ->
+      compareBy<ConnectionRow> { (it.client == null) != arrangement.descending }
+        .thenBy(String.CASE_INSENSITIVE_ORDER) { it.client.orEmpty() }
     ConnectionSort.Route -> compareBy({ it.connection.direction }, { it.connection.route })
     ConnectionSort.Peer -> compareBy(
       { it.connection.peer == null },

@@ -8,6 +8,7 @@
   <string name="connections_column_protocol">Protocole</string>
   <string name="connections_column_route">Route</string>
   <string name="connections_column_peer">Pair</string>
+  <string name="connections_column_client">Client</string>
   <string name="connections_column_down">Réception</string>
   <string name="connections_column_up">Envoi</string>
   <string name="connections_column_received">Reçu</string>

@@ -1564,14 +1564,17 @@ public final class com/linroid/ketch/api/PauseReason$WaitingForCondition : com/l
 
 public final class com/linroid/ketch/api/PeerDetails {
 	public static final field Companion Lcom/linroid/ketch/api/PeerDetails$Companion;
-	public fun <init> (Ljava/lang/String;ZZZ)V
+	public fun <init> (Ljava/lang/String;ZZZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ZZZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Z
 	public final fun component3 ()Z
 	public final fun component4 ()Z
-	public final fun copy (Ljava/lang/String;ZZZ)Lcom/linroid/ketch/api/PeerDetails;
-	public static synthetic fun copy$default (Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;ZZZILjava/lang/Object;)Lcom/linroid/ketch/api/PeerDetails;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;ZZZLjava/lang/String;)Lcom/linroid/ketch/api/PeerDetails;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/PeerDetails;Ljava/lang/String;ZZZLjava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/PeerDetails;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClient ()Ljava/lang/String;
 	public final fun getPeerChoking ()Z
 	public final fun getPeerInterested ()Z
 	public final fun getUploadSlot ()Z

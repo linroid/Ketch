@@ -37,6 +37,8 @@ enum class ConnectionRoute {
  * @property peerChoking whether the peer chokes this instance
  * @property uploadSlot whether this instance unchoked the peer
  * @property peerInterested whether the peer wants data this instance has
+ * @property client the peer's client, such as `qBittorrent 4.6.3`, as the peer names it (its
+ *   BEP 10 `v`, else its peer ID); self-reported, so only fit for display. `null` when unknown
  */
 @Serializable
 data class PeerDetails(
@@ -44,6 +46,7 @@ data class PeerDetails(
   val peerChoking: Boolean,
   val uploadSlot: Boolean,
   val peerInterested: Boolean,
+  val client: String? = null,
 )
 
 /**

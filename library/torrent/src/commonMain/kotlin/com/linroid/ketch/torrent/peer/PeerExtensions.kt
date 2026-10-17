@@ -22,6 +22,10 @@ internal class PeerExtensions {
   var requestQueue: Int? = null
     private set
 
+  /** The peer's client as it names itself (BEP 10 `v`), cleaned up for display. */
+  var client: String? = null
+    private set
+
   fun id(name: String): Int = ids[name] ?: 0
 
   fun receive(bytes: ByteArray, maxMetadataBytes: Int) {
@@ -52,6 +56,7 @@ internal class PeerExtensions {
     // Hints only: a peer that sends nonsense here is not worth dropping.
     root["p"]?.integer?.takeIf { it in 1..65_535 }?.let { listenPort = it.toInt() }
     root["reqq"]?.integer?.takeIf { it in 1..MAX_REQUEST_QUEUE }?.let { requestQueue = it.toInt() }
+    root["v"]?.bytes?.let(PeerClients::fromVersion)?.let { client = it }
   }
 
   companion object {

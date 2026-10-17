@@ -976,7 +976,8 @@ internal class TorrentSwarm(
       fast = handshake.fast
       state = PeerProtocolState(store.pieceCount, maxPending = MAX_PIPELINE, fast = fast)
       attempt.stage = PeerStage.CONNECTED
-      traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true)
+      traffic = PeerTraffic.open(reporter, endpoint, incoming, v1 = true,
+        peerId = handshake.peerId)
       chokerMutex.withLock { choker.add(id) }
       publishContact()
       holepunch.join(id, connection.remote, connection.utp, holepunchOut)
@@ -1301,6 +1302,7 @@ internal class TorrentSwarm(
           listen = PeerEndpoint(connection.remote.host, port)
           traffic?.listenPort(port)
         }
+        extensions.client?.let { traffic?.client(it) }
         publishContact()
         holepunch.update(id, listen, extensions.id(HOLEPUNCH_EXTENSION) != 0)
       } else if (message.id == PeerExtensions.HOLEPUNCH) {

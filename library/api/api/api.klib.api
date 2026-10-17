@@ -1026,8 +1026,10 @@ final class com.linroid.ketch.api/NetworkInterfaces { // com.linroid.ketch.api/N
 }
 
 final class com.linroid.ketch.api/PeerDetails { // com.linroid.ketch.api/PeerDetails|null[0]
-    constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean) // com.linroid.ketch.api/PeerDetails.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/String? = ...) // com.linroid.ketch.api/PeerDetails.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?){}[0]
 
+    final val client // com.linroid.ketch.api/PeerDetails.client|{}client[0]
+        final fun <get-client>(): kotlin/String? // com.linroid.ketch.api/PeerDetails.client.<get-client>|<get-client>(){}[0]
     final val peerChoking // com.linroid.ketch.api/PeerDetails.peerChoking|{}peerChoking[0]
         final fun <get-peerChoking>(): kotlin/Boolean // com.linroid.ketch.api/PeerDetails.peerChoking.<get-peerChoking>|<get-peerChoking>(){}[0]
     final val peerInterested // com.linroid.ketch.api/PeerDetails.peerInterested|{}peerInterested[0]
@@ -1041,7 +1043,8 @@ final class com.linroid.ketch.api/PeerDetails { // com.linroid.ketch.api/PeerDet
     final fun component2(): kotlin/Boolean // com.linroid.ketch.api/PeerDetails.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.linroid.ketch.api/PeerDetails.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.linroid.ketch.api/PeerDetails.component4|component4(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.linroid.ketch.api/PeerDetails // com.linroid.ketch.api/PeerDetails.copy|copy(kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component5(): kotlin/String? // com.linroid.ketch.api/PeerDetails.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.linroid.ketch.api/PeerDetails // com.linroid.ketch.api/PeerDetails.copy|copy(kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/PeerDetails.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/PeerDetails.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/PeerDetails.toString|toString(){}[0]

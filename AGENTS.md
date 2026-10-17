@@ -202,7 +202,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TrackerFailureException`)
 - `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
   `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
-  (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`,
+  (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`, `PeerClients`,
   `PeerDiagnostics`, `PeerRedial` (when swarms dial an endpoint again), `PeerIdentity` and
   `keepsOutgoing` (duplicate connections) and `TorrentChoker`
 - `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `SwarmHolepunch`,
@@ -513,8 +513,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   v2/hybrid (the session loop, from `Ready` to `Closed`, on `TorrentV2PeerView`), either
   direction, through `PeerTraffic`: protocol `BitTorrent`, `PeerDetails.wire` `v1` (also a
   hybrid's v1-swarm peers) or `v2`, choke and interest state as it changes, the peer's IP and port
-  (an incoming peer's source port until BEP 10 `p` names its listen port), and payload on the
-  wire both ways (a v1 route's padding included). `TorrentTaskSpec`/`TorrentV2TaskSpec`
+  (an incoming peer's source port until BEP 10 `p` names its listen port), its client
+  (`PeerDetails.client`, display only: what `PeerClients` reads from its Azureus, Shadow or
+  Mainline style peer ID until its BEP 10 `v`, kept by `PeerExtensions.client` without control or
+  formatting characters and cut to 64, replaces it; never logged with the host), and payload on
+  the wire both ways (a v1 route's padding included). `TorrentTaskSpec`/`TorrentV2TaskSpec`
   `.connections` carry the task's reporter for the session's life, so a seeding session (lent
   after its download returned, started by `startSeeding`, restored or adopted) keeps reporting.
   Magnet metadata peers, trackers and DHT are not reported. A web seed (BEP 19) is one
@@ -1380,11 +1383,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `net.activeConnections`, the fastest `ActiveConnections.MAX_LIMIT` of them, with a footer
   counting the slower ones and the devices that don't report connections. Wide windows show a
   table (endpoint, device under All devices, task, protocol with a shield when encrypted, route
-  or Incoming, a torrent peer's wire and choke state, down, up, received, sent, open for) whose
+  or Incoming, a torrent peer's client and its wire and choke state, down, up, received, sent, open for) whose
   headers sort it (`ConnectionArrangement`; by default the longest open first, so rows keep
   their place), dropping the least telling columns as it narrows (`fitColumns`); narrow windows
   and phones show two-line rows. Chips pick a source by its commonest protocol family
-  (`sourceFilters`) and the field searches endpoints, tasks, protocols and devices
+  (`sourceFilters`) and the field searches endpoints, tasks, protocols, peer clients and devices
   (`matching`). Each row leads with ↓, ↑, both or a dot, and its speeds are drawn in the traffic
   colors, so direction never rests on color alone; a row shows its task, on its Connections tab
   for HTTP and FTP. `ConnectionGridModel` asks each online device for its own stream

@@ -8,6 +8,7 @@
   <string name="connections_column_protocol">프로토콜</string>
   <string name="connections_column_route">경로</string>
   <string name="connections_column_peer">피어</string>
+  <string name="connections_column_client">클라이언트</string>
   <string name="connections_column_down">받기</string>
   <string name="connections_column_up">보내기</string>
   <string name="connections_column_received">받은 양</string>

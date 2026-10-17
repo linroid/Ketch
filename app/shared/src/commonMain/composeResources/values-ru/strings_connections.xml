@@ -8,6 +8,7 @@
   <string name="connections_column_protocol">Протокол</string>
   <string name="connections_column_route">Маршрут</string>
   <string name="connections_column_peer">Пир</string>
+  <string name="connections_column_client">Клиент</string>
   <string name="connections_column_down">Приём</string>
   <string name="connections_column_up">Отдача</string>
   <string name="connections_column_received">Получено</string>

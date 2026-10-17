@@ -11,9 +11,9 @@ import com.linroid.ketch.torrent.net.PeerEndpoint
 /**
  * One connected peer among the task's live connections: its payload in both directions and
  * its choke and interest state. Only the peer's own worker (v1) or the session loop (v2) calls
- * it, so it needs no locking. Counting is one atomic add and allocates nothing; [state] and
- * [listenPort] allocate only when something changed. The peer's address goes to the reporter
- * only, never to the logs.
+ * it, so it needs no locking. Counting is one atomic add and allocates nothing; [state],
+ * [listenPort] and [client] allocate only when something changed. The peer's address and client
+ * go to the reporter only, never to the logs.
  */
 internal class PeerTraffic private constructor(
   private val handle: ConnectionHandle,
@@ -40,6 +40,16 @@ internal class PeerTraffic private constructor(
     describe(spec.copy(port = port))
   }
 
+  /**
+   * The peer named its client, cleaned up for display: its BEP 10 `v`, which replaces what its
+   * peer ID suggested.
+   */
+  fun client(name: String) {
+    val peer = spec.peer ?: return
+    if (peer.client == name) return
+    describe(spec.copy(peer = peer.copy(client = name)))
+  }
+
   /** The connection ended; later calls do nothing. */
   fun close() = handle.close()
 
@@ -62,12 +72,14 @@ internal class PeerTraffic private constructor(
      * @param incoming the peer dialed us, so [remote] is its source port
      * @param v1 the peer speaks the v1 wire protocol, as every peer of a v1 torrent and a
      *   hybrid's peers from its v1 swarm do
+     * @param peerId the peer ID its handshake claimed, which names its client until it says more
      */
     fun open(
       reporter: ConnectionReporter,
       remote: PeerEndpoint,
       incoming: Boolean,
       v1: Boolean,
+      peerId: ByteArray? = null,
     ): PeerTraffic? {
       if (reporter === ConnectionReporter.None) return null
       val spec = ConnectionSpec(
@@ -80,7 +92,8 @@ internal class PeerTraffic private constructor(
         // Peers are always dialed directly: proxies only carry HTTP(S), HLS and DASH.
         route = ConnectionRoute.DIRECT,
         peer = PeerDetails(wire = if (v1) "v1" else "v2", peerChoking = true,
-          uploadSlot = false, peerInterested = false),
+          uploadSlot = false, peerInterested = false,
+          client = peerId?.let(PeerClients::fromPeerId)),
       )
       return PeerTraffic(reporter.open(spec), spec)
     }
