@@ -85,9 +85,12 @@ private fun lanIpv6Addresses(addresses: List<InetAddress>): List<Inet6Address> =
 
 /**
  * A multicast socket on [port], shared with other clients (SO_REUSEADDR), that joined the IPv4
- * group, the IPv6 group or both on the interfaces of each [memberships] entry, and sends there on
- * each in turn. Receives wake every [POLL_MS] to notice a cancelled caller, as closing the socket
- * from another thread is the only other way to stop them on Android.
+ * group, the IPv6 group or both on the interfaces of each [memberships] entry, none of them a
+ * point-to-point link ([LsdInterfaceFacts]). It receives every announce and sends the IPv6 ones;
+ * the IPv4 ones leave through [ipv4Sender], a separate IPv4 socket on an ephemeral port. Each
+ * announce goes out of every joined interface in turn. Receives wake every [POLL_MS] to notice a
+ * cancelled caller, as closing the socket from another thread is the only other way to stop them
+ * on Android.
  */
 internal class JvmLsdTransport private constructor(
   private val socket: MulticastSocket,

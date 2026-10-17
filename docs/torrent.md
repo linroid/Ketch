@@ -328,8 +328,10 @@ public magnet can also get its file list from another device at home this way.
 - It works over IPv4 and IPv6. Over IPv6 it only finds devices with a unique local address
   (`fc00::/7`); devices with only a link-local address are heard but cannot be dialed.
 - Devices announce every 5 minutes, so a new one may take that long to be found.
-- VPN tunnels are left out: Ketch announces on each local network interface itself, also when a
-  VPN takes the system's multicast traffic.
+- VPN tunnels are left out on macOS, Linux and Android, where they are point-to-point links:
+  Ketch announces on each local network interface itself, also when a VPN takes the system's
+  multicast traffic. On Windows, TUN adapters such as Wintun or TAP may not count as
+  point-to-point, so discovery may still use them.
 - Private and tracker-only torrents never take part, and peers found this way are never shared
   with other peers.
 - It runs on desktop and Android. iOS does not support it, as multicast there needs an entitlement
@@ -692,11 +694,15 @@ every interface map ports.
 
 While a public torrent runs, the engine joins `239.192.152.143:6771` on each interface with a
 private or link-local IPv4 address and `[ff15::efc0:988f]:6771` on each interface with a
-link-local or unique local IPv6 address (not VPN tunnels), on one socket shared with other clients
-(`SO_REUSEADDR`). It sends `BT-SEARCH` announces to both groups with its TCP listen port (never a
+link-local or unique local IPv6 address, leaving out point-to-point links (VPN tunnels) in both
+families, on one socket shared with other clients (`SO_REUSEADDR`). It sends `BT-SEARCH` announces
+to both groups, out of each joined interface in turn, with its TCP listen port (never a
 router-mapped one), a random cookie and up to 20 info hashes, when each torrent starts and every 5
 minutes, at most once a minute per torrent. A v1 torrent announces its info hash, a v2 torrent the
-first 20 bytes of its SHA-256 hash, and a hybrid both.
+first 20 bytes of its SHA-256 hash, and a hybrid both. The shared socket receives every announce
+and sends the IPv6 ones; IPv4 announces leave through a separate IPv4 socket, from an ephemeral
+port rather than 6771, as on macOS the shared socket cannot choose the interface IPv4 multicast
+leaves on.
 
 Announces are accepted only from private (10/8, 172.16/12, 192.168/16, 100.64/10) or link-local
 IPv4 senders and unique local IPv6 senders, with a valid port and at most 20 hashes in 1400 bytes,
