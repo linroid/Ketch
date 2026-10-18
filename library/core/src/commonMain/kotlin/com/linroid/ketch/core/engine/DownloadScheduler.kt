@@ -41,9 +41,9 @@ internal class DownloadScheduler(
   }
 
   /**
-   * Waits for [schedule] and [conditions] again, then enqueues the task. A cancel or remove
-   * landing meanwhile, as while the caller paused the task, keeps it canceled: its record and
-   * state stay so and nothing waits to enqueue it.
+   * Waits for [schedule] and [conditions] again, then enqueues the task. A task that ended
+   * meanwhile, as when it completed, failed, was canceled or removed while the caller paused it,
+   * keeps its record and state, and nothing waits to enqueue it.
    */
   suspend fun reschedule(
     handle: TaskHandle,
@@ -57,7 +57,7 @@ internal class DownloadScheduler(
 
     // Persist so a restart restores the new schedule. Conditions are kept in memory only.
     handle.record.update {
-      if (it.state == TaskState.CANCELED) {
+      if (it.state.isTerminal) {
         it
       } else {
         it.copy(
@@ -68,7 +68,7 @@ internal class DownloadScheduler(
       }
     }
     handle.mutableState.update { state ->
-      if (state is DownloadState.Canceled) state else DownloadState.Scheduled(schedule)
+      if (state.isTerminal) state else DownloadState.Scheduled(schedule)
     }
     log.i {
       "Rescheduling download: taskId=$taskId, schedule=$schedule, " +
@@ -78,9 +78,10 @@ internal class DownloadScheduler(
   }
 
   /**
-   * Enqueues the task, resuming its progress, once [schedule] and [conditions] are met. A canceled
-   * task is never enqueued: nothing waits for one canceled already, and one canceled while it
-   * waits is checked again. A cancel shown after the check here then [cancel]s the wait.
+   * Enqueues the task, resuming its progress, once [schedule] and [conditions] are met. A task
+   * that ended (completed, failed or canceled) is never enqueued, as it would download again:
+   * nothing waits for one that ended already, and one that ends while it waits is checked again.
+   * A cancel shown after the check here then [cancel]s the wait.
    */
   private suspend fun launchWhenDue(
     handle: TaskHandle,
@@ -89,16 +90,16 @@ internal class DownloadScheduler(
   ) {
     val taskId = handle.taskId
     mutex.withLock {
-      if (handle.mutableState.value is DownloadState.Canceled) {
-        log.d { "Not scheduling canceled taskId=$taskId" }
+      if (handle.mutableState.value.isTerminal) {
+        log.d { "Not scheduling taskId=$taskId, which has ended" }
         return
       }
       val job = scope.launch {
         waitForSchedule(taskId, schedule)
         waitForConditions(taskId, conditions)
 
-        if (handle.mutableState.value is DownloadState.Canceled) {
-          log.d { "Not enqueuing canceled taskId=$taskId" }
+        if (handle.mutableState.value.isTerminal) {
+          log.d { "Not enqueuing taskId=$taskId, which has ended" }
         } else {
           log.i { "Schedule and conditions met for taskId=$taskId, enqueuing" }
           queue.enqueue(handle, preferResume = true)

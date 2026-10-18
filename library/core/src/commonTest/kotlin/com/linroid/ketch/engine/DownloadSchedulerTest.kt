@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadQueue
@@ -356,17 +357,24 @@ class DownloadSchedulerTest {
   }
 
   @Test
-  fun reschedule_canceledTask_keepsItCanceledAndWaitsForNothing() = runTest {
+  fun reschedule_endedTask_keepsItsStateAndWaitsForNothing() = runTest {
     val (_, manager) = createTestComponents(backgroundScope)
-    val handle = createHandle("task-1")
-    handle.mutableState.value = DownloadState.Canceled
-    handle.record.update { it.copy(state = TaskState.CANCELED) }
+    val ended = listOf(
+      DownloadState.Canceled to TaskState.CANCELED,
+      DownloadState.Completed("/tmp/file.zip", 1000) to TaskState.COMPLETED,
+      DownloadState.Failed(KetchError.Network()) to TaskState.FAILED,
+    )
+    for ((state, saved) in ended) {
+      val handle = createHandle("task-$saved")
+      handle.mutableState.value = state
+      handle.record.update { it.copy(state = saved) }
 
-    manager.reschedule(handle, DownloadSchedule.AfterDelay(10.seconds), emptyList())
+      manager.reschedule(handle, DownloadSchedule.AfterDelay(10.seconds), emptyList())
 
-    assertIs<DownloadState.Canceled>(handle.mutableState.value)
-    assertEquals(TaskState.CANCELED, handle.record.value.state)
-    assertFalse(manager.isScheduled("task-1"))
+      assertEquals(state, handle.mutableState.value)
+      assertEquals(saved, handle.record.value.state)
+      assertFalse(manager.isScheduled(handle.taskId), "$saved")
+    }
   }
 
   @Test

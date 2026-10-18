@@ -41,7 +41,8 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * A cancel or remove never waits for the queue, so it can land while the queue starts the task.
  * These tests hold a save of the start (the queue's or the coordinator's) open while the cancel
- * comes, then let it finish: the task must stay canceled, run no more and free its slot.
+ * comes, then let it finish: the task must stay canceled, run no more and free its slot. A run
+ * that ends as a reschedule stops it stays ended the same way.
  */
 class CancelRaceTest {
   private val folder = "/tmp/ketch-cancel-race/"
@@ -394,6 +395,42 @@ class CancelRaceTest {
       assertIs<DownloadState.Canceled>(task.state.value)
       assertTrue(ketch.tasks.value.none { it.taskId == task.taskId })
       assertNull(store.load(task.taskId))
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun reschedule_completedBeforeItsPause_staysCompleted() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      val task = ketch.download(request("0"))
+      val other = ketch.download(request("1"))
+      runCurrent()
+      assertIs<DownloadState.Downloading>(task.state.value)
+      // The other task's pause saves under the coordinator's lock, which the reschedule's pause
+      // then waits for while the task completes.
+      val gate = SaveGate(store) { it.taskId == other.taskId && it.state == TaskState.PAUSED }
+      val pausing = launch { other.pause() }
+      runCurrent()
+      assertTrue(gate.held.isCompleted)
+      val rescheduling = launch { task.reschedule(DownloadSchedule.AfterDelay(1.minutes)) }
+      runCurrent()
+      source.runs.value.single { it.context.taskId == task.taskId }.finish.complete(Unit)
+      runCurrent()
+      assertIs<DownloadState.Completed>(task.state.value)
+
+      gate.release.complete(Unit)
+      pausing.join()
+      rescheduling.join()
+      advanceTimeBy(2.minutes)
+      runCurrent()
+
+      assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals(TaskState.COMPLETED, store.load(task.taskId)?.state)
+      assertEquals(1, source.runs.value.count { it.context.taskId == task.taskId })
     } finally {
       ketch.close()
     }
