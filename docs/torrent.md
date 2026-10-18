@@ -703,9 +703,12 @@ external port; when another device holds that port, UPnP picks another. Only eng
 every interface map ports.
 
 When Ketch shuts down, the routers get 2 seconds to remove the mappings, also those Ketch was
-still asking for, and the log says once how many of them confirmed it; a router that already lost
-a mapping counts. One that did not confirm may keep forwarding the port until the mapping's lease
-ends, or, when the router only takes permanent UPnP leases, until the router itself drops it.
+still asking for, all asked at once, so a gateway that does not answer holds none of the others
+up. A gateway Ketch only guessed at and that never answered, such as a carrier-grade NAT asked
+over PCP, is asked once and briefly. The log says once how many routers confirmed the removal,
+counting only routers that answered; a router that already lost a mapping counts. One that did not
+confirm may keep forwarding the port until the mapping's lease ends, or, when the router only
+takes permanent UPnP leases, until the router itself drops it.
 
 ### Local discovery details
 

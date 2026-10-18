@@ -251,8 +251,10 @@ class PortMappingTest {
       mapper.stop(timeoutMs = stopMs)
       val actions = igd.actions.value
       assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping TCP 6888",
-        "AddPortMapping UDP 6888", "GetExternalIPAddress null null",
-        "DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"), actions)
+        "AddPortMapping UDP 6888", "GetExternalIPAddress null null"), actions.take(4))
+      // Removed side by side, in no particular order.
+      assertEquals(setOf("DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"),
+        actions.drop(4).toSet())
     } finally {
       silent.close()
     }
@@ -276,7 +278,9 @@ class PortMappingTest {
       assertEquals(6981, mapped.first { it != -1 })
       assertEquals("203.0.113.7", address.value)
       mapper.stop(timeoutMs = stopMs)
-      assertEquals(listOf(2 to 3600, 1 to 3600, 2 to 0, 1 to 0), requests.value)
+      assertEquals(listOf(2 to 3600, 1 to 3600), requests.value.take(2))
+      // Removed side by side, in no particular order.
+      assertEquals(setOf(2 to 0, 1 to 0), requests.value.drop(2).toSet())
     }
 
   @Test
@@ -295,10 +299,12 @@ class PortMappingTest {
         mapper.start()
         assertEquals(6888, mapped.first { it != -1 })
         mapper.stop(timeoutMs = stopMs)
+        val actions = igd.actions.value
         assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping UDP 6881",
           "DeletePortMapping TCP 6881", "AddPortMapping TCP 6888", "AddPortMapping UDP 6888",
-          "GetExternalIPAddress null null", "DeletePortMapping TCP 6888",
-          "DeletePortMapping UDP 6888"), igd.actions.value)
+          "GetExternalIPAddress null null"), actions.take(6))
+        assertEquals(setOf("DeletePortMapping TCP 6888", "DeletePortMapping UDP 6888"),
+          actions.drop(6).toSet())
       } finally {
         silent.close()
       }

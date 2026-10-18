@@ -971,12 +971,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the UDP port DHT and uTP share map to one external port per layer; the outermost one is what
   `TorrentAdvertisedPort.setMapped` announces, and `PortMapLayers` (the layers, that port and
   address, and whether the address is public) what `KotlinTorrentEngine.reachability` reads.
-  Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
-  2 s, which the engine starts as its stopped window opens; UPnP tries other ports on 718 and
-  permanent leases on 725. `stop` logs once (info, the port and layer counts only) how many layers
-  confirmed removing every mapping asked for, also those of a pass it cut short (UPnP fault 714,
-  no such entry, counts) and, if not all, that the rest may still forward the port until their
-  lease ends, or until the router drops one asked for with lease 0.
+  Mappings last an hour, renew every half hour and are removed by `stop` within 2 s, all at once
+  (`unmapAll`, also for stale ones), which the engine starts as its stopped window opens; UPnP
+  tries other ports on 718 and permanent leases on 725. Every request is noted before it goes out;
+  a PCP MAP to a guessed gateway counts as answered only once a reply came (`Requested.answered`;
+  NAT-PMP and UPnP gateways answered discovery), and until then its removal goes out once
+  (`PcpClient.map(once = true)`, the first window, 250 ms), so silent guesses never hold up the
+  router's. `stop` logs once (info, the port and layer counts only) how many layers confirmed
+  removing every mapping asked for, counting only layers whose gateway answered, before or by
+  confirming the removal, also those of a pass it cut short (UPnP fault 714, no such entry,
+  counts) and, if not all, that the rest may still forward the port until their lease ends, or
+  until the router drops one asked for with lease 0.
   `PortMappingTest` and
   `NatLayersTest` run them against scripted gateways on loopback, and `TorrentShutdownTest` an
   engine's (`portMapGateways`)

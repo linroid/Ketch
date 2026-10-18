@@ -27,8 +27,9 @@ internal class PcpClient(
 ) {
   /**
    * Maps [internalPort] of [client] (IPv4) for [lifetimeSeconds], asking for [externalPort]; the
-   * gateway may pick another. A lifetime of 0 removes the mapping that [nonce] made. Null when
-   * the gateway refuses or is silent.
+   * gateway may pick another. A lifetime of 0 removes the mapping that [nonce] made. [once] sends
+   * the request a single time and waits only the first retry window, for a gateway that may not
+   * be there. Null when the gateway refuses or is silent.
    */
   suspend fun map(
     gateway: ByteArray,
@@ -38,6 +39,7 @@ internal class PcpClient(
     externalPort: Int,
     lifetimeSeconds: Long,
     nonce: ByteArray,
+    once: Boolean = false,
   ): PcpMapping? {
     require(client.size == 4 && nonce.size == NONCE_BYTES)
     require(internalPort in 1..65535 && externalPort in 0..65535 && lifetimeSeconds >= 0)
@@ -51,7 +53,7 @@ internal class PcpClient(
       // Any external address the gateway has, of the IPv4 family.
       .write(ipv4Mapped(ByteArray(4)))
       .readByteArray()
-    val reply = exchange(gateway, request) ?: return null
+    val reply = exchange(gateway, request, if (once) retryMs.take(1) else retryMs) ?: return null
     val body = Buffer().write(reply, HEADER_BYTES, MAP_BYTES)
     val replyNonce = body.readByteArray(NONCE_BYTES.toLong())
     val replyProtocol = body.readByte().toInt() and 0xff
@@ -65,8 +67,15 @@ internal class PcpClient(
     return PcpMapping(PortMapping(protocol, internal, external, lifetime), address)
   }
 
-  /** Sends [request] until a successful MAP reply arrives from [gateway]. */
-  private suspend fun exchange(gateway: ByteArray, request: ByteArray): ByteArray? {
+  /**
+   * Sends [request] until a successful MAP reply arrives from [gateway], waiting each of [waits]
+   * in turn.
+   */
+  private suspend fun exchange(
+    gateway: ByteArray,
+    request: ByteArray,
+    waits: List<Long>,
+  ): ByteArray? {
     val remote = PeerEndpoint(numericHost(gateway), port)
     val socket = try {
       network.bindUdp(PeerEndpoint("0.0.0.0", 0))
@@ -76,7 +85,7 @@ internal class PcpClient(
       return null
     }
     try {
-      for (wait in retryMs) {
+      for (wait in waits) {
         try {
           socket.send(remote, request)
         } catch (e: CancellationException) {

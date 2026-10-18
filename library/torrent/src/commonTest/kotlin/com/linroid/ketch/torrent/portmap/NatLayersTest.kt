@@ -63,14 +63,14 @@ class NatLayersTest {
 
   /**
    * A NAT-PMP gateway whose external address is the next of [addresses] at each ask (the last
-   * once they run out), and which maps each internal port to itself plus [offset], without a
-   * reply for [silentPort], whose replies are lost. Records each mapping as (opcode, internal
-   * port, lifetime).
+   * once they run out; null leaves the ask unanswered), and which maps each internal port to
+   * itself plus [offset], without a reply for [silentPort], whose replies are lost. Records each
+   * mapping as (opcode, internal port, lifetime).
    */
   private suspend fun natPmpGateway(
     network: TorrentNetwork,
     scope: CoroutineScope,
-    addresses: List<String>,
+    addresses: List<String?>,
     offset: Int,
     requests: MutableStateFlow<List<Triple<Int, Int, Int>>>,
     silentPort: Int? = null,
@@ -86,7 +86,7 @@ class NatLayersTest {
           val opcode = input.readByte().toInt()
           val reply = Buffer().writeByte(0).writeByte(128 + opcode).writeShort(0).writeInt(1)
           if (opcode == 0) {
-            reply.write(ip(addresses[minOf(asked++, addresses.lastIndex)]))
+            reply.write(ip(addresses[minOf(asked++, addresses.lastIndex)] ?: continue))
           } else {
             input.readShort()
             val internal = input.readShort().toInt() and 0xffff
@@ -108,13 +108,15 @@ class NatLayersTest {
   }
 
   /**
-   * A PCP server granting each MAP its suggested port plus one at 20.0.113.9. Records each
-   * request's client address, protocol, internal port and lifetime.
+   * A PCP server granting each MAP its suggested port plus one at 20.0.113.9, or answering
+   * nothing when [silent]. Records each request's client address, protocol, internal port and
+   * lifetime.
    */
   private suspend fun pcpServer(
     network: TorrentNetwork,
     scope: CoroutineScope,
     requests: MutableStateFlow<List<PcpRequest>>,
+    silent: Boolean = false,
   ): Int {
     val socket = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
     scope.launch {
@@ -132,6 +134,7 @@ class NatLayersTest {
           val internal = input.readShort().toInt() and 0xffff
           val suggested = input.readShort().toInt() and 0xffff
           requests.update { it + PcpRequest(numericHost(client), protocol, internal, lifetime) }
+          if (silent) continue
           val granted = if (lifetime == 0) 0 else suggested + 1
           val reply = Buffer()
             .writeByte(2).writeByte(0x81).writeByte(0).writeByte(0)
@@ -177,10 +180,13 @@ class NatLayersTest {
       listOf(
         Triple(2, 6881, 3600), Triple(1, 6881, 3600),
         Triple(2, 6981, 3600), Triple(1, 6981, 3600),
-        // Removed outermost first.
-        Triple(2, 6981, 0), Triple(1, 6981, 0), Triple(2, 6881, 0), Triple(1, 6881, 0),
       ),
-      requests.value,
+      requests.value.take(4),
+    )
+    // Removed side by side, in no particular order.
+    assertEquals(
+      setOf(Triple(2, 6981, 0), Triple(1, 6981, 0), Triple(2, 6881, 0), Triple(1, 6881, 0)),
+      requests.value.drop(4).toSet(),
     )
   }
 
@@ -206,8 +212,47 @@ class NatLayersTest {
         assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 1 of 2 NAT " +
           "layer(s) confirmed it; the others may still forward the port until their lease ends"),
           lines.drain().filter { "mapping of port" in it })
-        assertEquals(listOf(Triple(2, 6881, 3600), Triple(2, 6981, 3600), Triple(2, 6981, 0),
-          Triple(2, 6881, 0)), requests.value)
+        assertEquals(listOf(Triple(2, 6881, 3600), Triple(2, 6981, 3600)),
+          requests.value.take(2))
+        assertEquals(setOf(Triple(2, 6981, 0), Triple(2, 6881, 0)), requests.value.drop(2).toSet())
+      }
+    }
+
+  @Test
+  fun mapper_stoppedWhileProbingASilentOuterGateway_removesTheRoutersMappingThroughOneLayer() =
+    gateways { network, scope ->
+      val requests = MutableStateFlow(emptyList<Triple<Int, Int, Int>>())
+      // The home router's external address is a carrier's; outside it, NAT-PMP goes unanswered.
+      val port = natPmpGateway(network, scope, listOf("100.64.0.2", null), offset = 0,
+        requests = requests)
+      val probes = MutableStateFlow(emptyList<PcpRequest>())
+      // The guessed carrier-grade NAT never answers PCP either.
+      val pcpPort = pcpServer(network, scope, probes, silent = true)
+      withInfoLog { lines ->
+        val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { null },
+          onMapped = {},
+          natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
+          // Its probe and the removal of a mapping it granted would wait 1.75 s for a reply.
+          pcp = PcpClient(network, pcpPort, retryMs = listOf(250, 500, 1000)),
+          upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+          networks = { listOf(network127) },
+          outerGateways = { address ->
+            assertContentEquals(ip("100.64.0.2"), address)
+            listOf(loopback)
+          })
+        mapper.start()
+        // The engine stops while the guessed gateway is probed.
+        probes.first { it.isNotEmpty() }
+        mapper.stop()
+        // The router's mapping is removed within the 2 s budget, and the probe names no layer.
+        assertEquals(
+          listOf("[TorrentEngine] Removed the mapping of port 6881 through 1 NAT layer(s)"),
+          lines.drain().filter { "mapping of port" in it },
+        )
+        assertEquals(listOf(Triple(2, 6881, 3600), Triple(2, 6881, 0)), requests.value)
+        // The probe's own removal went out once.
+        val removals = probes.first { asked -> asked.any { it.life == 0 } }.filter { it.life == 0 }
+        assertEquals(listOf(PcpRequest("100.64.0.2", 6, 6881, 0)), removals)
       }
     }
 
