@@ -280,10 +280,43 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun downloadUntilDone_outputIsNotATerminal_printsTheWarningOnALineOfItsOwn() {
+    // As `ketch <url> > out.log`: captured, the carriage returns that clear the line on a
+    // terminal put the progress and a run of spaces in front of every record.
+    val engine = ServingEngine(byteArrayOf(1, 2, 3), release = CompletableDeferred())
+    val log = KetchLogger("Tracker")
+    val status = withConsole {
+      download(
+        "https://example.com/a.bin",
+        engine,
+        logger = Logger.console(quietLogLevel(LogLevel.INFO)),
+        interactive = false,
+        stalls = {
+          flow {
+            awaitPrinted { "[Downloading] " in it }
+            log.w { "Tracker warns about the torrent" }
+            awaitPrinted { "Tracker warns about the torrent" in it }
+            engine.release?.complete(Unit)
+          }
+        },
+      )
+    }
+
+    assertEquals(DownloadExit.OK, status)
+    val output = out.toString(Charsets.UTF_8)
+    assertFalse('\r' in output, output)
+    val lines = output.lines()
+    val warning =
+      Regex("""\d{4}-\d\d-\d\d [\d:.]+ \[WARN] \[Tracker] Tracker warns about the torrent""")
+    assertEquals(1, lines.count { warning.matches(it) }, output)
+    assertTrue(lines.any { it.startsWith("[Downloading] ") }, output)
+  }
+
+  @Test
   fun progressPrinter_torrentStalls_keepsEveryLineNarrowerThan80Columns() {
     // Printed again every second: a line that wraps leaves a row behind at each update. Some
     // consoles wrap once the 80th column is written, so a line must stop before it.
-    val printer = ProgressPrinter(ProgressLine(outStream), SpeedLimit.kbps(500))
+    val printer = ProgressPrinter(ProgressLine(outStream, interactive = true), SpeedLimit.kbps(500))
     val sizes = listOf(
       DownloadProgress(179_516_211, 1_503_238_554, bytesPerSecond = 1_258_291),
       DownloadProgress(872_309_637_120, 1_099_511_627_775, bytesPerSecond = 1_048_575),
@@ -305,7 +338,7 @@ class DownloadCommandTest {
 
   @Test
   fun progressPrinter_stallGoesOn_saysWhyOnceEachTimeTheReasonChanges() {
-    val printer = ProgressPrinter(ProgressLine(outStream), SpeedLimit.Unlimited)
+    val printer = ProgressPrinter(ProgressLine(outStream, interactive = true), SpeedLimit.Unlimited)
     val downloading = DownloadState.Downloading(DownloadProgress(1024, 65_536))
     fun stall(reason: TorrentStallReason, seconds: Long) = TorrentStall(reason, seconds)
 
@@ -454,9 +487,10 @@ class DownloadCommandTest {
     stalls: ((taskId: String) -> Flow<TorrentStall?>)? = null,
     sources: List<DownloadSource<*>> = emptyList(),
     config: DownloadConfig = DownloadConfig(retryCount = 0),
+    interactive: Boolean = true,
   ): Int = runBlocking {
     // As `ketch <url>` sets them up.
-    val progress = ProgressLine(outStream)
+    val progress = ProgressLine(outStream, interactive)
     val ketch = Ketch(
       httpEngine = engine,
       config = config,

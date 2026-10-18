@@ -7,13 +7,15 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class ProgressLineTest {
   // One terminal, which stdout and stderr both write to, each through a buffer of its own.
   private val terminal = ByteArrayOutputStream()
   private val out = PrintStream(BufferedOutputStream(terminal), false, Charsets.UTF_8)
   private val err = PrintStream(BufferedOutputStream(terminal), false, Charsets.UTF_8)
-  private val line = ProgressLine(out)
+  private val line = ProgressLine(out, interactive = true)
 
   @Test
   fun above_recordWhileTheLineIsShown_takesARowOfItsOwnAboveTheLine() {
@@ -69,12 +71,57 @@ class ProgressLineTest {
     )
   }
 
-  /** The rows [terminal] shows, empty last one left out. */
-  private fun screen(): List<String> {
+  @Test
+  fun above_outputIsNotATerminal_printsRecordsAndProgressAsWholeLines() {
+    // As `ketch -v <url> > debug.log`: a file keeps every carriage return the terminal would
+    // act on, which put the progress line and spaces in front of each record.
+    val line = ProgressLine(out, interactive = false)
+    val logger = PrintingLogger(LogLevel.WARN).above(line)
+    line.show("[Downloading] 50%  1.0 MB / 2.0 MB  1.0 MB/s")
+
+    logger.w("[WARN] [Tracker] Tracker warns about 08ada5a7a618")
+    logger.e("[ERROR] [Execution] Couldn't save the piece")
+    line.printAbove("[Stalled] No peers, still looking")
+    line.printBelow("Download completed: /tmp/a.bin")
+
+    assertEquals(
+      listOf(
+        "[Downloading] 50%  1.0 MB / 2.0 MB  1.0 MB/s",
+        "[WARN] [Tracker] Tracker warns about 08ada5a7a618",
+        "[ERROR] [Execution] Couldn't save the piece",
+        "[Stalled] No peers, still looking",
+        "Download completed: /tmp/a.bin",
+        "",
+      ),
+      output().split('\n'),
+    )
+  }
+
+  @Test
+  fun show_outputIsNotATerminal_printsALineAtMostEveryFiveSeconds() {
+    // Updates come several times a second: a line for each would flood the file.
+    val time = TestTimeSource()
+    val line = ProgressLine(out, interactive = false, time)
+
+    line.show("[Downloading] 10%")
+    time += 1.seconds
+    line.show("[Downloading] 20%")
+    time += 4.seconds
+    line.show("[Downloading] 30%")
+    line.end()
+
+    assertEquals("[Downloading] 10%\n[Downloading] 30%\n", output())
+  }
+
+  /** What was written to [terminal], unrendered. */
+  private fun output(): String {
     out.flush()
     err.flush()
-    return terminalRows(terminal.toString(Charsets.UTF_8)).dropLastWhile { it.isEmpty() }
+    return terminal.toString(Charsets.UTF_8)
   }
+
+  /** The rows [terminal] shows, empty last one left out. */
+  private fun screen(): List<String> = terminalRows(output()).dropLastWhile { it.isEmpty() }
 
   /** Prints records from [minLevel] as they come, errors to [err] and the rest to [out]. */
   private inner class PrintingLogger(private val minLevel: LogLevel) : Logger {

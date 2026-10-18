@@ -154,7 +154,7 @@ private suspend fun install(
   try {
     val archive = File(work, asset.name)
     println("Downloading ${asset.name} (${formatBytes(asset.size)})")
-    val line = ProgressLine(System.out)
+    val line = ProgressLine.stdout()
     try {
       ReleaseDownloader({ KtorHttpEngine() }, logger.above(line)).download(asset, archive) {
         val pct = (it.percent * 100).toInt()

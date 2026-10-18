@@ -2,7 +2,12 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import java.io.Console
 import java.io.PrintStream
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * The terminal line a command's progress is written over, on [out], such as the one of
@@ -12,15 +17,28 @@ import java.io.PrintStream
  * ([printBelow]), which ends it. Otherwise a log record, written from Ketch's threads to the same
  * terminal, would start at the end of the progress line. One lock keeps the progress and the
  * records from interleaving.
+ *
+ * Only an [interactive] terminal is written over. Output captured to a file or a pipe would keep
+ * every carriage return, the progress in front of each record, so there the progress goes on
+ * lines of its own, at most one every [PLAIN_INTERVAL] by [timeSource], and every other line is
+ * printed as it comes.
  */
-internal class ProgressLine(private val out: PrintStream) {
+internal class ProgressLine(
+  private val out: PrintStream,
+  private val interactive: Boolean,
+  private val timeSource: TimeSource = TimeSource.Monotonic,
+) {
   private val lock = Any()
 
   // The progress line on the terminal, `null` while the cursor is at the start of a line.
   private var shown: String? = null
 
+  // When the progress was last printed on a line of its own, while not interactive.
+  private var printedAt: TimeMark? = null
+
   /** Writes [text] over the progress line, which stays open for the next update. */
   fun show(text: String): Unit = synchronized(lock) {
+    if (!interactive) return printLine(text)
     // Spaces cover what a longer line left, such as a speed a stall replaced.
     out.print("\r" + text.padEnd(shown?.length ?: 0))
     out.flush()
@@ -34,12 +52,15 @@ internal class ProgressLine(private val out: PrintStream) {
   fun printBelow(text: String): Unit = synchronized(lock) {
     end()
     out.println(text)
+    out.flush()
   }
 
   /** Ends the progress line, leaving it on the terminal, so what follows starts a line below it. */
   fun end(): Unit = synchronized(lock) {
     if (shown != null) {
       out.println()
+      // Before what follows on another stream, such as an error on stderr.
+      out.flush()
       shown = null
     }
   }
@@ -50,6 +71,7 @@ internal class ProgressLine(private val out: PrintStream) {
    */
   fun <T> above(block: () -> T): T {
     synchronized(lock) {
+      // Never set unless interactive: elsewhere every line is printed as it comes.
       val line = shown ?: return block()
       out.print("\r" + " ".repeat(line.length) + "\r")
       // Written before what [block] sends to another stream, such as stderr.
@@ -61,6 +83,38 @@ internal class ProgressLine(private val out: PrintStream) {
         out.flush()
       }
     }
+  }
+
+  /** Prints [text] on a line of its own, unless the last one is younger than [PLAIN_INTERVAL]. */
+  private fun printLine(text: String) {
+    val last = printedAt
+    if (last != null && last.elapsedNow() < PLAIN_INTERVAL) return
+    out.println(text)
+    out.flush()
+    printedAt = timeSource.markNow()
+  }
+
+  companion object {
+    /** The least time between two lines of progress on output that is not a terminal. */
+    val PLAIN_INTERVAL: Duration = 5.seconds
+
+    /** The progress line of stdout, written over only while stdout is a terminal. */
+    fun stdout(): ProgressLine = ProgressLine(System.out, interactive = stdoutIsTerminal())
+  }
+}
+
+/**
+ * Whether stdout is an interactive terminal. The JVM has a console only while its standard input
+ * and output are a terminal; from JDK 22, whose console may also stand for redirected streams,
+ * `Console.isTerminal` tells them apart.
+ */
+internal fun stdoutIsTerminal(): Boolean {
+  val console = System.console() ?: return false
+  return try {
+    Console::class.java.getMethod("isTerminal").invoke(console) as Boolean
+  } catch (_: ReflectiveOperationException) {
+    // Before JDK 22, which has no such method, a console is a terminal.
+    true
   }
 }
 

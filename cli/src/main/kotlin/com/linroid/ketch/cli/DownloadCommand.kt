@@ -94,10 +94,11 @@ internal fun stallReason(stall: TorrentStall): String = when (stall.reason) {
 
 /**
  * Prints a download's states to [line] for `ketch <url>`: a line for each state but Downloading,
- * whose progress line each update writes over. As that line is printed again every second, it
- * stays narrower than an 80-column terminal, where a wrapped line would leave a row behind at each
- * update: while a torrent stalls it says only for how long, in place of the speed and
- * [speedLimit], and why goes on a line of its own above it each time the reason changes.
+ * whose progress line each update writes over on a terminal (see [ProgressLine] for output that
+ * is captured instead). As that line is printed again every second, it stays narrower than an
+ * 80-column terminal, where a wrapped line would leave a row behind at each update: while a
+ * torrent stalls it says only for how long, in place of the speed and [speedLimit], and why goes
+ * on a line of its own above it each time the reason changes.
  */
 internal class ProgressPrinter(private val line: ProgressLine, speedLimit: SpeedLimit) {
   private val limitLabel =
@@ -157,7 +158,7 @@ internal class ProgressPrinter(private val line: ProgressLine, speedLimit: Speed
 internal suspend fun downloadUntilDone(
   ketch: KetchApi,
   request: DownloadRequest,
-  progress: ProgressLine = ProgressLine(System.out),
+  progress: ProgressLine = ProgressLine.stdout(),
   err: PrintStream = System.err,
   stalls: (taskId: String) -> Flow<TorrentStall?> = { torrentStalls(ketch, it) },
 ): Int = coroutineScope {

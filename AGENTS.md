@@ -2041,7 +2041,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   limit, and a line above it says why each time the reason changes (`torrentStalls`, from
   `TorrentInterest` snapshots, and `stallReason`). Log records go above it, as above
   `ketch update`'s progress: `Logger.above(ProgressLine)` wraps the console logger, clearing the
-  line under a lock shared with the printer and drawing it again below each record
+  line under a lock shared with the printer and drawing it again below each record. Only a
+  terminal is written over (`stdoutIsTerminal`: `System.console()`, and `Console.isTerminal`
+  from JDK 22); captured to a file or pipe, the progress goes on lines of its own, one every 5 s
+  at most, and records as they come
 - `ketch <url> --files <ids>` downloads only those files of a torrent
   (`DownloadRequest.selectedFileIds`); `ketch --list-files <url>` resolves the URL and prints
   `ID  SIZE  PATH` rows instead (`fileListRows`), in the order of `--sort name|size|type` (`type`

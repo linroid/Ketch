@@ -173,7 +173,7 @@ private fun runDownload(args: DownloadArgs.Download): Int {
   )
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
-  val progress = ProgressLine(System.out)
+  val progress = ProgressLine.stdout()
   // Only warnings unless -v or --debug asks for more, so the progress line stays readable; they
   // go above it rather than onto its end.
   val ketch = Ketch(
