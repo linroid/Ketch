@@ -15,6 +15,8 @@ import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
+import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
@@ -26,6 +28,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
@@ -116,6 +119,62 @@ class DownloadCoordinatorPauseTest {
     }
   }
 
+  @Test
+  fun pause_flushesTheKeptFileBeforeTheRunClosesIt() = runTest {
+    val ops = mutableListOf<String>()
+    // A disk slow to flush, so a flush the pause left running would land once the file closed.
+    val disk = CompletableDeferred<Unit>()
+    val file = object : FileAccessor by NoOpFileAccessor {
+      var closed = false
+      override suspend fun writeAt(offset: Long, data: ByteArray) { ops += "write" }
+      override suspend fun flush() {
+        disk.await()
+        ops += if (closed) "flush after close" else "flush"
+      }
+      override fun close() {
+        closed = true
+        ops += "close"
+      }
+    }
+    val handle = handle()
+    val coordinator = coordinator(WritingSource(), openFile = { _, _ -> file })
+    try {
+      coordinator.start(handle)
+      runCurrent()
+      assertEquals(listOf("write"), ops)
+
+      val pause = launch { coordinator.pause(handle.taskId) }
+      runCurrent()
+      disk.complete(Unit)
+      runCurrent()
+
+      assertTrue(pause.isCompleted)
+      assertEquals(listOf("write", "flush", "close"), ops)
+      assertEquals(TaskState.PAUSED, handle.record.value.state)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  /** Writes some bytes to the file Ketch opened for it, then waits to be stopped. */
+  private class WritingSource : DownloadSource<Unit> {
+    override val stateSerializer = Unit.serializer()
+    override val type = "fixture"
+    override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+      val url = (input as ResolveInput.Url).url
+      return ResolvedSource(
+        url = url, sourceType = type, totalBytes = 100, supportsResume = true,
+        suggestedFileName = "fixture.bin", maxSegments = 1,
+      )
+    }
+    override suspend fun download(context: DownloadContext, state: Unit?) {
+      context.fileAccessor.writeAt(0, ByteArray(20))
+      context.segments.value = listOf(Segment(0, 0, 99, 20))
+      awaitCancellation()
+    }
+  }
+
   /** Publishes some progress, then waits for [checkpoint] while it stops. */
   private class StoppingSource(
     private val checkpoint: CompletableDeferred<Unit>,
@@ -158,11 +217,14 @@ class DownloadCoordinatorPauseTest {
     }
   }
 
-  private fun TestScope.coordinator(source: DownloadSource<*>): DownloadCoordinator {
+  private fun TestScope.coordinator(
+    source: DownloadSource<*>,
+    openFile: (String, CoroutineDispatcher) -> FileAccessor = { _, _ -> NoOpFileAccessor },
+  ): DownloadCoordinator {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return DownloadCoordinator(SourceResolver(listOf(source)),
       { DownloadConfig(saveIntervalMs = 60_000) }, DefaultFileNameResolver(),
-      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher))
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher), openFile = openFile)
   }
 
   private suspend fun pauseWhileSourceStops(

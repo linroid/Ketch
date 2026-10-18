@@ -154,7 +154,6 @@ internal class DownloadExecution(
    */
   val taskLimiter = DelegatingSpeedLimiter(createLimiter(handle.request.speedLimit))
   var context: DownloadContext? = null
-  var fileAccessor: FileAccessor? = null
 
   /** The size of the download; a selection delivered while it runs changes it. */
   @Volatile
@@ -576,6 +575,8 @@ internal class DownloadExecution(
     val selfManagedIo = source.managesOwnFileIo
     var opened: FileAccessor? = null
     var completed = false
+    // Whether the run stopped before its last flush, so the file it keeps still needs one.
+    var unflushed = true
     try {
       currentCoroutineContext().ensureActive()
       val (prepared, ctx) = handle.controlLock.withLock {
@@ -592,7 +593,6 @@ internal class DownloadExecution(
           openFile(prepared.target.writePath, dispatchers.disk)
         }
         opened = accessor
-        fileAccessor = accessor
         val built = buildContext(
           fileAccessor = accessor,
           totalBytes = prepared.total,
@@ -699,6 +699,8 @@ internal class DownloadExecution(
       var finalTotal = totalBytes
       var outputPath = target.path
       if (!selfManagedIo) {
+        // Tried once: a file whose flush failed keeps no progress to flush for.
+        unflushed = false
         try {
           fa.flush()
           // Content of unknown size was streamed to its end, so the file holds all of it.
@@ -755,7 +757,7 @@ internal class DownloadExecution(
     } finally {
       val accessor = opened
       if (!selfManagedIo && accessor != null) {
-        cleanupAfterExecution(accessor, completed)
+        cleanupAfterExecution(accessor, completed, unflushed)
       }
     }
   }
@@ -885,10 +887,24 @@ internal class DownloadExecution(
   private fun finishTime(): Instant =
     Instant.fromEpochMilliseconds(clock.now().toEpochMilliseconds())
 
+  /**
+   * Closes the file of a run that ended, flushing it first when the run stopped before its last
+   * flush ([unflushed]) and keeps it, and deletes it when the run was discarded. Only this run
+   * touches its file, so nothing flushes it while it closes.
+   */
   private suspend fun cleanupAfterExecution(
     fa: FileAccessor,
     completed: Boolean,
+    unflushed: Boolean,
   ) {
+    if (unflushed && !discardsPartialFile) {
+      // The saved segments count these bytes, so a resume trusts them to be on disk.
+      try {
+        withContext(NonCancellable) { fa.flush() }
+      } catch (e: Exception) {
+        log.w(e) { "Failed to flush the kept file of taskId=$taskId" }
+      }
+    }
     try {
       fa.close()
     } catch (e: Exception) {

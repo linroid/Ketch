@@ -32,7 +32,10 @@ interface FileAccessor {
   /** Flushes buffered writes to disk. */
   suspend fun flush()
 
-  /** Closes the underlying file handle. */
+  /**
+   * Closes the underlying file handle. It is not serialized with the other operations, so the
+   * caller closes a file once nothing else uses it.
+   */
   fun close()
 
   /** Deletes the file from disk. */

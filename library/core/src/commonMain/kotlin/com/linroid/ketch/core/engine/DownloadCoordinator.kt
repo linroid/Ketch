@@ -12,6 +12,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.KetchDispatchers
+import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.FileNameResolver
 import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.file.createFileAccessor
@@ -22,6 +23,7 @@ import com.linroid.ketch.core.task.savedProgress
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -44,6 +46,7 @@ import kotlinx.coroutines.withContext
  *   resume takes a snapshot of it, with the task's own [DownloadRequest.proxy] if it has one
  * @param clock stamps when downloads complete
  * @param connections the reporter of a task's live connections
+ * @param openFile opens the output file of a source that does not write its own files
  */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -53,6 +56,8 @@ internal class DownloadCoordinator(
   private val dispatchers: KetchDispatchers,
   private val clock: Clock = Clock.System,
   private val connections: (taskId: String) -> ConnectionReporter = { ConnectionReporter.None },
+  private val openFile: (path: String, ioDispatcher: CoroutineDispatcher) -> FileAccessor =
+    ::createFileAccessor,
 ) {
   // A supervisor, so one execution that fails does not cancel the others.
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatchers.network)
@@ -138,21 +143,12 @@ internal class DownloadCoordinator(
         }
       }
 
-      execution.fileAccessor?.let { accessor ->
-        try {
-          accessor.flush()
-        } catch (e: Exception) {
-          log.w(e) {
-            "Failed to flush file during pause for taskId=$taskId"
-          }
-        }
-      }
-
       activeDownloads.remove(taskId)
       stoppingDownloads[taskId] = entry.job
       entry.job
     }
-    // Source checkpointing and file closure finish before an immediate resume can start.
+    // Source checkpointing and the file's last flush and closure finish before an immediate
+    // resume can start.
     job?.join()
   }
 
@@ -469,6 +465,7 @@ internal class DownloadCoordinator(
       globalLimiter = globalLimiter,
       dispatchers = dispatchers,
       clock = clock,
+      openFile = openFile,
       connections = connections(handle.taskId),
     )
   }
@@ -493,7 +490,7 @@ internal class DownloadCoordinator(
     val fa = if (source.managesOwnFileIo || outputPath == null) {
       NoOpFileAccessor
     } else {
-      createFileAccessor(outputPath, dispatchers.disk)
+      openFile(outputPath, dispatchers.disk)
     }
     val ctx = DownloadContext(
       taskId = handle.taskId,

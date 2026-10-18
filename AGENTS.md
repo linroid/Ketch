@@ -442,8 +442,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   uses too; `updater` verifies
   release assets through `DownloadRequest.checksum`
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
-  execution); a failure, `close()` or `remove(deleteFiles = false)` keeps it and its segments, but
-  a failed final flush resets their progress. For files the engine writes (not torrents), an empty
+  execution); a pause, a failure, `close()` or `remove(deleteFiles = false)` keeps it and its
+  segments, flushed by the run itself before it closes the file (never by the pause, which would
+  race the close), but a failed final flush resets their progress. For files the engine writes (not torrents), an empty
   segment list is no progress: it is never saved, and resuming one starts from zero
 - `DownloadState.Completed` reports the size and the download time, summed over every run and
   excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records),
