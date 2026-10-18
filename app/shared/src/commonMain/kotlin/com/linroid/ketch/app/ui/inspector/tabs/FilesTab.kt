@@ -344,7 +344,8 @@ internal fun FilesTabContent(
               chip = chips,
               // Nothing downloads before the files are chosen.
               progress = !waiting,
-              check = model?.let { m ->
+              // A single choice picks one variant, never a folder of them.
+              check = model?.takeUnless { single && folder != null }?.let { m ->
                 FileCheck(state = toggleState(node, checked), single = single) {
                   if (single) m.choose(file.id, applied) else m.toggle(node.fileIds, applied)
                 }
