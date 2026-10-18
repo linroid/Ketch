@@ -391,7 +391,7 @@ Torrent tasks follow the same download settings as HTTP and FTP tasks, with thes
 | Setting | Torrent behavior |
 | --- | --- |
 | Simultaneous downloads | Ketch's queue starts torrents like other tasks. The engine also runs at most 5 torrents at once, seeding included. Further torrents wait for a slot as downloading at 0 B/s; they can be paused or canceled at once and start by priority, then arrival order. A seeder gives its slot to a waiting download. |
-| Speed limits | Global and per-task limits apply to torrents too, live, also after a seeding task reopens to download files added to it. A torrent that keeps seeding right after its download follows the global limit should it have to fetch a piece again; one Ketch starts seeding again later, as after a restart, does not. |
+| Speed limits | Global and per-task limits apply to torrents too, live, also after a seeding task reopens to download files added to it. A torrent that keeps seeding right after its download follows the global limit should it have to fetch a piece again; one Ketch starts seeding again later, as after a restart, does not. Under a low limit a v2 or hybrid torrent receives a 16 KiB block at a time, seconds apart; its speed is measured across several blocks, so it reads near the limit. |
 | Connections per task | The task's peer limit, applied live, clamped to 1-512 (v1) or 1-500 (v2). Auto (0) means 100 peers. |
 | Connections per download | Not used: it counts HTTP segments. The engine opens at most 200 peer connections across all torrents. |
 | Priority | Orders the queue and the wait for an engine slot. |

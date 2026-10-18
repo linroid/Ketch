@@ -242,7 +242,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentPieceScheduler`, `TorrentPeerDownloader`, `TorrentUploadCache`
 - `com.linroid.ketch.torrent.v2` -- v2 and hybrid sessions: `TorrentV2DownloadSession`,
   `TorrentV2SessionLoop` (`TorrentV2Swarm`), `TorrentV2PieceScheduler`, `TorrentV2Candidates`,
-  `TorrentV2Uploader`, `TorrentV2Extensions`, `TorrentV2ServeWorker` and their peers' views
+  `TorrentV2Uploader`, `TorrentV2Extensions`, `TorrentV2ServeWorker` and their peers' views,
+  and `TorrentV2Speed`, a task's speed measured between block arrivals over at least a second
+  and four blocks (up to 20 s back), so a low limit reads near the limit rather than a block or
+  none each second
 - `com.linroid.ketch.torrent.v2.peer` -- v2 peer connections: `PeerV2Connector`,
   `PeerV2Dialer`, `PeerV2Pool`, `PeerV2DownloadActor`, `PeerBlockExchange` and the BEP 52 hash
   exchange (`PeerHashWire`, `PeerHashTransport`, `PeerHashExchange`, `TorrentV2HashServer`)

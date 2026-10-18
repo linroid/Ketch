@@ -61,6 +61,7 @@ import com.linroid.ketch.torrent.storage.torrentSystemFileSystem
 import com.linroid.ketch.torrent.tracker.TrackerLists
 import com.linroid.ketch.torrent.tracker.bundledTrackers
 import com.linroid.ketch.torrent.v2.TorrentV2DownloadSession
+import com.linroid.ketch.torrent.v2.TorrentV2Speed
 import io.ktor.http.Url
 import io.ktor.http.decodeURLPart
 import kotlinx.coroutines.CancellationException
@@ -1805,9 +1806,7 @@ class TorrentDownloadSource(
       }
     }
     val clock = monotonicClock()
-    var lastTime = clock()
-    var lastReceived = (session as? TorrentV2DownloadSession)?.receivedBytes() ?: 0
-    var v2Speed = 0L
+    val v2Speed = TorrentV2Speed()
     var seeding = false
     try {
       if (!adopted) session.resume()
@@ -1857,16 +1856,8 @@ class TorrentDownloadSource(
           gate.withLock { hold() }
         }
         context.reportedSpeed.value = if (session is TorrentV2DownloadSession) {
-          // Over a second or more, as v1 sessions sample theirs: blocks arrive in bursts, and
-          // each 200 ms pass read one as several times the rate and the pause after it as none.
-          val now = clock()
-          if (now - lastTime >= SPEED_SAMPLE_MS) {
-            val received = session.receivedBytes()
-            v2Speed = (received - lastReceived) * 1000 / (now - lastTime)
-            lastReceived = received
-            lastTime = now
-          }
-          v2Speed
+          // Blocks arrive whole, under low limits seconds apart: measured across several.
+          v2Speed.sample(clock(), session.receivedBytes())
         } else session.downloadSpeed
         val (downloaded, size) = gate.withLock {
           context.segments.value.sumOf { it.downloadedBytes } to total
@@ -2153,9 +2144,6 @@ private class MetadataNotFoundException : Exception("Torrent metadata resolution
 
 /** Pause between a task's magnet lookups, so one that ends at once cannot spin. */
 private const val MAGNET_LOOKUP_PAUSE_MS = 1_000L
-
-/** The least time a v2 download's reported speed is measured over. */
-private const val SPEED_SAMPLE_MS = 1_000L
 
 /** How long a run waits for its task's previous session to stop before it fails. */
 private const val RELEASE_TIMEOUT_MS = 10_000L
