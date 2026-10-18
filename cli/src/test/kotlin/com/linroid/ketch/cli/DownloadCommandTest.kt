@@ -8,10 +8,12 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentStallReason
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.PrintStream
 import java.net.UnknownHostException
 import java.nio.file.Files
@@ -118,6 +121,35 @@ class DownloadCommandTest {
 
     assertEquals(DownloadExit.FAILED, status)
     assertEquals("Download failed: $reason", err.toString(Charsets.UTF_8).trim())
+  }
+
+  @Test
+  fun downloadUntilDone_sourceSumsUpItsCause_saysBoth() {
+    // WebDAV's detail is a summary; only its cause says what is wrong with the link.
+    val engine = ServingEngine(ByteArray(0))
+    val status = download(
+      "webdav://:8080/a.iso",
+      engine,
+      sources = listOf(WebDavDownloadSource(engine)),
+    )
+
+    assertEquals(DownloadExit.FAILED, status)
+    assertEquals(
+      "Download failed: Invalid WebDAV link <- IllegalArgumentException: The link has no host",
+      err.toString(Charsets.UTF_8).trim(),
+    )
+  }
+
+  @Test
+  fun failureReason_detailRepeatsTheFirstCause_namesTheCausesBelowIt() {
+    val reason = "Couldn't save the piece"
+    val error = KetchError.SourceError(
+      "torrent",
+      IllegalStateException(reason, IOException("No space left on device")),
+      detail = reason,
+    )
+
+    assertEquals("$reason <- IOException: No space left on device", failureReason(error))
   }
 
   @Test
@@ -220,8 +252,14 @@ class DownloadCommandTest {
     engine: HttpEngine,
     logger: Logger = Logger.None,
     stalls: (taskId: String) -> Flow<TorrentStall?> = { emptyFlow() },
+    sources: List<DownloadSource<*>> = emptyList(),
   ): Int = runBlocking {
-    val ketch = Ketch(httpEngine = engine, config = DownloadConfig(retryCount = 0), logger = logger)
+    val ketch = Ketch(
+      httpEngine = engine,
+      config = DownloadConfig(retryCount = 0),
+      additionalSources = sources,
+      logger = logger,
+    )
     try {
       withTimeout(10.seconds) {
         downloadUntilDone(
