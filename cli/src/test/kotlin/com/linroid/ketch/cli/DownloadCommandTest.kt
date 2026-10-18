@@ -145,10 +145,13 @@ class DownloadCommandTest {
     assertFalse("[ERROR]" in logged, logged)
     assertFalse("[KtorHttpEngine]" in logged, logged)
     assertEquals(2, count("""\[WARN] \[Execution] Retry \d/2 """), logged)
-    assertEquals(1, count("""\[WARN] \[Coordinator] Download failed """), logged)
+    // It still says where the download failed, which only the engine's records said.
+    val url = Regex.escape("http://127.0.0.1:$port/a.iso")
+    assertEquals(1, count("""\[WARN] \[Coordinator] Download failed .* [A-Z]+ $url """), logged)
     // Only the summary goes to stderr.
     val summary = err.toString(Charsets.UTF_8).trim()
     assertTrue(summary.startsWith("Download failed: Network: ") && '\n' !in summary, logged)
+    assertTrue(Regex(""" [A-Z]+ $url """).containsMatchIn(summary), summary)
   }
 
   @Test

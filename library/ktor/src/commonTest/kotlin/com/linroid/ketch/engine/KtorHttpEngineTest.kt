@@ -6,6 +6,7 @@ import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.HttpBody
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -22,7 +23,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class KtorHttpEngineTest {
@@ -541,7 +544,7 @@ class KtorHttpEngineTest {
     val failures = listOf(
       "HTTP error 503: Service Unavailable for GET $URL",
       "HTTP error 429: Too Many Requests for GET $URL",
-      "Network error: IllegalStateException: Connection reset",
+      "IllegalStateException: Connection reset",
     )
     for (failure in failures) {
       assertEquals(2, logged.count { failure in it }, logged.joinToString("\n"))
@@ -550,7 +553,7 @@ class KtorHttpEngineTest {
 
   @Test
   fun download_clientError_isLoggedAsErrorWithItsUrl() = runTest {
-    // No retry helps, and no other record names the URL that refused it.
+    // No retry helps.
     val records = recordLogs()
     try {
       withServer({ respond("", HttpStatusCode.NotFound) }) { engine, _ ->
@@ -564,6 +567,67 @@ class KtorHttpEngineTest {
       listOf(LogLevel.ERROR to "[KtorHttpEngine] HTTP error 404: Not Found for GET $URL"),
       records.filter { (level, _) -> level > LogLevel.DEBUG },
     )
+  }
+
+  @Test
+  fun download_failsAtRedirectTarget_errorNamesTheTarget() = runTest {
+    // The engine logs these at debug level only: what the caller reports when it gives up, such
+    // as the Coordinator's "Download failed", says where through the error.
+    var reset = false
+    withServer({ request ->
+      when {
+        request.url.host == "origin.example" ->
+          respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, CDN_URL))
+        reset -> throw IllegalStateException("TLS handshake failed")
+        else -> respond("", HttpStatusCode.ServiceUnavailable)
+      }
+    }) { engine, _ ->
+      val refused = assertFailsWith<KetchError.Http> { engine.download(URL, null) {} }
+      reset = true
+      val failed = assertFailsWith<KetchError.Network> { engine.download(URL, null) {} }
+
+      assertEquals(
+        "Http: HTTP error 503: Service Unavailable <- " +
+          "FailedRequest: GET https://cdn.example/file?sig=***",
+        refused.describeCauses(),
+      )
+      // Coroutines may add a copy of the exception they recover below it.
+      val causes = failed.describeCauses()
+      val expected = "Network: Network error occurred <- " +
+        "FailedRequest: GET https://cdn.example/file?sig=*** <- " +
+        "IllegalStateException: TLS handshake failed"
+      assertTrue(causes.startsWith(expected), causes)
+    }
+  }
+
+  @Test
+  fun download_callbackFails_isTheCauseOfItsError() = runTest {
+    // Callers look for what their callback threw, such as GitHubReleases for its UpdateException.
+    val thrown = IllegalStateException("No space left on device")
+    withServer({ respond("abcdefgh", HttpStatusCode.OK) }) { engine, _ ->
+      val error = assertFailsWith<KetchError.Network> {
+        engine.download(URL, null) { throw thrown }
+      }
+
+      assertSame(thrown, error.cause)
+    }
+  }
+
+  @Test
+  fun requests_withoutRequestLogging_leaveTheUrlOutOfTheirErrors() = runTest {
+    // As a torrent's trackers are asked: their URLs may hold a passkey.
+    withServer({ respond("", HttpStatusCode.ServiceUnavailable) }, logRequests = false) {
+      engine, _ ->
+      val refused = assertFailsWith<KetchError.Http> { engine.download(URL, null) {} }
+
+      assertNull(refused.cause)
+    }
+    withServer({ throw IllegalStateException("Connection reset") }, logRequests = false) {
+      engine, _ ->
+      val failed = assertFailsWith<KetchError.Network> { engine.download(URL, null) {} }
+
+      assertIs<IllegalStateException>(failed.cause)
+    }
   }
 
   @Test
@@ -691,6 +755,7 @@ class KtorHttpEngineTest {
   private suspend fun withServer(
     handler: MockRequestHandler,
     userAgent: String? = KtorHttpEngine.DEFAULT_USER_AGENT,
+    logRequests: Boolean = true,
     block: suspend (KtorHttpEngine, List<HttpRequestData>) -> Unit,
   ) {
     val requests = mutableListOf<HttpRequestData>()
@@ -698,7 +763,7 @@ class KtorHttpEngineTest {
       requests += request
       handler(request)
     })
-    val engine = KtorHttpEngine(client, userAgent = userAgent)
+    val engine = KtorHttpEngine(client, logRequests, userAgent)
     try {
       block(engine, requests)
     } finally {
