@@ -913,10 +913,11 @@ rejected rather than dropped requests, a choke that leaves requests to be reject
 unanswered after 5 seconds are canceled), and allowed-fast pieces requested and served while
 choked. While it uploads, Ketch offers IPv4 peers BEP 6's set of 10 allowed-fast pieces. A rejected
 block goes to other peers without counting against the peer. A piece a peer rejects block by
-block is left to other peers until that peer unchokes Ketch again, announces the piece again or a
-minute passes. Ketch announces a piece it lost and verified again, such as one of a file you
-edited, so its peers ask for it again. A torrent at its peer limit closes peers that dial it
-before answering their handshake.
+block is left to other peers until that peer unchokes Ketch again, and in a v1 torrent also until
+it announces the piece again or a minute passes. A v1 torrent announces a piece it lost and
+verified again, such as one of a file you edited, so its peers ask for it again; v2 and hybrid
+torrents announce each piece once. A torrent at its peer limit closes peers that dial it before
+answering their handshake.
 
 ### Partial selections
 

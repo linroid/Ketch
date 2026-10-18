@@ -1029,7 +1029,8 @@ class TorrentDownloadSource(
 
   /**
    * Applies to [task]'s seeder, which seeds [from], the smaller selection its task saved since:
-   * [changeSeedingSelection] changes a seeder only while it checks or seeds, so one saved from
+   * [changeSeedingSelection] changes a seeder only while it checks, or while its watcher follows
+   * it from the moment it seeds, also as it downloads a piece it lost again, so one saved from
    * then on reaches it, and one saved before is read here, before the check and once it seeds.
    * Reads it again after each change, which a newer selection applied meanwhile may have
    * preceded, until it holds.

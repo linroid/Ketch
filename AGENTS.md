@@ -1003,7 +1003,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   thrown away: `ThrottleClock`, but for the requests of a v2 peer that rejected a piece's worth
   since its last block, `rejectsSinceBlock`), is a stall, whose reason (`TorrentStall`: missing
   pieces no
-  connected peer or running web seed has
+  connected peer or running web seed has (in v1, or every connected peer that has them refuses,
+  `TorrentPieceScheduler.refusing`)
   and every stopped one could not serve, a seed started again
   counting as stopped until it answers (`WebSeedWorker.unproven`) and one dropped again once
   started again without answering aside until a later relaunch finds it answering, and their
@@ -1350,7 +1351,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   was asked for. Each pass, `poll` hands a worker the requests to cancel (the
   other copy arrived, or the piece is done or unwanted), newly verified pieces for HAVEs (an
   append-only log with a cursor per peer, which also logs a piece revoked, `Poll.revoked`, so one
-  verified again is announced again) and its interest: workers start not interested and send
+  verified again is announced again, where `TorrentV2Uploader` announces each piece once) and its
+  interest: workers start not interested and send
   INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A
   swarm holding every piece closes connections to peers holding every piece and never redials
   them. A peer is admitted while everything the engine-wide budget holds but the swarm's own pieces
@@ -1366,10 +1368,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   until the peer rejects them; requests left unanswered for `FAST_REJECT_GRACE_MS` (5 s) are
   canceled. A rejected block is free for any peer at once; unchoked, the peer may ask for it
   again until it has rejected as many blocks of the piece as the piece has, then other peers
-  fetch it (`refused` until the peer unchokes us anew, announces the piece or `REFUSAL_MS`, a
+  fetch it (v1's `refused` until the peer unchokes us anew, announces the piece or `REFUSAL_MS`, a
   minute, passes; the scheduler hears of it, `TorrentPieceScheduler.refusing`, and keeps it past
   the minute until the peer sends a block of the piece, `probing`; `health` counts a wanted piece
-  every connected holder refuses as missing). We reject requests we will not serve
+  every connected holder refuses as missing; v2 and hybrid lift `TorrentV2PeerView.refused` only
+  on an unchoke). We reject requests we will not serve
   (choked or uninterested peer, a piece we lack, a
   full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
   (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.
