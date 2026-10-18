@@ -121,6 +121,8 @@ internal class DownloadCoordinator(
         currentSegments?.sumOf { it.downloadedBytes } ?: 0L
 
       execution.stopReportingProgress()
+      // The run flushes the file it keeps before closing it; a flush here would race the close.
+      execution.flushKeptFile()
       // The execution may have finished just before; its finally has not removed it yet.
       handle.mutableState.update { state ->
         if (state.isTerminal) state
@@ -296,7 +298,7 @@ internal class DownloadCoordinator(
    *
    * @param deletePartialFile whether a running download deletes the file it was writing: `true`
    *   for an explicit cancel or `remove(deleteFiles = true)`, `false` for
-   *   `remove(deleteFiles = false)`
+   *   `remove(deleteFiles = false)`, which flushes the file it keeps
    */
   suspend fun cancel(handle: TaskHandle, deletePartialFile: Boolean) {
     val taskId = handle.taskId
@@ -311,7 +313,7 @@ internal class DownloadCoordinator(
       val stopping = entry?.job ?: stoppingDownloads[taskId]
       entry?.execution?.let { execution ->
         execution.stopReportingProgress()
-        if (deletePartialFile) execution.discardPartialFile()
+        if (deletePartialFile) execution.discardPartialFile() else execution.flushKeptFile()
       }
       stopping?.cancel()
       activeDownloads.remove(taskId)
@@ -516,7 +518,7 @@ internal class DownloadCoordinator(
 
   /**
    * Stops every execution. Running tasks pause for [PauseReason.Shutdown] and keep their
-   * partial files and DOWNLOADING records.
+   * partial files, closed without waiting for the disk, and DOWNLOADING records.
    *
    * @return the job that completes once every execution has finished
    */

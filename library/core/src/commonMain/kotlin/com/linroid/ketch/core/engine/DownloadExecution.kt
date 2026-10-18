@@ -148,6 +148,17 @@ internal class DownloadExecution(
    */
   fun discardPartialFile() { discardsPartialFile = true }
 
+  @Volatile
+  private var flushesKeptFile = false
+
+  /**
+   * Flushes the file this execution keeps before closing it, once it stops before its last
+   * flush, as the saved segments count those bytes. Set before a pause, reschedule, preemption
+   * or `remove(deleteFiles = false)` cancels it. A failure or `Ketch.close()` leaves the file to
+   * the system, so neither the failure nor the sources' stop waits for the disk.
+   */
+  fun flushKeptFile() { flushesKeptFile = true }
+
   /**
    * Per-task limiter, created from the persisted request so a limit set
    * while the task was not running applies from the first byte.
@@ -889,15 +900,16 @@ internal class DownloadExecution(
 
   /**
    * Closes the file of a run that ended, flushing it first when the run stopped before its last
-   * flush ([unflushed]) and keeps it, and deletes it when the run was discarded. Only this run
-   * touches its file, so nothing flushes it while it closes.
+   * flush ([unflushed]) and a pause or `remove(deleteFiles = false)` keeps it ([flushKeptFile]),
+   * and deletes it when the run was discarded. Only this run touches its file, so nothing flushes
+   * it while it closes.
    */
   private suspend fun cleanupAfterExecution(
     fa: FileAccessor,
     completed: Boolean,
     unflushed: Boolean,
   ) {
-    if (unflushed && !discardsPartialFile) {
+    if (unflushed && flushesKeptFile && !discardsPartialFile) {
       // The saved segments count these bytes, so a resume trusts them to be on disk.
       try {
         withContext(NonCancellable) { fa.flush() }

@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
@@ -24,6 +25,7 @@ import com.linroid.ketch.core.task.TaskState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlinx.coroutines.sync.Mutex
@@ -45,7 +47,9 @@ import kotlinx.serialization.builtins.serializer
  * Verifies that [DownloadCoordinator.pause] keeps the segments the execution saves while
  * stopping. With an unconfined network dispatcher, the `job.cancel()` inside `pause()` runs
  * the execution's final checkpoint before `pause()` persists anything, which forces the
- * interleaving that once made a restarted task resume from stale offsets.
+ * interleaving that once made a restarted task resume from stale offsets. Also verifies that the
+ * run flushes the file a pause or a cancel keeping it leaves, and that a close or a failure closes
+ * it without waiting for the disk.
  */
 class DownloadCoordinatorPauseTest {
   @Test
@@ -121,27 +125,15 @@ class DownloadCoordinatorPauseTest {
 
   @Test
   fun pause_flushesTheKeptFileBeforeTheRunClosesIt() = runTest {
-    val ops = mutableListOf<String>()
     // A disk slow to flush, so a flush the pause left running would land once the file closed.
     val disk = CompletableDeferred<Unit>()
-    val file = object : FileAccessor by NoOpFileAccessor {
-      var closed = false
-      override suspend fun writeAt(offset: Long, data: ByteArray) { ops += "write" }
-      override suspend fun flush() {
-        disk.await()
-        ops += if (closed) "flush after close" else "flush"
-      }
-      override fun close() {
-        closed = true
-        ops += "close"
-      }
-    }
+    val file = RecordingFile(disk)
     val handle = handle()
     val coordinator = coordinator(WritingSource(), openFile = { _, _ -> file })
     try {
       coordinator.start(handle)
       runCurrent()
-      assertEquals(listOf("write"), ops)
+      assertEquals(listOf("write"), file.ops)
 
       val pause = launch { coordinator.pause(handle.taskId) }
       runCurrent()
@@ -149,15 +141,94 @@ class DownloadCoordinatorPauseTest {
       runCurrent()
 
       assertTrue(pause.isCompleted)
-      assertEquals(listOf("write", "flush", "close"), ops)
+      assertEquals(listOf("write", "flush", "close"), file.ops)
       assertEquals(TaskState.PAUSED, handle.record.value.state)
     } finally {
       coordinator.close()
     }
   }
 
-  /** Writes some bytes to the file Ketch opened for it, then waits to be stopped. */
-  private class WritingSource : DownloadSource<Unit> {
+  @Test
+  fun cancel_keepingTheFile_flushesItBeforeTheRunClosesIt() = runTest {
+    val file = RecordingFile()
+    val handle = handle()
+    val coordinator = coordinator(WritingSource(), openFile = { _, _ -> file })
+    try {
+      coordinator.start(handle)
+      runCurrent()
+
+      coordinator.cancel(handle, deletePartialFile = false)
+
+      assertEquals(listOf("write", "flush", "close"), file.ops)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
+  fun close_closesTheKeptFileWithoutWaitingForTheDisk() = runTest {
+    // A disk that never finishes a flush: closing must not wait for one.
+    val file = RecordingFile(CompletableDeferred())
+    val handle = handle()
+    val coordinator = coordinator(WritingSource(), openFile = { _, _ -> file })
+    coordinator.start(handle)
+    runCurrent()
+
+    val closed = coordinator.close()
+    runCurrent()
+
+    assertTrue(closed.isCompleted)
+    assertEquals(listOf("write", "close"), file.ops)
+  }
+
+  @Test
+  fun failure_closesTheKeptFileWithoutWaitingForTheDisk() = runTest {
+    val file = RecordingFile(CompletableDeferred())
+    val handle = handle()
+    val source = WritingSource(end = { throw KetchError.Http(404) })
+    val coordinator = coordinator(source, openFile = { _, _ -> file })
+    try {
+      coordinator.start(handle)
+      runCurrent()
+
+      assertIs<DownloadState.Failed>(handle.mutableState.value)
+      assertEquals(listOf("write", "close"), file.ops)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  /**
+   * Records what a run does to its file. A flush waits for [disk], which by default is ready, and
+   * a flush that lands once the file closed is recorded as such.
+   */
+  private class RecordingFile(
+    private val disk: CompletableDeferred<Unit> = CompletableDeferred(Unit),
+  ) : FileAccessor by NoOpFileAccessor {
+    val ops = mutableListOf<String>()
+    private var closed = false
+
+    override suspend fun writeAt(offset: Long, data: ByteArray) { ops += "write" }
+
+    override suspend fun flush() {
+      disk.await()
+      ops += if (closed) "flush after close" else "flush"
+    }
+
+    override fun close() {
+      closed = true
+      ops += "close"
+    }
+  }
+
+  /**
+   * Writes [written] of its 100 bytes to the file Ketch opened for it, then runs [end], which by
+   * default waits to be stopped.
+   */
+  private class WritingSource(
+    private val written: Int = 20,
+    private val end: suspend () -> Unit = { awaitCancellation() },
+  ) : DownloadSource<Unit> {
     override val stateSerializer = Unit.serializer()
     override val type = "fixture"
     override fun canHandle(input: ResolveInput): Boolean = input is ResolveInput.Url
@@ -169,9 +240,9 @@ class DownloadCoordinatorPauseTest {
       )
     }
     override suspend fun download(context: DownloadContext, state: Unit?) {
-      context.fileAccessor.writeAt(0, ByteArray(20))
-      context.segments.value = listOf(Segment(0, 0, 99, 20))
-      awaitCancellation()
+      context.fileAccessor.writeAt(0, ByteArray(written))
+      context.segments.value = listOf(Segment(0, 0, 99, written.toLong()))
+      end()
     }
   }
 
