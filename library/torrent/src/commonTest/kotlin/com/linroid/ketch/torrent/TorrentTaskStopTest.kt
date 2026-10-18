@@ -22,6 +22,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okio.FileSystem
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -31,6 +32,8 @@ class TorrentTaskStopTest {
   /** A tracker that answers every announce but `stopped`, and serves [metainfo] elsewhere. */
   private class DeafTracker(private val metainfo: ByteArray) : HttpEngine {
     val announces = MutableStateFlow<List<String>>(emptyList())
+    /** Whether a `stopped` announce gave up: the window the engine gives it ended. */
+    val stoppedGaveUp = MutableStateFlow(false)
 
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
       error("Unexpected HEAD")
@@ -43,7 +46,13 @@ class TorrentTaskStopTest {
     ) {
       if ("/announce" !in url) return onData(metainfo)
       announces.update { it + url }
-      if ("event=stopped" in url) awaitCancellation()
+      if ("event=stopped" in url) {
+        try {
+          awaitCancellation()
+        } finally {
+          stoppedGaveUp.value = true
+        }
+      }
       onData(Bencode.encode(mapOf("interval" to 3600L, "peers" to ByteArray(0))))
     }
 
@@ -54,8 +63,9 @@ class TorrentTaskStopTest {
 
   /**
    * Starts a torrent no peer serves, stops it with [stop] once its tracker heard it start, and
-   * checks that [stop] returned at once, with the task in the state [stopped] expects, while the
-   * tracker still hears it stopped.
+   * checks that [stop] returned while the tracker's `stopped` announce was still waiting, with the
+   * task in the state [stopped] expects, and that the tracker still hears it stopped. A stop that
+   * waited for its trackers would return only once that announce's 2 s window ended.
    */
   private fun stoppingTheTask_returnsAtOnce(
     stop: suspend (Ketch, DownloadTask) -> Unit,
@@ -81,7 +91,7 @@ class TorrentTaskStopTest {
           val stopping = TimeSource.Monotonic.markNow()
           stop(ketch, task)
           val took = stopping.elapsedNow()
-          assertTrue(took < 1.seconds, "Stopping took $took")
+          assertFalse(tracker.stoppedGaveUp.value, "Stopping waited for the tracker: $took")
           assertTrue(stopped(ketch, task), "Left ${task.state.value}")
           eventually("the tracker to hear it stop") { tracker.heard("stopped") }
         } finally {
