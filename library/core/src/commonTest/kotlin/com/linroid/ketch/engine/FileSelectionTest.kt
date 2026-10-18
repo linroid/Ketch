@@ -863,6 +863,27 @@ class FileSelectionTest {
   }
 
   @Test
+  fun download_resolutionListsNoFiles_isRefusedNamingTheSelection() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store)
+    try {
+      // An ordinary file: its resolution lists no files to choose.
+      val resolved = source.resolved("pick:files", "client").copy(files = emptyList())
+
+      val error = assertFailsWith<IllegalArgumentException> {
+        ketch.download(request("0").copy(resolvedSource = resolved))
+      }
+
+      assertEquals("Unknown file ID: 0", error.message)
+      assertTrue(ketch.tasks.value.isEmpty())
+      assertTrue(store.saves.isEmpty())
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun freshStart_unknownFile_failsWithASourceErrorNamingIt() = runTest {
     val source = SelectableSource()
     val ketch = ketch(source)

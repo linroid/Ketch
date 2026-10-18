@@ -1131,13 +1131,13 @@ class Ketch(
 
   /**
    * Refuses [DownloadRequest.selectedFileIds] that the request's [DownloadRequest.resolvedSource]
-   * does not list, such as a torrent's padding files; a request without one is checked as it
-   * starts.
+   * does not list, such as a torrent's padding files, or any when it lists none, as an ordinary
+   * file has no files to choose; a request without one is checked as it starts.
    */
   private fun requireListedFiles(request: DownloadRequest) {
-    val files = request.resolvedSource?.files.orEmpty()
-    if (files.isEmpty() || request.selectedFileIds.isEmpty()) return
-    val listed = files.mapTo(HashSet()) { it.id }
+    val resolved = request.resolvedSource ?: return
+    if (request.selectedFileIds.isEmpty()) return
+    val listed = resolved.files.mapTo(HashSet()) { it.id }
     val unknown = request.selectedFileIds.filter { it !in listed }
     require(unknown.isEmpty()) { unknownFilesMessage(unknown) }
   }
