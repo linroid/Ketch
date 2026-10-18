@@ -207,7 +207,7 @@ class DownloadCommandTest {
     assertEquals(listOf("[Stalled] No peers, still looking"), reasons)
     val stalled = rows.indexOfLast { "stalled" in it }
     assertTrue(rows[stalled].startsWith("[Downloading] "), rows[stalled])
-    assertTrue("  stalled 2m 30s    " in rows[stalled], rows[stalled])
+    assertTrue(rows[stalled].endsWith("  stalled 2m 30s"), rows[stalled])
     // The next line covers it, so nothing of the stall is left on the terminal.
     val next = rows[stalled + 1]
     assertFalse("stalled" in next, next)
@@ -215,10 +215,46 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun downloadUntilDone_ketchWarnsWhileDownloading_printsTheWarningAboveTheProgressLine() {
+    // As `ketch <url>` logs. A tracker's warning was written onto the end of the progress line.
+    val engine = ServingEngine(byteArrayOf(1, 2, 3), release = CompletableDeferred())
+    val log = KetchLogger("Tracker")
+    val status = withConsole {
+      download(
+        "https://example.com/a.bin",
+        engine,
+        logger = Logger.console(quietLogLevel(LogLevel.INFO)),
+        stalls = {
+          flow {
+            awaitPrinted { "[Downloading] " in it }
+            log.w { "Tracker warns about the torrent" }
+            awaitPrinted { "Tracker warns about the torrent" in it }
+            engine.release?.complete(Unit)
+          }
+        },
+      )
+    }
+
+    assertEquals(DownloadExit.OK, status)
+    val rows = terminalRows(out.toString(Charsets.UTF_8))
+    val screen = rows.joinToString("\n")
+    val warning = rows.indexOfFirst { "Tracker warns" in it }
+    assertTrue(warning >= 0, screen)
+    assertTrue(
+      Regex("""\d{4}-\d\d-\d\d [\d:.]+ \[WARN] \[Tracker] Tracker warns about the torrent""")
+        .matches(rows[warning]),
+      screen,
+    )
+    // The line it cleared is drawn again below it, where the download goes on.
+    assertTrue(rows[warning + 1].startsWith("[Downloading] "), screen)
+    assertEquals(1, rows.count { "[Downloading]" in it }, screen)
+  }
+
+  @Test
   fun progressPrinter_torrentStalls_keepsEveryLineNarrowerThan80Columns() {
     // Printed again every second: a line that wraps leaves a row behind at each update. Some
     // consoles wrap once the 80th column is written, so a line must stop before it.
-    val printer = ProgressPrinter(outStream, SpeedLimit.kbps(500))
+    val printer = ProgressPrinter(ProgressLine(outStream), SpeedLimit.kbps(500))
     val sizes = listOf(
       DownloadProgress(179_516_211, 1_503_238_554, bytesPerSecond = 1_258_291),
       DownloadProgress(872_309_637_120, 1_099_511_627_775, bytesPerSecond = 1_048_575),
@@ -240,7 +276,7 @@ class DownloadCommandTest {
 
   @Test
   fun progressPrinter_stallGoesOn_saysWhyOnceEachTimeTheReasonChanges() {
-    val printer = ProgressPrinter(outStream, SpeedLimit.Unlimited)
+    val printer = ProgressPrinter(ProgressLine(outStream), SpeedLimit.Unlimited)
     val downloading = DownloadState.Downloading(DownloadProgress(1024, 65_536))
     fun stall(reason: TorrentStallReason, seconds: Long) = TorrentStall(reason, seconds)
 
@@ -389,19 +425,21 @@ class DownloadCommandTest {
     stalls: ((taskId: String) -> Flow<TorrentStall?>)? = null,
     sources: List<DownloadSource<*>> = emptyList(),
   ): Int = runBlocking {
+    // As `ketch <url>` sets them up.
+    val progress = ProgressLine(outStream)
     val ketch = Ketch(
       httpEngine = engine,
       config = DownloadConfig(retryCount = 0),
       additionalSources = sources,
-      logger = logger,
+      logger = logger.above(progress),
     )
     try {
       val request = DownloadRequest(url = url, destination = Destination(folder.path + "/"))
       withTimeout(10.seconds) {
         if (stalls == null) {
-          downloadUntilDone(ketch, request, outStream, errStream)
+          downloadUntilDone(ketch, request, progress, errStream)
         } else {
-          downloadUntilDone(ketch, request, outStream, errStream, stalls)
+          downloadUntilDone(ketch, request, progress, errStream, stalls)
         }
       }
     } finally {

@@ -93,18 +93,15 @@ internal fun stallReason(stall: TorrentStall): String = when (stall.reason) {
 }
 
 /**
- * Prints a download's states to [out] for `ketch <url>`: a line for each state but Downloading,
+ * Prints a download's states to [line] for `ketch <url>`: a line for each state but Downloading,
  * whose progress line each update writes over. As that line is printed again every second, it
  * stays narrower than an 80-column terminal, where a wrapped line would leave a row behind at each
  * update: while a torrent stalls it says only for how long, in place of the speed and
  * [speedLimit], and why goes on a line of its own above it each time the reason changes.
  */
-internal class ProgressPrinter(private val out: PrintStream, speedLimit: SpeedLimit) {
+internal class ProgressPrinter(private val line: ProgressLine, speedLimit: SpeedLimit) {
   private val limitLabel =
     if (speedLimit.isUnlimited) "" else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
-
-  // How many columns the progress line took last.
-  private var width = 0
 
   // The stall reason printed above the progress line, until the download progresses again.
   private var shownReason: String? = null
@@ -113,26 +110,22 @@ internal class ProgressPrinter(private val out: PrintStream, speedLimit: SpeedLi
   fun print(state: DownloadState, stall: TorrentStall?) {
     if (state !is DownloadState.Downloading) shownReason = null
     when (state) {
-      is DownloadState.Scheduled -> out.println("[Scheduled] Waiting for scheduled time...")
-      is DownloadState.Queued -> out.println("[Queued] Waiting for download slot...")
+      is DownloadState.Scheduled -> line.printBelow("[Scheduled] Waiting for scheduled time...")
+      is DownloadState.Queued -> line.printBelow("[Queued] Waiting for download slot...")
       is DownloadState.Downloading -> printProgress(state.progress, stall)
-      is DownloadState.Paused -> out.println("\n[Paused] Download paused.")
+      is DownloadState.Paused -> line.printBelow("[Paused] Download paused.")
       is DownloadState.Completed -> {
-        out.println("\n[Completed] Saved to ${state.outputPath}")
-        state.checksum?.let { out.println("[Verified] ${it.algorithm.label} matches") }
+        line.printBelow("[Completed] Saved to ${state.outputPath}")
+        state.checksum?.let { line.printBelow("[Verified] ${it.algorithm.label} matches") }
       }
-      is DownloadState.Failed -> out.println("\n[Failed] ${state.error.message}")
-      is DownloadState.Canceled -> out.println("\n[Canceled] Download canceled.")
+      is DownloadState.Failed -> line.printBelow("[Failed] ${state.error.message}")
+      is DownloadState.Canceled -> line.printBelow("[Canceled] Download canceled.")
     }
   }
 
   private fun printProgress(progress: DownloadProgress, stall: TorrentStall?) {
     val reason = stall?.let(::stallReason)
-    if (reason != null && reason != shownReason) {
-      // Over the progress line, which goes on below it.
-      out.println(overwrite("[Stalled] $reason"))
-      width = 0
-    }
+    if (reason != null && reason != shownReason) line.printAbove("[Stalled] $reason")
     shownReason = reason
     val downloaded = formatBytes(progress.downloadedBytes)
     val amount = if (progress.totalBytes > 0) {
@@ -149,27 +142,22 @@ internal class ProgressPrinter(private val out: PrintStream, speedLimit: SpeedLi
       } else ""
       speed + limitLabel
     }
-    // Spaces cover what a longer line left, such as a speed the stall replaced.
-    val line = "[Downloading] $amount$rate    "
-    out.print(overwrite(line))
-    width = line.length
+    line.show("[Downloading] $amount$rate")
   }
-
-  /** [text] from the start of the terminal line, covering what the progress line left there. */
-  private fun overwrite(text: String): String = "\r" + text.padEnd(width)
 }
 
 /**
- * Downloads [request] with [ketch] until it completes or fails, printing its progress to [out],
- * and returns its exit status, one of [DownloadExit]. Why Ketch refused it or it failed goes to
- * [err] in one line ([failureReason]), without a stack trace. The task is removed once it ends.
- * While a torrent makes no progress, its output says why ([stalls], from [torrentStalls]; see
- * [ProgressPrinter]), as Ketch logs only warnings meanwhile.
+ * Downloads [request] with [ketch] until it completes or fails, printing its progress to
+ * [progress], and returns its exit status, one of [DownloadExit]. Why Ketch refused it or it
+ * failed goes to [err] in one line ([failureReason]), without a stack trace. The task is removed
+ * once it ends. While a torrent makes no progress, its output says why ([stalls], from
+ * [torrentStalls]; see [ProgressPrinter]), as Ketch logs only warnings meanwhile; those go above
+ * the progress line when [ketch]'s logger writes through [progress] (see [ProgressLine]).
  */
 internal suspend fun downloadUntilDone(
   ketch: KetchApi,
   request: DownloadRequest,
-  out: PrintStream = System.out,
+  progress: ProgressLine = ProgressLine(System.out),
   err: PrintStream = System.err,
   stalls: (taskId: String) -> Flow<TorrentStall?> = { torrentStalls(ketch, it) },
 ): Int = coroutineScope {
@@ -183,7 +171,7 @@ internal suspend fun downloadUntilDone(
     return@coroutineScope DownloadExit.FAILED
   }
 
-  val printer = ProgressPrinter(out, request.speedLimit)
+  val printer = ProgressPrinter(progress, request.speedLimit)
   val latestStall = MutableStateFlow<TorrentStall?>(null)
   val stallWatch = launch { stalls(task.taskId).collect { latestStall.value = it } }
   val monitor = launch {
@@ -201,11 +189,12 @@ internal suspend fun downloadUntilDone(
 
   result.fold(
     onSuccess = { path ->
-      out.println("\nDownload completed: $path")
+      progress.printBelow("Download completed: $path")
       DownloadExit.OK
     },
     onFailure = { error ->
-      err.println("\nDownload failed: ${failureReason(error)}")
+      progress.end()
+      err.println("Download failed: ${failureReason(error)}")
       DownloadExit.FAILED
     },
   )

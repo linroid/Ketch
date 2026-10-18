@@ -173,11 +173,13 @@ private fun runDownload(args: DownloadArgs.Download): Int {
   )
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
-  // Only warnings unless -v or --debug asks for more, so the progress line stays readable.
+  val progress = ProgressLine(System.out)
+  // Only warnings unless -v or --debug asks for more, so the progress line stays readable; they
+  // go above it rather than onto its end.
   val ketch = Ketch(
     httpEngine = httpEngine,
     config = config,
-    logger = Logger.console(quietLogLevel(ketchLogLevel)),
+    logger = Logger.console(quietLogLevel(ketchLogLevel)).above(progress),
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
@@ -187,7 +189,7 @@ private fun runDownload(args: DownloadArgs.Download): Int {
 
   return runBlocking {
     try {
-      downloadUntilDone(ketch, args.toRequest(destination))
+      downloadUntilDone(ketch, args.toRequest(destination), progress)
     } finally {
       ketch.shutdown()
     }

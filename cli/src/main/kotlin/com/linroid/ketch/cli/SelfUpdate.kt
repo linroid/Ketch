@@ -154,11 +154,15 @@ private suspend fun install(
   try {
     val archive = File(work, asset.name)
     println("Downloading ${asset.name} (${formatBytes(asset.size)})")
-    ReleaseDownloader({ KtorHttpEngine() }, logger).download(asset, archive) { progress ->
-      val pct = (progress.percent * 100).toInt()
-      print("\r  $pct%  ${formatBytes(progress.downloadedBytes)} / ${formatBytes(asset.size)}    ")
+    val line = ProgressLine(System.out)
+    try {
+      ReleaseDownloader({ KtorHttpEngine() }, logger.above(line)).download(asset, archive) {
+        val pct = (it.percent * 100).toInt()
+        line.show("  $pct%  ${formatBytes(it.downloadedBytes)} / ${formatBytes(asset.size)}")
+      }
+    } finally {
+      line.end()
     }
-    println()
     println("Verified the SHA-256 checksum")
     val extracted = File(work, "extracted")
     extractArchive(archive, extracted)
