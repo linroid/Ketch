@@ -279,6 +279,15 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
+  fun planSelection_unknownFiles_namesThem() = runTest {
+    val resolved = source.resolveMetainfo(pack.metainfo)
+    val error = assertFailsWith<IllegalArgumentException> {
+      source.planSelection(selection(setOf("0", "99", "zz"), resolved))
+    }
+    assertEquals("Unknown file IDs: 99, zz", error.message)
+  }
+
+  @Test
   fun planSelection_noMetadata_isIllegalState() = runTest {
     val resolved = source.resolveMetainfo(pack.metainfo)
     assertFailsWith<IllegalStateException> {

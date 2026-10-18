@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.engine
 
+import com.linroid.ketch.api.InternalKetchApi
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 
@@ -69,9 +70,11 @@ internal const val SINGLE_CHOICE_MESSAGE: String = "Choose exactly one variant o
 
 /**
  * Why a selection naming [ids], which the source does not list, is refused: the first few of
- * them, cut short and without control characters, as callers may send anything.
+ * them, cut short and without control characters, as callers may send anything. Sources that
+ * plan selections ([DownloadSource.planSelection]) refuse unknown IDs with it too.
  */
-internal fun unknownFilesMessage(ids: Collection<String>): String {
+@InternalKetchApi
+fun unknownFilesMessage(ids: Collection<String>): String {
   val named = ids.take(NAMED_FILE_IDS).joinToString { id ->
     id.take(NAMED_FILE_ID_LENGTH).filterNot { it.isISOControl() }
   }

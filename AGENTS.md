@@ -789,7 +789,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `DownloadTask.selectFiles` changes the selection in every state but canceled (default throws
   `UnsupportedOperationException`; `RemoteDownloadTask` sends `PUT /api/tasks/{id}/files`). Ketch
   validates it with `DownloadSource.planSelection` against metadata the source holds, never
-  client sizes, fitting a running download's latest segments (else the saved ones), saves it
+  client sizes (the torrent source names unknown IDs with core's `@InternalKetchApi`
+  `unknownFilesMessage`, as Ketch does), fitting a running download's latest segments (else the saved ones), saves it
   (selection, total, segments and `TaskControl.selectionGeneration` in one record write; the
   task shows the plan first, so its new request never comes with the old selection's size: a
   running task the plan's progress, dropping its transfer's reports until the selection is

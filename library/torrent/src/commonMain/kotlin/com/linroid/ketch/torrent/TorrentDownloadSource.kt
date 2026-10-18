@@ -21,6 +21,7 @@ import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.encodeState
+import com.linroid.ketch.core.engine.unknownFilesMessage
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentReachability
@@ -702,7 +703,8 @@ class TorrentDownloadSource(
     require(requested.size <= maxOf(config.maxFilesPerTorrent, table.files.size)) {
       "Too many files selected"
     }
-    require(requested.all { table[it] != null }) { "Unknown file id" }
+    val unknown = requested.filter { table[it] == null }
+    require(unknown.isEmpty()) { unknownFilesMessage(unknown) }
     val ids = table.ordered(requested)
     val mirror = state?.selectedFileIds.orEmpty().filterTo(LinkedHashSet()) { table[it] != null }
     val effective = table.ordered(request.current.ifEmpty { mirror }.ifEmpty { table.ids })
