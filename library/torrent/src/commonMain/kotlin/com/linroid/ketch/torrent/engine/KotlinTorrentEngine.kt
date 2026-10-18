@@ -268,6 +268,8 @@ internal class KotlinTorrentEngine(
   private val udpMutex = Mutex()
   // Guarded by udpMutex.
   private val udpPorts = mutableMapOf<String, TorrentUdpPort>()
+  /** The IPv4 UDP socket [listenForPeers] bound at the listen port, until [udpPort] takes it. */
+  private var reservedUdp: TorrentDatagramSocket? = null
   /** The running uTP endpoint of each UDP host, read by dials without [udpMutex]. */
   private val utpEndpoints = AtomicReference(emptyMap<String, UtpEndpoint>())
   private val exchangeBudgets = TorrentExchangeBudgets(config)
@@ -374,7 +376,7 @@ internal class KotlinTorrentEngine(
   override suspend fun start() = mutex.withLock {
     check(!closed && shutdown.load() == null) { "Torrent runtime is closed" }
     if (running.load()) return@withLock
-    val listener = network.listen(PeerEndpoint(listenHost, config.listenPort))
+    val listener = listenForPeers()
     advertisedPort.setListen(listener.local.port)
     running.store(true)
     acceptIncoming(listener)
@@ -398,6 +400,37 @@ internal class KotlinTorrentEngine(
         ", dht=${config.dhtEnabled}, maxActiveTorrents=${config.maxActiveTorrents}, " +
         "maxConnections=${config.maxConnections}, extraTrackers=${additionalTrackers.load().size}"
     }
+  }
+
+  /**
+   * Listens on [TorrentConfig.listenPort], or on a port the system picks whose UDP port is free
+   * too, as DHT and uTP bind the listen port over UDP: another socket, or on Windows an excluded
+   * port range, may hold it for UDP while TCP had it free, and peers dialing it over uTP would
+   * reach nothing. After [SHARED_PORT_ATTEMPTS] the last port picked is kept anyway.
+   */
+  private suspend fun listenForPeers(): TorrentListener {
+    val local = PeerEndpoint(listenHost, config.listenPort)
+    if (config.listenPort != 0) return network.listen(local)
+    repeat(SHARED_PORT_ATTEMPTS - 1) {
+      val listener = network.listen(local)
+      val udp = try {
+        attempt { network.bindUdp(PeerEndpoint(WILDCARD_IPV4, listener.local.port)) }
+      } catch (e: CancellationException) {
+        listener.close()
+        throw e
+      }
+      // Free: kept for udpPort, so nothing takes the port before uTP or DHT binds it.
+      if (udp != null) {
+        udpMutex.withLock {
+          reservedUdp?.close()
+          reservedUdp = udp
+        }
+        return listener
+      }
+      log.d { "UDP port ${listener.local.port} is taken, picking another listen port" }
+      listener.close()
+    }
+    return network.listen(local)
   }
 
   private fun acceptIncoming(listener: TorrentListener) = scope.launch {
@@ -561,6 +594,8 @@ internal class KotlinTorrentEngine(
         udpMutex.withLock {
           udpPorts.values.forEach { it.close() }
           udpPorts.clear()
+          reservedUdp?.close()
+          reservedUdp = null
         }
         utpEndpoints.store(emptyMap())
       } finally {
@@ -1442,7 +1477,12 @@ internal class KotlinTorrentEngine(
   private suspend fun udpPort(host: String): TorrentUdpPort = udpMutex.withLock {
     udpPorts[host]?.let { if (it.isRunning) return@withLock it else it.close() }
     val port = listenPort.takeIf { it != 0 } ?: config.listenPort
-    val socket = if (port != 0) {
+    // The socket listenForPeers reserved, unless the listen port changed since.
+    val reserved = if (host == WILDCARD_IPV4) reservedUdp?.also { reservedUdp = null } else null
+    if (reserved != null && reserved.local.port != port) reserved.close()
+    val socket = if (reserved != null && reserved.local.port == port) {
+      reserved
+    } else if (port != 0) {
       try {
         network.bindUdp(PeerEndpoint(host, port))
       } catch (e: CancellationException) {
@@ -1805,6 +1845,9 @@ private class AnnounceState(val verified: BooleanArray, val received: Long, val 
 private const val WILDCARD_IPV4 = "0.0.0.0"
 /** The hosts DHT and uTP bind UDP on: every IPv4 and every IPv6 interface. */
 private val UDP_HOSTS = listOf(WILDCARD_IPV4, "::")
+
+/** How many system-picked listen ports [KotlinTorrentEngine] tries for one UDP has free too. */
+private const val SHARED_PORT_ATTEMPTS = 8
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128

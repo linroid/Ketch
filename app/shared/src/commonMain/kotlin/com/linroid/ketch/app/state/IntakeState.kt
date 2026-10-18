@@ -266,6 +266,9 @@ class IntakeEntry internal constructor(source: IntakeSource) {
 
   private var chosenFiles: Set<String>? by mutableStateOf(null)
 
+  /** Id of the stream variant chosen among [variants]; `null` keeps the first, the best. */
+  var selectedVariant: String? by mutableStateOf(null)
+
   internal var job: Job? = null
   internal var wanted: Boolean = false
 
@@ -294,16 +297,30 @@ class IntakeEntry internal constructor(source: IntakeSource) {
 
   /**
    * The files of a torrent with several, once its file list arrived; otherwise empty. A stream's
-   * variants, a single choice, are not picked here: it downloads the best, and the inspector's
-   * Files tab switches to another. A single choice of separate files that each name the file
-   * they save ([SourceFile.FILE_NAME_KEY]), as a Metalink lists them, is picked here, as the
-   * task cannot switch files once it starts.
+   * variants, a single choice, are [variants]. A single choice of separate files that each name
+   * the file they save ([SourceFile.FILE_NAME_KEY]), as a Metalink lists them, is picked here, as
+   * the task cannot switch files once it starts.
    */
   val files: List<SourceFile>
     get() = resolved?.takeIf { source ->
       source.selectionMode == FileSelectionMode.MULTIPLE ||
         source.files.all { SourceFile.FILE_NAME_KEY in it.metadata }
     }?.files?.takeIf { it.size > 1 }.orEmpty()
+
+  /**
+   * The variants of a stream with several, best first, such as an HLS master's qualities, of
+   * which the row downloads one; otherwise empty.
+   */
+  val variants: List<SourceFile>
+    get() = resolved?.takeIf { it.selectionMode == FileSelectionMode.SINGLE && files.isEmpty() }
+      ?.files?.takeIf { it.size > 1 }.orEmpty()
+
+  /** The variant the row downloads: the [selectedVariant] while listed, else the first. */
+  val variant: SourceFile?
+    get() {
+      val all = variants
+      return all.firstOrNull { it.id == selectedVariant } ?: all.firstOrNull()
+    }
 
   /** The link the row stands for: a range's first link, or a file's resolved `torrent:` id. */
   val url: String?
@@ -808,6 +825,17 @@ class IntakeSession internal constructor(
   /** What [target] reports it supports, as its status says, else as the app last heard. */
   private fun targetFeatures(): Set<String> =
     targetStatus?.features ?: target?.let { state.featuresOf(it.deviceId) }.orEmpty()
+
+  /**
+   * The variants [entry] offers to choose from: its [IntakeEntry.variants] when the target device
+   * lists file selection, which plans the choice, otherwise none, so it downloads its default.
+   */
+  fun variantsOf(entry: IntakeEntry): List<SourceFile> =
+    if (KetchFeatures.FILE_SELECTION in targetFeatures()) entry.variants else emptyList()
+
+  /** The variant [entry] downloads when it offers a choice ([variantsOf]), else `null`. */
+  private fun chosenVariant(entry: IntakeEntry): SourceFile? =
+    entry.variant?.takeIf { variantsOf(entry).isNotEmpty() }
 
   /**
    * Whether the Advanced section offers a checksum: for a single link that is not a torrent,
@@ -1465,12 +1493,13 @@ class IntakeSession internal constructor(
       else -> emptyMap()
     }.let { if (TaskOrigin.PROPERTY in it) it else it + (TaskOrigin.PROPERTY to TaskOrigin.App.id) }
     val selection = entry.selectedFiles
-    val selectedIds = if (entry.files.isEmpty() || selection == null ||
-      selection.size == entry.files.size
-    ) {
-      emptySet()
-    } else {
-      selection
+    val variant = chosenVariant(entry)
+    val selectedIds = when {
+      // The first variant is the source's default, so a request names only another.
+      variant != null -> if (variant == entry.variants.first()) emptySet() else setOf(variant.id)
+      entry.files.isEmpty() || selection == null || selection.size == entry.files.size ->
+        emptySet()
+      else -> selection
     }
     // A link added anyway before its files were known, such as a magnet still looking for its
     // file list, waits for a choice on devices that can, should it turn out to have several
@@ -1611,11 +1640,16 @@ class IntakeSession internal constructor(
     val name = displayName(current, task.state.value)
     if (!startsOver) {
       val newConnections = connectionsFor(current)
+      // A quality chosen in the sheet replaces the one the task downloaded, the first by default.
+      val variant = chosenVariant(entry)?.takeIf {
+        it.id != (current.selectedFileIds.singleOrNull() ?: entry.variants.first().id)
+      }
       val failure = { device: UiText -> Res.string.intake_retry_failed.text(name, device) }
       state.runTaskCommand(task, "retry $name", failure) {
         if (speedLimit != current.speedLimit) setSpeedLimit(speedLimit)
         if (priority != current.priority) setPriority(priority)
         newConnections?.let { setConnections(it) }
+        variant?.let { selectFiles(setOf(it.id)) }
         resume()
       }
       onDone()
@@ -1809,6 +1843,10 @@ class IntakeSession internal constructor(
     }
     result.onSuccess { resolved ->
       entry.status = IntakeStatus.Ready(resolved)
+      // A task retried or edited shows the quality it downloads.
+      if (entry.selectedVariant == null) {
+        entry.selectedVariant = boundRequest?.selectedFileIds?.singleOrNull()
+      }
       if (entry.files.isNotEmpty() && entry.selectedFiles == null) {
         entry.selectedFiles = defaultTorrentSelection(resolved.files)
         // A torrent on its own goes straight to its files.

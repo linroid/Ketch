@@ -22,6 +22,7 @@ import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.TimelineKind
 import com.linroid.ketch.app.state.FileSelectionModel
+import com.linroid.ketch.app.ui.intake.TorrentNode
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -94,20 +95,20 @@ class FilesTabTest {
   }
 
   @Test
-  fun sortedFor_eachOrder_ordersTheFiles() {
+  fun taskFileTree_eachOrder_ordersTheFiles() {
     val files = listOf(
       file("0", path = "b.mkv", size = 10, downloaded = 10, start = 0, number = 1),
       file("1", path = "C.mkv", size = 30, downloaded = 0, start = 10, number = 2),
       file("2", path = "a.mkv", size = 20, downloaded = 5, start = 40, number = 3)
     )
 
-    assertEquals(listOf("2", "1", "0"), files.sortedFor(FileSort(FileOrder.Progress)).map { it.id })
-    assertEquals(listOf("2", "0", "1"), files.sortedFor(FileSort(FileOrder.Name)).map { it.id })
-    assertEquals(listOf("1", "2", "0"), files.sortedFor(FileSort(FileOrder.Size)).map { it.id })
-    assertEquals(listOf("0", "1", "2"), files.sortedFor(FileSort(FileOrder.Torrent)).map { it.id })
+    assertEquals(listOf("2", "1", "0"), files.sorted(FileSort(FileOrder.Progress)).map { it.id })
+    assertEquals(listOf("2", "0", "1"), files.sorted(FileSort(FileOrder.Name)).map { it.id })
+    assertEquals(listOf("1", "2", "0"), files.sorted(FileSort(FileOrder.Size)).map { it.id })
+    assertEquals(listOf("0", "1", "2"), files.sorted(FileSort(FileOrder.Torrent)).map { it.id })
     assertEquals(
       listOf("1", "0", "2"),
-      files.sortedFor(FileSort(FileOrder.Name).reverse()).map { it.id }
+      files.sorted(FileSort(FileOrder.Name).reverse()).map { it.id }
     )
   }
 
@@ -216,12 +217,75 @@ class FilesTabTest {
   }
 
   @Test
-  fun matching_query_filtersByPathIgnoringCase() {
+  fun taskFileTree_query_filtersByPathIgnoringCase() {
     val files = listOf(file("0", path = "Show/S01E01.mkv"), file("1", path = "extras/info.nfo"))
+    val tree = taskFileTree(files, FileSort(FileOrder.Torrent))
 
-    assertEquals(listOf("0"), files.matching(" show ").map { it.id })
-    assertEquals(listOf("0", "1"), files.matching("").map { it.id })
+    assertEquals(listOf("Show", "Show/S01E01.mkv"), tree.visible(emptySet(), " show ").paths())
+    assertEquals(4, tree.visible(emptySet()).size)
   }
+
+  @Test
+  fun taskFileTree_sharedRoot_isLeftOut() {
+    val files = listOf(
+      file("0", path = "Show/E01.mkv", number = 1),
+      file("1", path = "Show/Subs/en.srt", number = 2),
+      file("2", path = "Show/Subs/fr.srt", number = 3),
+    )
+    val tree = taskFileTree(files, FileSort(FileOrder.Torrent))
+
+    assertEquals(
+      listOf("Subs", "Subs/en.srt", "Subs/fr.srt", "E01.mkv"),
+      tree.visible(emptySet()).paths(),
+    )
+    assertEquals(listOf("Subs", "E01.mkv"), tree.visible(setOf("Subs")).paths())
+  }
+
+  @Test
+  fun taskFileTree_unnamedFile_keepsEveryFolder() {
+    val files = listOf(
+      file("0", path = "Show/E01.mkv", number = 1),
+      file("1", path = null, number = 2),
+    )
+    val tree = taskFileTree(files, FileSort(FileOrder.Torrent))
+
+    assertEquals(listOf("Show", "Show/E01.mkv", ""), tree.visible(emptySet()).paths())
+  }
+
+  @Test
+  fun taskFileTree_progress_ordersFoldersByTheirSelectedFiles() {
+    val files = listOf(
+      file("0", path = "Pack/a/1.flac", size = 10, downloaded = 10, number = 1),
+      file("1", path = "Pack/b/1.flac", size = 10, downloaded = 2, number = 2),
+      file("2", path = "Pack/b/2.flac", size = 10, downloaded = 0, number = 3, selected = false),
+      file("3", path = "Pack/c/1.flac", size = 10, downloaded = 0, number = 4, selected = false),
+    )
+    val tree = taskFileTree(files, FileSort(FileOrder.Progress))
+
+    assertEquals(listOf("b", "a", "c"), tree.roots.map { it.path })
+  }
+
+  @Test
+  fun folded_sumsTheSelectedFiles() {
+    val files = listOf(
+      file("0", size = 10, downloaded = 10),
+      file("1", size = 30, downloaded = 5),
+      file("2", size = 60, downloaded = 0, selected = false),
+    )
+
+    val folder = files.folded()
+    assertEquals(40, folder.size)
+    assertEquals(15, folder.downloaded)
+    assertEquals(37, folder.percent)
+    assertNull(files.drop(2).folded().percent)
+    assertFalse(files.drop(2).folded().selected)
+  }
+
+  private fun List<TaskFile>.sorted(sort: FileSort): List<TaskFile> =
+    taskFileTree(this, sort).visible(emptySet())
+      .map { node -> single { it.id == node.fileIds.single() } }
+
+  private fun List<TorrentNode>.paths(): List<String> = map { it.path }
 
   @Test
   fun blocks_doneNeighbours_shareOneBlock() {
@@ -351,11 +415,12 @@ class FilesTabTest {
 
   private fun file(
     id: String,
-    path: String = "file-$id.bin",
+    path: String? = "file-$id.bin",
     size: Long = 100,
     downloaded: Long = 0,
     start: Long = 0,
     number: Int = 0,
+    selected: Boolean = true,
   ) = TaskFile(
     id = id,
     path = path,
@@ -363,6 +428,7 @@ class FilesTabTest {
     size = size,
     downloaded = downloaded,
     number = number,
+    selected = selected,
   )
 
   private fun seg(index: Int, start: Long, end: Long, downloaded: Long) =

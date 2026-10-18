@@ -28,6 +28,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -239,6 +240,46 @@ class UtpEndpointTest {
       a.endpoint.dial(target).close()
       engine.setUtpEnabled(false)
       assertFailsWith<IOException> { a.endpoint.dial(target).readExactly(1) }
+    } finally {
+      engine.stop()
+    }
+  }
+
+  @Test
+  fun engine_listenPortTakenForUdp_picksAPortFreeForBoth() = endpoints { network, scope ->
+    // The first port the system picks for TCP is held for UDP, as by another socket or a
+    // Windows excluded port range: peers dialing the listen port over uTP would reach nothing.
+    var taken = -1
+    val crowded = object : TorrentNetwork by network {
+      override suspend fun listen(local: PeerEndpoint) = network.listen(local).also {
+        if (taken < 0) taken = it.local.port
+      }
+
+      override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
+        if (local.port == taken) throw IOException("Address already in use")
+        return network.bindUdp(local)
+      }
+    }
+    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false), rawNetwork = crowded,
+      listenHost = "127.0.0.1")
+    try {
+      engine.start()
+      assertTrue(engine.listenPort != taken)
+      val a = side(network, scope, dialOptions = UtpOptions(synRetries = 1))
+      a.endpoint.dial(PeerEndpoint("127.0.0.1", engine.listenPort)).close()
+    } finally {
+      engine.stop()
+    }
+  }
+
+  @Test
+  fun engine_utpOff_keepsTheListenPortForUdp() = endpoints { network, _ ->
+    // DHT binds the port lazily: until then the engine holds it, so nothing else takes it.
+    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, utpEnabled = false),
+      rawNetwork = network, listenHost = "127.0.0.1")
+    try {
+      engine.start()
+      assertFails { network.bindUdp(PeerEndpoint("0.0.0.0", engine.listenPort)).close() }
     } finally {
       engine.stop()
     }

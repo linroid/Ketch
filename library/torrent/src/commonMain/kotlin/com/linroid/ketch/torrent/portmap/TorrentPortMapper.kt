@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -112,14 +113,20 @@ internal class TorrentPortMapper(
   /**
    * A mapping [gateway] of NAT [layer] may hold for us: asked for, and not removed since;
    * [permanent] once it was asked for with UPnP's lease 0, which the gateway keeps until it is
-   * removed.
+   * removed. [answered] once the gateway answered us: NAT-PMP and UPnP gateways did before any
+   * request, as discovery found them, a PCP gateway only once a MAP got its reply. A request to
+   * a guessed gateway that never answered may have reached no gateway at all.
    */
   private class Requested(
     val gateway: Gateway,
     val mapping: PortMapping,
     val layer: Int,
     var permanent: Boolean,
+    var answered: Boolean,
   ) {
+    /** Whether the gateway confirmed, once asked to remove it, that it holds no such mapping. */
+    var removed = false
+
     fun matches(gateway: Gateway, mapping: PortMapping) =
       this.gateway.sameAs(gateway) && gateway.sameMapping(this.mapping, mapping)
   }
@@ -148,7 +155,8 @@ internal class TorrentPortMapper(
   private var current: List<Mapped> = emptyList()
   // Guarded by mutex. Every mapping asked for since it was last removed, noted before the
   // request goes out: a gateway may grant one whose reply never arrives, as when stop() cancels
-  // the pass waiting for it, and those are removed too.
+  // the pass waiting for it, and those are removed too. Requests to guessed PCP gateways that
+  // never answered are noted as well, and their removal sent once.
   private val requested = mutableListOf<Requested>()
   // Guarded by mutex. The layer the running pass maps, 0 innermost.
   private var asking = 0
@@ -196,50 +204,46 @@ internal class TorrentPortMapper(
   }
 
   /**
-   * Stops renewing and removes the mappings, giving the gateways at most [timeoutMs], and logs
-   * once whether they did. A mapping whose removal its gateway did not confirm may stay until its
-   * lease ends, or until the router drops it where UPnP leased it permanently.
+   * Stops renewing and removes the mappings, all at once, giving the gateways at most
+   * [timeoutMs], and logs once whether they did. A mapping whose removal its gateway did not
+   * confirm may stay until its lease ends, or until the router drops it where UPnP leased it
+   * permanently.
    */
   suspend fun stop(timeoutMs: Long = 2_000) {
     job?.cancel()
     withContext(NonCancellable) {
       // Every mapping asked for, the ones of a pass stop() cut short included, read once that
-      // pass let go, and the removals confirmed.
+      // pass let go.
       var removing: List<Requested>? = null
-      val confirmed = mutableSetOf<Requested>()
       val finished = withTimeoutOrNull(timeoutMs) {
         mutex.withLock {
-          val asked = outermostFirst(requested)
+          val asked = requested.toList()
           removing = asked
-          for (request in asked) {
-            if (unmap(request.gateway, request.mapping)) confirmed += request
-          }
+          unmapAll(asked)
           requested.clear()
           current = emptyList()
         }
       } != null
-      logRemoval(removing, confirmed, finished, timeoutMs)
+      logRemoval(removing, finished, timeoutMs)
     }
   }
 
   /**
    * Logs how removing [removing], every mapping asked for, went, naming only the port and the
    * NAT layers: a layer may still forward the port when its gateway did not confirm every
-   * removal, whether or not it ever confirmed the mapping. [removing] is null when the removal
-   * timed out before it began; nothing asked for, nothing is logged.
+   * removal, whether or not it ever confirmed the mapping. Only gateways that answered, before or
+   * by confirming the removal, name layers: a guessed gateway that never answered its probe may
+   * not be there. [removing] is null when the removal timed out before it began; nothing asked of
+   * a gateway that answered, nothing is logged.
    */
-  private fun logRemoval(
-    removing: List<Requested>?,
-    confirmed: Set<Requested>,
-    finished: Boolean,
-    timeoutMs: Long,
-  ) {
-    if (removing != null && removing.isEmpty()) return
+  private fun logRemoval(removing: List<Requested>?, finished: Boolean, timeoutMs: Long) {
+    val heard = removing?.filter { it.answered || it.removed }
+    if (heard != null && heard.isEmpty()) return
     val head = if (finished) "Removing the mapping of port $tcpPort" else {
       "Removing the mapping of port $tcpPort timed out after ${timeoutMs}ms"
     }
-    val layers = removing?.distinctBy { it.layer }?.size
-    val kept = removing?.filterNot { it in confirmed }
+    val layers = heard?.distinctBy { it.layer }?.size
+    val kept = heard?.filterNot { it.removed }
     log.i {
       when {
         layers == null || kept == null ->
@@ -390,6 +394,7 @@ internal class TorrentPortMapper(
       requesting(pcpGateway, MappedProtocol.TCP, target.tcp, requestTcp)
       val tcp = pcp.map(gateway, client, MappedProtocol.TCP, target.tcp, requestTcp,
         LIFETIME_SECONDS, nonce) ?: continue
+      heardFrom(pcpGateway)
       val external = tcp.mapping.externalPort
       val udpMapping = target.udp?.let {
         requesting(pcpGateway, MappedProtocol.UDP, it, external)
@@ -497,37 +502,61 @@ internal class TorrentPortMapper(
       if (lease == 0L) held.permanent = true
       return null
     }
-    return Requested(gateway, mapping, asking, permanent = lease == 0L).also { requested += it }
+    val answered = gateway !is Gateway.Pcp ||
+      requested.any { it.answered && it.gateway.sameAs(gateway) }
+    return Requested(gateway, mapping, asking, permanent = lease == 0L, answered = answered)
+      .also { requested += it }
+  }
+
+  /** Notes that [gateway] answered, so the mappings asked of it are a NAT layer's. */
+  private fun heardFrom(gateway: Gateway) {
+    for (request in requested) {
+      if (request.gateway.sameAs(gateway)) request.answered = true
+    }
   }
 
   /** Removes [mapping] from [gateway] now. */
   private suspend fun release(gateway: Gateway, mapping: PortMapping) {
-    requested.removeAll { it.matches(gateway, mapping) }
     unmap(gateway, mapping)
+    requested.removeAll { it.matches(gateway, mapping) }
   }
 
-  /** Removes every requested mapping [layers] do not hold, outermost first. */
+  /** Removes every requested mapping [layers] do not hold. */
   private suspend fun prune(layers: List<Mapped>) {
     val stale = requested.filterNot { request ->
       layers.any { layer -> layer.mappings.any { request.matches(layer.gateway, it) } }
     }
+    // Forgotten once asked to go, so a stop() that cuts the removal short sends it again.
+    unmapAll(stale)
     requested -= stale.toSet()
-    outermostFirst(stale).forEach { unmap(it.gateway, it.mapping) }
   }
 
   /**
-   * [requests] in the order they are removed: each layer forwards to the one inside it, so the
-   * outermost layer's go first, each layer's in the order they were asked.
+   * Removes [requests] side by side, so a gateway that never answers holds none of the others
+   * up, and marks those whose gateway confirmed it. Order does not matter: an outer
+   * layer still forwarding the port to an inner one that no longer does reaches nothing.
    */
-  private fun outermostFirst(requests: List<Requested>) = requests.sortedByDescending { it.layer }
+  private suspend fun unmapAll(requests: List<Requested>) = coroutineScope {
+    for (request in requests) {
+      launch { request.removed = unmap(request.gateway, request.mapping, request.answered) }
+    }
+  }
 
-  /** Removes [mapping] from [gateway]; true once the gateway confirmed it holds no such mapping. */
-  private suspend fun unmap(gateway: Gateway, mapping: PortMapping): Boolean = try {
+  /**
+   * Removes [mapping] from [gateway]; true once the gateway confirmed it holds no such mapping.
+   * Unless the gateway [answered] before, the removal goes out once, briefly: a guessed gateway
+   * that never answered is likely not there.
+   */
+  private suspend fun unmap(
+    gateway: Gateway,
+    mapping: PortMapping,
+    answered: Boolean = true,
+  ): Boolean = try {
     when (gateway) {
       is Gateway.NatPmp ->
         natPmp.map(gateway.address, mapping.protocol, mapping.internalPort, 0, 0) != null
       is Gateway.Pcp -> pcp?.map(gateway.address, gateway.client, mapping.protocol,
-        mapping.internalPort, 0, 0, gateway.nonce) != null
+        mapping.internalPort, 0, 0, gateway.nonce, once = !answered) != null
       is Gateway.Upnp -> {
         upnp.deletePortMapping(gateway.gateway, mapping.protocol, mapping.externalPort)
         true

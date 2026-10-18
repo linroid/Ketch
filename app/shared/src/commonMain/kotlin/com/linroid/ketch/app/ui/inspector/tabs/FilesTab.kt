@@ -1,11 +1,13 @@
 package com.linroid.ketch.app.ui.inspector.tabs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -15,7 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.triStateToggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -30,9 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,7 +51,6 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
-import com.linroid.ketch.app.components.KetchCheckbox
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
@@ -54,6 +58,7 @@ import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchRadio
 import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.components.KetchTooltip
+import com.linroid.ketch.app.components.KetchTriStateCheckbox
 import com.linroid.ketch.app.components.LanePhase
 import com.linroid.ketch.app.components.LaneStripCanvas
 import com.linroid.ketch.app.components.LaneStripDefaults
@@ -67,20 +72,22 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
+import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.FileOrder
 import com.linroid.ketch.app.state.FileSelectionModel
 import com.linroid.ketch.app.state.FileSort
-import com.linroid.ketch.app.state.FileSortKey
 import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.awaitsFileSelection
 import com.linroid.ketch.app.state.selectionMode
-import com.linroid.ketch.app.state.sortedByFiles
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchSpacing
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.files.fileSortItems
+import com.linroid.ketch.app.ui.intake.TorrentNode
+import com.linroid.ketch.app.ui.intake.TorrentTree
+import com.linroid.ketch.app.ui.intake.toggleState
 import com.linroid.ketch.app.ui.list.TaskCommand
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_file_description
@@ -103,6 +110,8 @@ import ketch.app.shared.generated.resources.inspector_files_sort
 import ketch.app.shared.generated.resources.inspector_files_start
 import ketch.app.shared.generated.resources.inspector_files_waiting
 import ketch.app.shared.generated.resources.inspector_percent_spoken
+import ketch.app.shared.generated.resources.intake_collapse
+import ketch.app.shared.generated.resources.intake_expand
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -209,7 +218,11 @@ internal fun FilesTabContent(
   val chosen = remember(files) { files.filter { it.selected } }
   val listed = list?.size ?: row.request.resolvedSource?.files?.size ?: 0
   var query by remember { mutableStateOf("") }
-  val shown = remember(files, sort, query) { files.matching(query).sortedFor(sort) }
+  var collapsed by remember { mutableStateOf(emptySet<String>()) }
+  val tree = remember(files, sort) { taskFileTree(files, sort) }
+  val shown = remember(tree, collapsed, query) { tree.visible(collapsed, query) }
+  val nested = remember(tree) { tree.roots.any { it is TorrentNode.Folder } }
+  val byId = remember(files) { files.associateBy { it.id } }
   val phase = row.state.lanePhase()
   val orders = remember(selectable) {
     FileSortSurface.Inspector.orders.filter { selectable || it != FileOrder.Selected }
@@ -317,7 +330,13 @@ internal fun FilesTabContent(
         // Narrow lists give the chip's room to the names.
         val chips = maxWidth >= metrics.chipsFrom
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-          items(shown, key = { it.id }) { file ->
+          items(shown, key = ::rowKey) { node ->
+            val folder = node as? TorrentNode.Folder
+            val file = if (folder != null) {
+              node.fileIds.mapNotNull(byId::get).folded()
+            } else {
+              byId.getValue(node.fileIds[0])
+            }
             FileRow(
               file = file,
               phase = phase,
@@ -325,10 +344,27 @@ internal fun FilesTabContent(
               chip = chips,
               // Nothing downloads before the files are chosen.
               progress = !waiting,
-              check = model?.let { m ->
-                FileCheck(checked = file.id in checked, single = single) {
-                  if (single) m.choose(file.id, applied) else m.toggle(listOf(file.id), applied)
+              // A single choice picks one variant, never a folder of them.
+              check = model?.takeUnless { single && folder != null }?.let { m ->
+                FileCheck(state = toggleState(node, checked), single = single) {
+                  if (single) m.choose(file.id, applied) else m.toggle(node.fileIds, applied)
                 }
+              },
+              tree = if (nested) {
+                FileTreePlace(
+                  depth = node.depth,
+                  folder = folder?.let { node.path },
+                  collapsed = folder != null && node.path in collapsed,
+                  size = node.size,
+                ) {
+                  collapsed = if (node.path in collapsed) {
+                    collapsed - node.path
+                  } else {
+                    collapsed + node.path
+                  }
+                }
+              } else {
+                null
               },
             )
           }
@@ -430,11 +466,29 @@ private fun SortChip(sort: FileSort, orders: List<FileOrder>, onSort: (FileSort)
 }
 
 /**
- * A file's checkbox, or its radio button when it is one variant of a [single] choice: whether it
- * is [checked], and what clicking it does.
+ * A row's checkbox, or its radio button when it is one variant of a [single] choice: whether
+ * every, some or none of its files are checked, and what clicking it does.
  */
-private class FileCheck(val checked: Boolean, val single: Boolean, val onToggle: () -> Unit)
+private class FileCheck(val state: ToggleableState, val single: Boolean, val onToggle: () -> Unit) {
+  val checked: Boolean get() = state == ToggleableState.On
+}
 
+/**
+ * Where a row sits in a list with folders: how deep, and for a [folder] row its path, whether it
+ * is [collapsed], the [size] of every file in it and what its chevron does.
+ */
+private class FileTreePlace(
+  val depth: Int,
+  val folder: String?,
+  val collapsed: Boolean,
+  val size: Long,
+  val onExpand: () -> Unit,
+)
+
+/**
+ * A row of the list: a file, or a folder of them when [tree] says so, which [file] then sums up.
+ * In a list with folders, rows are indented by their depth and folders open with a chevron.
+ */
 @Composable
 private fun FileRow(
   file: TaskFile,
@@ -443,22 +497,35 @@ private fun FileRow(
   chip: Boolean,
   progress: Boolean,
   check: FileCheck?,
+  tree: FileTreePlace? = null,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
-  val size = (if (file.size >= 0) compactSizeText(file.size) else verbatim(UNKNOWN)).resolve()
+  val glyph = KetchTheme.density.controlGlyph
+  val folder = tree?.folder
+  val bytes = if (folder != null) tree.size else file.size
+  val size = (if (bytes >= 0) compactSizeText(bytes) else verbatim(UNKNOWN)).resolve()
   val shows = progress && file.selected
   val percent = file.percent.takeIf { shows }
-  val name = file.label.resolve()
+  val name = folder?.substringAfterLast('/') ?: file.label.resolve()
   val description = if (percent != null) {
     Res.string.inspector_file_description
       .text(name, size, Res.string.inspector_percent_spoken.text(percent))
   } else {
     Res.string.inspector_file_description_no_share.text(name, size)
   }.resolve()
+  val expandLabel = if (tree?.collapsed == true) {
+    stringResource(Res.string.intake_expand)
+  } else {
+    stringResource(Res.string.intake_collapse)
+  }
   val toggle = when {
-    check == null -> Modifier
+    check == null -> if (folder != null) {
+      Modifier.clip(KetchTheme.shapes.sm).clickable(onClick = tree.onExpand)
+    } else {
+      Modifier
+    }
     check.single -> Modifier
       .clip(KetchTheme.shapes.sm)
       .selectable(
@@ -468,13 +535,13 @@ private fun FileRow(
       )
     else -> Modifier
       .clip(KetchTheme.shapes.sm)
-      .toggleable(
-        value = check.checked,
+      .triStateToggleable(
+        state = check.state,
         role = Role.Checkbox,
-        onValueChange = { check.onToggle() },
+        onClick = check.onToggle,
       )
   }
-  KetchTooltip(text = file.pathText.resolve()) {
+  KetchTooltip(text = folder ?: file.pathText.resolve()) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(spacing.s2),
@@ -482,19 +549,45 @@ private fun FileRow(
         .fillMaxWidth()
         .height(metrics.rowHeight)
         .then(toggle)
-        .clearAndSetSemantics { contentDescription = description },
+        .clearAndSetSemantics {
+          contentDescription = description
+          if (folder != null) {
+            customActions = listOf(CustomAccessibilityAction(expandLabel) { tree.onExpand(); true })
+          }
+        }
+        .then(if (tree != null) Modifier.padding(start = spacing.s4 * tree.depth) else Modifier),
     ) {
+      if (tree != null) {
+        if (folder != null) {
+          KetchIconImage(
+            icon = if (tree.collapsed) KetchIcon.Chevron else KetchIcon.ChevronDown,
+            size = glyph,
+            tint = colors.textSecondary,
+            modifier = Modifier.clickable(
+              onClickLabel = expandLabel,
+              role = Role.Button,
+              onClick = tree.onExpand,
+            ),
+          )
+        } else {
+          Spacer(Modifier.width(glyph))
+        }
+      }
       if (check?.single == true) {
         KetchRadio(selected = check.checked, onClick = null, modifier = Modifier.size(spacing.s5))
       } else if (check != null) {
-        KetchCheckbox(
-          checked = check.checked,
-          onCheckedChange = null,
+        KetchTriStateCheckbox(
+          state = check.state,
+          onClick = null,
           modifier = Modifier.size(spacing.s5),
         )
       }
-      if (chip) KetchFileTypeChip(fileName = name, size = KetchFileTypeChipDefaults.TableSize)
-      FileName(name, Modifier.weight(1f), dimmed = !file.selected)
+      if (folder != null) {
+        KetchIconImage(KetchIcon.Folder, size = glyph, tint = colors.textSecondary)
+      } else if (chip) {
+        KetchFileTypeChip(fileName = name, size = KetchFileTypeChipDefaults.TableSize)
+      }
+      FileName(if (folder != null) "$name/" else name, Modifier.weight(1f), dimmed = !file.selected)
       Text(
         text = size,
         style = type.numeral,
@@ -533,6 +626,10 @@ private fun FileRow(
     }
   }
 }
+
+/** A row's key in the list: a folder's path, which no file id starts with, or the file's id. */
+private fun rowKey(node: TorrentNode): String =
+  if (node is TorrentNode.Folder) "/${node.path}" else node.fileIds.single()
 
 /**
  * A file name on one line that gives up its middle when it does not fit, so both its start and
@@ -778,22 +875,43 @@ private fun filesMapDescription(files: List<TaskFile>): UiText {
   return Res.plurals.inspector_files_map.text(files.size, files.size, done, percent)
 }
 
-/** These files in [sort] order; Selected first follows the files the task downloads. */
-internal fun List<TaskFile>.sortedFor(sort: FileSort): List<TaskFile> =
-  sortedByFiles(sort) { file ->
-    FileSortKey(
-      path = file.path,
-      size = file.size,
-      index = file.number - 1,
-      selected = file.selected,
-      progress = file.percent?.let { it / 100f },
-    )
+/**
+ * [files] as a folder tree from the `/`-separated paths in their names, in [sort] order within
+ * each folder, folders first. A root folder every file shares, a torrent's usual one, is left out:
+ * the task's name already says it. Unnamed files stay at the top, named by [TaskFile.label].
+ */
+internal fun taskFileTree(files: List<TaskFile>, sort: FileSort): TorrentTree {
+  val ordered = files.sortedBy { it.number }
+  val paths = ordered.map { it.path }
+  val root = paths.firstOrNull()?.substringBefore('/', missingDelimiterValue = "")
+  val shared = if (!root.isNullOrEmpty() && paths.all { it != null && it.startsWith("$root/") }) {
+    root.length + 1
+  } else {
+    0
   }
+  val byId = files.associateBy { it.id }
+  return TorrentTree(
+    files = ordered.map { SourceFile(it.id, it.path?.substring(shared).orEmpty(), it.size) },
+    sort = sort,
+    selection = files.filter { it.selected }.mapTo(HashSet()) { it.id },
+    progress = { ids -> ids.mapNotNull(byId::get).folded().percent?.let { it / 100f } },
+  )
+}
 
-/** The files whose path contains [query], ignoring case; all of them for a blank query. */
-internal fun List<TaskFile>.matching(query: String): List<TaskFile> {
-  val text = query.trim()
-  return if (text.isEmpty()) this else filter { it.path?.contains(text, ignoreCase = true) == true }
+/**
+ * These files as one row: their size, and the bytes downloaded of those the task downloads, which
+ * it counts as selected when any is.
+ */
+internal fun List<TaskFile>.folded(): TaskFile {
+  val chosen = filter { it.selected && it.size >= 0 }
+  return TaskFile(
+    id = "",
+    path = null,
+    start = 0,
+    size = if (chosen.isEmpty()) -1 else chosen.sumOf { it.size },
+    downloaded = chosen.sumOf { it.downloaded.coerceIn(0, it.size) },
+    selected = any { it.selected },
+  )
 }
 
 /**

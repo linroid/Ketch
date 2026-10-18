@@ -149,6 +149,7 @@
   <string name="intake_user_name">ユーザー名</string>
   <string name="intake_password">パスワード</string>
   <string name="intake_connections">接続数</string>
+  <string name="intake_quality">画質</string>
 
   <string name="intake_options">オプション</string>
   <string name="intake_pill_label">%1$s：</string>
