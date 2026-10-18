@@ -60,6 +60,7 @@ class SegmentLane internal constructor(
    * Whether this lane's connection failed and waits to retry: its remaining bytes are free for
    * the next connection that asks [SegmentLedger.steal] or [SegmentLedger.rejoin].
    */
+  @Volatile
   internal var released: Boolean = false
 
   /** When this lane's current transfer began, for its rate. */

@@ -259,6 +259,9 @@ class SegmentedDownloadHelper(
       } catch (e: KetchError) {
         if (!retriesAlone || !e.isRetryable || (e is KetchError.Http && e.code == 429)) throw e
         if (lane.laneBytes > 0) retries = 0
+        // Read before the release: a connection may take the released bytes, finish them and end
+        // before this one reads the count again.
+        val ended = ledger.ended.value
         if (!policy.allows(retries) || !ledger.release(lane)) throw e
         retries++
         val delayMs = policy.delayMs(retries)
@@ -267,9 +270,9 @@ class SegmentedDownloadHelper(
             "retrying the connection in ${delayMs}ms: ${e.describeCauses()}"
         }
         context.segments.value = ledger.snapshot()
-        val ended = ledger.ended.value
-        // Stop waiting once a connection ended for lack of work: none is left for this one.
-        withTimeoutOrNull(delayMs) { ledger.ended.first { it > ended } }
+        // Stop waiting once another connection took this lane and one ended for lack of work:
+        // none is left for this one.
+        withTimeoutOrNull(delayMs) { ledger.ended.first { it > ended && !lane.released } }
         val steal = ledger.rejoin(lane) ?: return
         if (steal.victimIdle) steal.victim.transfer?.cancel(LaneDrainedException())
         if (steal.lane !== lane) {
