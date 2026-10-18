@@ -690,36 +690,41 @@ internal class DownloadExecution(
       // Hashed after the last flush, so the digest covers the bytes on disk, and before the
       // move, so a file that does not match never takes the final name.
       val verified = if (selfManagedIo) null else verify(fa, ctx.publishedChecksum, finalTotal)
-      if (!selfManagedIo) {
-        // Closed before the move: some systems, such as Windows, cannot move an open file.
-        fa.close()
-        outputPath = moveToFinal(target)
-      }
+      // Verified, the download is done. A pause, reschedule or preemption that cancels this job
+      // from here on finds it completed: stopped once the move landed, it would resume without
+      // its partial file and download the file again beside it.
+      withContext(NonCancellable) {
+        if (!selfManagedIo) {
+          // Closed before the move: some systems, such as Windows, cannot move an open file.
+          fa.close()
+          outputPath = moveToFinal(target)
+        }
 
-      val finalTime = downloadTime()
-      val finishedAt = finishTime()
-      handle.record.update {
-        it.copy(
-          state = TaskState.COMPLETED,
+        val finalTime = downloadTime()
+        val finishedAt = finishTime()
+        handle.record.update {
+          it.copy(
+            state = TaskState.COMPLETED,
+            outputPath = outputPath,
+            partialPath = null,
+            totalBytes = finalTotal,
+            segments = null,
+            downloadTime = finalTime,
+            completedAt = finishedAt,
+            updatedAt = finishedAt,
+          )
+        }
+
+        completed = true
+        log.i { "Download completed for taskId=$taskId" }
+        handle.mutableState.value = DownloadState.Completed(
           outputPath = outputPath,
-          partialPath = null,
-          totalBytes = finalTotal,
-          segments = null,
+          totalBytes = finalTotal.takeIf { it >= 0 },
           downloadTime = finalTime,
           completedAt = finishedAt,
-          updatedAt = finishedAt,
+          checksum = verified,
         )
       }
-
-      completed = true
-      log.i { "Download completed for taskId=$taskId" }
-      handle.mutableState.value = DownloadState.Completed(
-        outputPath = outputPath,
-        totalBytes = finalTotal.takeIf { it >= 0 },
-        downloadTime = finalTime,
-        completedAt = finishedAt,
-        checksum = verified,
-      )
     } finally {
       val accessor = opened
       if (!selfManagedIo && accessor != null) {
@@ -818,27 +823,30 @@ internal class DownloadExecution(
         log.w(e) { "Failed to close file for taskId=$taskId" }
       }
     }
-    val outputPath = moveToFinal(target)
-    val finishedAt = finishTime()
-    handle.record.update {
-      it.copy(
+    // Completed even when a stop lands meanwhile, as a larger download is once verified.
+    withContext(NonCancellable) {
+      val outputPath = moveToFinal(target)
+      val finishedAt = finishTime()
+      handle.record.update {
+        it.copy(
+          outputPath = outputPath,
+          partialPath = null,
+          state = TaskState.COMPLETED,
+          totalBytes = 0,
+          segments = null,
+          sourceType = sourceType,
+          completedAt = finishedAt,
+          updatedAt = finishedAt,
+        )
+      }
+      handle.mutableState.value = DownloadState.Completed(
         outputPath = outputPath,
-        partialPath = null,
-        state = TaskState.COMPLETED,
         totalBytes = 0,
-        segments = null,
-        sourceType = sourceType,
+        downloadTime = handle.record.value.downloadTime,
         completedAt = finishedAt,
-        updatedAt = finishedAt,
+        checksum = wanted,
       )
     }
-    handle.mutableState.value = DownloadState.Completed(
-      outputPath = outputPath,
-      totalBytes = 0,
-      downloadTime = handle.record.value.downloadTime,
-      completedAt = finishedAt,
-      checksum = wanted,
-    )
   }
 
   /**

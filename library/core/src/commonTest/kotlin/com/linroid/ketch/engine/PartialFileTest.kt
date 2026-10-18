@@ -3,17 +3,24 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.InMemoryTaskStore
+import com.linroid.ketch.core.task.TaskState
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.FileSystem
 import okio.Path
+import kotlin.coroutines.CoroutineContext
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -22,11 +29,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Verifies that a download writes under its partial name (`name.ext.ketch`) until it completes,
- * then takes its final name without replacing a file that appeared there meanwhile, and that
- * tasks saved before partial files existed keep writing to their final name.
+ * then takes its final name without replacing a file that appeared there meanwhile, also when a
+ * pause or reschedule lands as it does, and that tasks saved before partial files existed keep
+ * writing to their final name.
  */
 class PartialFileTest {
   @Test
@@ -209,6 +218,94 @@ class PartialFileTest {
       assertEquals((folder / "file (1).bin").toString(), completed.outputPath)
       assertTrue(platformFileSystem.exists(folder / "file.bin.ketch"))
     }
+  }
+
+  @Test
+  fun pause_asTheFileTakesItsFinalName_keepsTheTaskCompleted() = runTest {
+    stopAsTheMoveLands(FakeHttpEngine()) { task -> task.pause() }
+  }
+
+  @Test
+  fun reschedule_asTheFileTakesItsFinalName_keepsTheTaskCompleted() = runTest {
+    stopAsTheMoveLands(FakeHttpEngine()) { task ->
+      task.reschedule(DownloadSchedule.AfterDelay(1.minutes))
+    }
+  }
+
+  @Test
+  fun reschedule_asAnEmptyFileTakesItsFinalName_keepsTheTaskCompleted() = runTest {
+    val engine = FakeHttpEngine(content = ByteArray(0))
+    engine.serverInfo = engine.serverInfo.copy(contentLength = 0)
+    stopAsTheMoveLands(engine) { task -> task.reschedule(DownloadSchedule.AfterDelay(1.minutes)) }
+  }
+
+  /**
+   * Holds every file operation of a download from [engine] and runs them one by one until its
+   * partial file has been moved to the final name, then calls [stop] before the download hears of
+   * the move: the task must complete under that name and never run again, which would download
+   * the file once more beside it.
+   */
+  private suspend fun TestScope.stopAsTheMoveLands(
+    engine: FakeHttpEngine,
+    stop: suspend (DownloadTask) -> Unit,
+  ) {
+    val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-partial-${Random.nextLong()}"
+    platformFileSystem.createDirectories(folder)
+    val store = InMemoryTaskStore()
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val disk = HeldDispatcher(StandardTestDispatcher(testScheduler))
+    val ketch = Ketch(
+      httpEngine = engine,
+      taskStore = store,
+      config = DownloadConfig(retryCount = 0),
+      dispatchers = KetchDispatchers(dispatcher, dispatcher, disk),
+    )
+    val output = folder / "file.bin"
+    try {
+      val task = ketch.download(request(folder))
+      runCurrent()
+      while (!platformFileSystem.exists(output)) {
+        disk.runNext()
+        if (!platformFileSystem.exists(output)) runCurrent()
+      }
+      // The move landed on disk; the download has not resumed from it yet.
+      assertFalse(task.state.value.isTerminal)
+      assertFalse(platformFileSystem.exists(folder / "file.bin.ketch"))
+      val requests = engine.headCallCount to engine.downloadCallCount
+
+      disk.holding = false
+      stop(task)
+      runCurrent()
+      advanceTimeBy(2.minutes)
+      runCurrent()
+
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals(output.toString(), completed.outputPath)
+      val record = store.load(task.taskId)
+      assertEquals(TaskState.COMPLETED, record?.state)
+      assertEquals(output.toString(), record?.outputPath)
+      assertNull(record?.partialPath)
+      assertEquals(requests, engine.headCallCount to engine.downloadCallCount)
+      assertContentEquals(engine.content, read(output))
+      assertFalse(platformFileSystem.exists(folder / "file (1).bin"))
+    } finally {
+      ketch.close()
+      runCurrent()
+      platformFileSystem.deleteRecursively(folder)
+    }
+  }
+
+  /** Holds the blocks it is given while [holding], for the test to run one at a time. */
+  private class HeldDispatcher(private val inner: CoroutineDispatcher) : CoroutineDispatcher() {
+    var holding = true
+    private val held = ArrayDeque<Runnable>()
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+      if (holding) held.addLast(block) else inner.dispatch(context, block)
+    }
+
+    /** Runs the block held longest, here and now. */
+    fun runNext() = held.removeFirst().run()
   }
 
   private fun read(path: Path): ByteArray = platformFileSystem.read(path) { readByteArray() }
