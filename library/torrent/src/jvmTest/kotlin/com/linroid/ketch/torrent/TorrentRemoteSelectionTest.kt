@@ -268,15 +268,19 @@ class TorrentRemoteSelectionTest {
       assertEquals(2, shrunk.selectionGeneration)
       seeder.openAll()
       task.resume()
-      assertEquals(torrent.sizeOf(1), task.awaitCompleted().totalBytes)
+      val shrunkCompleted = task.awaitCompleted()
+      assertEquals(torrent.sizeOf(1), shrunkCompleted.totalBytes)
       assertFile(daemon.output, torrent, 1)
 
       val reopened = controller.select(task.taskId, setOf("1", "2"),
         controller.context(task.taskId, "reopen"))
       assertEquals(3, reopened.selectionGeneration)
+      // While the selection saves, the task shows the new size still completed; the run that
+      // downloads file 2 completes it again, later.
       awaitStage("the reopened task to finish", task, timeoutMs = 30_000) {
         task.state.first {
-          it is DownloadState.Completed && it.totalBytes == torrent.sizeOf(1, 2)
+          it is DownloadState.Completed && it.totalBytes == torrent.sizeOf(1, 2) &&
+            it.completedAt != shrunkCompleted.completedAt
         }
       }
       assertFile(daemon.output, torrent, 1)
