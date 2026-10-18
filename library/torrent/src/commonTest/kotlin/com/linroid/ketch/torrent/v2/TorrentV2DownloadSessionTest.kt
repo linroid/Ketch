@@ -355,4 +355,64 @@ class TorrentV2DownloadSessionTest {
       }
     }
   }
+
+  @Test
+  fun endSeedOnly_checkingSeederGrows_downloadsInsteadOfStopping() = runTest {
+    fixture {
+      val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+      // A seed with both pieces.
+      val server = scope.launch {
+        while (true) {
+          val connection = listener.accept()
+          launch {
+            try {
+              PeerIdentityHandshake(pair.document.identity).respond(connection,
+                ByteArray(20) { 2 }.toByteString(), buffers)
+              val wire = PeerWire(connection, pieceCount = 2)
+              wire.send(PeerMessage.Bitfield(byteArrayOf(192.toByte())))
+              wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+              while (true) {
+                val request = wire.read() as? PeerMessage.Request ?: continue
+                wire.send(PeerMessage.Piece(request.index, request.begin,
+                  pair.v2Piece(request.index)))
+              }
+            } catch (_: IOException) {
+              // The session closed the connection.
+            } finally { connection.close() }
+          }
+        }
+      }
+      val slots = Semaphore(1)
+      val store = TorrentV2PieceStore(pair.document, output, setOf("0"), "owner", buffers, slots)
+      // The task completed a, the only file it chose.
+      store.initialize()
+      pair.seed(store, listOf(0))
+      val restored = TorrentV2DownloadSession.open(scope, pair.document, pair.layout, setOf("0"),
+        store, TorrentV2Runtime(network, peerId, buffers, state,
+          uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION }),
+        TorrentV2SessionOptions(maxPeers = 1, seedOnly = true,
+          discovery = { sink -> sink.relay { it.send(listener.local); awaitCancellation() } }))
+      try {
+        // A restored seeder waits to check its files when a download run takes it over for b.
+        slots.acquire()
+        restored.resume()
+        restored.state.first { it == TorrentSessionState.CHECKING_FILES }
+        restored.endSeedOnly()
+        val changed = async { restored.changeSelection(setOf("0", "1")) }
+        slots.release()
+        assertTrue(changed.await())
+        assertEquals(TorrentSessionState.SEEDING, restored.state.first {
+          it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED
+        }, restored.failure.value?.stackTraceToString())
+        assertContentEquals(pair.payloads[1], torrentFileSystem.read(output / "b") {
+          readByteArray()
+        })
+      } finally {
+        withContext(NonCancellable) { restored.close() }
+        server.cancelAndJoin()
+        listener.close()
+        store.cleanup()
+      }
+    }
+  }
 }

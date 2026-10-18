@@ -64,6 +64,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.ByteString
+import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
@@ -123,7 +124,8 @@ internal class TorrentV2SessionOptions(
   val discovery: suspend (TorrentV2DiscoverySink) -> Unit = { awaitCancellation() },
   /**
    * Only seed: when the file check finds the selection incomplete, stop with
-   * [IncompleteSeedException] before any discovery instead of downloading.
+   * [IncompleteSeedException] before any discovery instead of downloading, until a download run
+   * takes the session over ([TorrentV2DownloadSession.endSeedOnly]).
    */
   val seedOnly: Boolean = false,
   /**
@@ -207,7 +209,8 @@ internal class TorrentV2DownloadSession private constructor(
   private val discover = options.discovery
   private val privacy = options.privacy
   private val waitForPeers = options.waitForPeers
-  private val seedOnly = options.seedOnly
+  // Cleared by [endSeedOnly]; read after each check.
+  @Volatile private var seedOnly = options.seedOnly
   private val reporter = options.connections
   private val webSeedRetryMs = options.webSeedRetryMs
   private val nowMs = options.nowMs
@@ -376,6 +379,12 @@ internal class TorrentV2DownloadSession private constructor(
 
   /** This owner's upload bucket, applied after the engine's; zero means unlimited. */
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
+
+  override fun endSeedOnly() {
+    if (!seedOnly) return
+    seedOnly = false
+    log.d { "Torrent $label downloads from now on what its selection misses" }
+  }
 
   /**
    * The runtime's upload policy changed: the running transfer chokes or unchokes peers within one
