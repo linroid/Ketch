@@ -369,7 +369,14 @@ class Ketch(
   }
 
   private val taskController = object : TaskController {
+    // Finished even when the caller is cancelled while the task stops, as a REST client that
+    // leaves is: stopped but still holding its slot, the task would keep every waiting task out
+    // of it, and its resume would do nothing.
     override suspend fun pause(handle: TaskHandle) {
+      withContext(NonCancellable) { pauseTask(handle) }
+    }
+
+    private suspend fun pauseTask(handle: TaskHandle) {
       val taskId = handle.taskId
       coordinator.pause(taskId)
       queue.dequeue(taskId)
@@ -530,12 +537,15 @@ class Ketch(
         "Rescheduling taskId=${handle.taskId}, " +
           "schedule=$schedule, conditions=${conditions.size}"
       }
-      scheduler.cancel(handle.taskId)
-      if (state.isActive) {
-        coordinator.pause(handle.taskId)
+      // Finished even when the caller is cancelled while the task stops, like a pause.
+      withContext(NonCancellable) {
+        scheduler.cancel(handle.taskId)
+        if (state.isActive) {
+          coordinator.pause(handle.taskId)
+        }
+        queue.dequeue(handle.taskId)
+        scheduler.reschedule(handle, schedule, conditions)
       }
-      queue.dequeue(handle.taskId)
-      scheduler.reschedule(handle, schedule, conditions)
     }
   }
 

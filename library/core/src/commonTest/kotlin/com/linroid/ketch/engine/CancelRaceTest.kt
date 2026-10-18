@@ -42,7 +42,8 @@ import kotlin.time.Duration.Companion.seconds
  * A cancel or remove never waits for the queue, so it can land while the queue starts the task.
  * These tests hold a save of the start (the queue's or the coordinator's) open while the cancel
  * comes, then let it finish: the task must stay canceled, run no more and free its slot. A run
- * that ends as a reschedule stops it stays ended the same way.
+ * that ends as a reschedule stops it stays ended the same way, and a caller cancelled while a
+ * task stops or starts leaves no task holding a slot with no execution.
  */
 class CancelRaceTest {
   private val folder = "/tmp/ketch-cancel-race/"
@@ -431,6 +432,70 @@ class CancelRaceTest {
       assertIs<DownloadState.Completed>(task.state.value)
       assertEquals(TaskState.COMPLETED, store.load(task.taskId)?.state)
       assertEquals(1, source.runs.value.count { it.context.taskId == task.taskId })
+    } finally {
+      ketch.close()
+    }
+  }
+
+  /**
+   * Runs [stop], which stops a running task, and cancels it while the task's last save holds the
+   * stop, then lets the stop finish.
+   */
+  private fun TestScope.stopAndGiveUp(
+    source: SelectableSource,
+    stop: suspend () -> Unit,
+  ) {
+    val stopping = CompletableDeferred<Unit>()
+    source.saveGate = stopping
+    val stopped = launch { stop() }
+    runCurrent()
+    assertTrue(stopped.isActive)
+    stopped.cancel()
+    runCurrent()
+    stopping.complete(Unit)
+    runCurrent()
+  }
+
+  @Test
+  fun pause_callerCanceledWhileTheTaskStops_freesItsSlot() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source, RecordingTaskStore(), maxConcurrent = 1)
+    try {
+      val task = ketch.download(request("0"))
+      val waiting = ketch.download(request("1"))
+      runCurrent()
+      assertIs<DownloadState.Queued>(waiting.state.value)
+
+      stopAndGiveUp(source) { task.pause() }
+
+      assertIs<DownloadState.Paused>(task.state.value)
+      assertIs<DownloadState.Downloading>(waiting.state.value)
+      // Waits for the slot again rather than doing nothing.
+      task.resume()
+      runCurrent()
+      assertIs<DownloadState.Queued>(task.state.value)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun reschedule_callerCanceledWhileTheTaskStops_freesItsSlotAndWaits() = runTest {
+    val source = SelectableSource()
+    val ketch = ketch(source, RecordingTaskStore(), maxConcurrent = 1)
+    try {
+      val task = ketch.download(request("0"))
+      val waiting = ketch.download(request("1"))
+      runCurrent()
+      assertIs<DownloadState.Queued>(waiting.state.value)
+
+      stopAndGiveUp(source) { task.reschedule(DownloadSchedule.AfterDelay(1.minutes)) }
+
+      assertIs<DownloadState.Scheduled>(task.state.value)
+      assertIs<DownloadState.Downloading>(waiting.state.value)
+      advanceTimeBy(2.minutes)
+      runCurrent()
+      assertIs<DownloadState.Queued>(task.state.value)
     } finally {
       ketch.close()
     }
