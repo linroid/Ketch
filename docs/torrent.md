@@ -485,8 +485,9 @@ carries the resolution; otherwise the download fails with a `KetchError.SourceEr
 
 `KetchApi.resolve` waits until a magnet's metadata is found or the caller cancels it; bound it with
 `withTimeout` if you need to. Up to 16 magnet lookups run at once; more wait for one to finish.
-A lookup stops as soon as nothing waits for it: its task paused, canceled or removed, or its
-preview given up.
+A lookup stops once nothing waits for it: its task paused, canceled or removed, or its preview
+given up. A btih magnet's lookup goes on for 5 seconds first, so a task resumed, or a previewed
+link added, meanwhile carries on with it and the peers it found.
 
 `TorrentDownloadSource` takes:
 

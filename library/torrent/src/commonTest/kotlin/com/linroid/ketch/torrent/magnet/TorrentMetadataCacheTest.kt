@@ -4,6 +4,7 @@ import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -12,6 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
@@ -21,6 +23,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class TorrentMetadataCacheTest {
   @Test
@@ -127,7 +130,7 @@ class TorrentMetadataCacheTest {
 
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   @Test
-  fun resolve_lastWaiterLeaves_cancelsTheFetchAndFreesItsPlace() = runTest {
+  fun resolve_lastWaiterLeaves_cancelsTheFetchOnceItsGraceEnds() = runTest {
     val metadata = fixture("a")
     val cache = TorrentMetadataCache(backgroundScope)
     var started = 0
@@ -144,12 +147,47 @@ class TorrentMetadataCacheTest {
     // The other caller still waits for it.
     assertEquals(0, stopped)
     second.cancelAndJoin()
-    runCurrent()
+    // Nothing waits for it: it goes on for its grace, keeping its place...
+    advanceTimeBy(ABANDONED_LOOKUP_GRACE - 1.milliseconds)
+    assertEquals(0, stopped)
+    assertEquals(1, cache.pendingFetches)
+    // ...and then stops and frees it.
+    advanceTimeBy(2.milliseconds)
     assertEquals(1, stopped)
     assertEquals(0, cache.pendingFetches)
     // A later caller runs a fetch of its own.
     assertEquals(metadata.infoHash, cache.resolve(metadata.infoHash) { metadata }.infoHash)
     assertEquals(1, started)
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun resolve_callerComesBackWithinTheGrace_carriesOnWithTheFetch() = runTest {
+    val metadata = fixture("a")
+    val cache = TorrentMetadataCache(backgroundScope)
+    val found = CompletableDeferred<Unit>()
+    var started = 0
+    var stopped = 0
+    val fetch: suspend () -> TorrentMetadata = {
+      started++
+      try { found.await() } catch (e: CancellationException) { stopped++; throw e }
+      metadata
+    }
+    val paused = async { cache.resolve(metadata.infoHash, fetch = fetch) }
+    runCurrent()
+    paused.cancelAndJoin()
+    advanceTimeBy(ABANDONED_LOOKUP_GRACE / 2)
+    // A task resumed, or a preview's link added, joins the lookup still going on...
+    val resumed = async { cache.resolve(metadata.infoHash, fetch = fetch) }
+    runCurrent()
+    // ...which goes on past the grace its first caller left it, while the other waits.
+    advanceTimeBy(ABANDONED_LOOKUP_GRACE)
+    assertEquals(0, stopped)
+    assertEquals(1, cache.pendingFetches)
+    found.complete(Unit)
+    assertEquals(metadata.infoHash, resumed.await().infoHash)
+    assertEquals(1, started)
+    assertEquals(0, cache.pendingFetches)
   }
 
   @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -170,14 +208,16 @@ class TorrentMetadataCacheTest {
     // The last one waits rather than failing.
     assertEquals((0..<MAX_PENDING_METADATA).toList(), started)
     assertTrue(callers.last().isActive)
-    // Their callers gone, the others stop, and it starts.
+    // Their callers gone, the others stop once their grace ends, and it starts.
     callers.dropLast(1).forEach { it.cancelAndJoin() }
     runCurrent()
+    assertEquals(MAX_PENDING_METADATA, started.size)
+    advanceTimeBy(ABANDONED_LOOKUP_GRACE + 1.milliseconds)
     assertEquals((0..<MAX_PENDING_METADATA).toList(), stopped.sorted())
     assertEquals((0..MAX_PENDING_METADATA).toList(), started)
     assertEquals(1, cache.pendingFetches)
     callers.last().cancelAndJoin()
-    runCurrent()
+    advanceTimeBy(ABANDONED_LOOKUP_GRACE + 1.milliseconds)
     assertEquals(0, cache.pendingFetches)
   }
 
@@ -258,6 +298,20 @@ class TorrentMetadataCacheTest {
       owner.coroutineContext[Job]!!.cancelAndJoin()
     }
     assertEquals(0, root.allocated)
+  }
+
+  @Test
+  fun close_fetchInItsGrace_letsStructuredOwnerCompleteAtOnce() = runTest {
+    withTimeout(1000) {
+      coroutineScope {
+        val cache = TorrentMetadataCache(this)
+        val left = async { cache.resolve(fixture("a").infoHash) { awaitCancellation() } }
+        runCurrent()
+        left.cancelAndJoin()
+        // The fetch nothing waits for ends with the cache, not with its grace.
+        cache.close()
+      }
+    }
   }
 
   @Test

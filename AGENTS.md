@@ -986,10 +986,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Magnet metadata is asked of sixteen peers at once (`METADATA_PARALLEL_PEERS`), failed peers
   again after 5, 15 and 30 s; tasks
   and previews keep looking (`DownloadSource.resolve`, in 2-minute lookups that ask given-up
-  peers again) until found or stopped. A lookup (`TorrentMetadataCache`) runs while a task or
-  preview waits for it: the last to leave cancels it, so pausing, canceling or removing a task
-  stops its discovery at once, and past `MAX_PENDING_METADATA` (16) new lookups wait for one to
-  end. The apps show such a task as Starting, "Finding peers",
+  peers again) until found or stopped. A btih lookup (`TorrentMetadataCache`) runs while a task
+  or preview waits for it, and `ABANDONED_LOOKUP_GRACE` (5 s) after the last left, then is
+  canceled: pausing, canceling or removing a task stops its discovery then, while a task resumed,
+  or a preview's link added, meanwhile carries on with it and its peers. Past
+  `MAX_PENDING_METADATA` (16), those in their grace included, new lookups wait for one to end.
+  The apps show such a task as Starting, "Finding peers",
   and a preview that takes 2 minutes offers Keep waiting and Add anyway. A peer has
   `METADATA_IDLE_MS` (30 s) for each part it sends (`MetadataProgress`: an info block or a piece
   layer response) and six times it in all, and a lookup goes on past its time while one arrives

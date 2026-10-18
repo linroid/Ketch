@@ -21,6 +21,7 @@ import com.linroid.ketch.torrent.logHash
 import com.linroid.ketch.torrent.lsd.LsdTopic
 import com.linroid.ketch.torrent.lsd.LsdTransport
 import com.linroid.ketch.torrent.lsd.TorrentLocalDiscovery
+import com.linroid.ketch.torrent.magnet.ABANDONED_LOOKUP_GRACE
 import com.linroid.ketch.torrent.magnet.MAX_METADATA_PEERS
 import com.linroid.ketch.torrent.magnet.AnsweringPeers
 import com.linroid.ketch.torrent.magnet.METADATA_IDLE_MS
@@ -218,6 +219,8 @@ internal class KotlinTorrentEngine(
   multicastLock: TorrentMulticastLock? = null,
   /** Test hook: how long one magnet metadata lookup runs. */
   private val magnetLookupTime: Duration = MAGNET_LOOKUP_TIME,
+  /** Test hook: how long a magnet metadata lookup goes on once nothing waits for it. */
+  magnetLookupGrace: Duration = ABANDONED_LOOKUP_GRACE,
   /** Test hook: the file system v1 stores keep their payload in. */
   private val payloadFileSystem: FileSystem = torrentFileSystem,
 ) : TorrentEngine {
@@ -294,8 +297,8 @@ internal class KotlinTorrentEngine(
   // Peers that sent a found torrent's metadata, which its download dials first.
   private val lookupPeers = MetadataLookupPeers()
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
-    exchangeBudgets.cache)
-  /** Magnet metadata lookups some caller still waits for; for tests. */
+    exchangeBudgets.cache, magnetLookupGrace)
+  /** Magnet metadata lookups running, those nothing waits for in their grace too; for tests. */
   internal val pendingMetadataLookups: Int get() = cache.pendingFetches
   private val tracker = TorrentTracker(http, network)
   // One peer ID for every peer, tracker and metadata lookup (BEP 20), as private trackers check.

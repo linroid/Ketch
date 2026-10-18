@@ -12,6 +12,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -20,16 +21,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Runtime-owned shared fetches. A fetch runs while some caller waits for it: one caller leaving
- * never cancels it for the others, and the last one leaving cancels it, so a task paused, canceled
- * or removed, or a preview given up, stops its discovery at once.
+ * never cancels it for the others, and [grace] after the last one left it is cancelled, so a task
+ * paused, canceled or removed, or a preview given up, stops its discovery then. A caller that
+ * comes back meanwhile, as a task paused and resumed or the download of a preview's link does,
+ * carries on with it and the peers it found.
  */
 internal class TorrentMetadataCache(
   private val scope: CoroutineScope,
   capacityBytes: Int = 32 * 1024 * 1024,
   parentBudget: TorrentBufferBudget? = null,
+  /** How long a fetch goes on once no caller waits for it. */
+  private val grace: Duration = ABANDONED_LOOKUP_GRACE,
 ) {
   private val budget = TorrentBufferBudget(capacityBytes, parentBudget)
   internal val retainedBytes: Int get() = budget.allocated
@@ -41,6 +48,8 @@ internal class TorrentMetadataCache(
   /** A shared fetch and how many callers wait for it, guarded by [mutex]. */
   private class Pending(val fetch: Deferred<TorrentMetadata>) {
     var waiters = 1
+    /** Cancels [fetch] once its grace ends, while no caller waits for it. */
+    var abandon: Job? = null
   }
   private val pending = mutableMapOf<PendingKey, Pending>()
   /** How many fetches [pending] holds, which callers past [MAX_PENDING_METADATA] wait on. */
@@ -67,7 +76,8 @@ internal class TorrentMetadataCache(
    * join a public operation: that operation may already be using explicit peers or DHT on its
    * behalf, and its rejection of private metadata does not apply to the restricted caller.
    * Completed entries stay shared because the hash authenticates them regardless of discovery.
-   * Beyond [MAX_PENDING_METADATA] fetches, a new one waits for another to end.
+   * Beyond [MAX_PENDING_METADATA] fetches, those in their grace included, a new one waits for
+   * another to end.
    */
   suspend fun resolve(
     hash: InfoHash,
@@ -84,13 +94,20 @@ internal class TorrentMetadataCache(
     }
   }
 
-  /** Joins the fetch of [key], or starts one once fewer than the bound are pending. */
+  /**
+   * Joins the fetch of [key], also one in its grace, or starts one once fewer than the bound are
+   * pending.
+   */
   private suspend fun join(key: PendingKey, fetch: suspend () -> TorrentMetadata): Pending {
     while (true) {
       val joined = mutex.withLock {
         scope.coroutineContext.ensureActive()
         check(!closed) { "Metadata cache is closed" }
-        pending[key]?.also { it.waiters++ } ?: if (pending.size < MAX_PENDING_METADATA) {
+        pending[key]?.also {
+          it.waiters++
+          it.abandon?.cancel()
+          it.abandon = null
+        } ?: if (pending.size < MAX_PENDING_METADATA) {
           Pending(start(key, fetch)).also {
             pending[key] = it
             pendingCount.value = pending.size
@@ -113,24 +130,36 @@ internal class TorrentMetadataCache(
       require(metadata.infoHash == key.hash)
       put(metadata)
     } finally {
-      // The last caller to leave may have removed it already, and another started anew.
+      // Its grace may have ended already, and another started anew.
       withContext(NonCancellable) {
-        mutex.withLock { if (pending[key]?.fetch === self) remove(key) }
+        mutex.withLock {
+          pending[key]?.takeIf { it.fetch === self }?.let {
+            it.abandon?.cancel()
+            remove(key)
+          }
+        }
       }
     }
   }
 
   /**
-   * A caller of [operation] left: the last to leave frees its place and cancels it, unless it
-   * ended. It ends in the engine scope, with any bounded `stopped` announce, holding no caller.
+   * A caller of [operation] left. Once the last left, it goes on for [grace], for a caller that
+   * comes back, then frees its place and is cancelled, unless it ended or a caller joined it. It
+   * ends in the engine scope, holding no caller.
    */
   private suspend fun leave(key: PendingKey, operation: Pending) {
-    val abandoned = mutex.withLock {
+    mutex.withLock {
       operation.waiters--
-      if (operation.waiters == 0 && pending[key] === operation) remove(key)
-      operation.waiters == 0
+      if (operation.waiters == 0 && pending[key] === operation) {
+        operation.abandon = scope.launch {
+          delay(grace)
+          val abandoned = mutex.withLock {
+            (operation.waiters == 0 && pending[key] === operation).also { if (it) remove(key) }
+          }
+          if (abandoned) operation.fetch.cancel()
+        }
+      }
     }
-    if (abandoned) operation.fetch.cancel()
   }
 
   /** Under [mutex]. */
@@ -191,6 +220,12 @@ internal class TorrentMetadataCache(
 
 /** Distinct in-flight metadata fetches per runtime; further ones wait for one to end. */
 internal const val MAX_PENDING_METADATA = 16
+
+/**
+ * How long a magnet lookup goes on once nothing waits for it, for a task paused and resumed, or
+ * the download of a preview's link, to carry on with it.
+ */
+internal val ABANDONED_LOOKUP_GRACE: Duration = 5.seconds
 
 /** Retained arrays, strings, file records, and container allowance; not process RSS. */
 internal fun cacheWeight(metadata: TorrentMetadata): Long =
