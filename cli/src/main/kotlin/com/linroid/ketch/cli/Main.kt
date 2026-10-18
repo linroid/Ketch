@@ -40,6 +40,7 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.dash.DashDownloadSource
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.hls.HlsDownloadSource
@@ -182,7 +183,7 @@ private fun runDownload(args: DownloadArgs.Download) {
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
-      MetalinkDownloadSource(httpEngine)
+      MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
   )
 
@@ -260,7 +261,7 @@ private fun runListFiles(args: DownloadArgs.Download): Int {
     additionalSources = listOf(
       FtpDownloadSource(), torrentSource(fileConfig.torrent),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
-      MetalinkDownloadSource(httpEngine)
+      MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
   )
   return try {
@@ -574,7 +575,7 @@ private fun runServer(args: Array<String>): Int {
       FtpDownloadSource(),
       torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
-      MetalinkDownloadSource(httpEngine)
+      MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
     countries = DbIpCountryDatabase(File(defaultConfigDir(), COUNTRY_DATABASE_FILE)),
   )
@@ -1164,7 +1165,7 @@ private fun runStandaloneMcp(
       // when it starts; MCP offers no seeding tool to stop them.
       FtpDownloadSource(), torrentSource(fileConfig.torrent, restoreSeeding = false),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
-      MetalinkDownloadSource(httpEngine)
+      MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
   )
   val apiToken = newToken()

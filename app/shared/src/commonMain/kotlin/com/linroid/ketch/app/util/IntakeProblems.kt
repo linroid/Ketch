@@ -201,7 +201,8 @@ private fun checkFailed(detail: String?) = IntakeProblem(
 /**
  * This link signed in as [user] with [password], to retry one that needs a sign-in. FTP and FTPS
  * links carry the credentials in the URL, where the FTP source reads them, replacing any there;
- * other links send them in an `Authorization: Basic` header, replacing any such header.
+ * other links send them in an `Authorization: Basic` header, replacing any such header. The
+ * WebDAV source reads that header as credentials and answers a Digest challenge with them too.
  */
 fun IntakeItem.Link.withCredentials(user: String, password: String): IntakeItem.Link {
   if (kind == LinkKind.Ftp) return copy(url = embedCredentials(url, user, password))

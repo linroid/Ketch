@@ -120,6 +120,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **HTTP und HTTPS**, mit Cookies und Referrer der Seite, wenn die Browsererweiterung den Download
   übergibt.
 - **FTP und FTPS**, mit parallelen Verbindungen und Fortsetzen.
+- **WebDAV** â Dateien auf Nextcloud, ownCloud, einem NAS oder jedem WebDAV-Server
+  (`davs://`-Links), mit parallelen Verbindungen, Fortsetzen und Anmeldung per Digest oder Basic
+  ([Details](docs/webdav.md)).
 - **BitTorrent und Magnet-Links** — v1-, v2- und Hybrid-Torrents mit Dateiauswahl und
   optionalem Seeden, in einer vollständig in Kotlin geschriebenen Engine. Sie beherrscht uTP und
   Protokollverschlüsselung, lädt von Webseeds, gibt ihren Port am Router frei und findet Peers im
@@ -267,7 +270,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Verteilung vor v1.0.0** — Signierte Windows-Versionen, signierte und notarisierte
   macOS-Versionen, die Erweiterung in weiteren Browser-Stores und geprüfte Installations- und
   Updatewege ([Plan](docs/plans/v1-distribution.md))
-- **WebDAV** — Downloads von WebDAV-Servern mit Fortsetzen
 - **Medienextraktion** — Medien von Webseiten speichern
 - **Ressourcensuche** — Herunterladbare Dateien auf einer Webseite finden
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer

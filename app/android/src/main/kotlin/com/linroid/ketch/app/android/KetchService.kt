@@ -68,6 +68,7 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -230,7 +231,7 @@ class KetchService : Service() {
             additionalSources = listOf(
               FtpDownloadSource(), torrentSource,
               HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
-              MetalinkDownloadSource(httpEngine)
+              MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
             ),
             // Left out of backups, as it downloads again on request.
             countries = DbIpCountryDatabase(File(noBackupFilesDir, COUNTRY_DATABASE_FILE)),

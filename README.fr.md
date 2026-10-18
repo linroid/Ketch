@@ -120,6 +120,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 - **HTTP et HTTPS**, avec les cookies et le référent de la page lorsque l'extension de navigateur
   transmet le téléchargement.
 - **FTP et FTPS**, avec connexions parallèles et reprise.
+- **WebDAV** — Fichiers sur Nextcloud, ownCloud, un NAS ou tout serveur WebDAV (liens
+  `davs://`), avec connexions parallèles, reprise et connexion Digest ou Basic
+  ([détails](docs/webdav.md)).
 - **BitTorrent et liens magnet** — Torrents v1, v2 et hybrides, avec sélection des fichiers et
   partage facultatif, dans un moteur entièrement écrit en Kotlin. Il prend en charge uTP et le
   chiffrement du protocole, télécharge depuis les sources web, ouvre son port sur le routeur et
@@ -270,7 +273,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Distribution avant v1.0.0** — Versions Windows signées, versions macOS signées et notariées,
   l'extension dans d'autres boutiques de navigateurs et parcours d'installation et de mise à
   jour vérifiés ([plan](docs/plans/v1-distribution.md))
-- **WebDAV** — Téléchargements depuis des serveurs WebDAV, avec reprise
 - **Extraction multimédia** — Enregistrer les médias des pages web
 - **Détection de ressources** — Trouver les fichiers téléchargeables d'une page web
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
