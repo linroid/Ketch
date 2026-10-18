@@ -394,7 +394,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   would still be replaced). Once the file is verified (an empty file once its checksum is), its
   creation when empty, the move, the `COMPLETED` record and the `Completed` state run under
   `NonCancellable`, so a pause, reschedule, preemption or `close()` landing meanwhile finds the
-  task completed rather than downloading the file again beside it.
+  task completed rather than downloading the file again beside it, and a cancel landing then
+  came too late: the task stays completed, with its file.
   A file `Destination` is replaced, as it was written in place before.
   Pause, failure, `close()` and `remove(deleteFiles = false)` keep the partial file; cancel and
   `remove(deleteFiles = true)` delete it, never a file at the final name the task did not write.

@@ -298,6 +298,9 @@ internal class DownloadCoordinator(
   suspend fun cancel(handle: TaskHandle, deletePartialFile: Boolean) {
     val taskId = handle.taskId
     log.i { "Canceling download for taskId=$taskId, deletePartialFile=$deletePartialFile" }
+    // A run whose last step began as the cancel landed completes, as that step does not stop
+    // once its file is verified: the cancel then came too late, and the task stays completed.
+    val completedBefore = handle.record.value.state == TaskState.COMPLETED
     val job = mutex.withLock {
       // From here on nothing starts the task, also a start the queue is making now.
       canceling += taskId
@@ -320,15 +323,19 @@ internal class DownloadCoordinator(
     } finally {
       // Also when the caller stops waiting: the task is stopped and must show it.
       withContext(NonCancellable) {
-        handle.mutableState.value = DownloadState.Canceled
-        handle.record.update {
-          it.copy(
-            state = TaskState.CANCELED,
-            segments = null,
-            updatedAt = Clock.System.now(),
-          )
+        if (!completedBefore && handle.record.value.state == TaskState.COMPLETED) {
+          log.i { "Download completed before the cancel took effect for taskId=$taskId" }
+        } else {
+          handle.mutableState.value = DownloadState.Canceled
+          handle.record.update {
+            it.copy(
+              state = TaskState.CANCELED,
+              segments = null,
+              updatedAt = Clock.System.now(),
+            )
+          }
         }
-        // Shown canceled, which keeps it from starting from now on.
+        // Shown canceled or completed, which keeps it from starting from now on.
         mutex.withLock { canceling -= taskId }
       }
     }

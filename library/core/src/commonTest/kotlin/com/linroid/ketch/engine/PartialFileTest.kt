@@ -248,6 +248,18 @@ class PartialFileTest {
     }
   }
 
+  @Test
+  fun cancel_asTheFileTakesItsFinalName_keepsTheTaskCompleted() = runTest {
+    stopAsTheMoveLands(FakeHttpEngine()) { task -> task.cancel() }
+  }
+
+  @Test
+  fun cancel_asAnEmptyFileIsCreated_keepsTheTaskCompleted() = runTest {
+    val engine = FakeHttpEngine(content = ByteArray(0))
+    engine.serverInfo = engine.serverInfo.copy(contentLength = 0)
+    stopAsTheMoveLands(engine, once = "file.bin.ketch") { task -> task.cancel() }
+  }
+
   /**
    * Holds every file operation of a download from [engine] and runs them one by one until the
    * file named [once] exists in its folder (by default the final name, once the partial file
