@@ -51,7 +51,10 @@ ketch --files 0,2,5 'magnet:?xt=urn:btih:...'
 `--list-files` prints `ID  SIZE  PATH` rows. Sort them with `--sort name|size|type` (`type` is the
 file extension) and `--reverse`. `ketch <url>` uploads to peers while it downloads, unless
 `[torrent] upload = "off"`, and exits once its downloads finish; it does not seed. To keep seeding,
-run [`ketch server`](#seeding-and-uploading).
+run [`ketch server`](#seeding-and-uploading). While a download makes no progress, its progress line
+says why, such as `stalled 2m 30s: no peers, still looking` (see
+[stalls](#when-a-download-stops-making-progress)); `ketch <url>` logs only warnings, so `-v` also
+shows the stall, peer and recovery messages.
 
 ### Where the files go
 

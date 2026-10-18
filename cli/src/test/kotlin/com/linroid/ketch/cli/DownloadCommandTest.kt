@@ -10,7 +10,15 @@ import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentStallReason
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -22,6 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class DownloadCommandTest {
   private val folder: File = Files.createTempDirectory("ketch-cli-download").toFile()
@@ -112,6 +121,46 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun downloadUntilDone_torrentStalls_saysWhyOnTheProgressLine() {
+    val engine = ServingEngine(byteArrayOf(1, 2, 3), release = CompletableDeferred())
+    val status = download("https://example.com/a.bin", engine, stalls = {
+      flow {
+        emit(TorrentStall(TorrentStallReason.NO_PEERS, seconds = 150))
+        awaitPrinted { "stalled" in it }
+        // Progressing again: the line loses the reason, then the download finishes.
+        emit(null)
+        awaitPrinted { "\r" in it.substringAfterLast("stalled") }
+        engine.release?.complete(Unit)
+      }
+    })
+
+    assertEquals(DownloadExit.OK, status)
+    val lines = out.toString(Charsets.UTF_8).split('\r')
+    val stalled = lines.indexOfLast { "stalled" in it }
+    assertTrue(lines[stalled].startsWith("[Downloading] "), lines[stalled])
+    assertTrue("  stalled 2m 30s: no peers, still looking    " in lines[stalled], lines[stalled])
+    // The next line covers it, so none of the reason is left on the terminal.
+    val next = lines[stalled + 1].substringBefore('\n')
+    assertFalse("stalled" in next, next)
+    assertEquals(lines[stalled].length, next.length, next)
+  }
+
+  @Test
+  fun stallLabel_missingPieces_countsThem() {
+    fun missing(seconds: Long, pieces: Int) =
+      TorrentStall(TorrentStallReason.MISSING_PIECES, seconds, missingPieces = pieces)
+
+    assertEquals(
+      "stalled 45s: no peer or web seed has 1 piece it needs",
+      stallLabel(missing(seconds = 45, pieces = 1)),
+    )
+    assertEquals(
+      "stalled 1h 2m 5s: no peer or web seed has 3 pieces it needs",
+      stallLabel(missing(seconds = 3725, pieces = 3)),
+    )
+  }
+
+  @Test
   fun quietLogLevel_verboseFlags_keepTheirLevel() {
     assertEquals(LogLevel.WARN, quietLogLevel(LogLevel.INFO))
     assertEquals(LogLevel.DEBUG, quietLogLevel(LogLevel.DEBUG))
@@ -170,20 +219,29 @@ class DownloadCommandTest {
     url: String,
     engine: HttpEngine,
     logger: Logger = Logger.None,
+    stalls: (taskId: String) -> Flow<TorrentStall?> = { emptyFlow() },
   ): Int = runBlocking {
     val ketch = Ketch(httpEngine = engine, config = DownloadConfig(retryCount = 0), logger = logger)
     try {
-      downloadUntilDone(
-        ketch = ketch,
-        request = DownloadRequest(url = url, destination = Destination(folder.path + "/")),
-        out = outStream,
-        err = errStream,
-      )
+      withTimeout(10.seconds) {
+        downloadUntilDone(
+          ketch = ketch,
+          request = DownloadRequest(url = url, destination = Destination(folder.path + "/")),
+          out = outStream,
+          err = errStream,
+          stalls = stalls,
+        )
+      }
     } finally {
       ketch.shutdown()
       // Ketch installs its logger for the whole process.
       KetchLogger.setLogger(Logger.None)
     }
+  }
+
+  /** Waits until what was printed to [out] matches [printed]. */
+  private suspend fun awaitPrinted(printed: (String) -> Boolean) {
+    while (!printed(out.toString(Charsets.UTF_8))) delay(10)
   }
 
   /** Runs [block] with the console's stdout and stderr going to [out] and [err]. */
@@ -216,8 +274,11 @@ class DownloadCommandTest {
     override fun close() {}
   }
 
-  /** Serves [content] without byte ranges. */
-  private class ServingEngine(private val content: ByteArray) : HttpEngine {
+  /** Serves [content] without byte ranges; with [release], its first byte until it completes. */
+  private class ServingEngine(
+    private val content: ByteArray,
+    val release: CompletableDeferred<Unit>? = null,
+  ) : HttpEngine {
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
       ServerInfo(
         contentLength = content.size.toLong(),
@@ -231,7 +292,12 @@ class DownloadCommandTest {
       range: LongRange?,
       headers: Map<String, String>,
       onData: suspend (ByteArray) -> Unit,
-    ) = onData(content)
+    ) {
+      if (release == null) return onData(content)
+      onData(content.copyOfRange(0, 1))
+      release.await()
+      onData(content.copyOfRange(1, content.size))
+    }
 
     override fun close() {}
   }

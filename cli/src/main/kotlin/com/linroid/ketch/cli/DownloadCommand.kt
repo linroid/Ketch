@@ -9,10 +9,22 @@ import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.reason
 import com.linroid.ketch.api.resolve
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentStallReason
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.PrintStream
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 
 /** Exit statuses of `ketch <url>` and `ketch --list-files <url>`, for scripts that run them. */
 internal object DownloadExit {
@@ -48,15 +60,45 @@ internal fun failureReason(error: Throwable): String = when (error) {
 }
 
 /**
+ * Why the torrent task [taskId] makes no progress, as [ketch]'s torrent snapshots report it, `null`
+ * while it progresses; nothing for other tasks, or without a torrent controller.
+ */
+internal fun torrentStalls(ketch: KetchApi, taskId: String): Flow<TorrentStall?> {
+  if (ketch.controller(TorrentController) == null) return emptyFlow()
+  return ketch.subscribe(TorrentInterest(taskId))
+    .map { it?.stall }
+    // Only the progress line misses it, such as when the controller follows too many tasks.
+    .catch {}
+}
+
+/** [stall] for the progress line: how long, then why, as the apps' inspector says it. */
+internal fun stallLabel(stall: TorrentStall): String {
+  val why = when (stall.reason) {
+    TorrentStallReason.MISSING_PIECES -> {
+      val pieces = stall.missingPieces
+      "no peer or web seed has $pieces ${if (pieces == 1) "piece" else "pieces"} it needs"
+    }
+    TorrentStallReason.NO_PEERS -> "no peers, still looking"
+    TorrentStallReason.CHOKED -> "peers connected, but none is sharing yet"
+    TorrentStallReason.SLOW_PEERS -> "peers are slow, asking others for the same pieces"
+    TorrentStallReason.UNKNOWN -> "no progress"
+  }
+  return "stalled ${stall.seconds.seconds}: $why"
+}
+
+/**
  * Downloads [request] with [ketch] until it completes or fails, printing its progress to [out],
  * and returns its exit status, one of [DownloadExit]. Why Ketch refused it or it failed goes to
  * [err] in one line ([failureReason]), without a stack trace. The task is removed once it ends.
+ * While a torrent makes no progress, its progress line says why ([stalls], from [torrentStalls]),
+ * as Ketch logs only warnings meanwhile.
  */
 internal suspend fun downloadUntilDone(
   ketch: KetchApi,
   request: DownloadRequest,
   out: PrintStream = System.out,
   err: PrintStream = System.err,
+  stalls: (taskId: String) -> Flow<TorrentStall?> = { torrentStalls(ketch, it) },
 ): Int = coroutineScope {
   val task = try {
     ketch.download(request)
@@ -71,8 +113,14 @@ internal suspend fun downloadUntilDone(
   val speedLimit = request.speedLimit
   val limitLabel = if (speedLimit.isUnlimited) ""
     else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
+  val stall = MutableStateFlow<TorrentStall?>(null)
+  val stallWatch = launch { stalls(task.taskId).collect { stall.value = it } }
   val monitor = launch {
-    task.state.collect { state ->
+    // How much of the terminal line the progress took last.
+    var width = 0
+    combine(task.state, stall) { state, stall ->
+      state to stall?.takeIf { state is DownloadState.Downloading }
+    }.distinctUntilChanged().collect { (state, stall) ->
       when (state) {
         is DownloadState.Scheduled ->
           out.println("[Scheduled] Waiting for scheduled time...")
@@ -90,7 +138,11 @@ internal suspend fun downloadUntilDone(
           val speed = if (progress.bytesPerSecond > 0) {
             "  ${formatBytes(progress.bytesPerSecond)}/s"
           } else ""
-          out.print("\r[Downloading] $amount$speed$limitLabel    ")
+          val stalled = stall?.let { "  ${stallLabel(it)}" } ?: ""
+          // Spaces cover what a longer line left, such as a reason the torrent no longer has.
+          val line = "\r[Downloading] $amount$speed$limitLabel$stalled    "
+          out.print(line.padEnd(width))
+          width = line.length
         }
         is DownloadState.Paused ->
           out.println("\n[Paused] Download paused.")
@@ -108,6 +160,7 @@ internal suspend fun downloadUntilDone(
 
   val result = task.await()
   monitor.cancel()
+  stallWatch.cancel()
   // The task lives only as long as this process: what a source kept beside its files to resume
   // it, such as a torrent's sidecar or creation log, would only clutter the folder.
   task.remove(deleteFiles = false)
