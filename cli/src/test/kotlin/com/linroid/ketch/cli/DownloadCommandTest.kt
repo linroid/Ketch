@@ -2,8 +2,11 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
@@ -153,13 +156,13 @@ class DownloadCommandTest {
   }
 
   @Test
-  fun downloadUntilDone_torrentStalls_saysWhyOnTheProgressLine() {
+  fun downloadUntilDone_torrentStalls_saysWhyAboveTheProgressLine() {
     val engine = ServingEngine(byteArrayOf(1, 2, 3), release = CompletableDeferred())
     val status = download("https://example.com/a.bin", engine, stalls = {
       flow {
         emit(TorrentStall(TorrentStallReason.NO_PEERS, seconds = 150))
-        awaitPrinted { "stalled" in it }
-        // Progressing again: the line loses the reason, then the download finishes.
+        awaitPrinted { "stalled 2m 30s" in it }
+        // Progressing again: the line loses the stall, then the download finishes.
         emit(null)
         awaitPrinted { "\r" in it.substringAfterLast("stalled") }
         engine.release?.complete(Unit)
@@ -167,29 +170,76 @@ class DownloadCommandTest {
     })
 
     assertEquals(DownloadExit.OK, status)
-    val lines = out.toString(Charsets.UTF_8).split('\r')
-    val stalled = lines.indexOfLast { "stalled" in it }
-    assertTrue(lines[stalled].startsWith("[Downloading] "), lines[stalled])
-    assertTrue("  stalled 2m 30s: no peers, still looking    " in lines[stalled], lines[stalled])
-    // The next line covers it, so none of the reason is left on the terminal.
-    val next = lines[stalled + 1].substringBefore('\n')
+    val rows = out.toString(Charsets.UTF_8).split('\r', '\n')
+    val reasons = rows.filter { "[Stalled]" in it }.map { it.trimEnd() }
+    assertEquals(listOf("[Stalled] No peers, still looking"), reasons)
+    val stalled = rows.indexOfLast { "stalled" in it }
+    assertTrue(rows[stalled].startsWith("[Downloading] "), rows[stalled])
+    assertTrue("  stalled 2m 30s    " in rows[stalled], rows[stalled])
+    // The next line covers it, so nothing of the stall is left on the terminal.
+    val next = rows[stalled + 1]
     assertFalse("stalled" in next, next)
-    assertEquals(lines[stalled].length, next.length, next)
+    assertEquals(rows[stalled].length, next.length, next)
   }
 
   @Test
-  fun stallLabel_missingPieces_countsThem() {
-    fun missing(seconds: Long, pieces: Int) =
-      TorrentStall(TorrentStallReason.MISSING_PIECES, seconds, missingPieces = pieces)
+  fun progressPrinter_torrentStalls_keepsEveryLineNarrowerThan80Columns() {
+    // Printed again every second: a line that wraps leaves a row behind at each update. Some
+    // consoles wrap once the 80th column is written, so a line must stop before it.
+    val printer = ProgressPrinter(outStream, SpeedLimit.kbps(500))
+    val sizes = listOf(
+      DownloadProgress(179_516_211, 1_503_238_554, bytesPerSecond = 1_258_291),
+      DownloadProgress(872_309_637_120, 1_099_511_627_775, bytesPerSecond = 1_048_575),
+    )
+    for (progress in sizes) {
+      printer.print(DownloadState.Downloading(progress), stall = null)
+      for (reason in TorrentStallReason.entries) {
+        for (seconds in listOf(150L, 3725L, 93_784L)) {
+          val stall = TorrentStall(reason, seconds, missingPieces = 12_345)
+          printer.print(DownloadState.Downloading(progress), stall)
+        }
+      }
+    }
 
+    val rows = out.toString(Charsets.UTF_8).split('\r', '\n')
+    assertTrue(rows.any { "stalled 1d 2h 3m 4s" in it }, rows.joinToString("\n"))
+    rows.forEach { assertTrue(it.length < 80, "${it.length} columns: $it") }
+  }
+
+  @Test
+  fun progressPrinter_stallGoesOn_saysWhyOnceEachTimeTheReasonChanges() {
+    val printer = ProgressPrinter(outStream, SpeedLimit.Unlimited)
+    val downloading = DownloadState.Downloading(DownloadProgress(1024, 65_536))
+    fun stall(reason: TorrentStallReason, seconds: Long) = TorrentStall(reason, seconds)
+
+    printer.print(downloading, stall(TorrentStallReason.NO_PEERS, seconds = 30))
+    printer.print(downloading, stall(TorrentStallReason.NO_PEERS, seconds = 31))
+    printer.print(downloading, stall(TorrentStallReason.CHOKED, seconds = 32))
+    printer.print(downloading, stall(TorrentStallReason.CHOKED, seconds = 33))
+    printer.print(downloading, stall = null)
+    // A stall after progress is a new one.
+    printer.print(downloading, stall(TorrentStallReason.CHOKED, seconds = 30))
+
+    val reasons = out.toString(Charsets.UTF_8).split('\r', '\n')
+      .filter { it.startsWith("[Stalled] ") }
+      .map { it.trimEnd() }
     assertEquals(
-      "stalled 45s: no peer or web seed has 1 piece it needs",
-      stallLabel(missing(seconds = 45, pieces = 1)),
+      listOf(
+        "[Stalled] No peers, still looking",
+        "[Stalled] Peers connected, but none is sharing yet",
+        "[Stalled] Peers connected, but none is sharing yet",
+      ),
+      reasons,
     )
-    assertEquals(
-      "stalled 1h 2m 5s: no peer or web seed has 3 pieces it needs",
-      stallLabel(missing(seconds = 3725, pieces = 3)),
-    )
+  }
+
+  @Test
+  fun stallReason_missingPieces_countsThem() {
+    fun missing(pieces: Int) =
+      TorrentStall(TorrentStallReason.MISSING_PIECES, seconds = 45, missingPieces = pieces)
+
+    assertEquals("No peer or web seed has 1 piece it needs", stallReason(missing(pieces = 1)))
+    assertEquals("No peer or web seed has 3 pieces it needs", stallReason(missing(pieces = 3)))
   }
 
   @Test

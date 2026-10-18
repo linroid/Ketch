@@ -119,6 +119,10 @@ Where the file goes:
   current folder.
 - Torrents follow the [torrent destination rules](../docs/torrent.md).
 
+While a torrent makes no progress, its progress line says for how long (`stalled 2m 30s`), and a
+line above it says why each time the reason changes, such as `[Stalled] No peers, still looking`;
+see [stalls](../docs/torrent.md#when-a-download-stops-making-progress).
+
 The download is kept in memory only: it is not added to the [task database](#database), and the
 Ketch app does not see it. To add a download to the app or server instead, use
 [`ketch add`](#add-a-download).

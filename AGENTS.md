@@ -1986,8 +1986,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SourceError`'s `detail` followed by the causes from the first whose message differs from it).
   It logs only warnings and errors unless -v or --debug asks for more (`quietLogLevel`, as
   `--list-files`, `update` and the attaching commands do); only an unknown or disk failure's
-  record has a stack trace. A torrent's progress line says why it stalls (`torrentStalls`, from
-  `TorrentInterest` snapshots, and `stallLabel`)
+  record has a stack trace. Its progress line (`ProgressPrinter`), written over every second,
+  stays under 80 columns: while a torrent stalls it says only for how long, without speed or
+  limit, and a line above it says why each time the reason changes (`torrentStalls`, from
+  `TorrentInterest` snapshots, and `stallReason`)
 - `ketch <url> --files <ids>` downloads only those files of a torrent
   (`DownloadRequest.selectedFileIds`); `ketch --list-files <url>` resolves the URL and prints
   `ID  SIZE  PATH` rows instead (`fileListRows`), in the order of `--sort name|size|type` (`type`

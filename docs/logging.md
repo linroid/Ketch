@@ -215,7 +215,7 @@ line with `stall:` and why (`missing-pieces`, `no-peers`, `choked`, `slow-peers`
 how long, the missing pieces and the files they belong to, and the peers connected and unchoking
 it. Each change of reason logs one line at info (`stalled: …`, `makes progress again`, never once
 the download completed), as does each recovery it tries (`reannounce`, `revive_peers`,
-`relaunch_web_seeds`). `ketch <url>` logs them only with `-v`; its progress line says why
+`relaunch_web_seeds`). `ketch <url>` logs them only with `-v`; its output says why
 meanwhile. `webSeedWasted` counts web seed payload thrown away: pieces that failed
 their hash check or that a failed request cut off, which never count as progress.
 
