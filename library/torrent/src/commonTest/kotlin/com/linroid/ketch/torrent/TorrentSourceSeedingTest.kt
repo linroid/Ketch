@@ -20,6 +20,7 @@ import com.linroid.ketch.torrent.control.UnusedHttpEngine
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
+import com.linroid.ketch.torrent.engine.KotlinTorrentSession
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRouteTable
 import com.linroid.ketch.torrent.engine.TorrentSessionState
@@ -43,10 +44,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
@@ -938,6 +941,47 @@ class TorrentSourceSeedingTest {
       assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
       source.stopSeeding("seeder")
       assertContentEquals(edited, torrentFileSystem.read(output / "f1") { readByteArray() })
+    }
+  }
+
+  @Test
+  fun seeder_v1DroppedFileDeletedWhileSeeding_keepsSeedingWithoutTheSharedPiece() {
+    val torrent = MultiFileTorrent()
+    v1Seeding(torrent) { source, engine, output ->
+      val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+      assertEquals(SeedingOutcome.SEEDING,
+        source.startSeeding(v1SeedingTask(torrent, output, ids)))
+      val session = assertIs<KotlinTorrentSession>(source.sessionOf("seeder"))
+      assertTrue(source.changeSeedingSelection("seeder", ids - "1"))
+      // The owner deletes the file it dropped; a peer asks for a piece f0 shares with it.
+      torrentFileSystem.delete(output / "f1")
+      val shared = torrent.piecesOf(1).first
+      val network = createTorrentNetwork()
+      try {
+        val connection = network.connect(PeerEndpoint("127.0.0.1", engine().listenPort))
+        try {
+          val wire = PeerWire(connection, torrent.metadata)
+          wire.handshake(PeerHandshake(torrent.metadata.infoHash, torrentRandomBytes(20), false,
+            false))
+          wire.send(PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+          while (wire.read() != PeerMessage.Control(PeerMessage.Signal.UNCHOKE)) Unit
+          wire.send(PeerMessage.Request(shared, 0, 16_384))
+          eventually { !session.verifiedPieces()[shared] }
+        } finally {
+          connection.close()
+        }
+      } finally {
+        network.close()
+      }
+
+      // It seeds on without the piece, which it never offers nor downloads again.
+      assertNull(withTimeoutOrNull(1_000) {
+        session.state.first { it != TorrentSessionState.SEEDING }
+      })
+      assertEquals(setOf("seeder"), source.seedingTaskIds.value)
+      val pieces = BooleanArray(torrent.pieceCount) { it != shared }
+      assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
+      source.stopSeeding("seeder")
     }
   }
 

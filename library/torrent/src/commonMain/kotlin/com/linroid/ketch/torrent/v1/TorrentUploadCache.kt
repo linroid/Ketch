@@ -34,7 +34,7 @@ internal class TorrentUploadCache(
         if (!sha1Digest(data).contentEquals(store.metadata.pieceHashes.copyOfRange(
             piece * 20, piece * 20 + 20))) {
           // A file outside the selection may change; the piece is dropped instead of failing.
-          if (store.revoke(piece)) throw PieceRevokedException(piece)
+          store.revoke(piece)?.let { throw it }
           throw IOException("Verified torrent output changed")
         }
         bytes = data

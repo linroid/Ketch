@@ -607,6 +607,21 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun setAsidePiece_isNeverFetchedNorWanted() = runTest {
+    val budget = TorrentBufferBudget(piece)
+    val scheduler = scheduler(pieces = 1, budget)
+    scheduler.availability(1, all(1))
+    scheduler.verified(0)
+    scheduler.setAside(0)
+    assertFalse(scheduler.isVerified(0))
+    assertFalse(scheduler.isWanted(0))
+    assertFalse(scheduler.poll(1, 0).wanted)
+    assertTrue(scheduler.request(1, max = 4).requests.isEmpty())
+    scheduler.remove(1)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun webSeedRuns_andPeersNeverFetchTheSamePieceOutsideTheEndgame() = runTest {
     val budget = TorrentBufferBudget(8 * piece)
     val scheduler = scheduler(pieces = 8, budget)

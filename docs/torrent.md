@@ -132,12 +132,12 @@ What happens next depends on the task's state:
   one you deleted before removing it no longer keeps the task from seeding. A v2 or hybrid
   torrent that still has a deleted file selected cannot start seeding again, though; removing
   that file then lets it seed the next time Ketch restores seeding, such as when it starts again.
-  In a v1 torrent a file usually shares its first and last pieces with the files beside it, and
-  a file you removed keeps its part of them. Deleting or changing it, before or after you removed
-  it, sets aside those of the shared pieces that no longer verify when the task checks its files
-  to seed: it seeds every other piece of the files you kept, never offers those, and keeps
-  seeding. The removed file is left as you left it. Adding a file again downloads those pieces,
-  keeping the removed file's part beside it rather than in it.
+  In a v1 torrent a file usually shares its first and last pieces with the files beside it, and a
+  file you removed keeps its part of them. Deleting or changing it, before or after you removed it,
+  sets aside those of the shared pieces that no longer verify, when the task checks its files to
+  seed or when a peer asks for one while it seeds: it seeds every other piece of the files you kept,
+  never offers those, and keeps seeding. The removed file is left as you left it. Adding a file
+  again downloads those pieces, keeping the removed file's part beside it rather than in it.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.

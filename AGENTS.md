@@ -892,13 +892,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   missing a selected file fails as it opens, before any check (its checkpoint's ownership no
   longer holds), and keeps its intent: a drop saved between that read and the check takes effect
   the next time seeding is restored. A v1 seeder whose check misses only pieces it shares with
-  deselected files whose bytes are gone or changed (deleted, cut short or edited, the selected
-  files holding their part) sets them aside (`TorrentPieceStore.setAsideLostPieces`): neither
-  wanted, verified nor offered, and wanted again at the next check or once the selection adds a
-  file. It seeds the rest, logs a
-  warning and keeps its intent. A lent seeder pays the global limit alone
-  (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
-  the spec fields it reads, so no finished run stays reachable.
+  deselected files whose bytes are gone or changed (deleted, cut short or edited, the selected files
+  holding their part) sets them aside (`TorrentPieceStore.setAsideLostPieces`): neither wanted,
+  verified nor offered, and wanted again at the next check or once the selection adds a file. It
+  seeds the rest, logs a warning and keeps its intent. Its store (`seedOnly`) sets a piece aside the
+  same way while its selection is complete when a peer's request finds it unreadable or changed
+  (`PieceRevokedException.setAside`, `TorrentPieceScheduler.setAside`), so it stays SEEDING rather
+  than downloading it. A lent seeder pays the global limit alone (`DownloadContext.globalThrottle`)
+  should it fetch a piece again, and its discovery keeps only the spec fields it reads, so no
+  finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,

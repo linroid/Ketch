@@ -588,6 +588,15 @@ internal class TorrentPieceScheduler(
     }
   }
 
+  /** Forgets a piece the store set aside: neither verified nor wanted, it is never fetched. */
+  suspend fun setAside(index: Int) = mutex.withLock {
+    if (verified[index]) verifiedCount-- else countWanted(index, -1)
+    track(index) {
+      verified[index] = false
+      wanted[index] = false
+    }
+  }
+
   /** A piece verified elsewhere, such as by a web seed: peers assembling it cancel. */
   suspend fun verified(index: Int) = mutex.withLock {
     openPieces[index]?.takeIf { !it.committing }?.let(::close)

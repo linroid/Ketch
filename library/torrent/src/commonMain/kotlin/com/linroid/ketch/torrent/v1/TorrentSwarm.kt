@@ -1300,7 +1300,9 @@ internal class TorrentSwarm(
         } catch (revoked: PieceRevokedException) {
           // A piece outside the selection could not be read back: refuse it and keep the peer.
           log.d { "Swarm $logLabel: revoked piece ${revoked.index}" }
-          scheduler.revoke(revoked.index)
+          // One a seed-only store set aside is never fetched again.
+          if (revoked.setAside) scheduler.setAside(revoked.index)
+          else scheduler.revoke(revoked.index)
           rejectUploads()
           uploadCache.close()
           chokerMutex.withLock { choker.refused(id) }

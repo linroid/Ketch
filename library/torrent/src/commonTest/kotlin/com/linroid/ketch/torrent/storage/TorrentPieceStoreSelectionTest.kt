@@ -227,6 +227,84 @@ class TorrentPieceStoreSelectionTest {
     }
   }
 
+  /** A completed task that dropped skip, kept in place: a checked store of a and b. */
+  private suspend fun droppedInPlace(root: Path, seedOnly: Boolean): TorrentPieceStore {
+    completeStore(root).finish()
+    val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test",
+      seedOnly = seedOnly)
+    store.initialize()
+    assertContentEquals(booleanArrayOf(true, true, true), store.recheck())
+    return store
+  }
+
+  @Test
+  fun read_seedOnlyDroppedFileDeleted_setsTheSharedPiecesAside() = runTest {
+    val root = root()
+    try {
+      val store = droppedInPlace(root, seedOnly = true)
+      torrentFileSystem.delete(root / "pack/skip")
+      assertTrue(assertFailsWith<PieceRevokedException> { store.read(0) }.setAside)
+      assertTrue(assertFailsWith<PieceRevokedException> { store.read(1) }.setAside)
+      assertTrue(store.completed())
+      val view = store.selectionView()
+      assertContentEquals(booleanArrayOf(false, false, true), view.wanted)
+      assertContentEquals(booleanArrayOf(false, false, true), view.verified)
+      assertContentEquals(piece(2), store.read(2))
+      assertFalse(torrentFileSystem.exists(root / "pack/skip"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun revoke_seedOnlyDroppedFileEdited_setsTheSharedPieceAsideAndLeavesIt() = runTest {
+    val root = root()
+    try {
+      val store = droppedInPlace(root, seedOnly = true)
+      torrentFileSystem.write(root / "pack/skip") { writeUtf8("WXYZ") }
+      // Read back for a peer, the piece no longer matches its hash.
+      assertEquals("012W", store.read(0).decodeToString())
+      assertTrue(assertNotNull(store.revoke(0)).setAside)
+      assertTrue(store.completed())
+      assertContentEquals(booleanArrayOf(false, true, true), store.selectionView().wanted)
+      assertEquals("WXYZ", text(root / "pack/skip"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun read_seedOnlySelectedFileCutShort_wantsThePieceAgain() = runTest {
+    val root = root()
+    try {
+      val store = droppedInPlace(root, seedOnly = true)
+      torrentFileSystem.delete(root / "pack/skip")
+      torrentFileSystem.write(root / "pack/a") { writeUtf8("01") }
+      // a lost its part of piece 0 too: the selection changed, which seeding cannot serve around.
+      assertFalse(assertFailsWith<PieceRevokedException> { store.read(0) }.setAside)
+      assertFalse(store.completed())
+      assertContentEquals(booleanArrayOf(true, true, true), store.selectionView().wanted)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun read_downloadingStoreDroppedFileDeleted_wantsTheSharedPieceAgain() = runTest {
+    val root = root()
+    try {
+      val store = droppedInPlace(root, seedOnly = false)
+      torrentFileSystem.delete(root / "pack/skip")
+      assertFalse(assertFailsWith<PieceRevokedException> { store.read(0) }.setAside)
+      assertFalse(store.completed())
+      assertEquals(CommitOutcome.VERIFIED, store.commit(0, piece(0)))
+      assertTrue(store.completed())
+      assertFalse(torrentFileSystem.exists(root / "pack/skip"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
   /** A completed task whose file skip was deleted, then dropped: a store of a and b, checked. */
   private suspend fun droppedAfterDeletion(root: Path): TorrentPieceStore {
     completeStore(root).finish()

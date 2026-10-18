@@ -912,7 +912,7 @@ internal class KotlinTorrentEngine(
       val requested = torrentSystemFileSystem.canonicalize(".".toPath())
         .resolve(spec.outputPath).normalized()
       val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
-        storageSlots = storageSlots)
+        storageSlots = storageSlots, seedOnly = spec.seedOnly)
       val output = store.outputPath.toPath()
       requireAvailableOutput(output)
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)

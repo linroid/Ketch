@@ -43,9 +43,10 @@ internal enum class CommitOutcome {
 
 /**
  * A verified piece that is no longer wanted, or that spans a file outside the selection, could
- * not be read back: the store dropped it, and peers asking for it are refused.
+ * not be read back: the store dropped it, and peers asking for it are refused. [setAside]: a
+ * seed-only store set it aside rather than wanting it again ([TorrentPieceStore.seedOnly]).
  */
-internal class PieceRevokedException(val index: Int) :
+internal class PieceRevokedException(val index: Int, val setAside: Boolean = false) :
   IllegalStateException("Torrent piece is no longer stored")
 
 /** The selection as a swarm applies it; [recheck] lists pieces whose stored bytes may verify. */
@@ -71,6 +72,12 @@ internal class TorrentPieceStore(
   val taskId: String,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val storageSlots: Semaphore = Semaphore(32),
+  /**
+   * Only seeds: while the selection is complete, a wanted piece that cannot be read back, or no
+   * longer matches, because of a file outside the selection is set aside as
+   * [setAsideLostPieces] does, rather than wanted again, so seeding never turns into a download.
+   */
+  val seedOnly: Boolean = false,
 ) {
   private val log = KetchLogger("TorrentSession")
   private val mutex = Mutex()
@@ -288,19 +295,18 @@ internal class TorrentPieceStore(
       storageOperation { readPiece(index) }
     } catch (failure: okio.IOException) {
       if (!revocable(index)) throw failure
-      storageOperation { revokeLocked(index) }
-      throw PieceRevokedException(index)
+      throw storageOperation { revokeLocked(index) }
     }
   }
 
   /**
    * Drops piece [index] when it is no longer wanted or spans a deselected file, after its stored
-   * bytes stopped matching; false leaves a piece of the selection alone.
+   * bytes stopped matching, and returns what the peers asking for it are refused with; null
+   * leaves a piece of the selection alone.
    */
-  suspend fun revoke(index: Int): Boolean = mutex.withLock {
-    if (!revocable(index)) return@withLock false
+  suspend fun revoke(index: Int): PieceRevokedException? = mutex.withLock {
+    if (!revocable(index)) return@withLock null
     storageOperation { revokeLocked(index) }
-    true
   }
 
   private fun revocable(index: Int): Boolean {
@@ -308,9 +314,26 @@ internal class TorrentPieceStore(
     return !wanted[index] || overlappingFiles(index).any { it !in selection && !padding[it] }
   }
 
-  private fun revokeLocked(index: Int) {
+  /**
+   * Drops piece [index]. A [seedOnly] store whose selection is complete sets a wanted piece
+   * aside instead when a deselected file it spans may be what changed ([lostOutsideSelection]):
+   * neither wanted nor verified, so the selection stays complete.
+   */
+  private fun revokeLocked(index: Int): PieceRevokedException {
+    val setsAside = seedOnly && remaining == 0 && wanted[index] &&
+      lostOutsideSelection(index, ByteArray(CHECK_CHUNK_BYTES))
+    if (setsAside) {
+      setAside = setAside + index
+      wanted = wanted.copyOf().also { it[index] = false }
+      selectionVersion++
+      log.w {
+        "Piece $index of taskId=$taskId shares a deleted or changed file outside the selection; " +
+          "seeding without it"
+      }
+    }
     if (verified[index]) unverify(index)
     overlappingFiles(index).forEach(::dropIfVanished)
+    return PieceRevokedException(index, setsAside)
   }
 
   /** Clears a verified piece and the progress its in-place spans counted. */
