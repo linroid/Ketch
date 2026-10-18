@@ -21,7 +21,8 @@ import kotlin.time.TimeSource
  * Only an [interactive] terminal is written over. Output captured to a file or a pipe would keep
  * every carriage return, the progress in front of each record, so there the progress goes on
  * lines of its own, at most one every [PLAIN_INTERVAL] by [timeSource], and every other line is
- * printed as it comes.
+ * printed as it comes. [stdout] counts stdout as a terminal only while stdin is one too
+ * ([stdoutIsTerminal]).
  */
 internal class ProgressLine(
   private val out: PrintStream,
@@ -98,7 +99,10 @@ internal class ProgressLine(
     /** The least time between two lines of progress on output that is not a terminal. */
     val PLAIN_INTERVAL: Duration = 5.seconds
 
-    /** The progress line of stdout, written over only while stdout is a terminal. */
+    /**
+     * The progress line of stdout, written over only while stdout and stdin are both a terminal
+     * ([stdoutIsTerminal]).
+     */
     fun stdout(): ProgressLine = ProgressLine(System.out, interactive = stdoutIsTerminal())
   }
 }
@@ -106,7 +110,10 @@ internal class ProgressLine(
 /**
  * Whether stdout is an interactive terminal. The JVM has a console only while its standard input
  * and output are a terminal; from JDK 22, whose console may also stand for redirected streams,
- * `Console.isTerminal` tells them apart.
+ * `Console.isTerminal` tells them apart, also checking both. So stdout counts as a terminal only
+ * while stdin is one too: a command run in a terminal with its input redirected, as
+ * `ketch <url> < /dev/null` or one in a `while read` loop over a file, prints its progress on
+ * lines of its own.
  */
 internal fun stdoutIsTerminal(): Boolean {
   val console = System.console() ?: return false
