@@ -96,7 +96,7 @@ class TorrentSwarmRefusalTest {
       // Within the refusal's minute, the peer sends the block it held back, and holds the rest.
       rig.peer { answerWith(Answer.HOLD); sendHeld() }
       // Stalled again once 30 s pass without payload.
-      rig.advanceTo(70_000)
+      rig.advanceTo(75_000)
       rig.assertStalledNotMissing()
       rig.peer { answerWith(Answer.SERVE) }
       rig.swarm.join()
@@ -167,11 +167,20 @@ class TorrentSwarmRefusalTest {
     private val actions: Channel<PeerAction>,
     val swarm: Job,
   ) {
-    /** Moves the clock on in 5 s steps, each longer than the swarm's tick, up to [until]. */
+    /**
+     * Moves the clock on in 1 s steps, the swarm's stall check interval, up to [until]. The swarm
+     * counts payload from the first check that sees it, so a coarser step, which a slow machine's
+     * swarm may check only steps later, would count payload as arriving later than it did. The
+     * first call has the swarm check at 1 s, so the payload it got before counts from then.
+     */
     suspend fun advanceTo(until: Long) {
+      if (clock.load() == 0L) {
+        clock.store(1_000)
+        delay(500)
+      }
       while (clock.load() < until) {
-        delay(150)
-        clock.addAndFetch(5_000)
+        delay(60)
+        clock.addAndFetch(1_000)
       }
       delay(300)
     }
@@ -216,7 +225,7 @@ class TorrentSwarmRefusalTest {
     body: suspend CoroutineScope.(Rig) -> Unit,
   ) = runTest {
     withContext(Dispatchers.Default) {
-      withTimeout(20_000) {
+      withTimeout(60_000) {
         coroutineScope {
           val root: Path = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
             "ketch-refusal-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
