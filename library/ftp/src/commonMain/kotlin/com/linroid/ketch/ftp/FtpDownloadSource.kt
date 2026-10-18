@@ -15,6 +15,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
+import com.linroid.ketch.core.segment.SegmentLane
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -292,35 +293,32 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
     )
     segmentHelper.downloadAll(
       context, segments, totalBytes, supportsRest, requestedConnections,
-    ) { segment, onProgress ->
-      downloadSegment(context, segment, onProgress)
+    ) { lane ->
+      downloadSegment(context, lane)
     }
   }
 
   /**
-   * Downloads a single segment via its own FTP connection.
+   * Downloads a single lane via its own FTP connection.
    *
    * Opens a fresh FTP connection, authenticates, seeks to the
-   * segment offset via REST, and downloads data via RETR.
+   * lane's offset via REST, and downloads data via RETR.
    *
    * Unlike HTTP Range requests, FTP RETR sends all data from the
-   * REST offset to EOF. This method tracks bytes received and
-   * truncates/stops once the segment's byte range is fully covered.
+   * REST offset to EOF. This method writes what [SegmentLane.admit]
+   * allows and stops once the lane's range, which another connection
+   * may shorten meanwhile, is fully covered.
    */
   private suspend fun downloadSegment(
     context: DownloadContext,
-    segment: Segment,
-    onProgress: suspend (bytesDownloaded: Long) -> Unit,
-  ): Segment {
-    if (segment.isComplete) {
-      log.d { "Skipping complete segment ${segment.index}" }
-      return segment
-    }
+    lane: SegmentLane,
+  ) {
+    if (lane.isComplete) return
 
     val ftpUrl = FtpUrl.parse(context.url)
     val client = clientFactory(ftpUrl, context.config.bufferSize)
-    var downloadedBytes = segment.downloadedBytes
-    val remaining = segment.totalBytes - downloadedBytes
+    val fileOffset = lane.offset
+    var writeOffset = fileOffset
     var handle = ConnectionHandle.None
 
     try {
@@ -331,12 +329,9 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
         client.login(ftpUrl.username, ftpUrl.password)
         client.setBinaryMode()
 
-        val fileOffset = segment.start + downloadedBytes
-
         log.d {
-          "Starting segment ${segment.index}: " +
-            "offset=$fileOffset, " +
-            "remaining=$remaining bytes"
+          "Starting range at offset=$fileOffset, " +
+            "remaining=${lane.remaining} bytes"
         }
 
         client.retrieve(
@@ -346,21 +341,13 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
           currentCoroutineContext().ensureActive()
           monitor.received(data.size)
 
-          val bytesNeeded = segment.totalBytes - downloadedBytes
-          if (bytesNeeded <= 0) {
-            throw SegmentCompleteException()
-          }
-
-          // Truncate if this chunk would exceed our segment boundary
-          val chunk = if (data.size.toLong() > bytesNeeded) {
-            data.copyOf(bytesNeeded.toInt())
-          } else {
-            data
-          }
+          // Truncate if this chunk would exceed the lane's boundary
+          val allowed = lane.admit(data.size)
+          if (allowed == 0) throw SegmentCompleteException()
+          val chunk = if (allowed == data.size) data else data.copyOf(allowed)
 
           monitor.throttled { context.throttle(chunk.size) }
 
-          val writeOffset = segment.start + downloadedBytes
           try {
             context.fileAccessor.writeAt(writeOffset, chunk)
           } catch (e: Exception) {
@@ -368,42 +355,37 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
             if (e is KetchError) throw e
             throw KetchError.Disk(e)
           }
-          downloadedBytes += chunk.size
+          writeOffset += chunk.size
           handle.received(chunk.size)
-          onProgress(downloadedBytes)
+          lane.commit(chunk.size)
 
-          // Stop reading once segment is complete
-          if (downloadedBytes >= segment.totalBytes) {
+          // Stop reading once the lane is complete
+          if (lane.isComplete) {
             throw SegmentCompleteException()
           }
         }
       }
     } catch (_: SegmentCompleteException) {
-      // Expected: segment boundary reached, stop reading
+      // Expected: lane boundary reached, stop reading
     } finally {
       handle.close()
       client.disconnect()
     }
 
-    if (downloadedBytes < segment.totalBytes) {
+    if (!lane.isComplete) {
       log.w {
-        "Incomplete segment ${segment.index}: " +
-          "downloaded $downloadedBytes/${segment.totalBytes} bytes"
+        "Incomplete range at offset=$fileOffset: " +
+          "downloaded ${writeOffset - fileOffset}/${lane.end - fileOffset + 1} bytes"
       }
       throw KetchError.Network(
         Exception(
           "FTP connection closed prematurely: received " +
-            "$downloadedBytes of ${segment.totalBytes} bytes",
+            "${writeOffset - fileOffset} of ${lane.end - fileOffset + 1} bytes",
         ),
       )
     }
 
-    log.d {
-      "Completed segment ${segment.index}: " +
-        "downloaded $downloadedBytes bytes"
-    }
-
-    return segment.copy(downloadedBytes = downloadedBytes)
+    log.d { "Completed range at offset=$fileOffset: downloaded ${writeOffset - fileOffset} bytes" }
   }
 
   /**

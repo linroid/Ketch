@@ -94,7 +94,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 
 - **Parallel connections** — Ketch splits a file into ranges and downloads them at once. The
   Connections tab shows every connection as a lane with its own speed, and you can add or remove
-  connections while the download runs.
+  connections while the download runs. A connection that finishes early takes over the rest of a
+  slower one, so a download never waits on its slowest connection.
 - **Several networks at once** — Spread one download over Wi-Fi, Ethernet and, on Android,
   cellular data ([how it works](docs/multiple-networks.md)).
 - **Proxies** — Download through the system's proxy, an HTTP or SOCKS5 proxy with a username and
@@ -242,8 +243,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **WebDAV** — Download from WebDAV servers, with resume
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
-- **Faster segmented downloads** — Connections that finish early take over the rest of the slower
-  ones, so a download no longer waits on its slowest connection
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own

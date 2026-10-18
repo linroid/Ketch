@@ -8,6 +8,7 @@ import com.linroid.ketch.core.file.NoOpFileAccessor
 import com.linroid.ketch.core.segment.SegmentDownloader
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.segment.SegmentCalculator
+import com.linroid.ketch.core.segment.SegmentLedger
 import com.linroid.ketch.engine.FakeHttpEngine
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -35,12 +36,12 @@ class SegmentDownloaderTest {
         written += data.size
       }
     }
+    val lane = SegmentLedger(listOf(Segment(index = 0, start = 0, end = 3))).initialLanes.single()
     assertFailsWith<KetchError.Unsupported> {
-      SegmentDownloader(engine, file).download(
-        "https://example.com/file", Segment(index = 0, start = 0, end = 3)
-      ) {}
+      SegmentDownloader(engine, file).download("https://example.com/file", lane)
     }
-    assertEquals(2, written)
+    assertEquals(4, written)
+    assertTrue(lane.isComplete)
   }
 
 

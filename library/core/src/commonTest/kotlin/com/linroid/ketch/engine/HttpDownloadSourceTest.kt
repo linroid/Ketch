@@ -5,11 +5,13 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpDownloadSource
+import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpSourceState
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.NoOpFileAccessor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -185,6 +187,71 @@ class HttpDownloadSourceTest {
     )
 
     assertEquals(6, resolved.maxSegments)
+  }
+
+  @Test
+  fun download_finishedConnectionTakesOverTheSlowOnesTail() = runTest {
+    val size = 4 * 1024 * 1024
+    val half = size / 2L
+    val (requests, context) = downloadWithSlowSecondConnection(
+      ServerInfo(size.toLong(), true, null, null),
+    )
+    assertTrue(
+      requests.any { it.first > half },
+      "The first connection must take over the end of the second one: $requests",
+    )
+    assertTrue(context.segments.value.all { it.isComplete })
+    assertEquals(size.toLong(), context.segments.value.sumOf { it.totalBytes })
+  }
+
+  @Test
+  fun download_requestQuota_neverTakesOverRanges() = runTest {
+    val size = 4 * 1024 * 1024L
+    val (requests, _) = downloadWithSlowSecondConnection(
+      ServerInfo(size, true, null, null, rateLimitRemaining = 2),
+    )
+    assertEquals(2, requests.size, "Taking over a range would spend a request: $requests")
+  }
+
+  /**
+   * Downloads [serverInfo]'s content over two connections, the second of which starts slow, and
+   * checks the file; returns the requests sent and the context.
+   */
+  private suspend fun downloadWithSlowSecondConnection(
+    serverInfo: ServerInfo,
+  ): Pair<List<LongRange>, DownloadContext> {
+    val size = checkNotNull(serverInfo.contentLength).toInt()
+    val half = size / 2L
+    val content = ByteArray(size) { (it * 31 % 251).toByte() }
+    val requests = mutableListOf<LongRange>()
+    val fake = FakeHttpEngine(serverInfo)
+    val engine = object : HttpEngine by fake {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        val requested = checkNotNull(range)
+        requests.add(requested)
+        // The request the second connection starts with is slow, every other one fast.
+        val pause = if (requested.first == half) 100L else 1L
+        var offset = requested.first
+        while (offset <= requested.last) {
+          delay(pause)
+          val end = minOf(offset + 64 * 1024, requested.last + 1)
+          onData(content.copyOfRange(offset.toInt(), end.toInt()))
+          offset = end
+        }
+      }
+    }
+    val file = MemoryFile()
+    val context = context(connections = MutableStateFlow(2), fileAccessor = file)
+
+    HttpDownloadSource(engine).download(context, null)
+
+    assertContentEquals(content, file.bytes)
+    return requests to context
   }
 
   private fun context(
