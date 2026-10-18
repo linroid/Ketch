@@ -5,7 +5,10 @@ import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.IOException
@@ -46,6 +49,26 @@ class TorrentPieceStoreSelectionTest {
     root / ".ketch-${metadata.infoHash.hex}-test" / "$index.piece"
 
   private fun text(path: Path): String = torrentFileSystem.read(path) { readUtf8() }
+
+  /**
+   * Rewrites [path] in place with [text], as an editor would, late enough that its modification
+   * time tells the edit apart from the last write.
+   */
+  private suspend fun edit(path: Path, text: String) {
+    val before = torrentFileSystem.metadata(path).lastModifiedAtMillis
+    while (true) {
+      torrentFileSystem.write(path) { writeUtf8(text) }
+      if (torrentFileSystem.metadata(path).lastModifiedAtMillis != before) return
+      withContext(Dispatchers.Default) { delay(5) }
+    }
+  }
+
+  /** What a store of every file saved once it completed, which a restarted store restores. */
+  private suspend fun completedCheckpoint(root: Path): TorrentCheckpoint {
+    val store = completeStore(root)
+    store.finish()
+    return assertNotNull(TorrentCheckpoint.decode(store.persistCheckpoint()))
+  }
 
   private suspend fun completeStore(
     root: Path,
@@ -261,13 +284,30 @@ class TorrentPieceStoreSelectionTest {
     val root = root()
     try {
       val store = droppedInPlace(root, seedOnly = true)
-      torrentFileSystem.write(root / "pack/skip") { writeUtf8("WXYZ") }
+      edit(root / "pack/skip", "WXYZ")
       // Read back for a peer, the piece no longer matches its hash.
       assertEquals("012W", store.read(0).decodeToString())
       assertTrue(assertNotNull(store.revoke(0)).setAside)
       assertTrue(store.completed())
       assertContentEquals(booleanArrayOf(false, true, true), store.selectionView().wanted)
       assertEquals("WXYZ", text(root / "pack/skip"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun revoke_seedOnlyChosenFileEditedInASharedPiece_wantsThePieceAgain() = runTest {
+    val root = root()
+    try {
+      val store = droppedInPlace(root, seedOnly = true)
+      // The owner edits a, which piece 0 shares with skip; skip is as the check found it.
+      edit(root / "pack/a", "01X")
+      assertEquals("01X3", store.read(0).decodeToString())
+      assertFalse(assertNotNull(store.revoke(0)).setAside)
+      assertFalse(store.completed())
+      assertContentEquals(booleanArrayOf(true, true, true), store.selectionView().wanted)
+      assertEquals("01X", text(root / "pack/a"))
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }
@@ -359,10 +399,11 @@ class TorrentPieceStoreSelectionTest {
   fun setAsideLostPieces_droppedFileEdited_setsItsPiecesAsideAndLeavesIt() = runTest {
     val root = root()
     try {
-      completeStore(root).finish()
+      val saved = completedCheckpoint(root)
       // The owner edits skip in place once it is dropped: Ketch still owns it.
-      torrentFileSystem.write(root / "pack/skip") { writeUtf8("WXYZ") }
+      edit(root / "pack/skip", "WXYZ")
       val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      store.restore(saved)
       store.initialize()
       assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
       assertEquals(2, store.setAsideLostPieces())
@@ -461,6 +502,42 @@ class TorrentPieceStoreSelectionTest {
       assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
       assertFalse(store.completed())
       assertContentEquals(booleanArrayOf(true, true, true), store.selectionView().wanted)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_chosenFileEditedInASharedPiece_setsNothingAside() = runTest {
+    val root = root()
+    try {
+      val saved = completedCheckpoint(root)
+      // Piece 0 holds a and the first byte of skip: a changed, skip did not.
+      edit(root / "pack/a", "01X")
+      val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      store.restore(saved)
+      store.initialize()
+      assertContentEquals(booleanArrayOf(false, true, true), store.recheck())
+      assertEquals(0, store.setAsideLostPieces())
+      assertFalse(store.completed())
+      assertEquals("01X", text(root / "pack/a"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun setAsideLostPieces_unknownFilesEdited_setsNothingAside() = runTest {
+    val root = root()
+    try {
+      completeStore(root).finish()
+      // Without a checkpoint nothing tells whether skip or a changed.
+      edit(root / "pack/skip", "WXYZ")
+      val store = TorrentPieceStore(metadata, root / "pack", setOf(0, 2), "test")
+      store.initialize()
+      assertContentEquals(booleanArrayOf(false, false, true), store.recheck())
+      assertEquals(0, store.setAsideLostPieces())
+      assertFalse(store.completed())
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }

@@ -135,11 +135,14 @@ What happens next depends on the task's state:
   In a v1 torrent a file usually shares its first and last pieces with the files beside it, and a
   file you removed keeps its part of them; Ketch never writes to it again. If you delete or change
   it, before or after removing it, the shared pieces that no longer verify are set aside: the task
-  never offers them, seeds every other piece of the files you kept and keeps seeding. Seeding finds
-  them as it checks its files, or as a peer asks for one; a task still seeding straight after its
-  own download downloads such a piece again instead. Choosing that file again, or any other,
-  downloads those pieces again: a file you chose is filled in, and one still removed keeps its part
-  in the task's hidden sidecar and stays as you left it.
+  never offers them, seeds every other piece of the files you kept and keeps seeding. Ketch tells
+  which file changed from each file's size and modification time, noted as it writes and checks
+  them: a shared piece that fails because a file you kept changed, or where nothing tells which
+  file did, is not set aside, so the task does not start seeding, or downloads the piece again if
+  it seeds. Seeding finds them as it checks its files, or as a peer asks for one; a task still
+  seeding straight after its own download downloads such a piece again instead. Choosing that
+  file again, or any other, downloads those pieces again: a file you chose is filled in, and one
+  still removed keeps its part in the task's hidden sidecar and stays as you left it.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
@@ -905,8 +908,9 @@ task refuses a newly chosen file whose path holds a file it did not create.
 ## Storage, restart and compatibility
 
 Data is verified before it is written as complete. Checkpoints record the metainfo, the selection
-and which files the task owns, and a restart rehashes the data rather than trusting a saved bitmap.
-Configure a durable `TaskStore` (such as `SqliteTaskStore`) to keep tasks across restarts.
+and which files the task owns (in v1, also each file's size and modification time as Ketch last
+knew it), and a restart rehashes the data rather than trusting a saved bitmap. Configure a
+durable `TaskStore` (such as `SqliteTaskStore`) to keep tasks across restarts.
 
 - File identities and an append-only ownership journal stop cleanup from deleting files that
   existed before the download or were replaced. A v1 task keeps them, its checkpoint and the

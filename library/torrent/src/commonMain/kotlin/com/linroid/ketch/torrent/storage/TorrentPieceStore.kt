@@ -107,6 +107,10 @@ internal class TorrentPieceStore(
   // Under the mutex: pieces of the selection [setAsideLostPieces] left out of [wanted], until the
   // files are checked again or the selection adds a file.
   private var setAside: Set<Int> = emptySet()
+  // Under the mutex: each content file as the store last knew it, which tells what changed since:
+  // stamped as the store writes it, and by a check that verified every wanted piece it holds.
+  // A check that finds one of them wrong keeps the earlier stamp. Saved in the checkpoint.
+  private val stamps = HashMap<Int, TorrentFileStamp>()
   private val ownedFiles = linkedMapOf<Path, String>()
   private val ownedDirectories = linkedMapOf<Path, String>()
   private val sidecar: Path
@@ -224,6 +228,7 @@ internal class TorrentPieceStore(
             recordOwned(path, directory = false)
             it.flush()
           }
+          restamp(index)
         }
       }
       // Files of an earlier selection stay in place while this task still owns them.
@@ -274,6 +279,7 @@ internal class TorrentPieceStore(
           val sourceOffset = (overlapStart - start).toInt()
           write(filePath(fileIndex), overlapStart - offsets[fileIndex], bytes, sourceOffset,
             count.toInt())
+          restamp(fileIndex)
         }
       }
       // Return through withContext's cancellation boundary before publishing availability. A
@@ -316,7 +322,7 @@ internal class TorrentPieceStore(
 
   /**
    * Drops piece [index]. A [seedOnly] store whose selection is complete sets a wanted piece
-   * aside instead when a deselected file it spans may be what changed ([lostOutsideSelection]):
+   * aside instead when a deselected file it spans is what changed ([lostOutsideSelection]):
    * neither wanted nor verified, so the selection stays complete.
    */
   private fun revokeLocked(index: Int): PieceRevokedException {
@@ -373,6 +379,9 @@ internal class TorrentPieceStore(
         if (!needed(index)) continue
         if (storedOrHealed(index, chunk)) markVerified(index)
       }
+      for (file in materialized) {
+        if (piecesOf(file).all { !wanted[it] || verified[it] }) restamp(file)
+      }
       if (healedPieces > 0) {
         log.d { "Healed $healedPieces piece(s) of taskId=$taskId from their sidecars" }
       }
@@ -382,13 +391,13 @@ internal class TorrentPieceStore(
 
   /**
    * For a session that only seeds and never downloads: when each wanted piece that did not
-   * verify holds bytes of a file outside the selection, which are gone or changed (the file
-   * deleted, cut short or edited, or kept in a sidecar that is gone too), while the selected
-   * files hold their part of it, stops wanting those pieces, so the rest completes the
-   * selection. They are neither verified nor offered to peers, and the files outside the
-   * selection are left as they are. Returns how many it set aside: 0, setting none aside, when
-   * any other piece is missing. They are wanted again once the files are checked again or the
-   * selection adds a file.
+   * verify lost the bytes of a file outside the selection ([lostOutsideSelection]: the file
+   * deleted, cut short or changed since the store last knew it, or kept in a sidecar that is
+   * gone too) while the selected files it spans are whole and unchanged, stops wanting those
+   * pieces, so the rest completes the selection. They are neither verified nor offered to
+   * peers, and the files outside the selection are left as they are. Returns how many it set
+   * aside: 0, setting none aside, when any other piece is missing. They are wanted again once
+   * the files are checked again or the selection adds a file.
    */
   suspend fun setAsideLostPieces(): Int = mutex.withLock {
     check(initialized)
@@ -406,28 +415,53 @@ internal class TorrentPieceStore(
   }
 
   /**
-   * Whether piece [index], which does not verify, lost the bytes of a file outside the
-   * selection: it spans one, and has no owned sidecar that verifies. That file may be gone, cut
-   * short or changed in place; which part changed cannot be told, so the piece counts as lost
-   * whenever the selected files it spans hold their part of it. One cut short counts as changed.
+   * Whether piece [index], which does not verify and has no owned sidecar that does, lost the
+   * bytes of a file outside the selection rather than of a selected one. A deselected file it
+   * spans must be gone, cut short or never in place, or have changed since the store last knew
+   * it ([stamps]: another identity, size or modification time) while every selected file it spans
+   * is as the store last knew it. Either way the selected files must hold their part of it, and
+   * none may have changed since the store last knew it: a piece whose chosen file changed is
+   * never set aside, and neither is one where nothing tells which file changed.
    */
   private fun lostOutsideSelection(index: Int, chunk: ByteArray): Boolean {
     val path = sidecar / "$index.piece"
     if (ownedSidecar(path) && sidecarMatches(index, path, chunk)) return false
     val start = index * metadata.pieceLength
     val end = start + pieceSize(index)
-    var outside = false
+    var gone = false
+    var changed = false
+    var selectedKnown = true
     for (file in overlappingFiles(index)) {
       if (overlap(start, end, file) == 0L || padding[file]) continue
-      if (file !in selected) {
-        outside = true
-        continue
-      }
       // The file's bytes up to the end of its span of the piece.
       val needed = minOf(end, offsets[file] + metadata.files[file].size) - offsets[file]
-      if ((fileSystem.metadataOrNull(filePath(file))?.size ?: -1) < needed) return false
+      val size = fileSystem.metadataOrNull(filePath(file))?.size ?: -1
+      val known = stamps[file]
+      if (file in selected) {
+        if (size < needed) return false
+        if (known == null) selectedKnown = false
+        else if (known != stampOf(file)) return false
+      } else if (file !in materialized || size < needed) {
+        gone = true
+      } else if (known != null && known != stampOf(file)) {
+        changed = true
+      }
     }
-    return outside
+    return gone || changed && selectedKnown
+  }
+
+  /** Notes [file] as it is now on disk, as the store last knew it. */
+  private fun restamp(file: Int) {
+    val stamp = stampOf(file)
+    if (stamp == null) stamps.remove(file) else stamps[file] = stamp
+  }
+
+  /** [file] as it is now on disk; null when it is not a regular file, or its time is unknown. */
+  private fun stampOf(file: Int): TorrentFileStamp? {
+    val path = filePath(file)
+    val info = fileSystem.metadataOrNull(path)?.takeIf { it.isRegularFile } ?: return null
+    return TorrentFileStamp(torrentFileIdentity(path), info.size ?: return null,
+      info.lastModifiedAtMillis ?: return null)
   }
 
   /**
@@ -545,6 +579,7 @@ internal class TorrentPieceStore(
             done += size
           }
         }
+        restamp(file)
       }
     }
   }
@@ -585,6 +620,7 @@ internal class TorrentPieceStore(
             recordOwned(path, directory = false)
             it.flush()
           }
+          restamp(file)
           moved += file
         } else if (file !in materialized) {
           // A file already in place, owned or not, is adopted only where its bytes verify.
@@ -701,8 +737,10 @@ internal class TorrentPieceStore(
         fileSystem.openReadWrite(path, mustExist = true).use { handle ->
           val expected = metadata.files[file].size
           check(handle.size() >= expected) { "Completed torrent file was truncated" }
-          if (handle.size() > expected) handle.resize(expected)
+          val resized = handle.size() > expected
+          if (resized) handle.resize(expected)
           handle.flush()
+          if (resized) restamp(file)
         }
       }
       deleteObsoleteSidecars()
@@ -810,6 +848,10 @@ internal class TorrentPieceStore(
     for (owned in checkpoint.directories) restoreOwned(true, owned)
     trackerConfiguration = checkpoint.trackerConfiguration
     trackerRevision = checkpoint.trackerRevision
+    // What changed since is told from them; a stamp this store took itself is newer.
+    for ((file, stamp) in checkpoint.stamps) {
+      if (file in contentFiles) stamps.getOrPut(file) { stamp }
+    }
     // Do not trust checkpoint.verified. initialize()/recheck() prove the files before progress.
   }
 
@@ -997,7 +1039,8 @@ internal class TorrentPieceStore(
     output.toString(), selected, verified.copyOf(),
     ownedFiles.map { TorrentOwnedPath(it.key.toString(), it.value) },
     ownedDirectories.map { TorrentOwnedPath(it.key.toString(), it.value) },
-    trackerConfiguration = trackerConfiguration, trackerRevision = trackerRevision)
+    trackerConfiguration = trackerConfiguration, trackerRevision = trackerRevision,
+    stamps = stamps.toMap())
 
   private fun recordOwned(path: Path, directory: Boolean) {
     val identity = requireNotNull(torrentFileIdentity(path)) { "Filesystem has no safe file identity" }

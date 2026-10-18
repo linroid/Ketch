@@ -10,6 +10,16 @@ import okio.Path.Companion.toPath
 
 internal data class TorrentOwnedPath(val path: String, val identity: String)
 
+/**
+ * A payload file as a store last knew it: its OS [identity] (null where it has none), [size] and
+ * modification time. A file whose stamp differs now was replaced, resized or written since.
+ */
+internal data class TorrentFileStamp(
+  val identity: String?,
+  val size: Long,
+  val modifiedAtMillis: Long,
+)
+
 /** Versioned Kotlin state. The bitmap is a hint; recovery always rehashes the actual output. */
 internal data class TorrentCheckpoint(
   val taskId: String,
@@ -25,6 +35,8 @@ internal data class TorrentCheckpoint(
   val trackerRevision: Long = 0,
   /** Payload received from peers and web seeds that was thrown away rather than verified. */
   val discardedBytes: Long = 0,
+  /** The files in place as the store last knew them, by file index ([TorrentFileStamp]). */
+  val stamps: Map<Int, TorrentFileStamp> = emptyMap(),
 ) {
   init {
     require(trackerRevision >= 0)
@@ -44,7 +56,12 @@ internal data class TorrentCheckpoint(
     "output" to output, "selected" to selected.sorted().map { it.toLong() },
     "verified" to pieceBitfield(verified),
     "files" to files.map { mapOf("path" to it.path, "identity" to it.identity) },
-    "directories" to directories.map { mapOf("path" to it.path, "identity" to it.identity) }
+    "directories" to directories.map { mapOf("path" to it.path, "identity" to it.identity) },
+    // Older builds ignore it, and read a checkpoint without it as knowing no file.
+    "stamps" to stamps.entries.sortedBy { it.key }.map { (file, stamp) ->
+      mapOf("file" to file.toLong(), "size" to stamp.size, "modified" to stamp.modifiedAtMillis) +
+        (stamp.identity?.let { mapOf("identity" to it) } ?: emptyMap())
+    }
   ) + (trackerConfiguration?.let { mapOf("tracker-tiers" to it.tiers) } ?: emptyMap()) +
     (if (trackerRevision > 0) mapOf("tracker-revision" to trackerRevision) else emptyMap()),
     maxBytes = MAX_BYTES - MAGIC.size).let { MAGIC + it }.also { require(it.size <= MAX_BYTES) }
@@ -118,13 +135,25 @@ internal data class TorrentCheckpoint(
           TorrentOwnedPath(path, identity)
         }.also { paths -> require(paths.map { it.path }.distinct().size == paths.size) }
       }
+      val stampList = root["stamps"]?.let { requireNotNull(it.list) }.orEmpty()
+      require(stampList.size <= metadata.files.size)
+      val stamps = stampList.associate {
+        val file = requireNotNull(it["file"]?.integer)
+        require(file in 0 until metadata.files.size.toLong())
+        val size = requireNotNull(it["size"]?.integer)
+        require(size >= 0)
+        val identity = it["identity"]?.let { value -> requireNotNull(value.text()) }
+        require(identity == null || identity.length in 1..512)
+        file.toInt() to TorrentFileStamp(identity, size, requireNotNull(it["modified"]?.integer))
+      }
+      require(stamps.size == stampList.size)
       val receivedBytes = root["received"]?.integer ?: 0L
       val uploadedBytes = root["uploaded"]?.integer ?: 0L
       val discardedBytes = root["discarded"]?.integer ?: 0L
       require(receivedBytes >= 0 && uploadedBytes >= 0 && discardedBytes >= 0)
       return TorrentCheckpoint(task, metadata, output, selected, verified,
         owned("files"), owned("directories"), receivedBytes, uploadedBytes,
-        trackerConfiguration, trackerRevision, discardedBytes)
+        trackerConfiguration, trackerRevision, discardedBytes, stamps)
     }
   }
 }
