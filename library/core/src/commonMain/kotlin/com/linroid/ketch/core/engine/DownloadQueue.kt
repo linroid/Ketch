@@ -8,9 +8,11 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.savedProgress
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.Volatile
 import kotlin.time.Clock
 
@@ -144,30 +146,35 @@ internal class DownloadQueue(
         "taskId=${entry.taskId}"
     }
 
-    coordinator.pause(victim.taskId, PauseReason.Preempted(entry.taskId))
-    removeActive(victim.taskId)
-    // A victim that finished while being stopped keeps its terminal state and is not re-queued:
-    // its slot is free and it must not run again. The late onTaskCompleted/Failed/Canceled then
-    // finds no active entry and does nothing.
-    if (!victim.handle.mutableState.value.isTerminal) {
-      victim.preempted = true
-      markPreempted(victim.handle, byTaskId = entry.taskId)
-      insertSorted(victim)
-    }
-
-    if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
-      log.i {
-        "Starting URGENT download: taskId=${entry.taskId}, " +
-          "active=${activeEntries.size + 1}/" +
-          "$maxConcurrent"
+    // Once the victim's pause is issued the preemption runs to its end, also when the caller is
+    // cancelled while the victim stops, as a scheduled task's wait is when the task is canceled:
+    // the victim would otherwise keep its slot with no execution, and resuming it do nothing.
+    withContext(NonCancellable) {
+      coordinator.pause(victim.taskId, PauseReason.Preempted(entry.taskId))
+      removeActive(victim.taskId)
+      // A victim that finished while being stopped keeps its terminal state and is not
+      // re-queued: its slot is free and it must not run again. The late
+      // onTaskCompleted/Failed/Canceled then finds no active entry and does nothing.
+      if (!victim.handle.mutableState.value.isTerminal) {
+        victim.preempted = true
+        markPreempted(victim.handle, byTaskId = entry.taskId)
+        insertSorted(victim)
       }
-      startTask(entry, host)
-    } else {
-      insertSorted(entry)
-      markWaiting(entry.handle)
-      log.i {
-        "URGENT taskId=${entry.taskId} queued " +
-          "(host limit still exceeded)"
+
+      if (activeEntries.size < maxConcurrent && hasHostCapacity(host)) {
+        log.i {
+          "Starting URGENT download: taskId=${entry.taskId}, " +
+            "active=${activeEntries.size + 1}/" +
+            "$maxConcurrent"
+        }
+        startTask(entry, host)
+      } else {
+        insertSorted(entry)
+        markWaiting(entry.handle)
+        log.i {
+          "URGENT taskId=${entry.taskId} queued " +
+            "(host limit still exceeded)"
+        }
       }
     }
   }
@@ -339,14 +346,18 @@ internal class DownloadQueue(
       hostConnectionCount[host] = (hostConnectionCount[host] ?: 0) + 1
       taskHostMap[entry.taskId] = host
     }
-    if (entry.preempted) {
-      entry.preempted = false
-      val resumed = coordinator.resume(entry.handle, entry.destination)
-      if (!resumed) {
+    // Started also when the caller is cancelled meanwhile, as while the coordinator finishes
+    // another task's pause: the task would otherwise hold its slot with no execution.
+    withContext(NonCancellable) {
+      if (entry.preempted) {
+        entry.preempted = false
+        val resumed = coordinator.resume(entry.handle, entry.destination)
+        if (!resumed) {
+          coordinator.start(entry.handle)
+        }
+      } else {
         coordinator.start(entry.handle)
       }
-    } else {
-      coordinator.start(entry.handle)
     }
   }
 

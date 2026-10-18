@@ -605,7 +605,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Priority-based ordering (`DownloadPriority`: LOW, NORMAL, HIGH, URGENT)
 - URGENT preemption: pauses lowest-priority active download to make room; the victim stays
   in the queue as `Paused(Preempted)` with a `QUEUED` record and resumes when a slot frees.
-  Tasks that already finished are never preempted
+  Tasks that already finished are never preempted. A preemption whose victim is stopping, and a
+  start the queue makes, finish even when their caller is cancelled (as a scheduled task's wait
+  is by its cancel), so no task keeps a slot with no execution
 - `DownloadTask.queuePosition`: 1-based place of `Queued` and preempted tasks in the queue
   (priority, then age), published under the queue mutex after every change; `null` otherwise,
   and never persisted

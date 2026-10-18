@@ -36,6 +36,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A cancel or remove never waits for the queue, so it can land while the queue starts the task.
@@ -191,6 +192,79 @@ class CancelRaceTest {
       // Never pushed out for it, the running task keeps its run.
       assertIs<DownloadState.Downloading>(running.state.value)
       assertEquals(runs, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun schedule_urgentCanceledWhileItsVictimStops_givesTheSlotBack() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store, maxConcurrent = 1)
+    try {
+      val running = ketch.download(request("0"))
+      val urgent = ketch.download(
+        request("1", priority = DownloadPriority.URGENT)
+          .copy(schedule = DownloadSchedule.AfterDelay(30.seconds)),
+      )
+      runCurrent()
+      assertIs<DownloadState.Downloading>(running.state.value)
+      assertIs<DownloadState.Scheduled>(urgent.state.value)
+      // The running task's last save waits, so the urgent task's wait, which preempts it, joins
+      // its stop when the cancel cancels that wait.
+      val stopping = CompletableDeferred<Unit>()
+      source.saveGate = stopping
+      advanceTimeBy(31.seconds)
+      runCurrent()
+      assertIs<DownloadState.Paused>(running.state.value)
+
+      val canceling = launch { urgent.cancel() }
+      runCurrent()
+      stopping.complete(Unit)
+      canceling.join()
+      runCurrent()
+
+      assertIs<DownloadState.Canceled>(urgent.state.value)
+      // Pushed out for a task that never runs, it takes its slot back and runs again.
+      assertIs<DownloadState.Downloading>(running.state.value)
+      assertEquals(2, source.runs.value.size)
+      assertEquals(running.taskId, source.runs.value.last().context.taskId)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun promote_callerCanceledWhileTheTaskStarts_stillRunsIt() = runTest {
+    val source = SelectableSource()
+    val store = RecordingTaskStore()
+    val ketch = ketch(source, store, maxConcurrent = 1)
+    try {
+      val paused = ketch.download(request("0"))
+      val waiting = ketch.download(request("1"))
+      runCurrent()
+      assertIs<DownloadState.Downloading>(paused.state.value)
+      assertIs<DownloadState.Queued>(waiting.state.value)
+      // The pause saves under the coordinator's lock, which the promoted task's start waits for.
+      val gate = SaveGate(store) { it.taskId == paused.taskId && it.state == TaskState.PAUSED }
+      val pausing = launch { paused.pause() }
+      runCurrent()
+      assertTrue(gate.held.isCompleted)
+      // A second slot promotes the waiting task; the caller gives up while it starts.
+      val raising = launch {
+        ketch.updateConfig(
+          DownloadConfig(retryCount = 0, saveIntervalMs = 60_000, maxConcurrentDownloads = 2),
+        )
+      }
+      runCurrent()
+      raising.cancel()
+      gate.release.complete(Unit)
+      pausing.join()
+      runCurrent()
+
+      assertIs<DownloadState.Downloading>(waiting.state.value)
+      assertEquals(waiting.taskId, source.runs.value.last().context.taskId)
     } finally {
       ketch.close()
     }
