@@ -52,16 +52,16 @@ internal fun quietLogLevel(verbosity: LogLevel): LogLevel =
  * Why [error] failed a download, in one line: what the source lacks for
  * [KetchError.Unsupported], whose own message is the same whatever the reason; the source's own
  * explanation for a [KetchError.SourceError] that has one, then its causes from the first whose
- * message differs from it, as a torrent's detail repeats its cause while WebDAV's only sums it
- * up; else the error and its causes, as a [KetchError]'s message alone is only a summary such as
- * "Network error occurred".
+ * message it does not already hold, as a torrent's detail repeats (or quotes) its cause while
+ * WebDAV's only sums it up; else the error and its causes, as a [KetchError]'s message alone is
+ * only a summary such as "Network error occurred".
  */
 internal fun failureReason(error: Throwable): String {
   if (error is KetchError.Unsupported) return error.reason()
   val detail = (error as? KetchError.SourceError)?.detail ?: return error.describeCauses()
   val cause = generateSequence(error.cause) { it.cause }
     .take(MAX_REASON_CAUSES)
-    .firstOrNull { it.message != detail }
+    .firstOrNull { val message = it.message; message == null || message !in detail }
   return listOfNotNull(detail, cause?.describeCauses()).joinToString(" <- ")
 }
 

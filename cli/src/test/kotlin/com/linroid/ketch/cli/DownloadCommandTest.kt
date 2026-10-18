@@ -177,6 +177,17 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun failureReason_detailQuotesItsCause_saysItOnce() {
+    // As a magnet's unusable metadata: the wrapper's message quotes its cause's.
+    val inner = IllegalArgumentException("Piece length is not a power of two")
+    val wrapper =
+      IllegalStateException("The magnet's torrent cannot be opened: ${inner.message}", inner)
+    val error = KetchError.SourceError("torrent", wrapper, detail = wrapper.message)
+
+    assertEquals(wrapper.message, failureReason(error))
+  }
+
+  @Test
   fun downloadUntilDone_torrentStalls_saysWhyAboveTheProgressLine() {
     val engine = ServingEngine(byteArrayOf(1, 2, 3), release = CompletableDeferred())
     val status = download("https://example.com/a.bin", engine, stalls = {
