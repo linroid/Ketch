@@ -1,7 +1,6 @@
 package com.linroid.ketch.core.segment
 
 import com.linroid.ketch.api.KetchError
-import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SpeedLimiter
@@ -23,72 +22,65 @@ internal class SegmentDownloader(
   private val log = KetchLogger("SegmentDownloader")
   private val owner = taskId?.let { " for taskId=$it" }.orEmpty()
 
+  /**
+   * Downloads [lane] with one Range request from its offset to its end. The response is closed
+   * early when another connection takes over the lane's tail meanwhile.
+   */
   suspend fun download(
     url: String,
-    segment: Segment,
+    lane: SegmentLane,
     headers: Map<String, String> = emptyMap(),
     handle: ConnectionHandle = ConnectionHandle.None,
-    onProgress: suspend (bytesDownloaded: Long) -> Unit,
-  ): Segment {
-    if (segment.isComplete) {
-      log.d { "Skipping complete segment ${segment.index}$owner" }
-      return segment
-    }
-
-    val remainingBytes = segment.totalBytes - segment.downloadedBytes
+  ) {
+    if (lane.isComplete) return
+    val range = lane.offset..lane.end
     log.d {
-      "Starting segment ${segment.index}$owner: range ${segment.start}..${segment.end} " +
-        "($remainingBytes bytes remaining)"
+      "Starting range ${range.first}..${range.last}$owner " +
+        "(${range.last - range.first + 1} bytes remaining)"
     }
-
-    val initialBytes = segment.downloadedBytes
-    var downloadedBytes = segment.downloadedBytes
-    val range = segment.currentOffset..segment.end
+    var writeOffset = range.first
 
     watchdog.watch { monitor ->
       httpEngine.download(url, range, headers) { data ->
         currentCoroutineContext().ensureActive()
         monitor.received(data.size)
-        if (data.size > segment.totalBytes - downloadedBytes) {
+        val allowed = lane.admit(data.size)
+        if (allowed > 0) {
+          monitor.throttled {
+            taskLimiter.acquire(allowed)
+            globalLimiter.acquire(allowed)
+          }
+          val chunk = if (allowed == data.size) data else data.copyOf(allowed)
+          try {
+            fileAccessor.writeAt(writeOffset, chunk)
+          } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (e is KetchError) throw e
+            throw KetchError.Disk(e)
+          }
+          writeOffset += allowed
+          handle.received(allowed)
+          // Ends the response when another connection took the rest of the range.
+          lane.commit(allowed)
+        }
+        if (allowed < data.size) {
           throw KetchError.Unsupported(IllegalStateException("Response exceeds segment boundary"))
         }
-        monitor.throttled {
-          taskLimiter.acquire(data.size)
-          globalLimiter.acquire(data.size)
-        }
-
-        val writeOffset = segment.start + downloadedBytes
-        try {
-          fileAccessor.writeAt(writeOffset, data)
-        } catch (e: Exception) {
-          if (e is CancellationException) throw e
-          if (e is KetchError) throw e
-          throw KetchError.Disk(e)
-        }
-        downloadedBytes += data.size
-        handle.received(data.size)
-        onProgress(downloadedBytes)
       }
     }
 
-    if (downloadedBytes < segment.totalBytes) {
+    if (!lane.isComplete) {
       log.w {
-        "Incomplete segment ${segment.index}$owner: " +
-          "downloaded $downloadedBytes/${segment.totalBytes} bytes"
+        "Incomplete range ${range.first}..${lane.end}$owner: " +
+          "downloaded ${writeOffset - range.first}/${lane.end - range.first + 1} bytes"
       }
       throw KetchError.Network(
         Exception(
           "Connection closed prematurely: received " +
-            "$downloadedBytes of ${segment.totalBytes} bytes"
+            "${writeOffset - range.first} of ${lane.end - range.first + 1} bytes"
         )
       )
     }
-
-    log.d {
-      "Completed segment ${segment.index}$owner: " +
-        "downloaded ${downloadedBytes - initialBytes} bytes"
-    }
-
-    return segment.copy(downloadedBytes = downloadedBytes)
+    log.d { "Completed range ${range.first}..${lane.end}$owner" }
   }
 }

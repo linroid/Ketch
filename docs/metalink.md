@@ -36,7 +36,9 @@ together with `download.fileSelection` and `download.awaitFileSelection`.
 The file is split into segments like any HTTP download, one per connection
 (`DownloadConfig.maxConnectionsPerDownload`, or the task's own count), and resegmented when the
 count changes. Each segment is fetched from the least busy mirror, preferring better priorities,
-so with more mirrors than connections the best ones are used and the rest wait as fallbacks.
+so with more mirrors than connections the best ones are used and the rest wait as fallbacks. A
+connection that finishes early takes over the rest of a slower one's range, from whichever mirror
+it picks next, so a slow mirror never holds the download back.
 
 When a mirror fails, the segment continues from the byte it reached on another mirror. A mirror
 answering with an error retrying cannot fix (such as 404, or a different byte range) is dropped

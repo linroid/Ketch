@@ -161,14 +161,14 @@ class MirrorDownloadHelper(
         context.throttle(bytes)
       }
     }
-    helper.downloadAll(context, segments, totalBytes, true, requested) { segment, onProgress ->
-      var current = segment
-      while (!current.isComplete) {
+    helper.downloadAll(context, segments, totalBytes, true, requested) { lane ->
+      // A connection that finishes early may take over this lane's tail, whichever mirror it
+      // fetches from; the lane then completes and the transfer ends by throwing.
+      while (!lane.isComplete) {
         currentCoroutineContext().ensureActive()
         val index = pool.acquire()
         val mirror = pool.mirror(index)
-        val from = current.currentOffset
-        var written = current.downloadedBytes
+        val from = lane.offset
         val spec = httpConnectionSpec(type, mirror.url, context.config.proxy)
         val handle = context.connections.open(spec)
         try {
@@ -177,11 +177,8 @@ class MirrorDownloadHelper(
             context.watchdog,
           )
           val headers = mirrorHeaders(context.url, mirror.url, context.headers)
-          current = observeExchanges(handle, spec) {
-            downloader.download(mirror.url, current, headers, handle) { bytes ->
-              written = bytes
-              onProgress(bytes)
-            }
+          observeExchanges(handle, spec) {
+            downloader.download(mirror.url, lane, headers, handle)
           }
           pool.succeeded(index)
         } catch (e: CancellationException) {
@@ -191,21 +188,21 @@ class MirrorDownloadHelper(
         } catch (e: KetchError.Canceled) {
           throw e
         } catch (e: Exception) {
+          // Another connection took the rest of the lane: not the mirror's fault.
+          if (lane.isComplete) throw e
           if (!pool.failed(index, e)) throw e
           log.w {
-            "Mirror #$index failed for taskId=${context.taskId}, segment ${segment.index}: " +
+            "Mirror #$index failed for taskId=${context.taskId} at byte ${lane.offset}: " +
               "${e.describeCauses()}; trying another"
           }
-          current = current.copy(downloadedBytes = written)
         } finally {
           handle.close()
           withContext(NonCancellable) {
-            spans.add(from, segment.start + written, index)
+            spans.add(from, lane.offset, index)
             pool.release(index)
           }
         }
       }
-      current
     }
   }
 
