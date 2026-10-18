@@ -72,6 +72,7 @@ import com.linroid.ketch.torrent.storage.TorrentCheckpoint
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.TorrentV2Checkpoint
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
+import com.linroid.ketch.torrent.storage.torrentFileSystem
 import com.linroid.ketch.torrent.storage.torrentSystemFileSystem
 import com.linroid.ketch.torrent.tracker.PrivateTrackerGroup
 import com.linroid.ketch.torrent.tracker.TRACKER_SCRAPE_WORKSPACE_BYTES
@@ -124,6 +125,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -214,6 +216,8 @@ internal class KotlinTorrentEngine(
   multicastLock: TorrentMulticastLock? = null,
   /** Test hook: how long one magnet metadata lookup runs. */
   private val magnetLookupTime: Duration = MAGNET_LOOKUP_TIME,
+  /** Test hook: the file system v1 stores keep their payload in. */
+  private val payloadFileSystem: FileSystem = torrentFileSystem,
 ) : TorrentEngine {
   private class RuntimeContext : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RuntimeContext>
@@ -272,8 +276,7 @@ internal class KotlinTorrentEngine(
    * frames and peer state come from it too, and refusing those drops the peer.
    */
   private val v1Shares = TorrentFairShares(budget)
-  /** Payload I/O every store takes a slot of; tests hold them all to keep a check waiting. */
-  internal val storageSlots = Semaphore(config.maxOpenPayloadFiles)
+  private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
   private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
   internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
   /** Every exchange partition together; zero after [stop] unless something leaked. */
@@ -913,7 +916,7 @@ internal class KotlinTorrentEngine(
       val requested = torrentSystemFileSystem.canonicalize(".".toPath())
         .resolve(spec.outputPath).normalized()
       val store = TorrentPieceStore(spec.metadata, requested, spec.selected, spec.taskId,
-        storageSlots = storageSlots, seedOnly = spec.seedOnly)
+        fileSystem = payloadFileSystem, storageSlots = storageSlots, seedOnly = spec.seedOnly)
       val output = store.outputPath.toPath()
       requireAvailableOutput(output)
       val checkpoint = spec.resumeData?.let(TorrentCheckpoint::decode)

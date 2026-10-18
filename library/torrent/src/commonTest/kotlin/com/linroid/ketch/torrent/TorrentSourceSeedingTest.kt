@@ -46,13 +46,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
+import okio.FileHandle
 import okio.FileSystem
+import okio.ForwardingFileSystem
 import okio.Path
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -818,12 +823,40 @@ class TorrentSourceSeedingTest {
   }
 
   /**
+   * The payload file system, which holds the next read of the file [hold] names until the hold is
+   * released: a check of the files waits there, in the middle of the check.
+   */
+  @OptIn(ExperimentalAtomicApi::class)
+  private class HoldingFileSystem : ForwardingFileSystem(torrentFileSystem) {
+    class Hold(val name: String) {
+      val reached = CompletableDeferred<Unit>()
+      val released = CompletableDeferred<Unit>()
+    }
+
+    private val next = AtomicReference<Hold?>(null)
+
+    fun hold(name: String): Hold = Hold(name).also { next.store(it) }
+
+    override fun openReadOnly(file: Path): FileHandle {
+      val hold = next.load()
+      if (hold != null && file.name == hold.name && next.compareAndSet(hold, null)) {
+        hold.reached.complete(Unit)
+        // A storage thread blocked in its read, as one reading a slow disk is.
+        runBlocking { hold.released.await() }
+      }
+      return super.openReadOnly(file)
+    }
+  }
+
+  /**
    * Runs [body] with a source whose engine seeds v1 tasks of [torrent], every file written into
    * the output folder it is given, and checks that the source and the engine return everything.
    * No file ends on a piece boundary: f1 shares its first piece with f0 and its last with f2.
+   * The engine's stores keep their payload in [payload].
    */
   private fun v1Seeding(
     torrent: MultiFileTorrent,
+    payload: FileSystem = torrentFileSystem,
     body: suspend CoroutineScope.(TorrentDownloadSource, () -> KotlinTorrentEngine, Path) -> Unit,
   ) = runTest {
     withContext(Dispatchers.Default) {
@@ -837,9 +870,8 @@ class TorrentSourceSeedingTest {
         val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
           uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION)).also {
           it.engineFactory = { config ->
-            KotlinTorrentEngine(config, listenHost = "127.0.0.1").also { created ->
-              engine = created
-            }
+            KotlinTorrentEngine(config, listenHost = "127.0.0.1", payloadFileSystem = payload)
+              .also { created -> engine = created }
           }
         }
         try {
@@ -1027,26 +1059,25 @@ class TorrentSourceSeedingTest {
   @Test
   fun startSeeding_v1FileDroppedWhileItChecks_seedsWithoutTheSharedPieces() {
     val torrent = MultiFileTorrent()
-    v1Seeding(torrent) { source, engine, output ->
+    val payload = HoldingFileSystem()
+    v1Seeding(torrent, payload) { source, engine, output ->
       val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
       // The owner deleted f1; a check of every file created it again, empty, and stopped.
       torrentFileSystem.delete(output / "f1")
       assertEquals(SeedingOutcome.CHANGED_ON_DISK,
         source.startSeeding(v1SeedingTask(torrent, output, ids)))
       assertEquals(0L, torrentFileSystem.metadata(output / "f1").size)
-      // The next check waits for storage while the owner drops f1.
-      val slots = engine().storageSlots
-      var held = 0
-      while (slots.tryAcquire()) held++
+      // The next check holds as it reads f2, having checked f0's pieces, when the owner drops f1.
+      val hold = payload.hold("f2")
       val seeding = async { source.startSeeding(v1SeedingTask(torrent, output, ids)) }
-      eventually {
-        source.sessionOf("seeder")?.state?.value == TorrentSessionState.CHECKING_FILES
-      }
+      hold.reached.await()
       val session = assertNotNull(source.sessionOf("seeder"))
-      // The drop stops the check and starts it again with the smaller selection, which waits
-      // for storage too.
-      assertTrue(source.changeSeedingSelection("seeder", ids - "1"))
-      repeat(held) { slots.release() }
+      assertEquals(TorrentSessionState.CHECKING_FILES, session.state.value)
+      // The drop stops the check where it is and checks again with the smaller selection.
+      val drop = async { source.changeSeedingSelection("seeder", ids - "1") }
+      delay(200)
+      hold.released.complete(Unit)
+      assertTrue(drop.await())
 
       assertEquals(SeedingOutcome.SEEDING, seeding.await())
       assertEquals(TorrentSessionState.SEEDING, session.state.value)
