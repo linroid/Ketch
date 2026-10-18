@@ -272,7 +272,8 @@ internal class KotlinTorrentEngine(
    * frames and peer state come from it too, and refusing those drops the peer.
    */
   private val v1Shares = TorrentFairShares(budget)
-  private val storageSlots = Semaphore(config.maxOpenPayloadFiles)
+  /** Payload I/O every store takes a slot of; tests hold them all to keep a check waiting. */
+  internal val storageSlots = Semaphore(config.maxOpenPayloadFiles)
   private val admissions = TorrentAdmissionLedger(exchangeBudgets.sessions)
   internal val admittedSessionBytes: Int get() = exchangeBudgets.sessions.allocated
   /** Every exchange partition together; zero after [stop] unless something leaked. */

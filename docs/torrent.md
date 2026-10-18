@@ -133,11 +133,13 @@ What happens next depends on the task's state:
   torrent that still has a deleted file selected cannot start seeding again, though; removing
   that file then lets it seed the next time Ketch restores seeding, such as when it starts again.
   In a v1 torrent a file usually shares its first and last pieces with the files beside it, and a
-  file you removed keeps its part of them. Deleting or changing it, before or after you removed it,
-  sets aside those of the shared pieces that no longer verify, when the task checks its files to
-  seed or when a peer asks for one while it seeds: it seeds every other piece of the files you kept,
-  never offers those, and keeps seeding. The removed file is left as you left it. Adding a file
-  again downloads those pieces, keeping the removed file's part beside it rather than in it.
+  file you removed keeps its part of them; Ketch never writes to it again. If you delete or change
+  it, before or after removing it, the shared pieces that no longer verify are set aside: the task
+  never offers them, seeds every other piece of the files you kept and keeps seeding. Seeding finds
+  them as it checks its files, or as a peer asks for one; a task still seeding straight after its
+  own download downloads such a piece again instead. Choosing that file again, or any other,
+  downloads those pieces again: a file you chose is filled in, and one still removed keeps its part
+  in the task's hidden sidecar and stays as you left it.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
@@ -210,7 +212,9 @@ complete. Seeding stops when:
 - Ketch quits.
 
 A seeder stopped by the mode, by paused uploads, by a waiting download or by quitting seeds again
-later; one you stop, or whose files changed on disk, does not.
+later; one you stop, or whose chosen files changed on disk, does not. In a v1 torrent, a file
+you removed that changed only sets aside the pieces it shares with the others (see
+[Choosing files](#choosing-files)).
 
 ### Only on Wi-Fi
 

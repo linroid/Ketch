@@ -945,6 +945,63 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
+  fun startSeeding_v1FileDroppedWhileItChecks_seedsWithoutTheSharedPieces() {
+    val torrent = MultiFileTorrent()
+    v1Seeding(torrent) { source, engine, output ->
+      val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+      // The owner deleted f1; a check of every file created it again, empty, and stopped.
+      torrentFileSystem.delete(output / "f1")
+      assertEquals(SeedingOutcome.CHANGED_ON_DISK,
+        source.startSeeding(v1SeedingTask(torrent, output, ids)))
+      assertEquals(0L, torrentFileSystem.metadata(output / "f1").size)
+      // The next check waits for storage while the owner drops f1.
+      val slots = engine().storageSlots
+      var held = 0
+      while (slots.tryAcquire()) held++
+      val seeding = async { source.startSeeding(v1SeedingTask(torrent, output, ids)) }
+      eventually {
+        source.sessionOf("seeder")?.state?.value == TorrentSessionState.CHECKING_FILES
+      }
+      val session = assertNotNull(source.sessionOf("seeder"))
+      // The drop stops the check and starts it again with the smaller selection, which waits
+      // for storage too.
+      assertTrue(source.changeSeedingSelection("seeder", ids - "1"))
+      repeat(held) { slots.release() }
+
+      assertEquals(SeedingOutcome.SEEDING, seeding.await())
+      assertEquals(TorrentSessionState.SEEDING, session.state.value)
+      val shared = setOf(torrent.piecesOf(1).first, torrent.piecesOf(1).last)
+      val kept = (torrent.piecesOf(0) + torrent.piecesOf(2)).toSet() - shared
+      val pieces = BooleanArray(torrent.pieceCount) { it in kept }
+      assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
+      assertEquals(0L, torrentFileSystem.metadata(output / "f1").size)
+      source.stopSeeding("seeder")
+    }
+  }
+
+  @Test
+  fun startSeeding_v1OwnedFileDroppedWhileNotSeedingThenDeleted_seedsWithoutTheSharedPieces() {
+    val torrent = MultiFileTorrent()
+    v1Seeding(torrent) { source, engine, output ->
+      val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+      source.seedWithF1Owned(torrent, output, ids)
+      source.stopSeeding("seeder")
+      // Dropped while the task does not seed, so no store sees it, then deleted.
+      torrentFileSystem.delete(output / "f1")
+
+      val outcome = source.startSeeding(v1SeedingTask(torrent, output, ids - "1"))
+
+      assertEquals(SeedingOutcome.SEEDING, outcome)
+      val shared = setOf(torrent.piecesOf(1).first, torrent.piecesOf(1).last)
+      val kept = (torrent.piecesOf(0) + torrent.piecesOf(2)).toSet() - shared
+      val pieces = BooleanArray(torrent.pieceCount) { it in kept }
+      assertContentEquals(pieceBitfield(pieces), advertised(torrent, engine()))
+      assertFalse(torrentFileSystem.exists(output / "f1"))
+      source.stopSeeding("seeder")
+    }
+  }
+
+  @Test
   fun seeder_v1DroppedFileDeletedWhileSeeding_keepsSeedingWithoutTheSharedPiece() {
     val torrent = MultiFileTorrent()
     v1Seeding(torrent) { source, engine, output ->
