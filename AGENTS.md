@@ -645,7 +645,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `DownloadSchedule.Immediate`, `AtTime(Instant)`, `AfterDelay(Duration)`
 - `DownloadCondition`: sealed; `DownloadCondition.Test(flow)` gates a task on a runtime
   `Flow<Boolean>` (e.g., WiFi-only)
-- Reschedule support via `DownloadTask.reschedule()`
+- Reschedule support via `DownloadTask.reschedule()`, which stops the task first, also one still
+  starting (shown `Queued` while it looks its content up, as a magnet does)
 
 ### Pluggable Download Sources (`DownloadSource`)
 - `SourceResolver` routes URLs to the appropriate source

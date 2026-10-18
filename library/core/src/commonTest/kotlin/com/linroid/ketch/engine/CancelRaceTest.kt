@@ -502,6 +502,35 @@ class CancelRaceTest {
   }
 
   @Test
+  fun reschedule_whileTheTaskStarts_stopsItUntilDue() = runTest {
+    val source = SelectableSource()
+    val lookup = CompletableDeferred<Unit>()
+    source.resolveGate = lookup
+    val ketch = ketch(source, RecordingTaskStore())
+    try {
+      val task = ketch.download(request("0"))
+      runCurrent()
+      // Still looking its files up, as a magnet finding peers is.
+      assertIs<DownloadState.Queued>(task.state.value)
+      assertEquals(1, source.resolves)
+
+      task.reschedule(DownloadSchedule.AfterDelay(1.minutes))
+      runCurrent()
+      lookup.complete(Unit)
+      runCurrent()
+
+      assertIs<DownloadState.Scheduled>(task.state.value)
+      assertTrue(source.runs.value.isEmpty())
+      advanceTimeBy(2.minutes)
+      runCurrent()
+      assertIs<DownloadState.Downloading>(task.state.value)
+      assertEquals(1, source.runs.value.size)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
   fun remove_writeAfterIt_savesNothing() = runTest {
     val source = SelectableSource()
     val store = RecordingTaskStore()

@@ -532,18 +532,19 @@ class Ketch(
       schedule: DownloadSchedule,
       conditions: List<DownloadCondition>,
     ) {
-      val state = handle.mutableState.value
+      val taskId = handle.taskId
       log.i {
-        "Rescheduling taskId=${handle.taskId}, " +
+        "Rescheduling taskId=$taskId, " +
           "schedule=$schedule, conditions=${conditions.size}"
       }
       // Finished even when the caller is cancelled while the task stops, like a pause.
       withContext(NonCancellable) {
-        scheduler.cancel(handle.taskId)
-        if (state.isActive) {
-          coordinator.pause(handle.taskId)
-        }
-        queue.dequeue(handle.taskId)
+        scheduler.cancel(taskId)
+        // Stopped also while it starts, shown queued as it looks its content up, as a magnet does,
+        // and again once out of the queue, which may have started it in between.
+        coordinator.pause(taskId)
+        queue.dequeue(taskId)
+        coordinator.pause(taskId)
         scheduler.reschedule(handle, schedule, conditions)
       }
     }
