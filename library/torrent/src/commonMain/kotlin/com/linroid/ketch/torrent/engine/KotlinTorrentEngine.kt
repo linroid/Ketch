@@ -262,6 +262,8 @@ internal class KotlinTorrentEngine(
   private val udpMutex = Mutex()
   // Guarded by udpMutex.
   private val udpPorts = mutableMapOf<String, TorrentUdpPort>()
+  /** The IPv4 UDP socket [listenForPeers] bound at the listen port, until [udpPort] takes it. */
+  private var reservedUdp: TorrentDatagramSocket? = null
   /** The running uTP endpoint of each UDP host, read by dials without [udpMutex]. */
   private val utpEndpoints = AtomicReference(emptyMap<String, UtpEndpoint>())
   private val exchangeBudgets = TorrentExchangeBudgets(config)
@@ -409,9 +411,12 @@ internal class KotlinTorrentEngine(
         listener.close()
         throw e
       }
-      // Free: closed again for udpPort to bind, as uTP or DHT may never run.
+      // Free: kept for udpPort, so nothing takes the port before uTP or DHT binds it.
       if (udp != null) {
-        udp.close()
+        udpMutex.withLock {
+          reservedUdp?.close()
+          reservedUdp = udp
+        }
         return listener
       }
       log.d { "UDP port ${listener.local.port} is taken, picking another listen port" }
@@ -577,6 +582,8 @@ internal class KotlinTorrentEngine(
         udpMutex.withLock {
           udpPorts.values.forEach { it.close() }
           udpPorts.clear()
+          reservedUdp?.close()
+          reservedUdp = null
         }
         utpEndpoints.store(emptyMap())
       } finally {
@@ -1455,7 +1462,12 @@ internal class KotlinTorrentEngine(
   private suspend fun udpPort(host: String): TorrentUdpPort = udpMutex.withLock {
     udpPorts[host]?.let { if (it.isRunning) return@withLock it else it.close() }
     val port = listenPort.takeIf { it != 0 } ?: config.listenPort
-    val socket = if (port != 0) {
+    // The socket listenForPeers reserved, unless the listen port changed since.
+    val reserved = if (host == WILDCARD_IPV4) reservedUdp?.also { reservedUdp = null } else null
+    if (reserved != null && reserved.local.port != port) reserved.close()
+    val socket = if (reserved != null && reserved.local.port == port) {
+      reserved
+    } else if (port != 0) {
       try {
         network.bindUdp(PeerEndpoint(host, port))
       } catch (e: CancellationException) {

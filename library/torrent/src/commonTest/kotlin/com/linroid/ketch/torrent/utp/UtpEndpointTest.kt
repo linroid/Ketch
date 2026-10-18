@@ -28,6 +28,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -266,6 +267,19 @@ class UtpEndpointTest {
       assertTrue(engine.listenPort != taken)
       val a = side(network, scope, dialOptions = UtpOptions(synRetries = 1))
       a.endpoint.dial(PeerEndpoint("127.0.0.1", engine.listenPort)).close()
+    } finally {
+      engine.stop()
+    }
+  }
+
+  @Test
+  fun engine_utpOff_keepsTheListenPortForUdp() = endpoints { network, _ ->
+    // DHT binds the port lazily: until then the engine holds it, so nothing else takes it.
+    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false, utpEnabled = false),
+      rawNetwork = network, listenHost = "127.0.0.1")
+    try {
+      engine.start()
+      assertFails { network.bindUdp(PeerEndpoint("0.0.0.0", engine.listenPort)).close() }
     } finally {
       engine.stop()
     }
