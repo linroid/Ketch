@@ -27,7 +27,7 @@
 
 [![最新版本](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
-[![网页应用](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
+[![网页应用](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](http://ketch.linroid.com/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
 [![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![桌面端](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
@@ -81,7 +81,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 | Linux（x64、ARM64） | [最新版本][release]中的 `.deb` |
 | Android 8.0+ | [最新版本][release]中的 `.apk` |
 | iOS 15+ | [最新版本][release]中未签名的 `.ipa`，用 AltStore、SideStore 或 Sideloadly 侧载（它们会用你的 Apple ID 签名）；或使用 Xcode 从源码构建（[`app/ios`](app/ios/)） |
-| 网页版 | [linroid.com/Ketch](https://linroid.com/Ketch/)，用于控制其他设备上运行的 Ketch |
+| 网页版 | [ketch.linroid.com](http://ketch.linroid.com/)，用于控制其他设备上运行的 Ketch |
 | 浏览器扩展 | Chrome、Edge、Brave 等 Chromium 浏览器：[Chrome 应用商店](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)；Firefox：扩展[发布页](https://github.com/linroid/Ketch/releases)中的 `.zip`（[安装方法](app/browser-extension/README.md#installing)） |
 | 命令行和服务器 | macOS、Linux 和 Windows：[安装脚本](#run-ketch-on-a-server)或[最新版本][release] |
 | Docker | x64 和 ARM64 的 NAS 与家庭服务器：`ghcr.io/linroid/ketch`（[指南](docs/docker.zh-CN.md)，含飞牛 fnOS 和 TrueNAS） |

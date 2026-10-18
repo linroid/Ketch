@@ -27,7 +27,7 @@
 
 [![最新リリース](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
-[![Web アプリ](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
+[![Web アプリ](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](http://ketch.linroid.com/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
 [![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![デスクトップ](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
@@ -82,7 +82,7 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 | Linux（x64、ARM64） | [最新リリース][release]の `.deb` |
 | Android 8.0+ | [最新リリース][release]の `.apk` |
 | iOS 15+ | [最新リリース][release]の未署名 `.ipa` を AltStore、SideStore、Sideloadly でサイドロード（各ツールがあなたの Apple ID で署名します）。または Xcode でソースからビルド（[`app/ios`](app/ios/)） |
-| Web | [linroid.com/Ketch](https://linroid.com/Ketch/) から別のデバイスで動作する Ketch を操作 |
+| Web | [ketch.linroid.com](http://ketch.linroid.com/) から別のデバイスで動作する Ketch を操作 |
 | ブラウザ拡張機能 | Chrome、Edge、Brave などの Chromium 系ブラウザ：[Chrome ウェブストア](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka)、Firefox：拡張機能の[リリース](https://github.com/linroid/Ketch/releases)の `.zip`（[インストール方法](app/browser-extension/README.md#installing)） |
 | コマンドラインとサーバー | macOS、Linux、Windows：[インストールスクリプト](#run-ketch-on-a-server)または[最新リリース][release] |
 | Docker | x64 と ARM64 の NAS・ホームサーバー：`ghcr.io/linroid/ketch`（[ガイド](docs/docker.md)、TrueNAS と fnOS の手順付き） |

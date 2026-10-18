@@ -27,7 +27,7 @@
 
 [![Última versión](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
-[![Aplicación web](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](https://linroid.com/Ketch/)
+[![Aplicación web](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](http://ketch.linroid.com/)
 [![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
 [![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Escritorio](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
@@ -83,7 +83,7 @@ Multiplatform está disponible en Maven Central.
 | Linux (x64, ARM64) | `.deb` de la [última versión][release] |
 | Android 8.0+ | `.apk` de la [última versión][release] |
 | iOS 15+ | `.ipa` sin firmar de la [última versión][release], para instalar con AltStore, SideStore o Sideloadly (lo firman con tu Apple ID); o compila desde el código fuente con Xcode ([`app/ios`](app/ios/)) |
-| Web | [linroid.com/Ketch](https://linroid.com/Ketch/), para controlar Ketch en otro dispositivo |
+| Web | [ketch.linroid.com](http://ketch.linroid.com/), para controlar Ketch en otro dispositivo |
 | Extensión del navegador | Chrome, Edge, Brave y otros navegadores Chromium: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` de las [versiones de la extensión](https://github.com/linroid/Ketch/releases) ([instalación](app/browser-extension/README.md#installing)) |
 | Línea de comandos y servidor | macOS, Linux y Windows: [script de instalación](#run-ketch-on-a-server) o la [última versión][release] |
 | Docker | NAS y servidores domésticos x64 y ARM64: `ghcr.io/linroid/ketch` ([guía](docs/docker.md), con TrueNAS y fnOS) |
