@@ -261,6 +261,65 @@ class TorrentSourceRunTest {
   }
 
   @Test
+  fun download_takesOverASeederThatChecks_endsItsRestoreAtOnce() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.SEED_AFTER_COMPLETION)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val hash = torrent.metadata.infoHash.hex
+          val session = FakeTorrentSession(hash)
+          session.selectedFileIds = setOf("0")
+          session.stateOnResume = TorrentSessionState.CHECKING_FILES
+          engine.addTorrentResult = session
+          val state = TorrentSourceState(hash, torrent.sizeOf(0), "", setOf("0"), "unused",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          // Ketch restores the completed task's seeding, and its session checks its files.
+          val restore = async {
+            source.startSeeding(SeedingTask("task", resolved.url, state.saved(), resolved,
+              "unused", setOf("0")))
+          }
+          eventually("the seeder to check its files") {
+            session.resumed && session.state.value == TorrentSessionState.CHECKING_FILES
+          }
+          // Ketch reopens it with f1 added: the run takes the seeder over and downloads f1,
+          // while the restore that opened it ends and goes on to the next task.
+          val run = async {
+            source.download(context("task", resolved, "unused".toPath(), setOf("0", "1")), state)
+          }
+          assertEquals(SeedingOutcome.ALREADY_ACTIVE, restore.await())
+          assertTrue(session.seedOnlyEnded)
+          assertTrue(run.isActive)
+          val next = MultiFileTorrent(sizes = listOf(50_000, 30_000))
+          val nextResolved = source.resolveMetainfo(next.metainfo)
+          val nextHash = next.metadata.infoHash.hex
+          val nextSession = FakeTorrentSession(nextHash)
+          nextSession.stateOnResume = TorrentSessionState.SEEDING
+          engine.addTorrentResult = nextSession
+          val nextState = TorrentSourceState(nextHash, next.sizeOf(0, 1), "", setOf("0", "1"),
+            "unused-next", encodeBase64(next.metainfo), version = 2,
+            privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          assertEquals(SeedingOutcome.SEEDING, source.startSeeding(SeedingTask("next",
+            nextResolved.url, nextState.saved(), nextResolved, "unused-next", setOf("0", "1"))))
+          // Once f1 is in, the run's seeder keeps seeding: nothing stopped it.
+          session.seed()
+          run.await()
+          assertEquals(listOf(setOf("0", "1")), session.selectionChanges)
+          assertSame(session, source.sessionOf("task"))
+          assertEquals(setOf("task", "next"), source.seedingTaskIds.value)
+          assertFalse(session.paused)
+          assertEquals(emptyList(), engine.removedTorrents)
+          source.stopSeeding("task")
+          source.stopSeeding("next")
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
   fun download_selectionChangesWhileTheSessionChecks_showsTheNewSelection() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(10_000) {

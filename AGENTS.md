@@ -1051,7 +1051,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   SEEDING rather than downloading it; a lent seeder downloads such a piece again. A run that takes
   a seed-only session over ends that mode (`TorrentSession.endSeedOnly`, session and store), so it
   downloads what its selection misses, also while the session checks its files, and seeds as a
-  lent seeder once it completes. A lent seeder pays the global limit alone
+  lent seeder once it completes; the `startSeeding` that opened one still checking returns
+  `ALREADY_ACTIVE` at once (`CheckingSeeder.takenOver`), so restoring goes on. A lent seeder
+  pays the global limit alone
   (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges

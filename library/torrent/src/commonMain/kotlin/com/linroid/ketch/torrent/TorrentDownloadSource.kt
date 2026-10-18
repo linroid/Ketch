@@ -78,6 +78,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
@@ -914,6 +915,9 @@ class TorrentDownloadSource(
     if (!slots.tryAcquire()) return SeedingOutcome.NO_SLOT
     var reserved = false
     var lent = false
+    // The task's own run took the session over as it checked ([adoptLive]): the run owns the
+    // session, its reservation and its slot from then on.
+    var takenOver = false
     var outcome = SeedingOutcome.FAILED
     try {
       try {
@@ -934,20 +938,31 @@ class TorrentDownloadSource(
         withContext(NonCancellable) { engine.load()?.removeTorrent(plan.hash) }
         throw e
       }
+      // Listed before the slot is lent, so a run that takes the slot over finds it. Once the
+      // slot is lent, a smaller selection saved meanwhile reaches the session, which checks its
+      // files again with it; one saved as it opened is read before the check.
+      val seeder = CheckingSeeder(session, opened)
+      checkingSeeders.update { it + (taskId to seeder) }
       lent = slots.lend(taskId)
       if (!lent) {
         outcome = SeedingOutcome.NO_SLOT
         return outcome
       }
-      // From here a smaller selection saved meanwhile reaches the session, which checks its
-      // files again with it; one saved as it opened is read before the check.
-      checkingSeeders.update { it + (taskId to CheckingSeeder(session, opened)) }
       seedLatestSelection(task, opened)
       log.i { "Torrent taskId=$taskId checks its files to seed (${logHash(plan.hash)})" }
       session.resume()
-      val reached = session.state.first {
-        it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED ||
+      // Null once the task's own run takes the session over, which may download for long.
+      val reached = combine(session.state, seeder.takenOver) { state, taken ->
+        state.takeUnless { taken }
+      }.first {
+        it == null || it == TorrentSessionState.SEEDING || it == TorrentSessionState.STOPPED ||
           it == TorrentSessionState.FINISHED
+      }
+      if (reached == null || seeder.takenOver.value) {
+        takenOver = true
+        outcome = SeedingOutcome.ALREADY_ACTIVE
+        log.i { "Torrent taskId=$taskId: its download took the seeder over as it checked" }
+        return outcome
       }
       if (!slots.isLent(taskId)) {
         // A download took the slot and stops the session, or the task's own run took it over.
@@ -990,7 +1005,7 @@ class TorrentDownloadSource(
     } finally {
       // Only the reservation's holder adds one.
       if (reserved) checkingSeeders.update { it - taskId }
-      if (outcome != SeedingOutcome.SEEDING) withContext(NonCancellable) {
+      if (outcome != SeedingOutcome.SEEDING && !takenOver) withContext(NonCancellable) {
         if (lent) {
           stopSeeder(taskId)
         } else {
@@ -1041,8 +1056,16 @@ class TorrentDownloadSource(
     return latest.takeIf { seeded.isEmpty() || seeded.containsAll(it) }
   }
 
-  /** A seed-only session that checks its files, and the selection it checks them for. */
-  private class CheckingSeeder(val session: TorrentSession, val selection: Set<String>)
+  /**
+   * A seed-only session that checks its files, and the selection it checks them for. [takenOver]
+   * turns true once the task's own run takes the session over ([adoptLive]), which ends the
+   * [startSeeding] that opened it.
+   */
+  private class CheckingSeeder(
+    val session: TorrentSession,
+    val selection: Set<String>,
+    val takenOver: MutableStateFlow<Boolean> = MutableStateFlow(false),
+  )
 
   /**
    * A completed task's seed-only session: its identity, the state it saves its checkpoint into,
@@ -1147,8 +1170,9 @@ class TorrentDownloadSource(
     val session = checking ?: tasks.session(taskId) ?: return false
     val live = session.changeSelection(fileIds)
     checkingSeeders.update { seeders ->
-      if (checking == null || seeders[taskId]?.session !== checking) return@update seeders
-      seeders + (taskId to CheckingSeeder(checking, fileIds))
+      val current = seeders[taskId]
+      if (checking == null || current?.session !== checking) return@update seeders
+      seeders + (taskId to CheckingSeeder(checking, fileIds, current.takenOver))
     }
     stateMutex.withLock {
       states[taskId]?.let {
@@ -1581,6 +1605,10 @@ class TorrentDownloadSource(
       log.i { "Torrent taskId=$taskId takes over its running session" }
       // A restored seeder downloads for this run, and once it seeds again as one would.
       existing.endSeedOnly()
+      // One still checking its files: the startSeeding that opened it returns now, leaving the
+      // session, its reservation and its slot to this run.
+      checkingSeeders.getAndUpdate { it - taskId }[taskId]
+        ?.takeIf { it.session === existing }?.takenOver?.value = true
       return existing
     }
     if (owned) {
