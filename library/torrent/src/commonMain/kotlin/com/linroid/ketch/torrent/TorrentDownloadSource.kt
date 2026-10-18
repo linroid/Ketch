@@ -1579,6 +1579,8 @@ class TorrentDownloadSource(
     val owned = slots.reclaim(taskId)
     if (owned && existing.infoHash == hash && existing.state.value in ADOPTABLE) {
       log.i { "Torrent taskId=$taskId takes over its running session" }
+      // A restored seeder downloads for this run, and once it seeds again as one would.
+      existing.endSeedOnly()
       return existing
     }
     if (owned) {

@@ -62,6 +62,13 @@ internal interface TorrentSession {
   fun setTaskThrottle(throttle: suspend (Int) -> Unit) {}
 
   /**
+   * A download run took this session over, such as a seeder Ketch restored: from now on it
+   * downloads what its selection misses, as a session a download opened does, rather than
+   * stopping or setting pieces aside. Sessions that never only seed ignore it.
+   */
+  fun endSeedOnly() {}
+
+  /**
    * Sets this torrent's upload rate limit (bytes/sec, 0=unlimited), applied after the engine's
    * shared one. Sessions that never upload ignore it.
    */

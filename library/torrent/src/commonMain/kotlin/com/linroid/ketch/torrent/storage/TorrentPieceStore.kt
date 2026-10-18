@@ -73,13 +73,15 @@ internal class TorrentPieceStore(
   val taskId: String,
   private val fileSystem: FileSystem = torrentFileSystem,
   private val storageSlots: Semaphore = Semaphore(32),
+  seedOnly: Boolean = false,
+) {
   /**
    * Only seeds: while the selection is complete, a wanted piece that cannot be read back, or no
    * longer matches, because of a file outside the selection is set aside as
    * [setAsideLostPieces] does, rather than wanted again, so seeding never turns into a download.
+   * A download run that takes the seeder over clears it.
    */
-  val seedOnly: Boolean = false,
-) {
+  @Volatile var seedOnly: Boolean = seedOnly
   private val log = KetchLogger("TorrentSession")
   private val mutex = Mutex()
   private val output = absolute(output)

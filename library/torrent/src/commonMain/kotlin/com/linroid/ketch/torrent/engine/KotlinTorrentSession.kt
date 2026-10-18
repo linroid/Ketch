@@ -23,6 +23,7 @@ import com.linroid.ketch.torrent.tracker.TrackerControl
 import com.linroid.ketch.torrent.tracker.TrackerRevisionConflict
 import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.v1.TorrentSwarm
+import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
@@ -84,9 +85,9 @@ internal class KotlinTorrentSession(
    * Only seed: when the file check finds the selection incomplete, stop with
    * [IncompleteSeedException] before any discovery instead of downloading, unless only pieces
    * shared with files outside the selection that were deleted or changed are missing
-   * ([TorrentPieceStore.setAsideLostPieces]): it seeds without them.
+   * ([TorrentPieceStore.setAsideLostPieces]): it seeds without them. [endSeedOnly] clears it.
    */
-  private val seedOnly: Boolean = false,
+  seedOnly: Boolean = false,
   /** The swarm's clock, for its peer deadlines; tests pass virtual time. */
   private val nowMs: () -> Long = monotonicClock(),
   /**
@@ -111,6 +112,7 @@ internal class KotlinTorrentSession(
 
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (${logHash(store.metadata.infoHash.hex)})"
+  @Volatile private var seedOnly = seedOnly
   private val scope = CoroutineScope(parent.coroutineContext +
     SupervisorJob(parent.coroutineContext[Job]) + TorrentDispatchers.engine)
   private val lifecycle = Mutex()
@@ -633,6 +635,13 @@ internal class KotlinTorrentSession(
   override fun setTaskThrottle(throttle: suspend (Int) -> Unit) = taskThrottle.store(throttle)
 
   override fun setUploadRateLimit(bytesPerSecond: Long) = uploadRate.set(bytesPerSecond)
+
+  override fun endSeedOnly() {
+    if (!seedOnly) return
+    seedOnly = false
+    store.seedOnly = false
+    log.d { "Torrent $label downloads from now on what its selection misses" }
+  }
 
   fun setConnections(value: Int) {
     require(value in 1..512)

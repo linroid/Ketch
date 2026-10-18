@@ -117,9 +117,10 @@ class KotlinTorrentSessionSelectionTest {
       slots: Semaphore = Semaphore(32),
       nowMs: () -> Long = monotonicClock(),
       peer: () -> PeerEndpoint = { seeder.listener.local },
+      store: TorrentPieceStore =
+        TorrentPieceStore(metadata, root / "pack", selected, "selection", storageSlots = slots),
     ) = KotlinTorrentSession(
-      TorrentPieceStore(metadata, root / "pack", selected, "selection", storageSlots = slots),
-      network, budget, scope, uploadPolicy = { policy }, seedOnly = seedOnly, nowMs = nowMs,
+      store, network, budget, scope, uploadPolicy = { policy }, seedOnly = seedOnly, nowMs = nowMs,
       discover = { peers, _ ->
         discoveries.incrementAndFetch()
         peers.send(peer())
@@ -354,6 +355,32 @@ class KotlinTorrentSessionSelectionTest {
     } finally {
       session.close()
       leecher.close()
+    }
+  }
+
+  @Test
+  fun endSeedOnly_checkingSeederGrows_downloadsInsteadOfStopping() = fixture {
+    torrentFileSystem.createDirectories(root / "pack")
+    torrentFileSystem.write(root / "pack/f0") { write(payloads[0]) }
+    val slots = Semaphore(1)
+    slots.acquire()
+    val store = TorrentPieceStore(metadata, root / "pack", setOf(0), "selection",
+      storageSlots = slots, seedOnly = true)
+    val restored = session(setOf(0), TorrentUploadPolicy.SEED_AFTER_COMPLETION, seedOnly = true,
+      store = store)
+    try {
+      // A restored seeder waits to check its files when a download run takes it over for f1.
+      restored.resume()
+      restored.state.first { it == TorrentSessionState.CHECKING_FILES }
+      restored.endSeedOnly()
+      assertFalse(store.seedOnly)
+      assertTrue(restored.changeSelection(setOf("0", "1")))
+      slots.release()
+      seeder.open(1)
+      awaitState(restored, TorrentSessionState.SEEDING)
+      assertContentEquals(payloads[1], file(1))
+    } finally {
+      restored.close()
     }
   }
 

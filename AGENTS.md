@@ -1043,9 +1043,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seeds the rest, logs a warning and keeps its intent. Its store (`seedOnly`) sets a piece aside
   the same way while its selection is complete when a peer's request finds it unreadable or
   changed (`PieceRevokedException.setAside`, `TorrentPieceScheduler.setAside`), so it stays
-  SEEDING rather than downloading it; a lent seeder downloads such a piece again. A lent seeder
-  pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again,
-  and its discovery keeps only the spec fields it reads, so no finished run stays reachable.
+  SEEDING rather than downloading it; a lent seeder downloads such a piece again. A run that takes
+  a seed-only session over ends that mode (`TorrentSession.endSeedOnly`, session and store), so it
+  downloads what its selection misses, also while the session checks its files, and seeds as a
+  lent seeder once it completes. A lent seeder pays the global limit alone
+  (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
+  the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,

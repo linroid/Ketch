@@ -899,11 +899,13 @@ peers that dial it before answering their handshake.
 
 ### Partial selections
 
-In v1, a piece that spans a selected and a skipped file needs all its bytes to be verified. The
-skipped file's part is kept in a hidden sidecar for the task, not in the skipped file, also when
-the skipped file was written before you skipped it: Ketch never writes a skipped file. When that
-file is chosen later, its verified bytes are copied from the sidecar and rechecked. A v2 or hybrid
-task refuses a newly chosen file whose path holds a file it did not create.
+In v1, a piece that spans a selected and a skipped file needs all its bytes to be verified. A piece
+stored after the file was skipped keeps the skipped file's part in a hidden sidecar for the task,
+not in the file: Ketch never writes a skipped file. A piece verified before you skipped it still
+reads that part from the file itself, so deleting or changing the file loses the piece (see
+[choosing files](#choosing-files)). When that file is chosen later, its verified bytes are copied
+from the sidecar and rechecked. A v2 or hybrid task refuses a newly chosen file whose path holds a
+file it did not create.
 
 ## Storage, restart and compatibility
 

@@ -177,6 +177,14 @@ internal class FakeTorrentSession(
     taskThrottle = throttle
   }
 
+  /** Whether a download run took the session over and ended its seed-only mode. */
+  var seedOnlyEnded = false
+    private set
+
+  override fun endSeedOnly() {
+    seedOnlyEnded = true
+  }
+
   override suspend fun saveResumeData(): ByteArray? {
     return savedResumeData
   }
