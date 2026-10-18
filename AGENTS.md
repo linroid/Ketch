@@ -391,9 +391,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   After the last flush the file is closed and moved with okio `atomicMove`; a file that appeared
   at the final name meanwhile is kept, and the download takes the next free `name (n).ext` and
   records it as its output path (a file created in the instant between the check and the move
-  would still be replaced). Once the file is verified, the move, the `COMPLETED` record and the
-  `Completed` state run under `NonCancellable`, so a pause, reschedule, preemption or `close()`
-  landing meanwhile finds the task completed rather than downloading the file again beside it.
+  would still be replaced). Once the file is verified (an empty file once its checksum is), its
+  creation when empty, the move, the `COMPLETED` record and the `Completed` state run under
+  `NonCancellable`, so a pause, reschedule, preemption or `close()` landing meanwhile finds the
+  task completed rather than downloading the file again beside it.
   A file `Destination` is replaced, as it was written in place before.
   Pause, failure, `close()` and `remove(deleteFiles = false)` keep the partial file; cancel and
   `remove(deleteFiles = true)` delete it, never a file at the final name the task did not write.

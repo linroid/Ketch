@@ -239,14 +239,24 @@ class PartialFileTest {
     stopAsTheMoveLands(engine) { task -> task.reschedule(DownloadSchedule.AfterDelay(1.minutes)) }
   }
 
+  @Test
+  fun reschedule_asAnEmptyFileIsCreated_keepsTheTaskCompleted() = runTest {
+    val engine = FakeHttpEngine(content = ByteArray(0))
+    engine.serverInfo = engine.serverInfo.copy(contentLength = 0)
+    stopAsTheMoveLands(engine, once = "file.bin.ketch") { task ->
+      task.reschedule(DownloadSchedule.AfterDelay(1.minutes))
+    }
+  }
+
   /**
-   * Holds every file operation of a download from [engine] and runs them one by one until its
-   * partial file has been moved to the final name, then calls [stop] before the download hears of
-   * the move: the task must complete under that name and never run again, which would download
-   * the file once more beside it.
+   * Holds every file operation of a download from [engine] and runs them one by one until the
+   * file named [once] exists in its folder (by default the final name, once the partial file
+   * moved there), then calls [stop] before the download hears of it: the task must complete under
+   * the final name and never run again, which would download the file once more beside it.
    */
   private suspend fun TestScope.stopAsTheMoveLands(
     engine: FakeHttpEngine,
+    once: String = "file.bin",
     stop: suspend (DownloadTask) -> Unit,
   ) {
     val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-partial-${Random.nextLong()}"
@@ -264,13 +274,13 @@ class PartialFileTest {
     try {
       val task = ketch.download(request(folder))
       runCurrent()
-      while (!platformFileSystem.exists(output)) {
+      val trigger = folder / once
+      while (!platformFileSystem.exists(trigger)) {
         disk.runNext()
-        if (!platformFileSystem.exists(output)) runCurrent()
+        if (!platformFileSystem.exists(trigger)) runCurrent()
       }
-      // The move landed on disk; the download has not resumed from it yet.
+      // The file is on disk; the download has not resumed from it yet.
       assertFalse(task.state.value.isTerminal)
-      assertFalse(platformFileSystem.exists(folder / "file.bin.ketch"))
       val requests = engine.headCallCount to engine.downloadCallCount
 
       disk.holding = false

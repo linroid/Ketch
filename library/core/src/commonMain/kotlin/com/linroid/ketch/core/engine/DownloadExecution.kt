@@ -808,23 +808,24 @@ internal class DownloadExecution(
       log.w { "Checksum mismatch for empty taskId=$taskId: ${wanted.algorithm.label}" }
       throw mismatch(wanted, empty, published = expected == null)
     }
-    val fa = openFile(target.writePath, dispatchers.disk)
-    try {
-      // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
-      fa.preallocate(0)
-      fa.flush()
-    } catch (e: Exception) {
-      if (e is CancellationException) throw e
-      throw KetchError.Disk(e)
-    } finally {
-      try {
-        fa.close()
-      } catch (e: Exception) {
-        log.w(e) { "Failed to close file for taskId=$taskId" }
-      }
-    }
-    // Completed even when a stop lands meanwhile, as a larger download is once verified.
+    // Created and completed even when a stop lands meanwhile, as a larger download is once
+    // verified: a partial file left behind would take the final name from the next run.
     withContext(NonCancellable) {
+      val fa = openFile(target.writePath, dispatchers.disk)
+      try {
+        // Create or truncate the destination; flushing a lazy accessor alone is insufficient.
+        fa.preallocate(0)
+        fa.flush()
+      } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        throw KetchError.Disk(e)
+      } finally {
+        try {
+          fa.close()
+        } catch (e: Exception) {
+          log.w(e) { "Failed to close file for taskId=$taskId" }
+        }
+      }
       val outputPath = moveToFinal(target)
       val finishedAt = finishTime()
       handle.record.update {
