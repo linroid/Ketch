@@ -138,6 +138,13 @@ internal class TorrentV2PeerView(
    */
   val refused = mutableSetOf<Int>()
 
+  /**
+   * Requests the peer rejected while it served us since the last block it delivered; an unchoke
+   * leaves the count. Once it reaches a piece's worth, its requests' speed limit waits are no
+   * progress any more.
+   */
+  var rejectsSinceBlock = 0
+
   /** Pieces we let the peer download while we choke it, offered only while we upload. */
   var offeredFast: Set<Int> = emptySet()
 

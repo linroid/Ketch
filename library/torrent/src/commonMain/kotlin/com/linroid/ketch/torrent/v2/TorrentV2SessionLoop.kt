@@ -262,9 +262,11 @@ internal object TorrentV2SessionLoop {
     // How each connection of a swarm ended: the same report v1 swarms log.
     val diagnostics = swarm?.let { PeerDiagnostics(listener = it.runtime.peerOutcomes) }
     // Time spent waiting on speed limits, which is never a stall: while a peer's request waits,
-    // the loop counts as one wait.
+    // the loop counts as one wait, unless the peer rejected a piece's worth of blocks since the
+    // last one it delivered.
     val throttle = swarm?.throttle ?: ThrottleClock(nowMs)
     var requestsWaiting = false
+    val pieceBlocks = ((layout.pieceLength + PeerWire.BLOCK_SIZE - 1) / PeerWire.BLOCK_SIZE).toInt()
     try {
       val pieces = checkNotNull(TorrentV2PieceScheduler.create(layout, selectedIds,
         store.verifiedPieces(), buffers, state, maxActive, nowMs,
@@ -427,8 +429,11 @@ internal object TorrentV2SessionLoop {
             }
           }
         }
-        // The loop wakes when the first delayed request is due, so a wait runs pump to pump.
-        val waiting = peers.values.any { it.rateRetryAt != 0L }
+        // The loop wakes when the first delayed request is due, so a wait runs pump to pump. A
+        // peer that answers only with rejects would hide a stall for as long as it does.
+        val waiting = peers.values.any {
+          it.rateRetryAt != 0L && it.rejectsSinceBlock < pieceBlocks
+        }
         if (waiting != requestsWaiting) {
           if (waiting) throttle.enter() else throttle.exit()
           requestsWaiting = waiting
@@ -507,6 +512,7 @@ internal object TorrentV2SessionLoop {
       fun rejected(view: TorrentV2PeerView, response: PeerBlockExchange.Response.Rejected) {
         val index = response.ticket.request.index
         if (view.choked && index !in view.allowedFast) return
+        view.rejectsSinceBlock++
         val count = (view.rejects[index] ?: 0) + 1
         val blocks = (layout.v2Piece(index.toLong()).length + PeerWire.BLOCK_SIZE - 1) /
           PeerWire.BLOCK_SIZE
@@ -604,6 +610,7 @@ internal object TorrentV2SessionLoop {
             val block = value.value as? PeerBlockExchange.Response.Block
             (value.value as? PeerBlockExchange.Response.Rejected)?.let { rejected(view, it) }
             if (block != null) {
+              view.rejectsSinceBlock = 0
               store.recordReceived(block.ticket.request.length)
               peerPayload += block.ticket.request.length
               // What crossed the wire: on a v1 route, the canonical block with its padding.

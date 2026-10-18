@@ -234,8 +234,10 @@ internal class TorrentStallWatchdog(private val nowMs: () -> Long) {
    * [MAX_FAILURES][com.linroid.ketch.torrent.webseed.WebSeedWorker.MAX_FAILURES] runs, about 5 T,
    * and within [NO_PAYLOAD_MS] of that: some 7.5 minutes for 256 KiB pieces at 3 KiB/s, though
    * its first corrupt piece is known within 1.5. While a seed started again waits, the stall does
-   * not age. A v2 download whose peer stops answering stalls once the limit let through every
-   * request the peer may have outstanding.
+   * not age. A v2 download whose peer stops answering stalls once no request waits: once the peer
+   * is dropped for answering none of its requests for a minute, or sooner when nothing is left to
+   * ask it. A v2 peer's requests count as waiting until it rejected a piece's worth of blocks since
+   * the last one it delivered.
    */
   private fun waited(throttled: Long, now: Long) {
     progressAt = minOf(progressAt + throttled, now)
