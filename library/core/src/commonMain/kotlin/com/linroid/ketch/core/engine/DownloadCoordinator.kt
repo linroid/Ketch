@@ -416,7 +416,8 @@ internal class DownloadCoordinator(
   private suspend fun fail(handle: TaskHandle, error: KetchError) {
     val taskId = handle.taskId
     // An expected failure, such as a source's refusal or a server's error, says why in one line;
-    // an unknown one, one of the disk or one a bug caused keeps its stack trace for a bug report.
+    // an unknown one, one of the disk or a source error a bug caused keeps its stack trace for a
+    // bug report.
     if (error is KetchError.Unknown || error is KetchError.Disk || error.causedByBug()) {
       log.e(error) { "Download failed for taskId=$taskId: ${error.describeCauses()}" }
     } else {
@@ -518,12 +519,16 @@ internal class DownloadCoordinator(
     val FINISHED_STATES = setOf(TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED)
 
     /**
-     * Whether the error's deepest cause looks like a bug rather than a refusal, a timeout or a
-     * failing network or disk: an [Error], or a [RuntimeException] other than an
-     * [IllegalArgumentException] or a cancellation, such as an [IndexOutOfBoundsException] a
-     * source reported as its own [KetchError.SourceError].
+     * Whether a source reported a bug as its own [KetchError.SourceError], as the torrent source
+     * does with any failure it does not recognize: its deepest cause is an [Error], or a
+     * [RuntimeException] other than an [IllegalArgumentException] or a cancellation, such as an
+     * [IndexOutOfBoundsException]. Ketch's other errors are failures an engine recognized, some
+     * with such a cause, as the HTTP engine's [IllegalStateException] for a response that ends
+     * early or covers another range, or the FTP client's [UnsupportedOperationException] for FTPS
+     * on a platform without TLS.
      */
     fun KetchError.causedByBug(): Boolean {
+      if (this !is KetchError.SourceError) return false
       // Bounded, as a cause chain may loop.
       val root = generateSequence<Throwable>(this) { it.cause?.takeIf { cause -> cause !== it } }
         .take(MAX_CAUSES)

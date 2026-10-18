@@ -47,8 +47,10 @@ class FailureLoggingTest {
 
   /**
    * `fail:refused` fails as a source refuses content, `fail:wrapped-refusal` as one that says why
-   * with the refusal it caught, `fail:stalled` as a transfer stalls; `fail:bug` with an unexpected
-   * error and `fail:wrapped-bug` with a bug the source reported as its own error.
+   * with the refusal it caught, `fail:stalled` as a transfer stalls; `fail:ended-early`,
+   * `fail:other-range` and `fail:no-tls` as the HTTP engine reports a response that ends early or
+   * covers another range, and the FTP client FTPS where it has no TLS; `fail:bug` with an
+   * unexpected error and `fail:wrapped-bug` with a bug the source reported as its own error.
    */
   private class FailingSource : DownloadSource<Unit> {
     override val type = "failing"
@@ -69,6 +71,15 @@ class FailureLoggingTest {
           detail = "Resume torrent changed",
         )
         "fail:stalled" -> throw KetchError.Network(TransferStalledException("No data for 60s"))
+        "fail:ended-early" -> throw KetchError.Network(
+          IllegalStateException("Response ended before requested length"),
+        )
+        "fail:other-range" -> throw KetchError.Unsupported(
+          IllegalStateException("Server returned a different range"),
+        )
+        "fail:no-tls" -> throw KetchError.Unsupported(
+          UnsupportedOperationException("FTPS is not available on this platform"),
+        )
         "fail:wrapped-bug" -> throw KetchError.SourceError(
           sourceType = type,
           cause = IndexOutOfBoundsException("Index 5 out of bounds"),
@@ -131,6 +142,25 @@ class FailureLoggingTest {
   @Test
   fun download_sourceWrapsAnExpectedFailure_logsAWarningWithoutATrace() = runTest {
     for (url in listOf("fail:wrapped-refusal", "fail:stalled")) {
+      val capture = Capture()
+      val ketch = ketch(capture)
+      try {
+        val task = ketch.download(request(url))
+        runCurrent()
+        assertIs<DownloadState.Failed>(task.state.value)
+
+        val line = capture.records.single { "Download failed" in it.message }
+        assertEquals("w", line.level, url)
+        assertNull(line.throwable, url)
+      } finally {
+        ketch.close()
+      }
+    }
+  }
+
+  @Test
+  fun download_engineReportsAServerOrPlatformLimit_logsAWarningWithoutATrace() = runTest {
+    for (url in listOf("fail:ended-early", "fail:other-range", "fail:no-tls")) {
       val capture = Capture()
       val ketch = ketch(capture)
       try {
