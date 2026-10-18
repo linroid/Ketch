@@ -682,7 +682,9 @@ This section describes the engine's protocol behavior for people who debug swarm
   same way. A connection that sent data or stayed up five minutes starts the count over. A tracker,
   the DHT, peer exchange or local discovery naming a peer that sent data again has it dialed 30
   seconds after its last dial, at most once every five minutes unless it sent data since, also
-  when it names the peer while a dial of it runs and that dial then fails. A stalled download
+  when it names the peer while a dial of it runs and that dial then fails. A naming that would
+  bring the dial less than five seconds forward does not count against those five minutes.
+  A stalled download
   with no peer at all dials every peer it knows again every minute, also ones a source named only
   once, such as a magnet's peers. A seeding torrent dials nobody back.
 - **One connection per peer**: a peer reached at two addresses, such as loopback from a magnet's

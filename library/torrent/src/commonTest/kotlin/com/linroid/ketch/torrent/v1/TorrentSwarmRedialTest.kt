@@ -151,6 +151,22 @@ class TorrentSwarmRedialTest {
   }
 
   @Test
+  fun droppedPeer_namedDuringTheThirtySecondWait_isBroughtForwardInTheNextOne() =
+    swarmTest(refusalTakesMs = 20) { rig ->
+      rig.dialedPeerSendsAPieceAndDrops()
+      // Refused 5 and 25 s after it dropped, each dial taking 20 ms, it waits 30 s. Named in
+      // that wait, dialing it 30 s after its last dial would be only those 20 ms sooner.
+      rig.advanceTo(35_000)
+      rig.peers.send(rig.listener.local)
+      delay(300)
+      // Refused again a minute after it dropped, it would next be dialed a minute later. Back
+      // and named 10 s into that wait, it is dialed 30 s after its last dial: the naming before
+      // spent nothing.
+      val reached = rig.reachAgain(upAt = 70_000) { rig.peers.send(rig.listener.local) }
+      assertTrue(reached - 70_000 <= 30_000, "Reached ${reached - 70_000} ms after it came back")
+    }
+
+  @Test
   fun droppedPeer_backAfterBeingBroughtForward_isBroughtForwardAgainOnceItDropsAgain() =
     swarmTest { rig ->
       rig.dialedPeerSendsAPieceAndDrops()
@@ -472,10 +488,12 @@ class TorrentSwarmRedialTest {
 
   /**
    * Runs a swarm with no peer but the one [body] plays, on a test clock, and checks it completes.
-   * With [stall], the swarm looks for stalls and recovers from them.
+   * With [stall], the swarm looks for stalls and recovers from them. A refused dial moves the
+   * clock on [refusalTakesMs].
    */
   private fun swarmTest(
     stall: Boolean = false,
+    refusalTakesMs: Long = 0,
     listenPortFor: (PeerEndpoint) -> Int = { 0 },
     body: suspend CoroutineScope.(Rig) -> Unit,
   ) = runTest {
@@ -501,6 +519,7 @@ class TorrentSwarmRedialTest {
                 release.await()
               }
               if (down.load() || remote.port != listener.local.port) {
+                clock.addAndFetch(refusalTakesMs)
                 throw IOException("Connection refused")
               }
               return transport.connect(remote)

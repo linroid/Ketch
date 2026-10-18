@@ -13,10 +13,12 @@ package com.linroid.ketch.torrent.peer
  * stays up [LASTING_MS], counts as the first of its endpoint's dials when it closes. A source
  * naming a peer that brought payload again has it dialed once [FOUND_AGAIN_MS] have passed since
  * its last dial, at most once every [FOUND_AGAIN_EVERY_MS]: the DHT names the same peers every
- * minute. A connection that counts as a first dial lifts that limit, as the peer was back: one
- * that restarts again is dialed soon once named again. A source naming it while it is being
- * dialed counts once that dial fails, as a peer that comes back during a dial announces itself
- * before the dial gives up.
+ * minute. Only a dial brought forward by [FOUND_AGAIN_MIN_GAIN_MS] or more counts, so a naming
+ * during the 30 s wait, which gains only the time the last dial took, leaves the next wait its
+ * bring-forward. A connection that counts as a first dial lifts that limit, as the peer was
+ * back: one that restarts again is dialed soon once named again. A source naming it while it is
+ * being dialed counts once that dial fails, as a peer that comes back during a dial announces
+ * itself before the dial gives up.
  */
 internal object PeerRedial {
   /** How often an endpoint that never brought payload is dialed again before it is given up. */
@@ -30,6 +32,9 @@ internal object PeerRedial {
 
   /** How often at most a source naming a peer again has it dialed sooner. */
   const val FOUND_AGAIN_EVERY_MS = 300_000L
+
+  /** How much sooner a source naming a peer again must have it dialed for that to count. */
+  const val FOUND_AGAIN_MIN_GAIN_MS = 5_000L
 
   /** A connection that stayed up this long counts as the first of its endpoint's dials. */
   const val LASTING_MS = 300_000L
@@ -56,13 +61,15 @@ internal object PeerRedial {
 
   /**
    * When to dial a peer that brought payload and waits to be dialed at [retryAt], now that a
-   * source names it again: [FOUND_AGAIN_MS] after its last dial at [dialedAt]. Null leaves it
-   * waiting: that would be no sooner, or a source brought it forward at [broughtForwardAt] less
-   * than [FOUND_AGAIN_EVERY_MS] ago, which callers forget once a connection to it counts as its
-   * first dial.
+   * source names it again: [FOUND_AGAIN_MS] after its last dial at [dialedAt], or at once when
+   * that passed. Null leaves it waiting: that would be less than [FOUND_AGAIN_MIN_GAIN_MS]
+   * sooner, or a source brought it forward at [broughtForwardAt] less than
+   * [FOUND_AGAIN_EVERY_MS] ago, which callers forget once a connection to it counts as its first
+   * dial. Callers record a bring-forward only when this returns a time.
    */
   fun foundAgainAt(now: Long, dialedAt: Long, retryAt: Long, broughtForwardAt: Long?): Long? {
     if (broughtForwardAt != null && now - broughtForwardAt < FOUND_AGAIN_EVERY_MS) return null
-    return (dialedAt + FOUND_AGAIN_MS).takeIf { it < retryAt }
+    val due = dialedAt + FOUND_AGAIN_MS
+    return due.takeIf { retryAt - maxOf(it, now) >= FOUND_AGAIN_MIN_GAIN_MS }
   }
 }

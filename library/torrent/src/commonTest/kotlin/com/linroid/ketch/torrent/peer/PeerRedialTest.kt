@@ -37,4 +37,19 @@ class PeerRedialTest {
     assertEquals(330_000L, PeerRedial.foundAgainAt(now = 410_000, dialedAt = 300_000,
       retryAt = 600_000, broughtForwardAt = 110_000))
   }
+
+  @Test
+  fun foundAgain_gainingSecondsOrLess_leavesTheDialWhereItIs() {
+    // During the 30 s wait after a dial refused in 5 ms: only those 5 ms sooner.
+    assertNull(PeerRedial.foundAgainAt(now = 10_000, dialedAt = 0, retryAt = 30_005,
+      broughtForwardAt = null))
+    // Nor 3 s before the dial is due anyway.
+    assertNull(PeerRedial.foundAgainAt(now = 57_000, dialedAt = 0, retryAt = 60_000,
+      broughtForwardAt = null))
+    // Five seconds or more count.
+    assertEquals(30_000L, PeerRedial.foundAgainAt(now = 10_000, dialedAt = 0, retryAt = 35_000,
+      broughtForwardAt = null))
+    assertEquals(30_000L, PeerRedial.foundAgainAt(now = 55_000, dialedAt = 0, retryAt = 60_000,
+      broughtForwardAt = null))
+  }
 }

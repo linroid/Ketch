@@ -1143,7 +1143,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   peer (v1 `PeerResult.alias`/`inherited`, v2 `Member.inherited`). A source naming a peer that
   brought payload again has it dialed `FOUND_AGAIN_MS` (30 s) after its last dial, at most once
   every `FOUND_AGAIN_EVERY_MS` (5 minutes), as the DHT names the same peers every minute, unless
-  a connection to it counted as its first dial since; named
+  a connection to it counted as its first dial since; only a dial brought forward
+  `FOUND_AGAIN_MIN_GAIN_MS` (5 s) or more counts, so a naming during the 30 s wait, sooner by
+  just the time the last dial took, leaves the next wait its bring-forward; named
   while a dial of it runs, once that dial fails without connecting. A revive
   dials every waiting or given-up endpoint at once and keeps its count; its dial of an endpoint
   given up on leaves when that was (`PeerRedial.spent`), so a source naming it 5 minutes on still
