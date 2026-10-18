@@ -124,6 +124,24 @@ class SegmentLedgerTest {
     assertEquals(100L, steal.lane.start)
     assertTrue(second.isComplete)
     assertTrue(steal.victimIdle, "A victim left with nothing is stopped at once")
+    // Its whole range moved, so no empty range ending before it starts is saved.
+    assertEquals(
+      listOf(0L..99L, 100L..199L),
+      ledger.snapshot().map { it.start..it.end },
+    )
+  }
+
+  @Test
+  fun steal_byConnectionThatMovedNothing_isRefused() = runTest {
+    val time = TestTimeSource()
+    val ledger = SegmentLedger(halves, minSplitBytes = 10, timeSource = time)
+    val (first, second) = ledger.initialLanes
+    time += 2.seconds
+    first.fill()
+    assertNotNull(ledger.steal(first))
+    // The drained lane's connection received nothing in two seconds; the lane it would rob is
+    // too new to have a rate, and would be cut in half for it.
+    assertNull(ledger.steal(second))
   }
 
   @Test

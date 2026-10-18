@@ -98,7 +98,9 @@ internal class Steal(val lane: SegmentLane, val victim: SegmentLane, val victimI
  * Every byte belongs to exactly one lane. A connection that finished its lane takes over the
  * tail of the lane expected to finish last ([steal]), split where both are expected to finish
  * together from their measured rates, or in half while the rates are unknown. A split never
- * moves a byte already admitted, and leaves both lanes at least [minSplitBytes].
+ * moves a byte already admitted, and leaves both lanes at least [minSplitBytes]. A connection
+ * that received nothing in its last measured lane takes nothing, and a lane that received
+ * nothing hands all of it over.
  *
  * @param minSplitBytes the smallest range a split hands over; [Long.MAX_VALUE] never splits
  * @param rateWindow how long a lane runs before its rate counts
@@ -185,6 +187,9 @@ internal class SegmentLedger(
       val lane = SegmentLane(this, split, split, victim.limit, timeSource.markNow())
       victim.limit = split
       victim.cut = true
+      // A victim left with no byte at all is replaced rather than kept as an empty range, which
+      // would be saved as a segment ending before it starts.
+      if (split == victim.start) lanes -= victim
       lanes += lane
       val idle = victim.cursor == victim.admitted && victim.cursor >= victim.limit
       return@withLock Steal(lane, victim, idle)
@@ -195,11 +200,12 @@ internal class SegmentLedger(
   /**
    * How many of [left] bytes the victim keeps so that it and the thief finish together, from
    * their rates in bytes per second; half while either is unknown, `null` when splitting would
-   * not finish sooner.
+   * not finish sooner, as when the thief received nothing in its last lane.
    */
   private fun keepFor(left: Long, victimRate: Double?, thiefRate: Double?): Long? {
+    // Checked first: a victim too new to have a rate would otherwise lose half to it.
+    if (thiefRate != null && thiefRate <= 0.0) return null
     if (victimRate == null || thiefRate == null) return left / 2
-    if (thiefRate <= 0.0) return null
     if (victimRate <= 0.0) return 0
     val setup = setupTime.inWholeMilliseconds / 1000.0
     // keep / victimRate == (left - keep) / thiefRate + setup
