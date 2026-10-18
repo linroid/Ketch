@@ -149,6 +149,35 @@ class DownloadCoordinatorPauseTest {
   }
 
   @Test
+  fun pause_cancellingTheLastFlush_flushesTheFileBeforeTheRunClosesIt() = runTest {
+    // The transfer is done and its last flush waits for a busy disk: the pause cancels it first.
+    val disk = CompletableDeferred<Unit>()
+    val file = RecordingFile(disk)
+    val handle = handle()
+    val source = WritingSource(written = 100, end = {})
+    val coordinator = coordinator(source, openFile = { _, _ -> file })
+    try {
+      coordinator.start(handle)
+      runCurrent()
+      assertEquals(listOf("write"), file.ops)
+
+      val pause = launch { coordinator.pause(handle.taskId) }
+      runCurrent()
+      disk.complete(Unit)
+      runCurrent()
+
+      // The saved segments count every byte, so they must be on disk.
+      assertTrue(pause.isCompleted)
+      assertEquals(listOf("write", "flush", "close"), file.ops)
+      assertIs<DownloadState.Paused>(handle.mutableState.value)
+      assertEquals(TaskState.PAUSED, handle.record.value.state)
+      assertEquals(listOf(Segment(0, 0, 99, 100)), handle.record.value.segments)
+    } finally {
+      coordinator.close()
+    }
+  }
+
+  @Test
   fun cancel_keepingTheFile_flushesItBeforeTheRunClosesIt() = runTest {
     val file = RecordingFile()
     val handle = handle()

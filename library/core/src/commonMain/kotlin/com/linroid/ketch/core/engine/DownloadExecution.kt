@@ -710,14 +710,17 @@ internal class DownloadExecution(
       var finalTotal = totalBytes
       var outputPath = target.path
       if (!selfManagedIo) {
-        // Tried once: a file whose flush failed keeps no progress to flush for.
-        unflushed = false
         try {
           fa.flush()
+          unflushed = false
           // Content of unknown size was streamed to its end, so the file holds all of it.
           if (total < 0) finalTotal = fa.size()
         } catch (e: Exception) {
+          // A flush a pause cancels may never have run, as one queued for a busy disk, so the run
+          // flushes the file it keeps as it closes it.
           if (e is CancellationException) throw e
+          // Tried once: a file whose flush failed keeps no progress to flush for.
+          unflushed = false
           // The written bytes may not have reached the disk, so none of them count as progress.
           withContext(NonCancellable) { discardProgress() }
           if (e is KetchError) throw e
