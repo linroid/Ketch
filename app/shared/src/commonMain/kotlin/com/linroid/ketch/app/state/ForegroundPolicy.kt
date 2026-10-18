@@ -85,8 +85,22 @@ object ForegroundPolicy {
    * emitting the [ForegroundStatus] at most once per [samplePeriod], and only when it changes.
    * A queued task that leaves the queue to start changes it, though its state stays the same.
    */
-  @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+  @OptIn(FlowPreview::class)
   fun observe(
+    tasks: Flow<List<DownloadTask>>,
+    serverState: Flow<ServerState>,
+    discovering: Flow<Int> = flowOf(0),
+    features: Set<String> = KetchFeatures.ALL,
+  ): Flow<ForegroundStatus> = statuses(tasks, serverState, discovering, features)
+    .sample(samplePeriod)
+    .distinctUntilChanged()
+
+  /**
+   * The [ForegroundStatus] of [observe] as each task changes, without sampling, for what must
+   * not miss a download that starts and ends between samples, such as [WhenDownloadsFinish].
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  fun statuses(
     tasks: Flow<List<DownloadTask>>,
     serverState: Flow<ServerState>,
     discovering: Flow<Int> = flowOf(0),
@@ -108,8 +122,6 @@ object ForegroundPolicy {
         discovering = searches,
         starting = tasks.count { (state, position) -> state.isStarting(position, features) },
       )
-    }
-      .sample(samplePeriod)
-      .distinctUntilChanged()
+    }.distinctUntilChanged()
   }
 }

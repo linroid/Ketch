@@ -135,6 +135,12 @@
   <string name="settings_general_power">Energie</string>
   <string name="settings_general_keep_awake">Während Downloads wach bleiben</string>
   <string name="settings_general_keep_awake_hint">%1$s wechselt nicht von selbst in den Ruhezustand, solange Downloads laufen. Der Bildschirm kann sich trotzdem ausschalten.</string>
+  <string name="settings_general_when_done">Wenn Downloads fertig sind</string>
+  <string name="settings_general_when_done_hint">Wird ausgeführt, sobald auf diesem Computer nichts mehr herunterlädt oder wartet, nach einer Minute Vorwarnung. Gilt einmal und wird beim Beenden von Ketch vergessen.</string>
+  <string name="settings_general_when_done_nothing">Nichts tun</string>
+  <string name="settings_general_when_done_quit">Ketch beenden</string>
+  <string name="settings_general_when_done_sleep">Ruhezustand</string>
+  <string name="settings_general_when_done_shut_down">Ausschalten</string>
 
   <string name="settings_notifications_downloads">Downloads</string>
   <string name="settings_notifications_footer">„Benachrichtigen“ verwendet Systembenachrichtigungen. „Nur in der App“ bleibt in Ketch.</string>
@@ -707,6 +713,7 @@
   <string name="settings_search_badge">Was das Symbol im Dock oder in der Taskleiste zeigt</string>
   <string name="settings_search_badge_keywords">Anzahl, Kennzeichen, Badge, Dock, Taskleiste</string>
   <string name="settings_search_keep_awake_keywords">Ruhezustand, Energie, Akku, Standby, Schlaf verhindern, Wakelock</string>
+  <string name="settings_search_when_done_keywords">ausschalten, herunterfahren, Ruhezustand, beenden, nach Downloads, Warteschlange, fertig</string>
   <string name="settings_search_shortcuts">Alle Tastenkürzel</string>
   <string name="settings_search_shortcuts_keywords">Tasten, Tastenkombinationen, Kurzbefehle, Hotkeys</string>
   <string name="settings_search_finished_keywords">fertig, abgeschlossen, Hinweis, Mitteilung</string>

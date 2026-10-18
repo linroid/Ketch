@@ -278,6 +278,133 @@ class TorrentSourceRunTest {
   }
 
   @Test
+  fun download_selectionTakesLongWhileTheSessionChecks_neverShowsTheOldFiles() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.DISABLED)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val hash = torrent.metadata.infoHash.hex
+          val all = setOf("0", "1", "2")
+          val session = FakeTorrentSession(hash)
+          session.stateOnResume = TorrentSessionState.CHECKING_FILES
+          engine.addTorrentResult = session
+          val restored = listOf(Segment(0, 0, 99_999, 100_000),
+            Segment(1, 100_000, 169_999, 35_000), Segment(2, 170_000, 256_143))
+          val state = TorrentSourceState(hash, torrent.sizeOf(0, 1, 2), "", all, "unused",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val selection = MutableStateFlow(SelectionUpdate(all, 0))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, segments = restored,
+            selection = selection,
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val run = launch { source.download(context, state) }
+          val everything = 135_000L to torrent.sizeOf(0, 1, 2)
+          assertEquals(everything, reports.receive())
+          // Stopping the check, changing the files and starting it again takes several passes.
+          val gate = CompletableDeferred<Unit>()
+          session.changeSelectionGate = gate
+          selection.value = SelectionUpdate(setOf("1", "2"), 1)
+          val narrowed = 35_000L to torrent.sizeOf(1, 2)
+          assertEquals(narrowed, reports.next(everything))
+          repeat(3) { assertEquals(narrowed, reports.receive()) }
+          gate.complete(Unit)
+          eventually("the session to take the selection") { session.selectionChanges.isNotEmpty() }
+          repeat(2) { assertEquals(narrowed, reports.receive()) }
+          session.finish()
+          run.join()
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_selectionTakesLongOnALiveSession_neverShowsTheOldFiles() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.DISABLED)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val all = setOf("0", "1", "2")
+          val session = FakeTorrentSession(torrent.metadata.infoHash.hex)
+          session.selectedFileIds = all
+          engine.addTorrentResult = session
+          val selection = MutableStateFlow(SelectionUpdate(all, 0))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, selection = selection,
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val run = launch { source.download(context, null) }
+          val everything = 0L to torrent.sizeOf(0, 1, 2)
+          assertEquals(everything, reports.receive())
+          // The session reports every file until its swarm took the change.
+          val gate = CompletableDeferred<Unit>()
+          session.changeSelectionGate = gate
+          selection.value = SelectionUpdate(setOf("1", "2"), 1)
+          val narrowed = 0L to torrent.sizeOf(1, 2)
+          assertEquals(narrowed, reports.next(everything))
+          repeat(3) { assertEquals(narrowed, reports.receive()) }
+          gate.complete(Unit)
+          eventually("the session to take the selection") { session.selectionChanges.isNotEmpty() }
+          repeat(2) { assertEquals(narrowed, reports.receive()) }
+          assertEquals(1, context.acknowledgedSelection.value)
+          session.finish()
+          run.join()
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun download_selectionArrivesWhileTheSessionTakesAnother_showsTheLatest() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = fakeSource(engine, TorrentUploadPolicy.DISABLED)
+        try {
+          val torrent = MultiFileTorrent()
+          val resolved = source.resolveMetainfo(torrent.metainfo)
+          val all = setOf("0", "1", "2")
+          val session = FakeTorrentSession(torrent.metadata.infoHash.hex)
+          session.selectedFileIds = all
+          engine.addTorrentResult = session
+          val selection = MutableStateFlow(SelectionUpdate(all, 0))
+          val reports = Channel<Pair<Long, Long>>(Channel.UNLIMITED)
+          val context = context("task", resolved, "unused".toPath(), all, selection = selection,
+            onProgress = { downloaded, total -> reports.send(downloaded to total) })
+          val run = launch { source.download(context, null) }
+          val everything = 0L to torrent.sizeOf(0, 1, 2)
+          assertEquals(everything, reports.receive())
+          // The session takes long to apply the first selection, and Ketch delivers a second
+          // one meanwhile, which it shows at once.
+          val gate = CompletableDeferred<Unit>()
+          session.changeSelectionGate = gate
+          selection.value = SelectionUpdate(setOf("1", "2"), 1)
+          val first = 0L to torrent.sizeOf(1, 2)
+          assertEquals(first, reports.next(everything))
+          selection.value = SelectionUpdate(setOf("2"), 2)
+          val latest = 0L to torrent.sizeOf(2)
+          assertEquals(latest, reports.next(first))
+          repeat(3) { assertEquals(latest, reports.receive()) }
+          gate.complete(Unit)
+          eventually("the session to take both selections") { session.selectionChanges.size == 2 }
+          repeat(3) { assertEquals(latest, reports.receive()) }
+          assertEquals(listOf(setOf("1", "2"), setOf("2")), session.selectionChanges)
+          assertEquals(2, context.acknowledgedSelection.value)
+          session.finish()
+          run.join()
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
   fun download_runAgainForANewSelection_showsItsFilesFromTheStart() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(10_000) {

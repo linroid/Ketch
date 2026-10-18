@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.util.IntakeAction.AddAnyway
 import com.linroid.ketch.app.util.IntakeAction.AddHeaders
@@ -21,6 +22,10 @@ class IntakeProblemsTest {
     val noTorrents = Expected("This device can't download torrents")
     val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
     assertEquals(noTorrents, KetchError.Unsupported().toIntakeProblem(magnet).loaded())
+    assertEquals(
+      noTorrents,
+      KetchError.Unsupported(NoDownloadSourceException()).toIntakeProblem(magnet).loaded(),
+    )
     assertEquals(
       noTorrents,
       KetchError.Unsupported().toIntakeProblem("a.torrent", file = true).loaded(),
@@ -80,6 +85,35 @@ class IntakeProblemsTest {
     cases.forEach { (error, expected) ->
       assertEquals(expected, error.toIntakeProblem(url).loaded(), error.toString())
     }
+  }
+
+  @Test
+  fun toIntakeProblem_sourceLacksSomething_saysWhyTheCheckFailed() = runTest {
+    // Such as a proxy setting the device cannot use, which a remote device sends as the reason.
+    val proxy = KetchError.Unsupported(
+      IllegalArgumentException("https_proxy is not an HTTP or SOCKS5 proxy URL"),
+    )
+    assertEquals(
+      Expected(
+        "Couldn't check this link",
+        "https_proxy is not an HTTP or SOCKS5 proxy URL",
+        listOf(Retry),
+      ),
+      proxy.toIntakeProblem(url).loaded(),
+    )
+    // A magnet's source lacking something is no sign that the device has no torrents.
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+    assertEquals(
+      Expected("Couldn't check this link", actions = listOf(Retry)),
+      KetchError.Unsupported(IllegalStateException()).toIntakeProblem(magnet).loaded(),
+    )
+    assertEquals(
+      Expected(
+        "Ketch can't download this kind of link",
+        "it supports http(s), ftp(s), magnet and .torrent",
+      ),
+      KetchError.Unsupported(NoDownloadSourceException()).toIntakeProblem(url).loaded(),
+    )
   }
 
   @Test

@@ -27,6 +27,8 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.state.ConnectionCellKey
+import com.linroid.ketch.app.ui.connections.ConnectionDetails
+import com.linroid.ketch.app.ui.connections.connectionRows
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.DeviceConnections
 import com.linroid.ketch.app.state.DeviceHealth
@@ -202,6 +204,110 @@ class ConnectionGridSnapshots {
   }
 
   @Test
+  fun detailsCard_peerAndHttp_listEveryDetail() {
+    val size = SnapshotSize(420.dp, 640.dp, KetchDensity.Compact)
+    val grid = ConnectionSamples.grid(ConnectionSamples.mixed(), limit = 24)
+    val rows = connectionRows(grid, mapOf(LOCAL_DEVICE_ID to "MacBook"))
+    val shown = listOf(
+      rows.first { it.connection.peer != null },
+      rows.first { it.connection.secure == true },
+    )
+    SnapshotTheme.entries.forEach { theme ->
+      snapshot("connections-details-card", size, theme) {
+        Column(
+          verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s4),
+          modifier = Modifier.padding(KetchTheme.spacing.s4),
+        ) {
+          for (row in shown) {
+            Panel(360.dp) { ConnectionDetails(row, showDevice = true, hint = true) }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun page_hoverClickAndSort_onlyTheTaskShowsTheTask() {
+    val data = {
+      val sample = SampleData.downloads()
+      SampleData(sample.tasks, connections = ConnectionSamples.mixed())
+    }
+    val size = SnapshotSize.Desktop
+    val theme = SnapshotTheme.Light
+    // The fifth row, a torrent peer, under the longest-open sort.
+    val peerRow = 322.dp
+    appSnapshot("connections-page-hover", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.hover(360.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-hover-task", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.hover(560.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-click-endpoint", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.click(360.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-click-task", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.click(560.dp, peerRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-sort", size, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.click(912.dp, 127.dp)
+      scene.settle()
+      check(state.appSettings.ui.sort["connections"] == "down:desc") {
+        "The sort was not saved: ${state.appSettings.ui.sort}"
+      }
+    }
+  }
+
+  @Test
+  fun page_totalsAndClosed_dimClosedRowsAndSayWhenTheyClosed() {
+    val data = {
+      val sample = SampleData.downloads()
+      SampleData(sample.tasks, connections = ConnectionSamples.withClosed())
+    }
+    val theme = SnapshotTheme.Light
+    for (size in listOf(SnapshotSize.Desktop, SnapshotSize.Phone)) {
+      appSnapshot("connections-page-totals", size, theme, data()) {
+        state.runInShell(KetchCommands.Connections)
+        scene.settle()
+      }
+      appSnapshot("connections-page-closed", size, theme, data()) {
+        state.runInShell(KetchCommands.Connections)
+        scene.settle()
+        scene.clickOnText("Closed")
+        scene.settle()
+      }
+    }
+    appSnapshot("connections-page-closed-hover", SnapshotSize.Desktop, theme, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      scene.clickOnText("Closed")
+      scene.settle()
+      scene.hover(360.dp, ClosedRow)
+      scene.settle(minimum = 1.seconds)
+    }
+    appSnapshot("connections-page-all", SnapshotSize.Desktop, SnapshotTheme.Dark, data()) {
+      state.runInShell(KetchCommands.Connections)
+      scene.settle()
+      // The switch's All, beside the protocol chips' own.
+      scene.click(431.dp, 86.dp)
+      scene.settle()
+    }
+  }
+
+  @Test
   fun app_everySize_showsTheConnectionsPage() {
     val data = {
       val sample = SampleData.downloads()
@@ -259,6 +365,9 @@ private fun Panel(width: Dp, content: @Composable ColumnScope.() -> Unit) {
     content = content,
   )
 }
+
+/** The second closed row, a torrent peer that left, under the longest-open sort. */
+private val ClosedRow = 216.dp
 
 private val BusyPulse = PulseState(
   listOf(
@@ -401,6 +510,71 @@ internal object ConnectionSamples {
     }
     return snapshot(list, total = list.size + 37)
   }
+
+  /**
+   * [mixed], with what every connection moved since the device started, and connections that
+   * closed in the last minutes: finished ubuntu segments, torrent peers that left, an FTP
+   * transfer and a proxied imagenet segment.
+   */
+  fun withClosed(): ActiveConnections {
+    val closed = listOf(
+      closedConnection(101, "ubuntu", "releases.ubuntu.com", 443, "HTTP/2", true, 380, 12,
+        downloaded = 412_000_000),
+      closedConnection(102, "ubuntu", "releases.ubuntu.com", 443, "HTTP/2", true, 300, 47,
+        downloaded = 389_500_000),
+      closedConnection(103, "archlinux", "203.0.113.201", 6881, "BitTorrent", false, 640, 95,
+        source = "torrent", downloaded = 48_200_000, uploaded = 3_100_000,
+        peer = PeerDetails("v2", peerChoking = true, uploadSlot = false,
+          peerInterested = false, client = "Transmission 4.0.6")),
+      closedConnection(104, "imagenet-03", "image-net.org", 443, "HTTP/1.1", true, 2_600, 160,
+        downloaded = 1_250_000_000, route = ConnectionRoute.HTTP_PROXY),
+      closedConnection(105, "archlinux", "198.51.100.140", 51413, "BitTorrent", false, 210, 255,
+        source = "torrent", downloaded = 0, uploaded = 820_000,
+        direction = INCOMING,
+        peer = PeerDetails("v1", peerChoking = true, uploadSlot = true,
+          peerInterested = true, client = "qBittorrent/5.0.2")),
+      closedConnection(106, "debian-cd", "ftp.debian.org", 21, "FTP", false, 1_800, 420,
+        source = "ftp", downloaded = 3_900_000_000),
+    )
+    return mixed().copy(
+      receivedBytes = 48_312_000_000,
+      sentBytes = 1_904_000_000,
+      closed = closed,
+    )
+  }
+
+  private fun closedConnection(
+    id: Long,
+    taskId: String,
+    host: String,
+    port: Int,
+    protocol: String,
+    secure: Boolean,
+    openFor: Int,
+    closedAgo: Int,
+    source: String = "http",
+    downloaded: Long = 0,
+    uploaded: Long = 0,
+    direction: ConnectionDirection = ConnectionDirection.OUTGOING,
+    route: ConnectionRoute = ConnectionRoute.DIRECT,
+    peer: PeerDetails? = null,
+  ) = ActiveConnection(
+    id = id,
+    taskId = taskId,
+    source = source,
+    protocol = protocol,
+    secure = secure,
+    direction = direction,
+    host = host,
+    port = port,
+    route = route,
+    downloadedBytes = downloaded,
+    uploadedBytes = uploaded,
+    openedAt = SampleData.NOW - (closedAgo + openFor).seconds,
+    peer = peer,
+    country = COUNTRIES[host],
+    closedAt = SampleData.NOW - closedAgo.seconds,
+  )
 
   /** A NAS seeding one torrent and downloading over HTTP. */
   fun nas(): ActiveConnections {

@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,6 +36,7 @@ import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.ketchSurface
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /**
  * Shows [text] in a small inverse bubble under [content] after the pointer rests on it for
@@ -51,14 +53,92 @@ fun KetchTooltip(
   enabled: Boolean = true,
   content: @Composable () -> Unit,
 ) {
+  val gap = with(LocalDensity.current) { TooltipGap.roundToPx() }
+  HoverPopup(
+    enabled = enabled && text.isNotEmpty(),
+    delayMillis = TOOLTIP_DELAY_MILLIS,
+    positionProvider = { remember(gap) { TooltipPositionProvider(gap) } },
+    popup = { KetchTooltipBubble(text, shortcut) },
+    modifier = modifier,
+    content = content,
+  )
+}
+
+/**
+ * Shows [card], a raised surface of details, under [content] where the pointer rests on it for
+ * a moment, or while it is long-pressed on touch screens. Unlike [KetchTooltip], it opens at the
+ * pointer rather than centered, as [content] may be as wide as a table row, and it never takes
+ * clicks or focus: what it shows must also be reachable another way.
+ *
+ * @param enabled whether hovering shows the card, such as off while a control inside [content]
+ *   is hovered, which shows its own tooltip.
+ * @param open shows the card whatever the pointer does, such as while a control inside [content]
+ *   has keyboard focus, so the details are not for pointers only.
+ */
+@Composable
+fun KetchHoverCard(
+  card: @Composable () -> Unit,
+  modifier: Modifier = Modifier,
+  enabled: Boolean = true,
+  open: Boolean = false,
+  content: @Composable () -> Unit,
+) {
+  val colors = KetchTheme.colors
+  val gap = with(LocalDensity.current) { TooltipGap.roundToPx() }
+  HoverPopup(
+    enabled = enabled,
+    open = open,
+    delayMillis = HOVER_CARD_DELAY_MILLIS,
+    positionProvider = { pointerX ->
+      remember(gap, pointerX) { PointerPositionProvider(gap, pointerX) }
+    },
+    popup = {
+      Box(
+        Modifier
+          .widthIn(max = HoverCardMaxWidth)
+          .ketchSurface(
+            KetchElevationLevel.E3,
+            KetchTheme.shapes.menu,
+            colors.surfaceRaised,
+            colors.hairline,
+          )
+          .padding(HoverCardPadding),
+      ) {
+        card()
+      }
+    },
+    modifier = modifier,
+    content = content,
+  )
+}
+
+/**
+ * [content], with [popup] shown after the pointer rests on it for [delayMillis] or while it is
+ * long-pressed on touch screens, or while [open], placed by the provider [positionProvider] makes from where the
+ * pointer was, in pixels from [content]'s left edge, as the popup opened.
+ */
+@Composable
+private fun HoverPopup(
+  enabled: Boolean,
+  delayMillis: Long,
+  open: Boolean = false,
+  positionProvider: @Composable (pointerX: Int) -> PopupPositionProvider,
+  popup: @Composable () -> Unit,
+  modifier: Modifier,
+  content: @Composable () -> Unit,
+) {
   var hovered by remember { mutableStateOf(false) }
   var suppressed by remember { mutableStateOf(false) }
   var hoverShown by remember { mutableStateOf(false) }
   var touchShown by remember { mutableStateOf(false) }
+  // Where the pointer is, read only as the popup opens, so moving never recomposes.
+  val pointer = remember { PointerX() }
+  var openedAt by remember { mutableIntStateOf(0) }
   LaunchedEffect(hovered, suppressed) {
     hoverShown = false
     if (hovered && !suppressed) {
-      delay(TOOLTIP_DELAY_MILLIS)
+      delay(delayMillis)
+      openedAt = pointer.x
       hoverShown = true
     }
   }
@@ -69,6 +149,7 @@ fun KetchTooltip(
         awaitPointerEventScope {
           while (true) {
             val event = awaitPointerEvent(PointerEventPass.Initial)
+            event.changes.firstOrNull()?.let { pointer.x = it.position.x.roundToInt() }
             when (event.type) {
               PointerEventType.Enter -> hovered = true
               PointerEventType.Exit -> {
@@ -90,6 +171,7 @@ fun KetchTooltip(
             released = true
           }
           if (released) return@awaitEachGesture
+          openedAt = down.position.x.roundToInt()
           touchShown = true
           // The release would also click the control under the finger.
           while (true) {
@@ -104,16 +186,19 @@ fun KetchTooltip(
       },
   ) {
     content()
-    if (enabled && text.isNotEmpty() && (touchShown || hoverShown && !suppressed)) {
-      val gap = with(LocalDensity.current) { TooltipGap.roundToPx() }
+    if (open || enabled && (touchShown || hoverShown && !suppressed)) {
       Popup(
-        popupPositionProvider = remember(gap) { TooltipPositionProvider(gap) },
+        popupPositionProvider = positionProvider(openedAt),
         properties = PopupProperties(focusable = false),
       ) {
-        KetchTooltipBubble(text, shortcut)
+        popup()
       }
     }
   }
+}
+
+private class PointerX {
+  var x: Int = 0
 }
 
 /**
@@ -184,9 +269,38 @@ private class TooltipPositionProvider(private val gap: Int) : PopupPositionProvi
   }
 }
 
+/**
+ * Opens a [KetchHoverCard] under its anchor, starting a little left of [pointerX] (pixels from
+ * the anchor's left edge), or above the anchor when there is no room below.
+ */
+private class PointerPositionProvider(
+  private val gap: Int,
+  private val pointerX: Int,
+) : PopupPositionProvider {
+  override fun calculatePosition(
+    anchorBounds: IntRect,
+    windowSize: IntSize,
+    layoutDirection: LayoutDirection,
+    popupContentSize: IntSize,
+  ): IntOffset {
+    val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+    val x = (anchorBounds.left + pointerX - gap * 2).coerceIn(0, maxX)
+    val below = anchorBounds.bottom + gap
+    val y = if (below + popupContentSize.height <= windowSize.height) {
+      below
+    } else {
+      anchorBounds.top - gap - popupContentSize.height
+    }
+    return IntOffset(x, y.coerceAtLeast(0))
+  }
+}
+
 private const val TOOLTIP_DELAY_MILLIS = 500L
+private const val HOVER_CARD_DELAY_MILLIS = 600L
 private const val SHORTCUT_ALPHA = 0.6f
 private val TooltipGap = 6.dp
 private val TooltipPaddingH = 10.dp
 private val TooltipPaddingV = 6.dp
 private val TooltipMaxWidth = 320.dp
+private val HoverCardMaxWidth = 360.dp
+private val HoverCardPadding = 12.dp

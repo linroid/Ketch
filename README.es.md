@@ -181,6 +181,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **Activo mientras descarga** — Las apps de escritorio y Android evitan que el sistema entre en
   reposo por sí mismo mientras hay descargas en curso; la pantalla puede apagarse igualmente
   (**Ajustes → General**).
+- **Al terminar las descargas** — La aplicación de escritorio puede cerrar Ketch, suspender o
+  apagar el equipo cuando terminan sus descargas, tras un aviso de un minuto que se puede cancelar
+  (**Ajustes → General**).
 - **Tu estilo y tu idioma** — Temas claro y oscuro con siete colores de acento, en English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français y Русский
   ([traducciones](docs/development/localization.md)).
@@ -265,8 +268,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Detector de recursos** — Encontrar los archivos descargables de una página web
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda
   a las más lentas para no esperar a la conexión más lenta
-- **Al terminar las descargas** — Opcionalmente, cerrar Ketch, suspender o apagar el equipo cuando
-  la cola quede vacía
 - **Transferencias entre dispositivos** — Enviar a y Mover a transfieren los datos ya descargados
   para que el otro dispositivo continúe en lugar de empezar de cero
   ([plan](docs/plans/task-transfer.md))

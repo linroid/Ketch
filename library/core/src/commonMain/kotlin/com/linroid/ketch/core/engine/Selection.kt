@@ -30,7 +30,8 @@ class SelectionUpdate(
  *   ([com.linroid.ketch.core.task.TaskRecord.resolvedSource]), else its
  *   [com.linroid.ketch.api.DownloadRequest.resolvedSource]: possibly from the client, so never
  *   trusted for sizes
- * @property segments the task's saved segments, if any
+ * @property segments the task's segments, if any: a running download's latest, else the saved
+ *   ones
  * @property outputPath where the task saves, once it started
  * @property completed whether the task has completed
  */

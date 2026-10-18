@@ -51,6 +51,8 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
+import com.linroid.ketch.app.state.WhenDownloadsFinish
+import com.linroid.ketch.app.state.label
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.darkKetchColors
@@ -107,6 +109,8 @@ import ketch.app.shared.generated.resources.settings_general_start_hidden_tray_h
 import ketch.app.shared.generated.resources.settings_general_startup
 import ketch.app.shared.generated.resources.settings_general_theme
 import ketch.app.shared.generated.resources.settings_general_this_device
+import ketch.app.shared.generated.resources.settings_general_when_done
+import ketch.app.shared.generated.resources.settings_general_when_done_hint
 import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -196,7 +200,8 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
   }
 
   if (LocalDesktopHooks.current.isSupported) StartupGroup(state, appSettings)
-  if (keepAwakeSupported) PowerGroup(appSettings)
+  val whenDone = state.whenDownloadsFinish
+  if (keepAwakeSupported || whenDone != null) PowerGroup(appSettings, whenDone)
   // Phones have no keyboard to speak of.
   if (!isMobilePlatform) {
     val chord = KetchCommands.Shortcuts.shortcutLabel(KeyboardPlatform.current)
@@ -343,16 +348,32 @@ private fun StartupGroup(state: AppState, appSettings: AppSettingsController) {
   }
 }
 
-/** Whether the system stays awake while downloads run, on desktop and Android. */
+/**
+ * Whether the system stays awake while downloads run, on desktop and Android, and what happens
+ * once they finish where the host can act on it ([whenDone]).
+ */
 @Composable
-private fun PowerGroup(appSettings: AppSettingsController) {
+private fun PowerGroup(appSettings: AppSettingsController, whenDone: WhenDownloadsFinish?) {
   SettingsGroup(title = stringResource(Res.string.settings_general_power)) {
-    SettingsSwitchRow(
-      title = stringResource(Res.string.settings_general_keep_awake),
-      description = Res.string.settings_general_keep_awake_hint.text(localDeviceNoun()).resolve(),
-      checked = appSettings.config.power.keepAwake,
-      onCheckedChange = { on -> appSettings.savePower { it.copy(keepAwake = on) } },
-    )
+    if (keepAwakeSupported) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_general_keep_awake),
+        description = Res.string.settings_general_keep_awake_hint.text(localDeviceNoun())
+          .resolve(),
+        checked = appSettings.config.power.keepAwake,
+        onCheckedChange = { on -> appSettings.savePower { it.copy(keepAwake = on) } },
+      )
+    }
+    if (whenDone != null) {
+      SettingsSelectRow(
+        title = stringResource(Res.string.settings_general_when_done),
+        description = stringResource(Res.string.settings_general_when_done_hint),
+        value = whenDone.action,
+        options = whenDone.options,
+        label = { action -> action.label.text() },
+        onSelect = whenDone::choose,
+      )
+    }
   }
 }
 

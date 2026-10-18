@@ -1,13 +1,19 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -21,11 +27,13 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -84,6 +92,99 @@ class ServerRoutesTest {
     assertFalse("hunter2" in line, line)
     assertFalse("s3cret" in line, line)
     assertTrue("example.com/file.zip" in line, line)
+  }
+
+  /** Refuses every `refuse:` URL with a reason, as the torrent source refuses large pieces. */
+  private class RefusingSource : DownloadSource<Unit> {
+    override val type = "refusing"
+    override val stateSerializer = Unit.serializer()
+    override fun canHandle(input: ResolveInput): Boolean =
+      input is ResolveInput.Url && input.url.startsWith("refuse:")
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+      throw KetchError.SourceError(type, detail = "The pieces are too large")
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
+  }
+
+  @Test
+  fun resolve_sourceRefusesTheUrl_returnsTheTypedErrorWithItsReason() = testApplication {
+    val ketch = Ketch(NoOpHttpEngine(), additionalSources = listOf(RefusingSource()))
+    application {
+      with(createTestServer(ketch)) { configureServer() }
+    }
+    val client = createClient { install(ContentNegotiation) { json(json) } }
+    try {
+      val response = client.post("/api/resolve") {
+        contentType(ContentType.Application.Json)
+        setBody(ResolveUrlRequest("refuse:large"))
+      }
+      assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+      val body = response.bodyAsText()
+      val error = json.decodeFromString(KetchError.tolerantSerializer(), body)
+      assertIs<KetchError.SourceError>(error)
+      assertEquals("refusing", error.sourceType)
+      assertEquals("The pieces are too large", error.detail)
+      // Released clients read every refusal as an ErrorResponse, and keep its reason so.
+      val refusal = json.decodeFromString<ErrorResponse>(body)
+      assertEquals("source_error", refusal.error)
+      assertEquals("The pieces are too large", refusal.message)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun resolve_urlNoSourceHandles_returnsUnsupported() = testApplication {
+    application {
+      with(createTestServer()) { configureServer() }
+    }
+    val response = client.post("/api/resolve") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(ResolveUrlRequest("gopher://example.com/file")))
+    }
+    assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+    val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    assertEquals("unsupported", error.error)
+    assertEquals("No download source handles this URL", error.message)
+  }
+
+  /**
+   * Takes every `lack:` URL but lacks something for it, as the HTTP source does for a server
+   * that answers the wrong range or a proxy variable it cannot use; the rest of the URL is why.
+   */
+  private class LackingSource : DownloadSource<Unit> {
+    override val type = "lacking"
+    override val stateSerializer = Unit.serializer()
+    override fun canHandle(input: ResolveInput): Boolean =
+      input is ResolveInput.Url && input.url.startsWith("lack:")
+    override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+      throw KetchError.Unsupported(IllegalStateException((input as ResolveInput.Url).url.drop(5)))
+    override suspend fun download(context: DownloadContext, state: Unit?) = Unit
+  }
+
+  @Test
+  fun resolve_sourceLacksSomethingForTheUrl_saysWhyNotThatNoSourceHandlesIt() = testApplication {
+    val ketch = Ketch(NoOpHttpEngine(), additionalSources = listOf(LackingSource()))
+    application {
+      with(createTestServer(ketch)) { configureServer() }
+    }
+    suspend fun refusal(url: String): ErrorResponse {
+      val response = client.post("/api/resolve") {
+        contentType(ContentType.Application.Json)
+        setBody(json.encodeToString(ResolveUrlRequest(url)))
+      }
+      assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+      return json.decodeFromString<ErrorResponse>(response.bodyAsText())
+    }
+    try {
+      val range = refusal("lack:Server returned a different range")
+      assertEquals("unsupported", range.error)
+      assertEquals("Not supported: Server returned a different range", range.message)
+      // A reason that quotes a URL is left out.
+      val redirect = refusal("lack:Redirected to https://cdn.example/a?sig=1")
+      assertEquals("Not supported", redirect.message)
+    } finally {
+      ketch.close()
+    }
   }
 
   @Test
