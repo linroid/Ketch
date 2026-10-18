@@ -78,6 +78,14 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
   override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
     withEngine { it.probe(url, headers) }
 
+  override suspend fun request(
+    method: String,
+    url: String,
+    headers: Map<String, String>,
+    body: HttpBody?,
+    maxBodyBytes: Int,
+  ): HttpReply = withEngine { it.request(method, url, headers, body, maxBodyBytes) }
+
   override suspend fun downloadResource(
     url: String,
     headers: Map<String, String>,
@@ -123,6 +131,15 @@ class ConfigurableNetworkHttpEngine(private val provider: NetworkInterfaceProvid
 
     override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo =
       withEngine { it.withProxy(proxy).probe(url, headers) }
+
+    override suspend fun request(
+      method: String,
+      url: String,
+      headers: Map<String, String>,
+      body: HttpBody?,
+      maxBodyBytes: Int,
+    ): HttpReply =
+      withEngine { it.withProxy(proxy).request(method, url, headers, body, maxBodyBytes) }
 
     override suspend fun downloadResource(
       url: String,

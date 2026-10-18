@@ -1082,12 +1082,12 @@ class AppState(
   }
 
   /**
-   * Adds dropped files to [target], by default the active device: the first `.torrent` file opens
-   * the add sheet, which resolves it there, and lists of links (see [LinkParser.isLinkList]) open
-   * it with their links.
+   * Adds dropped files to [target], by default the active device: the first `.torrent` or
+   * Metalink file opens the add sheet, which resolves it there, and lists of links (see
+   * [LinkParser.isLinkList]) open it with their links.
    */
   fun addDroppedFiles(files: List<DroppedFile>, target: InstanceEntry? = null) {
-    val torrent = files.firstOrNull { it.name.endsWith(".torrent", ignoreCase = true) }
+    val torrent = files.firstOrNull { isContentFile(it.name) }
     if (torrent != null) {
       openIntake(IntakeRequest(targetDeviceId = target?.deviceId))
       if (showAddDialog) resolveDroppedFile(torrent, target)

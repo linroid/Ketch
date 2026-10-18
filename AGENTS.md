@@ -37,8 +37,13 @@ library/
   core/       # In-process download engine (Android, iOS, JVM, JS/Node, WasmWasi) -- published
   ktor/       # Ktor-based HttpEngine implementation (Android, iOS, JVM) -- published SDK module
   ftp/        # FTP/FTPS DownloadSource (Android, iOS, JVM only) -- published SDK module
-  hls/        # Finite HLS DownloadSource (same targets as core) -- published SDK module
-  dash/       # Finite DASH DownloadSource (same targets as core) -- published SDK module
+  hls/        # Finite HLS DownloadSource: variants, AES-128, separate audio (same targets as
+              # core) -- published SDK module
+  dash/       # Finite DASH DownloadSource: representations, separate audio (same targets as
+              # core) -- published SDK module
+  metalink/   # Metalink DownloadSource over several HTTP(S) mirrors (same targets as core) --
+              # published SDK module
+  webdav/     # WebDAV DownloadSource (same targets as core) -- published SDK module
   torrent/    # BitTorrent/Magnet DownloadSource (Android, JVM, iOS) -- published SDK module
   kermit/     # Optional Kermit logging integration -- published SDK module
   sqlite/     # SQLite-backed TaskStore (Android, iOS, JVM only) -- published SDK module
@@ -117,7 +122,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:core` (implementation)
 - `com.linroid.ketch.core` -- `Ketch` (implements `KetchApi`), `KetchDispatchers`
   (`KetchDispatchers.Default`, shared by every instance)
-- `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
+- `com.linroid.ketch.core.engine` -- `HttpEngine` (`HttpBody` and `HttpReply` for its
+  `request`), `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
   `SourceResolver`, `SourceState`, `DownloadContext`,
   `DownloadQueue`, `DownloadScheduler`,
@@ -141,6 +147,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.core.geo` -- `CountryLookup` (a `CountryDatabase` `Ketch(countries = ...)`
   names `ActiveConnection.country` with), internal `CountryTable`, and `DbIpCountryDatabase`
   (jvmAndAndroidMain)
+- `com.linroid.ketch.core.mirror` -- `MirrorDownloadHelper` (one file of known size from several
+  HTTP(S) mirrors at once, with piece checks and repair), `Mirror`, `PieceHashes`,
+  `mirrorHeaders()`; internal `MirrorPool` (least busy mirror, backoff, dropping)
 - `com.linroid.ketch.core.digest` -- `MessageDigest`, `Md5`, `Sha1`, `Sha256`, `Sha512` (pure
   Kotlin, on every engine target) and `ChecksumAlgorithm.newDigest()`, which gives the platform's
   digest where there is one (`platformDigest`, expect/actual: `java.security.MessageDigest` on the
@@ -165,10 +174,30 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (expect/actual)
 
 ### `library:hls`, `library:dash`
-- `com.linroid.ketch.hls` -- `HlsDownloadSource` (`.m3u8`)
-- `com.linroid.ketch.dash` -- `DashDownloadSource` (`.mpd`)
-- Both depend on core's `com.linroid.ketch.core.media` helpers for bounded manifest fetching,
-  URL/header handling and sequential transfer; each owns its parser and tests
+- `com.linroid.ketch.hls` -- `HlsDownloadSource` (`.m3u8`); internal `parseHls`, `HlsPlaylist`
+  (`audioFor`), `HlsVariant`, `HlsRendition`
+- `com.linroid.ketch.dash` -- `DashDownloadSource` (`.mpd`); internal `parseDashStream`,
+  `DashStream`, `DashRepresentation`, `manifestXml`
+- Both depend on core's `com.linroid.ketch.core.media` helpers: `MediaDownloadHelper` (bounded
+  manifest fetching, variant resolution and `planSelection`, `downloadFollowingSelection`,
+  sequential transfer), `MediaPart`/`MediaPlan`/`MediaKey`/`MediaVariant`, `mergeTracks`,
+  `mediaVariantNames`, `Aes128CbcDecryptor` (pure Kotlin AES-128-CBC) and `Mp4Tracks.kt`
+  (internal `mergeInitSegments`, `FragmentRewriter`, `mp4Boxes`); each module owns its parser
+  and tests
+
+### `library:metalink`
+- `com.linroid.ketch.metalink` -- `MetalinkDownloadSource` (`.meta4`, `.metalink`, content, and
+  the `metalink:` URLs of content), `MetalinkSourceState` (the file the saved bytes belong to;
+  opaque); internal `Metalink`/`MetalinkFile`/`MetalinkPieces`/`MetalinkUrl` (the parsed document
+  kept as `ResolvedSource.METAINFO_KEY` JSON), `parseMetalink()`, `mirrorUrl()` and a minimal XML
+  reader (`parseXml`, `XmlElement`) that refuses document type declarations
+- Transfers through core's `com.linroid.ketch.core.mirror` helper
+
+### `library:webdav`
+- `com.linroid.ketch.webdav` -- `WebDavDownloadSource` (implements `DownloadSource`),
+  `WebDavSourceState`; internal `WebDavUrl` (`Credentials`), `WebDavClient` (`PROPFIND`, probe,
+  ranged `GET`s, answering `401`s), `DavProperties` (multistatus answers), `Xml` (`XmlElement`),
+  `Challenge` and `Authenticator` (Digest and Basic)
 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
@@ -617,16 +646,75 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `SourceResolver` routes URLs to the appropriate source
 - `HttpDownloadSource` is the built-in HTTP/HTTPS implementation
 - `HlsDownloadSource` (`library:hls`) and `DashDownloadSource` (`library:dash`) are optional
-  sources, registered by the apps and CLI ahead of HTTP: finite, unencrypted `.m3u8` HLS and
-  `.mpd` DASH streams are concatenated into one media file. HLS masters choose the
-  highest-bandwidth variant; byte ranges and initialization segments are supported. Transfers
-  are sequential and pause/retry restarts from zero. Live streams, encryption and separate
-  audio/video tracks are rejected; see [media support and limits](docs/media.md)
+  sources, registered by the apps and CLI ahead of HTTP: finite `.m3u8` HLS and `.mpd` DASH
+  streams are joined into one media file. Byte ranges and initialization segments are supported.
+  Transfers are sequential and pause/retry restarts from zero. Live streams, DRM (HLS
+  `SAMPLE-AES`, non-`identity` key formats, DASH `ContentProtection`) and separate audio for
+  MPEG-TS/AAC/MP3 HLS are rejected; see [media support and limits](docs/media.md)
+- Quality: a stream with several HLS variants or DASH video representations resolves them as a
+  `FileSelectionMode.SINGLE` choice (`ResolvedSource.files`, best first: video before audio-only,
+  then by declared bandwidth; IDs are `mediaVariantIds` hashes of each variant's manifest identity,
+  kept across refreshed or re-signed manifests and resumes, each with `bandwidth`, `resolution`,
+  `codecs`, `frameRate`, `audio` metadata; sizes -1), so both sources list `download.fileSelection`
+  and `download.awaitFileSelection`. `MediaDownloadHelper.chosenVariant` fails a download whose
+  manifest no longer lists the chosen ID (or, from `preResolved`, its bandwidth); `download` refuses
+  a plan whose container differs from the output name Ketch chose (not a file `Destination`); and
+  `downloadFollowingSelection` restarts the transfer with a variant selected while it runs,
+  acknowledging each revision as it plans it. The add sheet does not pick variants
+  (`IntakeEntry.files` leaves single choices out): it downloads the best, and the inspector's Files
+  tab switches
+- Separate tracks: an HLS variant's `AUDIO` group rendition with a `URI` (the `DEFAULT`, else
+  `AUTOSELECT`, else first) and a DASH presentation's main audio adaptation set (`Role` `main`,
+  else first; text and image sets are ignored) are merged with the video when both are
+  fragmented MP4 (`mergeTracks`, `MediaPlan.tracks` 2, `media.tracks` metadata): both
+  initialization segments (at most 4 MiB each) become one `moov` with video as track 1 and audio
+  as track 2 (`mergeInitSegments`, audio durations rescaled to the video's timescale), and each
+  fragment streams through `FragmentRewriter`, which keeps `moof`/`mdat` only, renumbers
+  `mfhd` sequences and `tfhd` track IDs and moves absolute base data offsets. Fragments are
+  interleaved by `MediaPart.startSeconds` (EXTINF sums, DASH times), else by their place in each
+  track. Samples are never decoded
+- AES-128 HLS (`EXT-X-KEY:METHOD=AES-128`, `identity` key format; consecutive key tags offer one
+  set, so a FairPlay tag beside an identity one is skipped): each part carries a `MediaKey` (its
+  URL and the `IV`, else the media sequence number big-endian; an encrypted `EXT-X-MAP` needs an
+  `IV`), and `MediaDownloadHelper` fetches each key once per run (16 bytes, headers scoped by
+  origin) and decrypts as bytes arrive with `Aes128CbcDecryptor`, which holds back the last block
+  for its PKCS#7 padding; a wrong key fails as `KetchError.SourceError`
 - `FtpDownloadSource` handles FTP/FTPS with segmented parallel transfers
+- `WebDavDownloadSource` (`library:webdav`) handles `webdav(s)://` and `dav(s)://` links with
+  segmented ranged transfers
 - `TorrentDownloadSource` handles BitTorrent/Magnet downloads
+- `MetalinkDownloadSource` (`library:metalink`, registered by the apps and CLI ahead of HTTP)
+  handles Metalink 4 (`.meta4`) and 3 (`.metalink`) links and content; see
+  [Metalink](docs/metalink.md). The parsed document (HTTP(S) mirrors only, without user info, at
+  most 64 per file, best priority first; MD5/SHA-1/SHA-256/SHA-512 hashes and piece hashes) is
+  kept with the task as `METAINFO_KEY`, so resumes never fetch it again; a size it lacks is asked
+  of the first three mirrors with `HEAD` while resolving (first 32 files, the request's headers and
+  proxy); `planSelection` never probes. A Metalink fetched over HTTPS keeps plain HTTP mirrors
+  only for files with a SHA-1 or stronger digest. Its strongest hash is
+  `ResolvedSource.checksum` / `DownloadContext.publishedChecksum`, which Ketch verifies. Several
+  files are a `FileSelectionMode.SINGLE` choice, each `SourceFile` naming its
+  `SourceFile.FILE_NAME_KEY`, which `DownloadExecution` saves the chosen file under; another file
+  can be chosen only before the task has an output path (`planSelection` refuses later). Lists
+  `KetchFeatures.METALINK` (`download.metalink`), `FILE_SELECTION` and `AWAIT_FILE_SELECTION`
+- `MirrorDownloadHelper` (core, `com.linroid.ketch.core.mirror`): segments as HTTP's
+  (`SegmentedDownloadHelper`, resegmenting on connection changes, and its work stealing, so a
+  connection on a fast mirror takes over a slow mirror's tail), each `SegmentLane` fetched from
+  the least busy usable mirror (`MirrorPool`, ties by priority). A failed segment continues from the byte
+  it reached on another mirror; a mirror is dropped at once for 4xx (not 408/429), `Unsupported`
+  (wrong range), `FileChanged` or `AuthenticationFailed`, else backs off 1 s doubling to 60 s (or
+  `Retry-After`) and is dropped after 5 failures in a row; the last mirror left never backs off
+  and rethrows, so Ketch's `RetryPolicy` applies as for HTTP. With `PieceHashes` it reads the
+  finished file back piece by piece (skipped when `readAt` is unsupported), drops the mirrors
+  that wrote a failed piece in that round while another remains, and refetches the failed pieces
+  (`mergedRanges`, `cover`, at most one incomplete segment per connection per batch), up to
+  `MAX_REPAIRS` (3) times before a `KetchError.SourceError`. Request headers go only to mirrors
+  on the origin of `DownloadContext.url` (`mirrorHeaders`); one live connection per segment
+  request. Mirrors are logged by index, never by host. Tests: `MirrorDownloadHelperTest`,
+  `MetalinkDownloadSourceTest`, `MetalinkTest`, `MetalinkKetchTest` (jvmTest, a whole `Ketch`)
 - Additional sources registered via `Ketch(additionalSources = listOf(...))`
 - Each source is a `DownloadSource<S>` over its own serializable source state `S`
-  (`HttpSourceState`, `FtpSourceState`, `TorrentSourceState`, `Unit` for HLS/DASH) and defines
+  (`HttpSourceState`, `FtpSourceState`, `WebDavSourceState`, `TorrentSourceState`, `Unit` for
+  HLS/DASH) and defines
   `type`, `stateSerializer`, `canHandle(input)` and `resolve(input, config)`, plus three
   state functions: `download(context, state)` continues from the stored `state` after checking
   the content is unchanged, or starts from the beginning with `null` (Ketch passes the state the
@@ -656,11 +744,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### Multi-File Download Support
 - `ResolvedSource.files` lists selectable files within a source (e.g., torrent)
 - `FileSelectionMode.MULTIPLE` for subset selection (torrent)
-- `FileSelectionMode.SINGLE` for single-variant selection (reserved for HLS quality; no built-in
-  source uses it yet): core supports it already. `selectFiles` takes exactly one ID (Ketch
+- `FileSelectionMode.SINGLE` for single-variant selection (HLS variants, DASH
+  representations and Metalinks listing several files). `selectFiles` takes exactly one ID (Ketch
   refuses several before `planSelection`, and `download` refuses them against a `SINGLE`
   `resolvedSource`), and the default, `ResolvedSource.defaultSelection()`, is the first of
-  `files` (every file for `MULTIPLE`). Tests: `SingleChoiceSelectionTest`
+  `files` (every file for `MULTIPLE`). A chosen `SINGLE` file's `SourceFile.FILE_NAME_KEY`, when
+  set, names the output in place of `suggestedFileName`. The add sheet lists a single choice
+  only when every file names one (separate files, as a Metalink's; stream variants download the
+  best and switch in the Files tab), keeps one checked (`IntakeEntry.singleChoice`) and hides
+  Download all. Tests:
+  `SingleChoiceSelectionTest`
 - Sources that implement `planSelection` list `KetchFeatures.FILE_SELECTION`
   (`download.fileSelection`) and, when their tasks can wait, `AWAIT_FILE_SELECTION`
   (`download.awaitFileSelection`) in `DownloadSource.features`; clients gate on those, never on
@@ -710,6 +803,48 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   server
 - Passive mode only (PASV/EPSV); FTP URL parsing with credentials
 - Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
+
+### WebDAV Support (`library:webdav`)
+- `WebDavDownloadSource(httpEngine)` takes `webdav://` and `dav://` links (HTTP) and
+  `webdavs://` and `davs://` (HTTPS), registered by the apps, the CLI and `ketch server` after
+  HLS and DASH; see [WebDAV](docs/webdav.md). Requests go through the shared `HttpEngine`, so
+  proxies, network interfaces, redirects and live connections behave as for HTTP
+- Every resolve and every run sends a `PROPFIND` with `Depth: 0` (`HttpEngine.request`, which
+  returns `HttpReply` with the status and headers of any status, the URL that answered after
+  redirects, and at most 1 MiB of a success's body; `KtorHttpEngine` and the network engines
+  implement it, the default throws
+  `UnsupportedOperationException`) for `getcontentlength`, `getetag`, `getlastmodified`,
+  `getcontenttype`, `displayname` and `resourcetype`: a collection fails with
+  `KetchError.SourceError`, a resource the multistatus reports with another status fails with
+  that `KetchError.Http`. `403`, `405`, `501`, another success than `207`, or an answer too long
+  (a server taking it for `GET`) read the file from its headers instead (`META_DAV` absent). A
+  probe (`HttpEngine.probe`, else `head`) tells range support and the size
+- Downloads in segments over `SegmentedDownloadHelper` (ranged `GET`s, `TransferWatchdog`,
+  throttle, `ConnectionReporter` with `httpConnectionSpec`/`observeExchanges`, now public), one
+  connection without ranges, and streams content of unknown size. Each segment `GET` carries
+  `If-Match` with the probe's strong `ETag`, else `If-Unmodified-Since` with its
+  `Last-Modified`, and a `412` fails with `KetchError.FileChanged`. `WebDavSourceState` (entity
+  tag, modification time, size; the probe's, else the `PROPFIND`'s) is what the run found
+  (`store` keeps it per task until `cleanup`), else the resolution's; a resume fails with
+  `KetchError.FileChanged` when the strong tag (quotes ignored), else the modification time, or
+  the size differs. Weak tags are never compared; a state with neither a strong tag nor a
+  modification time starts over from zero, and saved segments are kept only while the file on
+  disk holds them
+- Sign-in (`WebDavClient`): credentials from the link's user info, else an
+  `Authorization: Basic` header (the apps' Sign in), which is then not sent as it is; other
+  `Authorization` headers pass through. Nothing is sent before a `401`; `Challenge` parses
+  `WWW-Authenticate` and `Authenticator` answers Digest (RFC 7616: `SHA-256` over `MD5`, `-sess`,
+  `qop=auth` or none, `userhash`, a nonce count per nonce) else Basic, warning over plain HTTP. A
+  `401` during a download fetches a new challenge with a `HEAD` once and retries; refused or
+  missing credentials are `KetchError.AuthenticationFailed`. A redirect to another path of the
+  same origin (`HttpReply.url`) moves the client there, so Digest answers name the target the
+  server checks; other origins never get credentials
+- The apps read the schemes as `LinkKind.WebDav` (quick add, palette), and Sign in adds the
+  Basic header
+- Tests: `WebDavDownloadSourceTest` over `FakeDavServer` (commonTest), RFC 2617/7616 Digest
+  vectors in `WebDavAuthTest`, and `WebDavIntegrationTest` (jvmTest) against a JDK `HttpServer`
+  requiring Digest, through `KtorHttpEngine` and `Ketch`
+- One file per link: no collection downloads, no NTLM/Negotiate, no Digest `auth-int`
 
 ### BitTorrent/Magnet Support (`library:torrent`)
 - Pure Kotlin BitTorrent v1/v2/hybrid downloads on Android, JVM and iOS;
@@ -1067,7 +1202,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
   `--torrent-port`; 16881 in the Docker image): the apps and other commands may run beside it
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
-  app) and resolve their content through `KetchApi.resolve`, like dropped files
+  app) and resolve their content through `KetchApi.resolve`, like dropped files (dropped files
+  and the add sheet also take `.meta4` and `.metalink`, `isContentFile`)
 - Native torrent engine dependencies exist only in interoperability tests
 - uTP (BEP 29), `TorrentConfig.utpEnabled` (on by default): `UtpPacket` (codec, selective-ack
   and unknown extensions, `looksLikeUtp`) and `UtpSocket`, a deterministic state machine without
@@ -2124,13 +2260,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Tags: "Ketch", "DownloadTask", "Coordinator", "Execution", "SegmentCalc", "SegmentDownloader",
   "RangeDetector", "FileAccessor", "FileNameResolver", "KtorHttpEngine", "NetworkHttpEngine",
   "DownloadQueue", "DownloadScheduler", "SourceResolver", "HttpSource", "FtpSource",
-  "FtpClient", "TorrentSource", "TorrentEngine", "TorrentSession", "TorrentSwarm",
-  "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList", "TorrentController",
-  "TorrentControls", "Connections", "RemoteKetch", "RemoteTask", "RemotePairing",
-  "RemoteTorrents", "TokenBucket", "SqliteStore",
+  "FtpClient", "WebDavSource", "TorrentSource", "TorrentEngine", "TorrentSession",
+  "TorrentSwarm", "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList",
+  "TorrentController", "TorrentControls", "Connections", "RemoteKetch", "RemoteTask",
+  "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
-  "GitHubReleases", "Hooks";
+  "GitHubReleases", "Hooks", "Mirrors", "MetalinkSource";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable
@@ -2171,23 +2307,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 Planned features not yet implemented:
 
-1. **Metalink** - Multi-source downloads with mirrors, checksums, and chunk verification
-2. **WebDAV** - Download from WebDAV servers with resume support
-3. **More HLS and DASH formats** - Extend the optional HLS/DASH sources with variant selection
-   (the reserved `FileSelectionMode.SINGLE`), matching separate audio/video tracks and AES-128
-   HLS encryption. Finite, unencrypted single-stream playlists and byte ranges already work
-4. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
+1. **Media Downloads** - Web media extraction (like yt-dlp) as a pluggable `DownloadSource`,
    supporting various media sites and extractors
-5. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
+2. **Resource Sniffer** - Detect and extract downloadable resources (media, files) from
    web pages by analyzing network requests, HTML, and embedded players
-6. **Lane scheduler** - The rest of the `LaneScheduler` / `RangeLedger` from the helper devices
+3. **Lane scheduler** - The rest of the `LaneScheduler` / `RangeLedger` from the helper devices
    [proposal](docs/design/multi-instance-downloads.md), beyond today's work stealing
    (`SegmentLedger`): a failed range retries alone instead of cancelling the batch, a minimum
    segment size keeps small files on one connection from the start, lowering the connection count
    drains the slowest lane instead of resegmenting, and stalled lanes are revoked in the endgame
-7. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+4. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-8. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+5. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
    own network and IP, joining or leaving mid-download without pausing it; see the
-   [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 6
+   [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 3

@@ -697,10 +697,11 @@ private fun IntakeFooter(actions: IntakeActions, phone: Boolean, modifier: Modif
       batchStage -> null
       session.mode == IntakeMode.Add && session.allFailed ->
         Res.string.intake_action_add_anyway to actions::addAnyway
-      stageEntry != null && session.mode == IntakeMode.Add -> Res.string.intake_download_all to {
-        stageEntry.selectedFiles = stageEntry.files.mapTo(LinkedHashSet()) { it.id }
-        actions.submit()
-      }
+      stageEntry != null && session.mode == IntakeMode.Add && !stageEntry.singleChoice ->
+        Res.string.intake_download_all to {
+          stageEntry.selectedFiles = stageEntry.files.mapTo(LinkedHashSet()) { it.id }
+          actions.submit()
+        }
       phone -> null
       else -> Res.string.action_cancel to actions::close
     }

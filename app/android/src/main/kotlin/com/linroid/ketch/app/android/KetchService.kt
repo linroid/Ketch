@@ -59,6 +59,7 @@ import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
+import com.linroid.ketch.metalink.MetalinkDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
@@ -67,6 +68,7 @@ import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -228,7 +230,8 @@ class KetchService : Service() {
             ),
             additionalSources = listOf(
               FtpDownloadSource(), torrentSource,
-              HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+              HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+              MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
             ),
             // Left out of backups, as it downloads again on request.
             countries = DbIpCountryDatabase(File(noBackupFilesDir, COUNTRY_DATABASE_FILE)),

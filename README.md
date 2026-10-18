@@ -57,8 +57,9 @@
 </p>
 
 Ketch splits every download across parallel connections, and shows each one as a live lane. It
-takes web links, FTP servers, torrents and magnet links in one place. Pair your laptop, phone and
-home server, and you can watch and control the downloads on all of them from any one of them.
+takes web links, FTP and WebDAV servers, torrents and magnet links in one place. Pair your laptop,
+phone and home server, and you can watch and control the downloads on all of them from any one of
+them.
 
 **Building your own app?** Embed the same download engine that powers Ketch's apps, with parallel
 downloads, pause and resume, queues and speed limits. The Kotlin Multiplatform library is
@@ -109,6 +110,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **HTTP and HTTPS**, with the cookies and referrer of the page when the browser extension sends
   the download.
 - **FTP and FTPS**, with parallel connections and resume.
+- **WebDAV** — Files on Nextcloud, ownCloud, a NAS or any WebDAV server (`davs://` links), with
+  parallel connections, resume and Digest or Basic sign-in ([details](docs/webdav.md)).
 - **BitTorrent and magnet links** — v1, v2 and hybrid torrents, with a choice of files and
   optional seeding, in an engine written in pure Kotlin. It speaks uTP and protocol encryption,
   downloads from web seeds, forwards its port on your router and finds peers on your local
@@ -117,8 +120,12 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   change them without starting over; a magnet link added before its details arrive waits for
   your choice. Stop or restart seeding a finished torrent; the ones you keep sharing seed again
   after Ketch restarts.
-- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
-  HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
+- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite streams as one media file, in the quality
+  you choose (the best by default), with separate audio merged in and AES-128 HLS decrypted
+  ([support and limits](docs/media.md)).
+- **Metalink (`.meta4`, `.metalink`)** — Download from every mirror a Metalink lists at once.
+  A mirror that fails or sends bad pieces is left out, and the file is checked against the
+  Metalink's hashes ([details](docs/metalink.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or
   the file manager lands in Ketch.
 
@@ -238,10 +245,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Distribution before v1.0.0** — Signed Windows releases, signed and notarized macOS releases,
   the extension in more browser stores and verified installation/update paths
   ([plan](docs/plans/v1-distribution.md))
-- **Metalink** — Downloads from several mirrors at once, with checksums
-- **WebDAV** — Download from WebDAV servers, with resume
-- **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
-  AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
@@ -284,6 +287,7 @@ task.state.collect { println(it) }
 - [Browser extension](app/browser-extension/README.md) — Setup, capturing, permissions and
   privacy
 - [BitTorrent](docs/torrent.md) — Torrent and magnet support and its limits
+- [Metalink](docs/metalink.md) — Downloads from several mirrors, with piece and file checks
 - [Multiple networks](docs/multiple-networks.md) — Spreading downloads across network interfaces
 - [AI discovery](docs/ai-discovery.md) — Providers, keys, web search, page access, chats and history
 - [Automation hooks](docs/hooks.md) — Commands and webhooks run on download events

@@ -65,6 +65,9 @@ enum class LinkKind {
   /** An FTP or FTPS link. */
   Ftp,
 
+  /** A WebDAV link: `webdav://` or `dav://`, and `webdavs://` or `davs://` over TLS. */
+  WebDav,
+
   /** A magnet link. */
   Magnet,
 
@@ -90,6 +93,7 @@ enum class LinkKind {
             Http
           }
         lower.startsWith("ftp://") || lower.startsWith("ftps://") -> Ftp
+        WEBDAV_SCHEME.containsMatchIn(lower) -> WebDav
         else -> Other
       }
     }
@@ -109,8 +113,8 @@ fun List<IntakeItem>.links(): List<IntakeItem.Link> = flatMap { item ->
 object LinkParser {
   /**
    * Finds the links in [text], in the order they appear:
-   * - http(s), ftp(s) and magnet links anywhere, one per line, in prose or in HTML (`&amp;` is
-   *   decoded, and punctuation that ends a sentence or closes a bracket is left out);
+   * - http(s), ftp(s), WebDAV and magnet links anywhere, one per line, in prose or in HTML
+   *   (`&amp;` is decoded, and punctuation that ends a sentence or closes a bracket is left out);
    * - a bare 40-hex or 32-base32 info hash, as a magnet link;
    * - `host.tld/path` without a scheme, with `https://` added;
    * - a line that is a single link of another scheme, which the target device then reports as
@@ -179,14 +183,14 @@ object LinkParser {
     }
 
   /**
-   * The link to add at once, without the add sheet, when [text] holds exactly one HTTP(S) or
-   * FTP(S) link that is not a `.torrent` file. Several links, a range, a magnet, a `.torrent`, a
-   * cURL command or text without a link return `null`, so the sheet opens.
+   * The link to add at once, without the add sheet, when [text] holds exactly one HTTP(S),
+   * FTP(S) or WebDAV link that is not a `.torrent` file. Several links, a range, a magnet, a
+   * `.torrent`, a cURL command or text without a link return `null`, so the sheet opens.
    */
   fun quickAddLink(text: String): IntakeItem.Link? {
     if (text.lines().any(CurlParser::isCurl)) return null
     val link = parseIntake(text).singleOrNull() as? IntakeItem.Link ?: return null
-    return link.takeIf { it.kind == LinkKind.Http || it.kind == LinkKind.Ftp }
+    return link.takeIf { it.kind in QUICK_ADD_KINDS }
   }
 
   /**
@@ -228,6 +232,8 @@ object LinkParser {
   }
 }
 
+private val QUICK_ADD_KINDS = setOf(LinkKind.Http, LinkKind.Ftp, LinkKind.WebDav)
+
 // Most lines one curl command may span, so a quote left open does not swallow a long list.
 private const val MAX_CURL_LINES = 200
 private val LINK_LIST_EXTENSIONS = setOf("txt", "csv", "url", "webloc")
@@ -236,10 +242,12 @@ private val WHITESPACE = Regex("\\s+")
 private val PLIST_STRING = Regex("<string>([^<]*)</string>")
 private val TOKEN = Regex("\\S+")
 private val SCHEME_URL = Regex(
-  "(?:https?|ftps?)://[^\\s\"'<>`]+|magnet:\\?[^\\s\"'<>`]+",
+  "(?:https?|ftps?|(?:web)?davs?)://[^\\s\"'<>`]+|magnet:\\?[^\\s\"'<>`]+",
   RegexOption.IGNORE_CASE,
 )
-private val SUPPORTED_SCHEME = Regex("^(?:https?|ftps?)://", RegexOption.IGNORE_CASE)
+private val SUPPORTED_SCHEME =
+  Regex("^(?:https?|ftps?|(?:web)?davs?)://", RegexOption.IGNORE_CASE)
+private val WEBDAV_SCHEME = Regex("^(?:web)?davs?://")
 private val ANY_SCHEME_URL = Regex("^[a-z][a-z0-9+.-]*://\\S+$", RegexOption.IGNORE_CASE)
 private val HEX_INFO_HASH = Regex("^[0-9a-f]{40}$", RegexOption.IGNORE_CASE)
 private val BASE32_INFO_HASH = Regex("^[a-z2-7]{32}$", RegexOption.IGNORE_CASE)
@@ -249,7 +257,10 @@ private const val HOST =
 private val SCHEMELESS_LINK = Regex("^$HOST/\\S*$", RegexOption.IGNORE_CASE)
 private val SCHEMELESS_HOST = Regex("^$HOST(?:/\\S*)?$", RegexOption.IGNORE_CASE)
 
-private val LINK_STARTS = listOf("http://", "https://", "ftp://", "ftps://", "magnet:?")
+private val LINK_STARTS = listOf(
+  "http://", "https://", "ftp://", "ftps://",
+  "webdav://", "webdavs://", "dav://", "davs://", "magnet:?",
+)
 private val AUTHORITY_ENDS = charArrayOf('/', '?', '#')
 
 // HTML escapes that cannot be part of a link, so one ends the link before it.

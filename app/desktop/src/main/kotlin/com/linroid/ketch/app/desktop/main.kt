@@ -108,6 +108,7 @@ import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.hooks.HookRunner
+import com.linroid.ketch.metalink.MetalinkDownloadSource
 import com.linroid.ketch.remote.RemoteKetch
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.sqlite.DriverFactory
@@ -120,6 +121,7 @@ import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
 import com.linroid.ketch.updater.ReleaseVersion
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.icon
 import ketch.app.desktop.generated.resources.keep_awake_reason
@@ -710,7 +712,8 @@ private fun createInstanceManager(
           logger = launch.logger,
           additionalSources = listOf(
             FtpDownloadSource(), torrentSource,
-            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine)
+            HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
+            MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
           ),
           countries = DbIpCountryDatabase(File(configDir, COUNTRY_DATABASE_FILE)),
         ).also { ketch ->

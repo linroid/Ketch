@@ -633,7 +633,7 @@ private val COPIES: Set<RowAction> = setOf(
 )
 
 /** Kinds of link added without the add sheet, like a quick add. */
-private val QUICK_KINDS: Set<LinkKind> = setOf(LinkKind.Http, LinkKind.Ftp)
+private val QUICK_KINDS: Set<LinkKind> = setOf(LinkKind.Http, LinkKind.Ftp, LinkKind.WebDav)
 
 private const val NO_VALUE = "–"
 private val SPEED = Regex("""(\d+(?:[.,]\d+)?)\s*([km])(?:i?b)?(?:/s|ps)?""")

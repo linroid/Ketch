@@ -24,6 +24,7 @@ ketch-remote = { module = "com.linroid.ketch:remote", version.ref = "ketch" }
 ketch-ftp = { module = "com.linroid.ketch:ftp", version.ref = "ketch" }
 ketch-hls = { module = "com.linroid.ketch:hls", version.ref = "ketch" }
 ketch-dash = { module = "com.linroid.ketch:dash", version.ref = "ketch" }
+ketch-webdav = { module = "com.linroid.ketch:webdav", version.ref = "ketch" }
 ketch-torrent = { module = "com.linroid.ketch:torrent", version.ref = "ketch" }
 ketch-torrent-api = { module = "com.linroid.ketch:torrent-api", version.ref = "ketch" }
 ```
@@ -62,7 +63,7 @@ dependencies {
 | Modules | Targets |
 |---|---|
 | `api`, `torrent-api` | Android, iOS, JVM, JS, WasmJs, WasmWasi |
-| `core`, `hls`, `dash` | Android, iOS, JVM, JS (Node.js), WasmWasi |
+| `core`, `hls`, `dash`, `webdav` | Android, iOS, JVM, JS (Node.js), WasmWasi |
 | `ktor`, `sqlite`, `ftp`, `torrent` | Android, iOS, JVM |
 | `remote`, `endpoints` | Android, iOS, JVM, WasmJs |
 | `kermit` | Android, iOS, JVM, JS, WasmJs |
@@ -180,8 +181,8 @@ ketch.download(
 `selectedFileIds` picks which of `ResolvedSource.files` to download:
 
 - `FileSelectionMode.MULTIPLE` takes any subset. An empty set downloads every file.
-- `FileSelectionMode.SINGLE` takes exactly one ID, and defaults to the first file. It is reserved
-  for HLS quality; no built-in source offers it yet.
+- `FileSelectionMode.SINGLE` takes exactly one ID, and defaults to the first file. The HLS and
+  DASH sources offer their qualities this way, best first ([media](media.md#choose-the-quality)).
 - `ResolvedSource.defaultSelection()` returns what an empty selection downloads.
 - An ID that `ResolvedSource.files` does not list is refused: `download` throws
   `IllegalArgumentException` when the request carries the resolution, and otherwise the download
@@ -435,6 +436,8 @@ order before HTTP; the first source whose `canHandle` accepts the URL is used:
 - `HlsDownloadSource(httpEngine)` from `library:hls` and `DashDownloadSource(httpEngine)` from
   `library:dash`, for [finite streaming media](media.md). Pass them the engine you give `Ketch`.
   Register them before HTTP, which `additionalSources` does.
+- `MetalinkDownloadSource(httpEngine)` from `library:metalink`, which downloads what a
+  [Metalink](metalink.md) lists from all its mirrors at once. Pass it the engine you give `Ketch`.
 - Your own `DownloadSource` (see [writing a download source](developers.md#write-your-own-download-source)).
 
 ### Dispatchers

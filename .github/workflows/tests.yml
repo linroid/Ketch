@@ -132,6 +132,7 @@ jobs:
           :library:torrent:testAndroidHostTest :library:core:testAndroidHostTest
           :library:hls:testAndroidHostTest :library:dash:testAndroidHostTest
           :library:ktor:testAndroidHostTest
+          :library:metalink:testAndroidHostTest
 
       - name: Upload test results
         if: always()

@@ -484,7 +484,7 @@ internal class ConnectionRegistry(
  * The spec of an HTTP(S) request to [url] for [source], before the engine says more: the URL's
  * host and port, and the route [proxy] would take.
  */
-internal fun httpConnectionSpec(source: String, url: String, proxy: Proxy): ConnectionSpec {
+fun httpConnectionSpec(source: String, url: String, proxy: Proxy): ConnectionSpec {
   val authority = UrlAuthority.parse(url)
   val host = authority?.host.orEmpty()
   val route = when (proxy) {
