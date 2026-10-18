@@ -118,9 +118,9 @@ internal class Steal(val lane: SegmentLane, val victim: SegmentLane, val victimI
  * nothing hands all of it over.
  *
  * A connection whose transfer failed [release]s its lane while it waits to retry: the next
- * connection to finish takes all its remaining bytes, whatever their size, and the failed one
- * [rejoin]s once it waited, taking its own lane back if nobody did, else a split like a finished
- * connection.
+ * connection to finish takes all its remaining bytes, whatever their size, unless it received
+ * nothing in its last measured lane, and the failed one [rejoin]s once it waited, taking its own
+ * lane back if nobody did, else a split like a finished connection.
  *
  * @param minSplitBytes the smallest range a split hands over; [Long.MAX_VALUE] never splits
  * @param rateWindow how long a lane runs before its rate counts
@@ -235,6 +235,9 @@ internal class SegmentLedger(
   }
 
   private fun takeOver(thief: SegmentLane, thiefRate: Double?): Steal? {
+    // A connection that received nothing in its last lane takes nothing, not even a failed
+    // connection's bytes, which then wait for their own connection to retry.
+    if (thiefRate != null && thiefRate <= 0.0) return null
     lanes.firstOrNull { it.released }?.let { orphan ->
       // A failed connection's bytes go whole to the first connection free to take them.
       val lane = SegmentLane(this, orphan.cursor, orphan.cursor, orphan.limit, timeSource.markNow())

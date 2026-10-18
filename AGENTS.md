@@ -362,7 +362,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Per-range retries (with range support): a connection whose transfer fails with a retryable
   `KetchError` other than a 429 releases its lane (`SegmentLedger.release`) and waits
   `RetryPolicy.delayMs` while the others keep running; the next connection to finish takes the
-  released bytes whole, whatever their size, and the failed one then `rejoin`s: its own lane when
+  released bytes whole, whatever their size (not one that received nothing in its last measured
+  lane, which closes), and the failed one then `rejoin`s: its own lane when
   nobody took it, else a split like a finished connection, or it ends (also early, once another
   connection ended for lack of work). Its retries count from zero after a transfer that wrote
   bytes. The batch fails, and `DownloadExecution` retries the run from saved segments, when a

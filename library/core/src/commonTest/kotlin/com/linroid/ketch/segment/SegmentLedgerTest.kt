@@ -145,6 +145,29 @@ class SegmentLedgerTest {
   }
 
   @Test
+  fun releasedLane_isNotTakenByConnectionThatMovedNothing() = runTest {
+    val time = TestTimeSource()
+    val thirds = listOf(
+      Segment(index = 0, start = 0, end = 99),
+      Segment(index = 1, start = 100, end = 199),
+      Segment(index = 2, start = 200, end = 299),
+    )
+    val ledger = SegmentLedger(thirds, minSplitBytes = 10, timeSource = time)
+    val (first, second, third) = ledger.initialLanes
+    time += 2.seconds
+    first.fill()
+    // The second lane received nothing in two seconds, so the first takes all of it.
+    assertSame(second, assertNotNull(ledger.steal(first)).victim)
+    third.fill(30)
+    assertTrue(ledger.release(third))
+    // The second lane's connection moved nothing: the failed range waits for its own.
+    assertNull(ledger.steal(second))
+    val rejoined = assertNotNull(ledger.rejoin(third))
+    assertSame(third, rejoined.lane)
+    assertEquals(230L, third.cursor)
+  }
+
+  @Test
   fun steal_whenSplittingWouldNotFinishSooner_isRefused() = runTest {
     val time = TestTimeSource()
     val ledger = SegmentLedger(
