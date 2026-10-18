@@ -1077,7 +1077,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   once `Ketch.start()` attaches it, then each time the effective policy turns to seeding (uploads
   resume under `seed`, or a live switch to `seed`, which re-seeds kept intents at once). A task
   whose files changed on disk loses the intent, one a download, a pause of uploads or shutdown
-  stopped keeps it.
+  stopped keeps it. A lent seeder's watcher (`watchSeeder`) follows it until it stops or finishes:
+  one that downloads a piece it lost again (an edited file) leaves `seedingTaskIds` meanwhile and
+  is back once it seeds, saving its checkpoint and taking `changeSeedingSelection` throughout.
   `TorrentDownloadSource(..., restoreSeeding = false)`, as `ketch mcp --standalone` builds it,
   never restores, never bumps `sharingResumes` and never records deferred intents
 - Payload counters (`TorrentCounters`): received, uploaded and, of what was received,

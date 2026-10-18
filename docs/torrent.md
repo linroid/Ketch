@@ -145,7 +145,8 @@ What happens next depends on the task's state:
   tells whether the file you kept did too: the task does not start seeding, or downloads the piece
   again if it seeds. One whose removed file is gone is set aside even when nothing tells whether the
   file you kept changed too. Seeding finds them as it checks its files, or as a peer asks for one; a
-  task still seeding straight after its own download downloads such a piece again instead. Choosing
+  task still seeding straight after its own download downloads such a piece again instead, then
+  seeds on; removing files meanwhile applies at once. Choosing
   that file again, or any other, downloads those pieces again: a file you chose is filled in, and
   one still removed keeps its part in the task's hidden sidecar and stays as you left it.
 

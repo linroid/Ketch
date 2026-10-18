@@ -81,6 +81,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -200,7 +201,8 @@ class TorrentDownloadSource(
   private val metadataFetches = Semaphore(MAX_PENDING_METADATA)
   private val stateMutex = Mutex()
   private val states = linkedMapOf<String, TorrentSourceState>()
-  // Guarded by stateMutex: what stops each seeding session's lent slot coming back.
+  // Guarded by stateMutex: the watcher of each lent seeder ([watchSeeder]), from the moment its
+  // slot is lent until it stops; what stops the slot coming back.
   private val seedWatchers = mutableMapOf<String, Job>()
   // The state each seeding session saves its checkpoint into, by task ([saveSeedingState]): set
   // once it seeds, removed once it stops or a run of the task takes it over.
@@ -1159,13 +1161,15 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Applies a completed task's smaller selection to its seeding session, if it seeds or checks
-   * its files to seed: the check starts again with it, so a file dropped meanwhile, deleted
-   * maybe, no longer keeps it from seeding.
+   * Applies a completed task's smaller selection to its seeding session, if it seeds, also while
+   * it downloads a piece it lost again, or checks its files to seed: the check starts again with
+   * it, so a file dropped meanwhile, deleted maybe, no longer keeps it from seeding.
    */
   internal suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean {
+    // A seeder its watcher follows is the task's session until the watcher is gone.
+    val watched = taskId in seedingTaskIds.value || stateMutex.withLock { taskId in seedWatchers }
     // Not once a download took a checking seeder's slot, or the task's own run took it over.
-    val checking = if (taskId in seedingTaskIds.value) null else {
+    val checking = if (watched) null else {
       checkingSeeders.value[taskId]?.session
         ?.takeIf { slots.isLent(taskId) && tasks.session(taskId) === it } ?: return false
     }
@@ -1641,7 +1645,7 @@ class TorrentDownloadSource(
       // The state the run saved last, which the seeder saves its checkpoint into from now on.
       val base = stateMutex.withLock { states[taskId] }
       if (base != null) seedStates.update { it + (taskId to base) }
-      // Marked before the watcher starts, which unmarks it once it stops seeding.
+      // Marked before the watcher starts, which follows whether it seeds from then on.
       markSeeding(taskId)
       watchSeeder(taskId, session)
     }
@@ -1649,9 +1653,11 @@ class TorrentDownloadSource(
   }
 
   /**
-   * The only seed watcher: reports that a lent seeder stopped seeding once it leaves
-   * [TorrentSessionState.SEEDING], and takes the slot back once it stops by itself, such as when
-   * the upload policy stops seeding or its storage fails, and stops it. [release], eviction,
+   * The only seed watcher, following a lent seeder until it stops: it reports the seeder seeding
+   * while it is [TorrentSessionState.SEEDING], and not while it downloads a piece it lost again,
+   * such as one of a file the owner edited, after which it seeds again; it saves what the seeder
+   * uploads meanwhile. Once the seeder stops by itself, such as when the upload policy stops
+   * seeding or its storage fails, it takes the slot back and stops it. [release], eviction,
    * adoption and [close] cancel it.
    */
   private suspend fun watchSeeder(taskId: String, session: TorrentSession) {
@@ -1665,17 +1671,25 @@ class TorrentDownloadSource(
         }
       }
       try {
-        session.state.first { it != TorrentSessionState.SEEDING }
+        session.state.takeWhile {
+          it != TorrentSessionState.STOPPED && it != TorrentSessionState.FINISHED
+        }.collect { state ->
+          stateMutex.withLock {
+            if (seedWatchers[taskId] !== self) return@withLock
+            if (state == TorrentSessionState.SEEDING) markSeeding(taskId) else unmarkSeeding(taskId)
+          }
+        }
       } finally {
         saver.cancel()
       }
-      stateMutex.withLock { if (seedWatchers[taskId] === self) unmarkSeeding(taskId) }
-      session.state.first {
-        it == TorrentSessionState.STOPPED || it == TorrentSessionState.FINISHED
-      }
       // Once it reclaimed the slot, it stops the seeder and returns the slot, whatever happens.
       withContext(NonCancellable) {
-        stateMutex.withLock { if (seedWatchers[taskId] === self) seedWatchers.remove(taskId) }
+        stateMutex.withLock {
+          if (seedWatchers[taskId] === self) {
+            unmarkSeeding(taskId)
+            seedWatchers.remove(taskId)
+          }
+        }
         if (slots.reclaim(taskId)) {
           log.i { "Torrent taskId=$taskId stopped seeding; its slot is free" }
           try { stopSession(taskId) } finally { slots.release() }
