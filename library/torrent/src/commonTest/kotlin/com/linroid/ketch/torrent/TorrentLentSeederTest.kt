@@ -42,9 +42,9 @@ import kotlin.test.assertTrue
 
 /**
  * A finished v1 torrent that keeps seeding on its lent slot and downloads a piece it lost again
- * seeds on afterwards as it did before: shown sharing, saving what it uploads, and taking a
- * smaller selection live, so a file dropped later is one it serves around. Files of 100,000,
- * 70,000 and 86,144 bytes in 16 KiB pieces, so pieces span files.
+ * takes a smaller selection live meanwhile, and seeds on afterwards as it did before: shown
+ * sharing and saving what it uploads, so a file dropped as it downloaded is one it serves around.
+ * Files of 100,000, 70,000 and 86,144 bytes in 16 KiB pieces, so pieces span files.
  */
 class TorrentLentSeederTest {
   private val unchoke = PeerMessage.Control(PeerMessage.Signal.UNCHOKE)
@@ -105,11 +105,17 @@ class TorrentLentSeederTest {
                 assertFalse(message is PeerMessage.Piece)
                 if (message == choke) break
               }
-              // f0 is still chosen, so the seeder downloads the piece again; this peer has it.
+              // f0 is still chosen, so the seeder downloads the piece again: no longer shown
+              // seeding, and waiting for this peer, which has not said it has the piece yet.
               eventually("the seeder to download the piece again") {
-                session.state.value == TorrentSessionState.DOWNLOADING ||
-                  session.verifiedPieces()[shared]
+                session.state.value == TorrentSessionState.DOWNLOADING &&
+                  task.taskId !in source.seedingTaskIds.value
               }
+              // A smaller selection reaches it meanwhile.
+              task.selectFiles(setOf("0"))
+              assertEquals(setOf("0"), session.selectedFileIds)
+              assertEquals(TorrentSessionState.DOWNLOADING, session.state.value)
+              assertTrue(task.taskId !in source.seedingTaskIds.value)
               wire.send(PeerMessage.Have(shared))
               wire.send(unchoke)
               val serving = launch { serve(wire, torrent) }
@@ -129,11 +135,9 @@ class TorrentLentSeederTest {
             while (saved.tryReceive().isSuccess) { }
             assertNotNull(withTimeoutOrNull(5_000) { saved.receive() },
               "The seeder no longer saves what it uploads")
-            // A smaller selection reaches it live.
-            task.selectFiles(setOf("0"))
             assertEquals(setOf("0"), session.selectedFileIds)
-            // The owner edits the file it dropped, in a piece only that file holds: the seeder
-            // drops the piece rather than fail its storage, and seeds on.
+            // The owner edits the file it dropped as the seeder downloaded, in a piece only that
+            // file holds: the seeder drops the piece rather than fail its storage, and seeds on.
             val edited = torrent.pieceCount - 1
             editInPlace(output / "f2", torrent.sizes[2] - 1)
             peer(network, torrent, enginePort) { wire ->
