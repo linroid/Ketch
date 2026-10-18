@@ -14,15 +14,20 @@ import com.linroid.ketch.core.KetchDispatchers
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadCoordinator
 import com.linroid.ketch.core.engine.DownloadSource
+import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.SourceResolver
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.file.NoOpFileAccessor
+import com.linroid.ketch.core.file.createFileAccessor
+import com.linroid.ketch.core.file.platformFileSystem
 import com.linroid.ketch.core.task.AtomicSaver
 import com.linroid.ketch.core.task.TaskHandle
 import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
+import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -31,7 +36,9 @@ import kotlin.time.Clock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,14 +49,16 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.serializer
+import okio.FileSystem
 
 /**
  * Verifies that [DownloadCoordinator.pause] keeps the segments the execution saves while
  * stopping. With an unconfined network dispatcher, the `job.cancel()` inside `pause()` runs
  * the execution's final checkpoint before `pause()` persists anything, which forces the
  * interleaving that once made a restarted task resume from stale offsets. Also verifies that the
- * run flushes the file a pause or a cancel keeping it leaves, and that a close or a failure closes
- * it without waiting for the disk.
+ * run flushes the file a pause or a cancel keeping it leaves, that a close or a failure closes it
+ * without waiting for the disk, and that a pause claiming a verified run's end stops it before
+ * its file takes the final name.
  */
 class DownloadCoordinatorPauseTest {
   @Test
@@ -178,6 +187,67 @@ class DownloadCoordinatorPauseTest {
   }
 
   @Test
+  fun pause_claimingTheRunBeforeItCompletes_keepsItsVerifiedPartialFileForTheResume() = runTest {
+    val folder = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "ketch-pause-${Random.nextLong()}"
+    platformFileSystem.createDirectories(folder)
+    val engine = FakeHttpEngine()
+    val handle = handle(
+      DownloadRequest(
+        "https://example.com/file.bin",
+        destination = Destination("$folder/"),
+        connections = 1,
+      ),
+    )
+    lateinit var coordinator: DownloadCoordinator
+    var pause: Job? = null
+    coordinator = coordinator(
+      HttpDownloadSource(engine),
+      openFile = { path, disk ->
+        val file = createFileAccessor(path, disk)
+        object : FileAccessor by file {
+          override suspend fun flush() {
+            file.flush()
+            // The run's last flush, as the source flushes none. The pause claims the run's end
+            // before the run suspends again, so before the run claims its completion.
+            if (pause == null) {
+              pause = launch(start = CoroutineStart.UNDISPATCHED) {
+                coordinator.pause(handle.taskId)
+              }
+            }
+          }
+        }
+      },
+    )
+    val partial = folder / "file.bin.ketch"
+    try {
+      coordinator.start(handle)
+      runCurrent()
+
+      // Stopped before the move, the whole file waits under its partial name.
+      assertTrue(pause?.isCompleted == true)
+      assertIs<DownloadState.Paused>(handle.mutableState.value)
+      assertEquals(TaskState.PAUSED, handle.record.value.state)
+      assertEquals(partial.toString(), handle.record.value.partialPath)
+      assertContentEquals(engine.content, platformFileSystem.read(partial) { readByteArray() })
+      assertFalse(platformFileSystem.exists(folder / "file.bin"))
+
+      val downloads = engine.downloadCallCount
+      assertTrue(coordinator.resume(handle))
+      runCurrent()
+
+      assertIs<DownloadState.Completed>(handle.mutableState.value)
+      assertEquals(downloads, engine.downloadCallCount)
+      val output = platformFileSystem.read(folder / "file.bin") { readByteArray() }
+      assertContentEquals(engine.content, output)
+      assertFalse(platformFileSystem.exists(partial))
+    } finally {
+      coordinator.close()
+      runCurrent()
+      platformFileSystem.deleteRecursively(folder)
+    }
+  }
+
+  @Test
   fun cancel_keepingTheFile_flushesItBeforeTheRunClosesIt() = runTest {
     val file = RecordingFile()
     val handle = handle()
@@ -300,10 +370,12 @@ class DownloadCoordinatorPauseTest {
     }
   }
 
-  private fun handle(onSave: (TaskRecord) -> Unit = {}): TaskHandle {
+  private fun handle(
+    request: DownloadRequest = DownloadRequest("fixture:input",
+      destination = Destination("/tmp/ketch-pause-checkpoint")),
+    onSave: (TaskRecord) -> Unit = {},
+  ): TaskHandle {
     val now = Clock.System.now()
-    val request = DownloadRequest("fixture:input",
-      destination = Destination("/tmp/ketch-pause-checkpoint"))
     return object : TaskHandle {
       override val taskId = "pause-checkpoint"
       override val request = request
