@@ -29,6 +29,7 @@ import com.linroid.ketch.torrent.tracker.TrackerStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -45,6 +46,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 @OptIn(ExperimentalAtomicApi::class)
 class TrackerOnlyMagnetTest {
@@ -153,7 +156,10 @@ class TrackerOnlyMagnetTest {
         } else listOf(listener.local)
         assertEquals(expected, network.connections.value)
         assertEquals(0, network.udp.load())
-        assertTrue(requests.value.any { "event=stopped" in it })
+        // Said from the engine once the lookup returned.
+        requests.first { sent ->
+          sent.any { it.startsWith("https://trusted/") && "event=stopped" in it }
+        }
         if (firstResult != "failure") {
           val stopped = requests.value.indexOfFirst {
             it.startsWith("https://unavailable/") && "event=stopped" in it
@@ -171,6 +177,57 @@ class TrackerOnlyMagnetTest {
         server.cancelAndJoin()
         listener.close()
         network.close()
+      }
+    }
+  }
+
+  @Test
+  fun trackerOnlyLookup_found_returnsBeforeItsTrackerAnswersStopped() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        val metadata = metadata(true)
+        val network = Network()
+        val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+        val requests = MutableStateFlow<List<String>>(emptyList())
+        val engine = KotlinTorrentEngine(TorrentConfig(encryption = TorrentEncryption.DISABLED),
+          rawNetwork = network,
+          http = http { url ->
+            requests.value += url
+            // A tracker that never answers `stopped`.
+            if ("event=stopped" in url) awaitCancellation()
+            Bencode.encode(mapOf("interval" to 3600L, "peers" to byteArrayOf(127, 0, 0, 1,
+              (listener.local.port ushr 8).toByte(), listener.local.port.toByte())))
+          })
+        val server = async {
+          val connection = listener.accept()
+          try {
+            val wire = PeerWire(connection)
+            wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), true, false))
+            wire.read()
+            wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
+              "m" to mapOf("ut_metadata" to 7L), "metadata_size" to metadata.infoBytes.size.toLong()
+            ))))
+            wire.read()
+            wire.send(TorrentMetadataExchange.response(1, 0, metadata))
+          } finally { connection.close() }
+        }
+        try {
+          engine.start()
+          val looking = TimeSource.Monotonic.markNow()
+          val resolved = assertNotNull(engine.fetchMetadata("magnet:?xt=urn:btih:" +
+            "${metadata.infoHash.hex}&tr=https%3A%2F%2Ftrusted%2Fannounce",
+            TorrentDiscoveryPrivacy.TRACKER_ONLY))
+          val took = looking.elapsedNow()
+          assertContentEquals(metadata.infoBytes, resolved.infoBytes)
+          // It did not wait for its tracker to answer `stopped`, which still heard it.
+          assertTrue(took < 1.5.seconds, "Looking up took $took")
+          requests.first { sent -> sent.any { "event=stopped" in it } }
+        } finally {
+          engine.stop()
+          server.cancelAndJoin()
+          listener.close()
+          network.close()
+        }
       }
     }
   }

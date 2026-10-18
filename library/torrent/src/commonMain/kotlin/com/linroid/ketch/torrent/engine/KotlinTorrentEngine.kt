@@ -630,12 +630,12 @@ internal class KotlinTorrentEngine(
     stoppedDeadline.load()?.let { -it.elapsedNow() } ?: STOPPED_ANNOUNCE_TIME
 
   /**
-   * Sends a stopped torrent's `stopped` announces ([announce]) from the engine, within
-   * [stoppedAnnounceTime] from now, rather than hold up what stopped it: a task canceled, paused
-   * or removed stops at once, whatever its trackers. Callers read what the announces report
-   * first, as the torrent's files may be gone by then. [stopRuntime] waits for them within the
-   * stopped window, and the next announces of [topics] that start the torrent again wait for
-   * them first ([awaitGoodbyes]).
+   * Sends a stopped torrent's, or magnet lookup's, `stopped` announces ([announce]) from the
+   * engine, within [stoppedAnnounceTime] from now, rather than hold up what stopped it: a task
+   * canceled, paused or removed stops at once, whatever its trackers. Callers read what the
+   * announces report first, as the torrent's files may be gone by then. [stopRuntime] waits for
+   * them within the stopped window, and the next announces of [topics] that start the torrent
+   * again wait for them first ([awaitGoodbyes]).
    */
   private fun sayGoodbye(topics: Collection<TrackerTopic>, announce: suspend () -> Unit) {
     val time = stoppedAnnounceTime()
@@ -657,8 +657,9 @@ internal class KotlinTorrentEngine(
   /**
    * Waits for the `stopped` announces of [topics] still on their way ([sayGoodbye]), which end
    * within the stopped window, so trackers hear a torrent stop before it starts again: a task
-   * paused and resumed, or retried, at once. Trackers that apply announces out of order would
-   * otherwise drop us from the swarm until our next regular announce.
+   * paused and resumed, or retried, at once, or the download of a magnet whose lookup just said
+   * goodbye. Trackers that apply announces out of order would otherwise drop us from the swarm
+   * until our next regular announce.
    */
   private suspend fun awaitGoodbyes(topics: Collection<TrackerTopic>) {
     val pending = farewells.load().filterKeys { it in topics }.values.flatten().distinct()
@@ -818,6 +819,7 @@ internal class KotlinTorrentEngine(
         for (url in tiers.flatten().distinct()) {
           val trackerSet = TrackerTiers(listOf(listOf(url)), ::announceToTracker)
           var started = false
+          awaitGoodbyes(listOf(topic))
           try {
             val response = attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
               advertisedPort.current(), 0, 1, event = TrackerEvent.STARTED)) } ?: continue
@@ -838,11 +840,10 @@ internal class KotlinTorrentEngine(
               }
             }
           } finally {
-            if (started) withContext(NonCancellable) {
-              withTimeoutOrNull(stoppedAnnounceTime()) {
-                attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
-                  advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED)) }
-              }
+            // Said from the engine, so a lookup canceled or done returns at once.
+            if (started) sayGoodbye(listOf(topic)) {
+              attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
+                advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED)) }
             }
           }
         }
@@ -872,6 +873,7 @@ internal class KotlinTorrentEngine(
     progress: MetadataProgress,
   ): TorrentMetadata {
     val urls = trackerTiers.flatten().distinct()
+    val topic = TrackerTopic.V1(magnet.infoHash)
     val asked = HashSet<PeerEndpoint>()
     while (currentCoroutineContext().isActive) {
       var retrySeconds = 30L
@@ -880,6 +882,7 @@ internal class KotlinTorrentEngine(
         // Each connection closes before switching trackers, including unsuccessful peer sets.
         val tiers = TrackerTiers(listOf(listOf(url)), ::announceToTracker)
         var contacted = false
+        awaitGoodbyes(listOf(topic))
         try {
           val result = attempt {
             tiers.announce(TrackerAnnounce(magnet.infoHash, peerId, advertisedPort.current(), 0, 1,
@@ -905,12 +908,11 @@ internal class KotlinTorrentEngine(
             }
           }
         } finally {
-          if (contacted) withContext(NonCancellable) {
-            withTimeoutOrNull(stoppedAnnounceTime()) {
-              attempt {
-                tiers.announce(TrackerAnnounce(magnet.infoHash, peerId,
-                  advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED))
-              }
+          // Said from the engine, so a lookup canceled or done returns at once.
+          if (contacted) sayGoodbye(listOf(topic)) {
+            attempt {
+              tiers.announce(TrackerAnnounce(magnet.infoHash, peerId,
+                advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED))
             }
           }
         }

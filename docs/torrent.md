@@ -642,7 +642,8 @@ This section describes the engine's protocol behavior for people who debug swarm
   Trackers of other schemes, such as WebTorrent's `wss://`, are skipped. A torrent that stops
   gives its trackers 2 seconds to hear it, in the background: canceling, pausing or removing it
   takes effect at once. Started again meanwhile, it announces itself to them only once they
-  heard it stop, or the 2 seconds are up. When Ketch shuts down, every torrent shares one such
+  heard it stop, or the 2 seconds are up. A magnet's tracker-only metadata lookup says goodbye
+  the same way. When Ketch shuts down, every torrent shares one such
   window, from the moment it begins, while the router removes the port mappings: downloading
   torrents pause and seeding ones stop side by side, each seeder saving its state while it says
   goodbye and again once it has, so slow trackers and routers hold the shutdown up for about 2

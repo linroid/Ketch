@@ -10,16 +10,24 @@ import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
+import com.linroid.ketch.torrent.net.PeerEndpoint
+import com.linroid.ketch.torrent.net.TorrentConnection
 import com.linroid.ketch.torrent.net.TorrentHttp
+import com.linroid.ketch.torrent.net.createTorrentNetwork
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -85,10 +93,14 @@ class TorrentEngineStopTest {
   }
 
   /**
-   * A tracker that takes [busy] to apply a `stopped` announce, as loaded ones do, recording each
-   * announce's event as it arrives (`none` for a regular one) and `stopped applied` once it is.
+   * A tracker that takes [busy] to apply a `stopped` announce, as loaded ones do, or never answers
+   * one, recording each announce's event as it arrives (`none` for a regular one) and `stopped
+   * applied` once it is. Its answers name [peer], if any.
    */
-  private class BusyTracker(private val busy: Duration) : HttpEngine {
+  private class BusyTracker(
+    private val busy: Duration = Duration.INFINITE,
+    private val peer: PeerEndpoint? = null,
+  ) : HttpEngine {
     val events = MutableStateFlow<List<String>>(emptyList())
 
     override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
@@ -108,7 +120,8 @@ class TorrentEngineStopTest {
           events.update { it + "stopped applied" }
         }
       }
-      onData(Bencode.encode(mapOf("interval" to 3600L, "peers" to ByteArray(0))))
+      val peers = peer?.let { listOf(mapOf("ip" to it.host, "port" to it.port.toLong())) }
+      onData(Bencode.encode(mapOf("interval" to 3600L, "peers" to (peers ?: ByteArray(0)))))
     }
 
     override fun close() = Unit
@@ -173,6 +186,82 @@ class TorrentEngineStopTest {
       engine.addV2Task(TorrentV2TaskSpec("busy-v2", fixture.document, (root / "v2").toString(),
         trackerTiers = listOf(listOf(tracker)), privacy = TorrentDiscoveryPrivacy.PUBLIC))
         .also { it.resume() }
+    }
+
+  /**
+   * Runs [body] with a started engine whose tracker-only v2 magnet lookups ask [tracker] at
+   * `http://busy/announce`, and get from it a peer that takes their connection and never
+   * answers: [body] waits for one with `dialed`.
+   */
+  private fun v2TrackerOnlyLookup(
+    busy: Duration,
+    body: suspend CoroutineScope.(
+      engine: KotlinTorrentEngine,
+      tracker: BusyTracker,
+      magnet: String,
+      dialed: suspend () -> Unit,
+    ) -> Unit,
+  ) = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(20_000) {
+        val network = createTorrentNetwork()
+        val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+        val tracker = BusyTracker(busy, peer = listener.local)
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          http = TorrentHttp(tracker))
+        val accepted = MutableStateFlow<List<TorrentConnection>>(emptyList())
+        try {
+          engine.start()
+          coroutineScope {
+            val peer = launch {
+              while (true) {
+                val connection = listener.accept()
+                accepted.update { it + connection }
+              }
+            }
+            var dials = 0
+            val magnet = "magnet:?xt=urn:btmh:1220${"ab".repeat(32)}" +
+              "&tr=http%3A%2F%2Fbusy%2Fannounce"
+            body(engine, tracker, magnet) {
+              dials++
+              accepted.first { it.size >= dials }
+            }
+            peer.cancel()
+          }
+        } finally {
+          engine.stop()
+          accepted.value.forEach { it.close() }
+          listener.close()
+          network.close()
+        }
+      }
+    }
+  }
+
+  @Test
+  fun v2TrackerOnlyLookup_canceled_returnsAtOnce() =
+    v2TrackerOnlyLookup(busy = Duration.INFINITE) { engine, tracker, magnet, dialed ->
+      val lookup = async { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
+      // The lookup asks the peer its tracker named.
+      dialed()
+      val canceling = TimeSource.Monotonic.markNow()
+      lookup.cancelAndJoin()
+      val took = canceling.elapsedNow()
+      // It did not wait for its tracker to answer `stopped`...
+      assertTrue(took < 1.seconds, "Canceling took $took")
+      // ...which still heard it.
+      tracker.events.first { "stopped" in it }
+    }
+
+  @Test
+  fun v2TrackerOnlyLookup_askedAgainAtOnce_startsOnceTheTrackerAppliedStopped() =
+    v2TrackerOnlyLookup(busy = 1.seconds) { engine, tracker, magnet, dialed ->
+      val first = async { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
+      dialed()
+      first.cancelAndJoin()
+      val second = async { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
+      assertTrue(tracker.restartedOnceStoppedApplied(), "Heard ${tracker.events.value}")
+      second.cancelAndJoin()
     }
 
   /** A new folder: a v2 owner's output must be in one that exists. */

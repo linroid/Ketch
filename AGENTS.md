@@ -476,9 +476,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   again once paused, while the downloads pause, so all of them announce, and the router forgets
   the port, within that window; its `stop()` waits for them, stops seeders that started since,
   then stops the engine, whose remaining sessions get what is left of the window. A session's
-  `stopped` announces run detached in the engine (`KotlinTorrentEngine.sayGoodbye`, within
-  2 s, from a snapshot of its pieces and counters), so canceling, pausing or removing a task
-  never waits on its trackers, while the next announces that start the same topic wait for them
+  `stopped` announces, and a tracker-only magnet lookup's, run detached in the engine
+  (`KotlinTorrentEngine.sayGoodbye`, within 2 s, from a snapshot of its pieces and counters), so
+  canceling, pausing or removing a task, or a lookup that ends, never waits on its trackers,
+  while the next announces that start the same topic, a lookup's included, wait for them
   (`awaitGoodbyes`), so a task resumed or retried at once never reaches a tracker before its
   `stopped`; the engine's stop waits for them within the window. Ketch
   closes dispatchers it was given only once every cancelled coroutine has finished, never under
