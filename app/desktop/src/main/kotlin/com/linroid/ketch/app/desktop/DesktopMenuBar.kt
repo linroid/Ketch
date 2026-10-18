@@ -111,6 +111,7 @@ import java.io.FilenameFilter
  * @property openFiles adds the `.torrent` files picked with "Open torrent file…".
  * @property checkForUpdates looks for a newer release of the app; `null` where the app does not
  *   update itself, which leaves out "Check for Updates…".
+ * @property installUpdate installs the downloaded update, for the tray's "Update and restart".
  */
 class DesktopActions(
   val showWindow: () -> Unit,
@@ -118,6 +119,7 @@ class DesktopActions(
   val quit: () -> Unit,
   val openFiles: (List<File>) -> Unit,
   val checkForUpdates: (() -> Unit)? = null,
+  val installUpdate: () -> Unit = {},
 )
 
 /**
@@ -279,6 +281,9 @@ internal sealed interface MenuAction {
 
   /** Opens Settings at About and looks for a newer release of the app. */
   data object CheckForUpdates : MenuAction
+
+  /** Installs the downloaded update: quits, installs it and restarts, or opens its installer. */
+  data object InstallUpdate : MenuAction
 }
 
 /** A menu of the menu bar. */
@@ -648,6 +653,7 @@ internal class DesktopCommands(
         state.openSettings(SettingsTarget(SettingsTarget.Page.About))
         actions.checkForUpdates?.invoke()
       }
+      MenuAction.InstallUpdate -> actions.installUpdate()
     }
   }
 

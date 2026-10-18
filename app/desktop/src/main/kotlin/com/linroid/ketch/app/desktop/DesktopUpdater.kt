@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.util.Properties
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
@@ -54,13 +55,14 @@ internal sealed interface UpdateEvent {
 /**
  * Updates the desktop app to the latest release: looks for one once a day while automatic
  * checks are on, and when asked; downloads this system's installer and checks it against the
- * digest GitHub published; then installs it with [installer], which replaces the app once it
- * quits and opens it again.
+ * digest GitHub published, on its own while automatic checks are on; then installs it with
+ * [installer], which replaces the app once it quits and opens it again.
  *
  * Every step runs in [scope], on the main thread, one at a time. Files live in [workDir]: the
- * download, what [installer] unpacks from it, and the record of an install in progress, which
- * the next run reads in [start] to report how it went. [start] also reports an update installed
- * any other way, by the version that ran last.
+ * download, what [installer] unpacks from it, the record of a download ready to install, which
+ * the next launch installs ([installDownloadedUpdate]) or [start] offers again, and the record of
+ * an install in progress, which the next run reads in [start] to report how it went. [start]
+ * also reports an update installed any other way, by the version that ran last.
  *
  * @param current the running version; `null` when it is not a release version.
  * @param platform the system the installers are for; `null` where Ketch is not released.
@@ -92,10 +94,10 @@ internal class DesktopUpdater(
   /** The newer release found, which [download] fetches. */
   private var release: Release? = null
 
-  /** What [UpdateInstaller.prepare] made of the download, which [install] installs. */
-  private var prepared: File? = null
+  /** The release downloaded and prepared, which [install] installs. */
+  private var ready: ReadyUpdate? = null
   private var step: Job? = null
-  private var automatic: Job? = null
+  private var automaticChecks: Job? = null
 
   /**
    * Reports the update since the run before, which ran [lastVersion], or its install that did
@@ -114,47 +116,60 @@ internal class DesktopUpdater(
   override fun download() {
     if (step?.isActive == true) return
     val release = release ?: return
-    val installer = installer ?: return
-    val asset = asset(release) ?: return
+    step = scope.launch { fetch(release) }
+  }
+
+  /**
+   * Downloads [release] and readies it for [install], saving the record the next launch installs
+   * from; tells the user once it is ready. Returns whether it is.
+   */
+  private suspend fun fetch(release: Release): Boolean {
+    val installer = installer ?: return false
+    val asset = asset(release) ?: return false
     val version = release.version.toString()
-    step = scope.launch {
-      mutableState.value = AppUpdateState.Downloading(version, release.pageUrl, 0, asset.size)
-      val next = try {
-        val file = File(workDir, asset.name)
-        download(asset, file) { progress ->
-          mutableState.value = AppUpdateState.Downloading(
-            version = version,
-            notesUrl = release.pageUrl,
-            downloadedBytes = progress.downloadedBytes,
-            totalBytes = progress.totalBytes.takeIf { it > 0 } ?: asset.size,
-          )
-        }
-        prepared = withContext(io) { installer.prepare(file) }
-        log.i { "Ketch $version is ready to install" }
-        AppUpdateState.Ready(version, release.pageUrl, installer.restarts)
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        log.w { "Couldn't download Ketch $version: ${e.describeCauses()}" }
-        AppUpdateState.Failed(AppUpdateStep.Download, reason(e), version, release.pageUrl)
+    mutableState.value = AppUpdateState.Downloading(version, release.pageUrl, 0, asset.size)
+    val next = try {
+      val file = File(workDir, asset.name)
+      download(asset, file) { progress ->
+        mutableState.value = AppUpdateState.Downloading(
+          version = version,
+          notesUrl = release.pageUrl,
+          downloadedBytes = progress.downloadedBytes,
+          totalBytes = progress.totalBytes.takeIf { it > 0 } ?: asset.size,
+        )
       }
-      mutableState.value = next
-      if (next is AppUpdateState.Ready) onEvent(UpdateEvent.Ready(next))
+      val update = withContext(io) {
+        ReadyUpdate(version, release.pageUrl, installer.prepare(file)).also { it.save(workDir) }
+      }
+      ready = update
+      log.i { "Ketch $version is ready to install" }
+      AppUpdateState.Ready(version, release.pageUrl, installer.restarts)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.w { "Couldn't download Ketch $version: ${e.describeCauses()}" }
+      AppUpdateState.Failed(AppUpdateStep.Download, reason(e), version, release.pageUrl)
     }
+    mutableState.value = next
+    if (next is AppUpdateState.Ready) onEvent(UpdateEvent.Ready(next))
+    return next is AppUpdateState.Ready
   }
 
   override fun install() {
     if (step?.isActive == true) return
-    val release = release ?: return
-    val prepared = prepared ?: return
+    val ready = ready ?: return
     val installer = installer ?: return
-    val version = release.version.toString()
+    val version = ready.version
     val record = File(workDir, PENDING_INSTALL)
     step = scope.launch {
       try {
         withContext(io) {
-          if (installer.restarts) record.writeText(version)
-          installer.install(prepared, ProcessHandle.current().pid())
+          if (installer.restarts) {
+            record.writeText(version)
+            // Installed now; the next launch must not install it again.
+            File(workDir, READY_UPDATE).delete()
+          }
+          installer.install(ready.prepared, ProcessHandle.current().pid())
         }
         if (installer.restarts) {
           log.i { "Quitting to install Ketch $version" }
@@ -166,7 +181,7 @@ internal class DesktopUpdater(
         log.w { "Couldn't install Ketch $version: ${e.describeCauses()}" }
         withContext(io) { record.delete() }
         mutableState.value =
-          AppUpdateState.Failed(AppUpdateStep.Install, reason(e), version, release.pageUrl)
+          AppUpdateState.Failed(AppUpdateStep.Install, reason(e), version, ready.notesUrl)
       }
     }
   }
@@ -179,11 +194,11 @@ internal class DesktopUpdater(
     feed.releasesFrom(releaseVersion(first)).map { it.toNotes() }
 
   override fun setCheckAutomatically(enabled: Boolean) {
-    automatic?.cancel()
-    automatic = null
+    automaticChecks?.cancel()
+    automaticChecks = null
     // An app run from source only checks when asked, so it does not nag while it is worked on.
     if (!enabled || installer == null) return
-    automatic = scope.launch {
+    automaticChecks = scope.launch {
       delay(firstCheckDelay)
       while (true) {
         check(automatic = true)
@@ -193,12 +208,20 @@ internal class DesktopUpdater(
   }
 
   /**
-   * Looks for a newer release, unless one was already found or a step runs. A failed check of
-   * its own, such as one made offline, leaves the state as it was.
+   * Looks for a newer release, unless one was already found or a step runs, and downloads it
+   * while automatic checks are on. A failed check of its own, such as one made offline, leaves
+   * the state as it was; one of its own after a failed download tries the download again.
    */
   private fun check(automatic: Boolean) {
     if (step?.isActive == true) return
     val before = mutableState.value
+    val found = release
+    if (automatic && found != null &&
+      before is AppUpdateState.Failed && before.step == AppUpdateStep.Download
+    ) {
+      step = scope.launch { fetch(found) }
+      return
+    }
     val checkable = before is AppUpdateState.Idle || before is AppUpdateState.UpToDate ||
       (before is AppUpdateState.Failed && before.step == AppUpdateStep.Check)
     if (!checkable) return
@@ -226,7 +249,12 @@ internal class DesktopUpdater(
         if (automatic) before else AppUpdateState.Failed(AppUpdateStep.Check, reason(e))
       }
       mutableState.value = next
-      if (automatic && next is AppUpdateState.Available) onEvent(UpdateEvent.Found(next))
+      if (next !is AppUpdateState.Available) return@launch
+      // Downloaded on its own, it tells the user once it is ready to install.
+      val fetched = next.installable && automaticChecks != null &&
+        fetch(checkNotNull(release))
+      // Its Update button tries a failed download again.
+      if (automatic && !fetched) onEvent(UpdateEvent.Found(next))
     }
   }
 
@@ -242,15 +270,28 @@ internal class DesktopUpdater(
 
   /**
    * Reports an install the run before set out to make that did not take, or an update since
-   * [lastVersion] ran, made by this updater or any other way.
+   * [lastVersion] ran, made by this updater or any other way; else offers an update a run before
+   * downloaded and did not install.
    */
   private suspend fun reportPreviousRun(lastVersion: ReleaseVersion?) {
     val record = File(workDir, PENDING_INSTALL)
+    var downloaded: ReadyUpdate? = null
     val pending = withContext(io) {
       val text = record.takeIf { it.isFile }?.readText()?.trim()
-      // The download, the unpacked app and the scripts have served their purpose.
-      workDir.deleteRecursively()
+      // After an install, taken or not, nothing is offered again.
+      if (text == null && installer != null) downloaded = ReadyUpdate.read(workDir, current)
+      // Otherwise the download, the unpacked app and the scripts have served their purpose.
+      if (downloaded == null) workDir.deleteRecursively()
       text?.let(ReleaseVersion::parse)
+    }
+    val restarts = installer?.restarts ?: false
+    downloaded?.let { update ->
+      log.i { "Ketch ${update.version} was downloaded before and is ready to install" }
+      ready = update
+      val state = AppUpdateState.Ready(update.version, update.notesUrl, restarts)
+      mutableState.value = state
+      onEvent(UpdateEvent.Ready(state))
+      return
     }
     val event = when {
       pending != null && pending != current -> {
@@ -276,12 +317,88 @@ internal class DesktopUpdater(
     is UpdateException, is IOException -> e.message ?: e.describeCauses()
     else -> e.describeCauses()
   }
+}
 
-  private companion object {
-    /** Holds the version an installer that restarts the app set out to install. */
-    const val PENDING_INSTALL = "pending-install"
+/**
+ * Starts installing the update a run before downloaded and did not install, as the app starts,
+ * when [installer] replaces the app and opens it again; the caller then exits before it starts
+ * anything. Leaves it to [DesktopUpdater.start] to report or offer it otherwise: after an install
+ * that did not take, which is not tried again, or with an installer the user finishes.
+ *
+ * @param workDir the [DesktopUpdater]'s folder.
+ * @param current the running version.
+ * @return whether the installer started.
+ */
+internal fun installDownloadedUpdate(
+  workDir: File,
+  current: ReleaseVersion?,
+  installer: UpdateInstaller?,
+): Boolean {
+  if (installer == null || !installer.restarts) return false
+  val record = File(workDir, PENDING_INSTALL)
+  if (record.exists()) return false
+  val update = ReadyUpdate.read(workDir, current) ?: return false
+  val log = KetchLogger("Updater")
+  return try {
+    record.writeText(update.version)
+    File(workDir, READY_UPDATE).delete()
+    installer.install(update.prepared, ProcessHandle.current().pid())
+    log.i { "Installing Ketch ${update.version}, downloaded before, as the app starts" }
+    true
+  } catch (e: Exception) {
+    log.w { "Couldn't install Ketch ${update.version}: ${e.describeCauses()}" }
+    record.delete()
+    false
   }
 }
+
+/**
+ * A release downloaded and readied for its installer.
+ *
+ * @property prepared what [UpdateInstaller.prepare] made of the download.
+ */
+internal data class ReadyUpdate(val version: String, val notesUrl: String, val prepared: File) {
+  /** Saves it in [workDir], for a later launch. Blocks. */
+  fun save(workDir: File) {
+    val properties = Properties().apply {
+      setProperty(VERSION, version)
+      setProperty(NOTES_URL, notesUrl)
+      setProperty(PREPARED, prepared.absolutePath)
+    }
+    File(workDir, READY_UPDATE).outputStream().use { properties.store(it, null) }
+  }
+
+  companion object {
+    private const val VERSION = "version"
+    private const val NOTES_URL = "notesUrl"
+    private const val PREPARED = "prepared"
+
+    /**
+     * The update saved in [workDir], when it is newer than [current] and its files are still
+     * there; `null` otherwise. Blocks.
+     */
+    fun read(workDir: File, current: ReleaseVersion?): ReadyUpdate? {
+      val file = File(workDir, READY_UPDATE).takeIf { it.isFile } ?: return null
+      val properties = try {
+        Properties().apply { file.inputStream().use { load(it) } }
+      } catch (_: IOException) {
+        return null
+      }
+      val version = properties.getProperty(VERSION)?.let(ReleaseVersion::parse) ?: return null
+      if (current == null || version <= current) return null
+      val prepared = properties.getProperty(PREPARED)?.let(::File)?.takeIf { it.exists() }
+        ?: return null
+      val notesUrl = properties.getProperty(NOTES_URL).orEmpty()
+      return ReadyUpdate(version.toString(), notesUrl, prepared)
+    }
+  }
+}
+
+/** Holds the [ReadyUpdate] a run downloaded and did not install yet. */
+private const val READY_UPDATE = "ready-update.properties"
+
+/** Holds the version an installer that restarts the app set out to install. */
+private const val PENDING_INSTALL = "pending-install"
 
 private fun releaseVersion(text: String): ReleaseVersion =
   ReleaseVersion.parse(text) ?: throw UpdateException("$text is not a release")

@@ -18,6 +18,8 @@
   <string name="tray_devices">设备</string>
   <string name="tray_recent">最近</string>
   <string name="tray_show_ketch">显示 Ketch</string>
+  <string name="tray_update_restart">更新并重新启动</string>
+  <string name="tray_update_open_installer">安装更新…</string>
   <string name="tray_speed">速度</string>
   <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">显示</string>

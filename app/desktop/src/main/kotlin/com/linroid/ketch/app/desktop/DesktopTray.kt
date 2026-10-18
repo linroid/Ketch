@@ -31,6 +31,8 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
+import com.linroid.ketch.app.platform.AppUpdateState
+import com.linroid.ketch.app.platform.AppUpdates
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppController
@@ -73,6 +75,8 @@ import ketch.app.desktop.generated.resources.tray_speed
 import ketch.app.desktop.generated.resources.tray_speed_now
 import ketch.app.desktop.generated.resources.tray_stay_connected
 import ketch.app.desktop.generated.resources.tray_tooltip_downloading
+import ketch.app.desktop.generated.resources.tray_update_open_installer
+import ketch.app.desktop.generated.resources.tray_update_restart
 import ketch.app.desktop.generated.resources.tray_waiting
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
@@ -251,6 +255,8 @@ private fun DevicePresence.toPulse(): DevicePulse = DevicePulse(
  * @param state sends notifications from the icon, see [TrayNotifier].
  * @param onMessageClick runs when one of the icon's notifications is clicked, see
  *   [TrayNotifier.trayMessageClicked]; shows the window by default.
+ * @param updates the app's updates; once one is downloaded the menu offers to install it, with
+ *   [DesktopActions.installUpdate].
  */
 @Composable
 fun ApplicationScope.KetchTray(
@@ -260,6 +266,7 @@ fun ApplicationScope.KetchTray(
   speedMode: SpeedModeController? = null,
   state: TrayState = rememberTrayState(),
   onMessageClick: () -> Unit = actions.showWindow,
+  updates: AppUpdates? = null,
 ) {
   if (!isTraySupported) return
   // Read once, when the first tray icon is created.
@@ -279,7 +286,8 @@ fun ApplicationScope.KetchTray(
   val devices = status.devices.map { trayDevice(controller.state, it, localSpeed) }
   val fleet = status.fleet
   val now = LocalClock.current.now()
-  val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices))
+  val update = updates?.state?.collectAsState()?.value as? AppUpdateState.Ready
+  val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices, update))
   // Text resolves as it composes, so the menu composes again in a new language.
   val language = controller.appSettings.language
   val showSpeed = controller.appSettings.config.desktop.menuBarSpeed
@@ -357,6 +365,7 @@ internal data class TrayDevice(
  * @property recent finished downloads, newest first.
  * @property now the time the status sentence's clock times are relative to.
  * @property devices every configured device, in the order of the app's devices.
+ * @property update the downloaded update, which the menu offers to install; `null` for none.
  */
 internal data class TrayContext(
   val pulse: PulseState,
@@ -364,6 +373,7 @@ internal data class TrayContext(
   val recent: List<RecentDownload>,
   val now: Instant,
   val devices: List<TrayDevice> = emptyList(),
+  val update: AppUpdateState.Ready? = null,
 )
 
 /** The tray menu in [context]. */
@@ -373,6 +383,14 @@ internal fun trayMenu(context: TrayContext): List<MenuEntry> = buildList {
   val counts = context.pulse.onlineCounts
   val targets = context.pulse.devices.filter { it.health.isOnline }.map { it.deviceId }
   add(MenuEntry.Item(MenuAction.ShowWindow, Res.string.tray_show_ketch.text()))
+  context.update?.let { update ->
+    val label = if (update.restarts) {
+      Res.string.tray_update_restart
+    } else {
+      Res.string.tray_update_open_installer
+    }
+    add(MenuEntry.Item(MenuAction.InstallUpdate, label.text()))
+  }
   add(MenuEntry.Separator)
   add(MenuEntry.Header(context.pulse.sentence(now = context.now)))
   traySpeedLine(context.pulse)?.let { add(MenuEntry.Header(it)) }

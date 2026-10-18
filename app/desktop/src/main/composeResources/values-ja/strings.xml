@@ -18,6 +18,8 @@
   <string name="tray_devices">デバイス</string>
   <string name="tray_recent">最近のダウンロード</string>
   <string name="tray_show_ketch">Ketchを表示</string>
+  <string name="tray_update_restart">アップデートして再起動</string>
+  <string name="tray_update_open_installer">アップデートをインストール…</string>
   <string name="tray_speed">速度</string>
   <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">表示</string>

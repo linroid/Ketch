@@ -1826,9 +1826,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   GitHub ships `assembleDirectRelease`; Play uses `bundlePlayRelease`. See [updates](docs/updates.md).
 - Self-update (desktop): `DesktopUpdater` implements the shared `AppUpdates`
   (`LocalAppUpdates`, shown in Settings → About and the macOS Help menu); it checks GitHub daily
-  while `[desktop] checkForUpdates` is on, downloads this system's installer with the `updater`
-  module, and `UpdateInstaller` replaces the app once it quits (macOS bundle swap, `msiexec`,
-  `pkexec dpkg -i`) and opens it again. The installers carry a monotonic numeric version
+  while `[desktop] checkForUpdates` is on and then downloads this system's installer on its own
+  with the `updater` module (when asked otherwise); the tray then offers Update and restart
+  (`MenuAction.InstallUpdate`), and `UpdateInstaller` replaces the app once it quits (macOS
+  bundle swap, `msiexec`, `pkexec dpkg -i`) and opens it again. A download not installed is
+  saved (`ReadyUpdate`, `updates/ready-update.properties`) and installed by the next plain launch
+  from `main` before anything starts (`installDownloadedUpdate`; hidden launches and those
+  bringing files or links offer it again), never after an install that did not take. The installers carry a monotonic numeric version
   (`installerVersion()` in `app/desktop/build.gradle.kts`) and the MSI a pinned `upgradeUuid`,
   so Windows Installer upgrades; see [updates](docs/updates.md)
 - Portable Windows app (`packageReleasePortableZip`, released as `…-windows-<arch>-portable.zip`):

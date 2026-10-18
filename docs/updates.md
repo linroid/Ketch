@@ -48,13 +48,19 @@ and the switch for automatic checks (`[desktop] checkForUpdates`, on by default)
 Help menu also has **Check for Updates…**.
 
 1. While the switch is on, the installed app checks 30 seconds after it starts and then once a
-   day. An app run from Gradle or an IDE only checks when asked, and links to the release page.
-2. A check that finds a release shows a toast with **Update** and **What's new**, which opens its
-   [release notes](#release-notes).
-3. **Update** downloads the installer for this system and checks it; another toast then offers
-   **Restart**.
-4. On restart, the app quits and an installer runs in a process of its own. It writes to
+   day, and downloads the installer for this system as soon as it finds a release. An app run
+   from Gradle or an IDE only checks when asked, and links to the release page.
+2. Once the installer is downloaded and checked, a toast offers **Restart** and the tray menu
+   **Update and restart** (**Install update…** where the app opens the installer instead). If
+   the download fails, the toast offers **Update** and **What's new**, which opens its
+   [release notes](#release-notes), and the next day's check tries the download again. With the
+   switch off, a check made in Settings shows **Update**, which downloads it.
+3. On restart, the app quits and an installer runs in a process of its own. It writes to
    `logs/update.log` in the config folder and opens the app again, updated or not.
+4. An update downloaded and not installed installs the next time you open the app, before
+   anything else starts. A launch that starts hidden (at login, or for the browser extension) or
+   that opens files or links starts as usual and offers the update again; so does an app whose
+   update opens an installer. After an install that did not take, it is not tried again.
 
 | System | How it installs | Needs |
 |---|---|---|

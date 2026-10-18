@@ -21,6 +21,7 @@ import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.detail
+import com.linroid.ketch.app.platform.AppUpdateState
 import com.linroid.ketch.app.state.DeviceHealth
 import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.PulseCounts
@@ -101,6 +102,20 @@ class DesktopTrayModelTest {
     assertTrue(menu[2] is MenuEntry.Header)
     assertEquals(MenuEntry.Separator, menu[3])
     assertTrue(menu.last().runs(KetchCommands.Quit))
+  }
+
+  @Test
+  fun trayMenu_updateDownloaded_offersToInstallItAfterShowKetch() = runTest {
+    val restarting = AppUpdateState.Ready("0.0.2", "https://x.test", restarts = true)
+    val menu = trayMenu(tray(pulse(PulseCounts()), update = restarting))
+
+    val item = menu[1] as MenuEntry.Item
+    assertEquals(MenuAction.InstallUpdate, item.action)
+    assertEquals("Update and restart", item.label.load())
+    assertEquals(MenuEntry.Separator, menu[2])
+
+    val opening = trayMenu(tray(pulse(PulseCounts()), update = restarting.copy(restarts = false)))
+    assertEquals("Install update…", (opening[1] as MenuEntry.Item).label.load())
   }
 
   @Test
@@ -811,7 +826,8 @@ class DesktopTrayModelTest {
     speed: TraySpeed? = null,
     recent: List<RecentDownload> = emptyList(),
     devices: List<TrayDevice> = emptyList(),
-  ): TrayContext = TrayContext(pulse, speed, recent, now, devices)
+    update: AppUpdateState.Ready? = null,
+  ): TrayContext = TrayContext(pulse, speed, recent, now, devices, update)
 
   // A device as the app's devices list it: This Mac, else a remote device named [name].
   private fun presence(

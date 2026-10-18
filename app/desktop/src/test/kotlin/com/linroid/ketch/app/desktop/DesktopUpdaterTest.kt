@@ -93,7 +93,25 @@ class DesktopUpdaterTest {
   }
 
   @Test
-  fun automaticCheck_newerRelease_postsAToastOnceADay() = runTest {
+  fun automaticCheck_newerRelease_downloadsItAndPostsAToastOnceReady() = runTest {
+    val updater = updater()
+    updater.setCheckAutomatically(true)
+    advanceTimeBy(31.seconds)
+    runCurrent()
+
+    assertEquals("ketch-desktop-0.0.2-macos-arm64.dmg", downloads.single().name)
+    val ready = AppUpdateState.Ready("0.0.2", newer.pageUrl, restarts = true)
+    assertEquals(ready, updater.state.value)
+    assertEquals(listOf<UpdateEvent>(UpdateEvent.Ready(ready)), events)
+    // A release already found is not looked up again.
+    advanceTimeBy(25.hours)
+    runCurrent()
+    assertEquals(1, feed.calls)
+  }
+
+  @Test
+  fun automaticCheck_downloadFailure_offersTheReleaseAndTriesAgainNextDay() = runTest {
+    downloadFails = true
     val updater = updater()
     updater.setCheckAutomatically(true)
     advanceTimeBy(31.seconds)
@@ -101,10 +119,24 @@ class DesktopUpdaterTest {
 
     val found = assertIs<UpdateEvent.Found>(events.single())
     assertEquals("0.0.2", found.update.version)
-    // A release already found is not looked up again.
-    advanceTimeBy(25.hours)
+    val failed = assertIs<AppUpdateState.Failed>(updater.state.value)
+    assertEquals(AppUpdateStep.Download, failed.step)
+
+    downloadFails = false
+    advanceTimeBy(24.hours)
     runCurrent()
-    assertEquals(1, feed.calls)
+    assertIs<AppUpdateState.Ready>(updater.state.value)
+    assertEquals(2, downloads.size)
+  }
+
+  @Test
+  fun check_whileCheckingAutomatically_downloadsTheRelease() = runTest {
+    val updater = updater()
+    updater.setCheckAutomatically(true)
+    updater.check()
+    runCurrent()
+
+    assertIs<AppUpdateState.Ready>(updater.state.value)
   }
 
   @Test
@@ -204,6 +236,16 @@ class DesktopUpdaterTest {
   }
 
   @Test
+  fun download_savesTheUpdateUntilItIsInstalled() = runTest {
+    val updater = ready()
+    assertTrue(File(workDir, "ready-update.properties").isFile)
+
+    updater.install()
+    runCurrent()
+    assertFalse(File(workDir, "ready-update.properties").exists())
+  }
+
+  @Test
   fun install_openingTheInstaller_staysOpen() = runTest {
     installer.restarts = false
     val updater = ready()
@@ -290,6 +332,78 @@ class DesktopUpdaterTest {
     runCurrent()
 
     assertTrue(events.isEmpty())
+  }
+
+  @Test
+  fun start_withAnUpdateDownloadedBefore_offersItAgain() = runTest {
+    ready()
+    events.clear()
+    val updater = updater()
+    updater.start(checkAutomatically = false, lastVersion = "0.0.1")
+    runCurrent()
+
+    val ready = AppUpdateState.Ready("0.0.2", newer.pageUrl, restarts = true)
+    assertEquals(ready, updater.state.value)
+    assertEquals(listOf<UpdateEvent>(UpdateEvent.Ready(ready)), events)
+    updater.install()
+    runCurrent()
+    val download = File(workDir, "ketch-desktop-0.0.2-macos-arm64.dmg")
+    assertEquals(download, installer.installed.single().first)
+  }
+
+  @Test
+  fun start_withAnUpdateNoNewerThanThisVersion_clearsIt() = runTest {
+    ready()
+    events.clear()
+    updater(current = "0.0.2").start(checkAutomatically = false, lastVersion = "0.0.2")
+    runCurrent()
+
+    assertTrue(events.isEmpty())
+    assertFalse(workDir.exists())
+  }
+
+  @Test
+  fun installDownloadedUpdate_installsItAndRecordsTheInstall() = runTest {
+    ready()
+
+    val started = installDownloadedUpdate(workDir, ReleaseVersion.parse("0.0.1"), installer)
+
+    assertTrue(started)
+    assertEquals(ProcessHandle.current().pid(), installer.installed.single().second)
+    assertEquals("0.0.2", File(workDir, "pending-install").readText())
+    assertFalse(File(workDir, "ready-update.properties").exists())
+  }
+
+  @Test
+  fun installDownloadedUpdate_installerTheUserFinishes_leavesItToStart() = runTest {
+    ready()
+    installer.restarts = false
+
+    assertFalse(installDownloadedUpdate(workDir, ReleaseVersion.parse("0.0.1"), installer))
+    assertTrue(installer.installed.isEmpty())
+  }
+
+  @Test
+  fun installDownloadedUpdate_afterAnInstallThatDidNotTake_doesNotTryAgain() = runTest {
+    ready()
+    File(workDir, "pending-install").writeText("0.0.2")
+
+    assertFalse(installDownloadedUpdate(workDir, ReleaseVersion.parse("0.0.1"), installer))
+    assertTrue(installer.installed.isEmpty())
+  }
+
+  @Test
+  fun installDownloadedUpdate_failure_forgetsTheRecord() = runTest {
+    ready()
+    installer.installFailure = IOException("no permission")
+
+    assertFalse(installDownloadedUpdate(workDir, ReleaseVersion.parse("0.0.1"), installer))
+    assertFalse(File(workDir, "pending-install").exists())
+  }
+
+  @Test
+  fun installDownloadedUpdate_nothingDownloaded_doesNothing() {
+    assertFalse(installDownloadedUpdate(workDir, ReleaseVersion.parse("0.0.1"), installer))
   }
 
   @Test

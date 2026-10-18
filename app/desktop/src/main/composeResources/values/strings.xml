@@ -34,6 +34,10 @@
   <!-- Submenu of the downloads that finished last on this computer. -->
   <string name="tray_recent">Recent</string>
   <string name="tray_show_ketch">Show Ketch</string>
+  <!-- Shown once an update is downloaded: quits, installs it and opens Ketch again. -->
+  <string name="tray_update_restart">Update and restart</string>
+  <!-- Shown once an update is downloaded where Ketch cannot replace itself: opens the installer. -->
+  <string name="tray_update_open_installer">Install update…</string>
   <string name="tray_speed">Speed</string>
   <!-- Under the tray menu's status sentence while downloading. %1$s is the speed: "↓ 4.2 MB/s". -->
   <string name="tray_speed_now">↓ %1$s</string>

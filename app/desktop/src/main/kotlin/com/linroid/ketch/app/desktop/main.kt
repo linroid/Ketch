@@ -286,6 +286,18 @@ fun main(args: Array<String>) {
       log.w { "Portable copy: can't write to ${portable.dataDir}, so data is kept in $configDir" }
     }
   }
+  // An update downloaded before installs as the app opens, before anything else starts; the
+  // installer opens the app again. A launch that starts hidden, as at login or for the browser
+  // extension, or that brings files or links, starts as it is and offers the update instead.
+  if (!background && launched.files.isEmpty() && launched.links.isEmpty()) {
+    val updates = File(configDir, UPDATES_DIR)
+    val updateLog = File(File(configDir, LOGS_DIR), UPDATE_LOG)
+    val installer = UpdateInstaller.forThisApp(updates, updateLog)
+    if (installDownloadedUpdate(updates, ReleaseVersion.parse(KetchApi.VERSION), installer)) {
+      singleInstance.close()
+      exitProcess(0)
+    }
+  }
   installOpenFileHandler { files ->
     open(OpenedArguments(files = files), LinkSource.Arguments)
     windowRequests.trySend(Unit)
@@ -497,6 +509,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       quit = { behavior.requestQuit() },
       openFiles = launch.openFiles,
       checkForUpdates = updater::check,
+      installUpdate = updater::install,
     )
   }
   val active by controller.state.activeInstance.collectAsState()
@@ -572,7 +585,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   LaunchedEffect(notifier, behavior, files) {
     notifier.clicks.collect { openNotification(it, controller, behavior, files) }
   }
-  KetchTray(controller, status, actions, speedMode, trayState, notifier::trayMessageClicked)
+  KetchTray(
+    controller = controller,
+    status = status,
+    actions = actions,
+    speedMode = speedMode,
+    state = trayState,
+    onMessageClick = notifier::trayMessageClicked,
+    updates = updater,
+  )
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   // Text resolves as it composes, so the menus compose again in a new language.
   val language = controller.appSettings.language

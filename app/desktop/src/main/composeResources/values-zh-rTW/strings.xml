@@ -18,6 +18,8 @@
   <string name="tray_devices">裝置</string>
   <string name="tray_recent">最近項目</string>
   <string name="tray_show_ketch">顯示 Ketch</string>
+  <string name="tray_update_restart">更新並重新啟動</string>
+  <string name="tray_update_open_installer">安裝更新…</string>
   <string name="tray_speed">速度</string>
   <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">顯示</string>

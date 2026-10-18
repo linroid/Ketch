@@ -18,6 +18,8 @@
   <string name="tray_devices">Dispositivos</string>
   <string name="tray_recent">Recentes</string>
   <string name="tray_show_ketch">Mostrar o Ketch</string>
+  <string name="tray_update_restart">Atualizar e reiniciar</string>
+  <string name="tray_update_open_installer">Instalar atualização…</string>
   <string name="tray_speed">Velocidade</string>
   <string name="tray_speed_now">↓ %1$s</string>
   <string name="tray_show">Mostrar</string>
