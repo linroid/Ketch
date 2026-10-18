@@ -205,8 +205,10 @@ class TorrentDownloadSource(
   // The state each seeding session saves its checkpoint into, by task ([saveSeedingState]): set
   // once it seeds, removed once it stops or a run of the task takes it over.
   private val seedStates = MutableStateFlow<Map<String, TorrentSourceState>>(emptyMap())
-  // The seed-only sessions [startSeeding] lent a slot to while they check their files, by task:
-  // a smaller selection saved meanwhile reaches them ([changeSeedingSelection]).
+  // The seed-only sessions [startSeeding] opened and still waits on, by task, listed before their
+  // slot is lent: a smaller selection saved once the slot is lent reaches them
+  // ([changeSeedingSelection]), and a run of the task that takes one over ends the wait
+  // ([CheckingSeeder.takenOver]).
   private val checkingSeeders = MutableStateFlow<Map<String, CheckingSeeder>>(emptyMap())
   // Where seeding sessions save their state: the task records, once attached.
   private val sessionStates =
