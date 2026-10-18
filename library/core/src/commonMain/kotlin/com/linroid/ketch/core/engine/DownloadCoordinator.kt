@@ -298,7 +298,8 @@ internal class DownloadCoordinator(
    *
    * @param deletePartialFile whether a running download deletes the file it was writing: `true`
    *   for an explicit cancel or `remove(deleteFiles = true)`, `false` for
-   *   `remove(deleteFiles = false)`, which flushes the file it keeps
+   *   `remove(deleteFiles = false)`, which closes the file it keeps without flushing it, as no
+   *   record is left to resume from it
    */
   suspend fun cancel(handle: TaskHandle, deletePartialFile: Boolean) {
     val taskId = handle.taskId
@@ -313,7 +314,7 @@ internal class DownloadCoordinator(
       val stopping = entry?.job ?: stoppingDownloads[taskId]
       entry?.execution?.let { execution ->
         execution.stopReportingProgress()
-        if (deletePartialFile) execution.discardPartialFile() else execution.flushKeptFile()
+        if (deletePartialFile) execution.discardPartialFile()
       }
       stopping?.cancel()
       activeDownloads.remove(taskId)

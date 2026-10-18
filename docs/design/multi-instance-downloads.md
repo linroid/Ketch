@@ -942,10 +942,11 @@ in one mutex section, call `fileAccessor.flush()`, then `record.update(…)`. Ev
 snapshot was written before the flush began, so persisted progress never exceeds durable bytes.
 This covers the periodic save (`DownloadExecution.runDownload`'s `saveJob` never flushes today),
 the `NonCancellable` final save (no flush today) and shutdown. `DownloadCoordinator.pause` never
-touches the file: a run that a pause or `remove(deleteFiles = false)` stops before its last flush
-flushes the file it keeps in `cleanupAfterExecution`, after its final save and before closing it,
-so a crash between the two counts bytes that may not be on disk; fixing the final save fixes
-pause. A failure or `Ketch.close()` closes the file unflushed, so neither waits for the disk.
+touches the file: a run that a pause stops before its last flush flushes the file it keeps in
+`cleanupAfterExecution`, after its final save and before closing it, so a crash between the two
+counts bytes that may not be on disk; fixing the final save fixes pause. A failure,
+`Ketch.close()` or `remove(deleteFiles = false)`, which drops the record that would resume from the
+file, closes it unflushed, so none waits for the disk.
 
 #359 covers one case: when the flush after a finished transfer throws, `discardProgress` keeps the
 file and the segment layout, zeroes every prefix in memory and in the record, and the task fails

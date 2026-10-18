@@ -452,10 +452,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
   execution; a canceled torrent keeps its files and sidecar until the task is removed, which deletes
   the files only with `deleteFiles`); a pause, a failure, `close()` or `remove(deleteFiles = false)`
-  keeps it and its segments, but a failed final flush resets their progress. A run that a pause or
-  `remove(deleteFiles = false)` stops before its last flush flushes the file itself before closing
-  it (`DownloadExecution.flushKeptFile`; never the pause, which would race the close); a failure or
-  `close()` closes it unflushed, so neither waits for the disk. For files the engine writes (not
+  keeps it and its segments, but a failed final flush resets their progress. A run that a pause
+  stops before its last flush flushes the file itself before closing it
+  (`DownloadExecution.flushKeptFile`; never the pause, which would race the close); a failure,
+  `close()` or `remove(deleteFiles = false)`, whose record goes, closes it unflushed, so none waits
+  for the disk. For files the engine writes (not
   torrents), an empty segment list is no progress: it is never saved, and resuming one starts from
   zero
 - `DownloadState.Completed` reports the size and the download time, summed over every run and

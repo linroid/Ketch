@@ -248,17 +248,21 @@ class DownloadCoordinatorPauseTest {
   }
 
   @Test
-  fun cancel_keepingTheFile_flushesItBeforeTheRunClosesIt() = runTest {
-    val file = RecordingFile()
+  fun cancel_keepingTheFile_closesItWithoutWaitingForTheDisk() = runTest {
+    // As remove(deleteFiles = false) does: its record goes, so nothing resumes from the file.
+    val file = RecordingFile(CompletableDeferred())
     val handle = handle()
     val coordinator = coordinator(WritingSource(), openFile = { _, _ -> file })
     try {
       coordinator.start(handle)
       runCurrent()
 
-      coordinator.cancel(handle, deletePartialFile = false)
+      val cancel = launch { coordinator.cancel(handle, deletePartialFile = false) }
+      runCurrent()
 
-      assertEquals(listOf("write", "flush", "close"), file.ops)
+      assertTrue(cancel.isCompleted)
+      assertEquals(listOf("write", "close"), file.ops)
+      assertEquals(DownloadState.Canceled, handle.mutableState.value)
     } finally {
       coordinator.close()
     }
