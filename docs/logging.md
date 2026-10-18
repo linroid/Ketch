@@ -128,7 +128,7 @@ Log messages keep the names of Ketch's API types and of exceptions, and the CLI 
 
 | Symptom | What to look for |
 |---------|------------------|
-| A download fails | `Download failed for taskId=...` with its cause chain (a warning, or an error with its stack trace when the failure is unknown, the disk's or a source error a bug caused, such as one wrapping an `IndexOutOfBoundsException`), where `FailedRequest` names an HTTP request that failed and its URL after redirects, and the `Retry n/m` lines before it |
+| A download fails | `Download failed for taskId=...` with its cause chain (a warning, or an error with its stack trace when the failure is unknown, the disk's or a source error a bug caused, such as one wrapping an `IndexOutOfBoundsException`), where `FailedRequest` names an HTTP request that failed and its URL after redirects, without its query, and the `Retry n/m` lines before it |
 | A resume restarts from zero | `ETag mismatch`, `Last-Modified mismatch` or `Local file integrity check failed` |
 | A task stays queued | `[DownloadQueue]` lines showing the concurrency and per-host limits |
 | A magnet never resolves | `Fetching metadata for magnet` repeating, tracker announce failures and DHT contacts; at debug, `Metadata for magnet ... not found within` after each 2-minute round |

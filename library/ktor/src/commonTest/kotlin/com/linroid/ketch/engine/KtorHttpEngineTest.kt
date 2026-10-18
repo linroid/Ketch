@@ -587,17 +587,28 @@ class KtorHttpEngineTest {
       val failed = assertFailsWith<KetchError.Network> { engine.download(URL, null) {} }
 
       assertEquals(
-        "Http: HTTP error 503: Service Unavailable <- " +
-          "FailedRequest: GET https://cdn.example/file?sig=***",
+        "Http: HTTP error 503: Service Unavailable <- FailedRequest: GET https://cdn.example/file",
         refused.describeCauses(),
       )
       // Coroutines may add a copy of the exception they recover below it.
       val causes = failed.describeCauses()
       val expected = "Network: Network error occurred <- " +
-        "FailedRequest: GET https://cdn.example/file?sig=*** <- " +
+        "FailedRequest: GET https://cdn.example/file <- " +
         "IllegalStateException: TLS handshake failed"
       assertTrue(causes.startsWith(expected), causes)
     }
+  }
+
+  @Test
+  fun failedRequest_urlWithCredentials_namesOnlyItsOriginAndPath() {
+    // Signed links carry tokens redactUrl does not know, such as a JWT, and the message may be
+    // shown to users, as an update's failure is.
+    val signed = Url("https://user:pass@cdn.example:8443/a/b%20c?sig=abc&jwt=eyJ.e30.c2ln#part")
+    assertEquals("GET https://cdn.example:8443/a/b%20c", FailedRequest("GET", signed).message)
+    val local = Url("http://[::1]:8080/file?token=abc")
+    assertEquals("HEAD http://[::1]:8080/file", FailedRequest("HEAD", local).message)
+    val origin = Url("https://cdn.example")
+    assertEquals("GET https://cdn.example", FailedRequest("GET", origin).message)
   }
 
   @Test

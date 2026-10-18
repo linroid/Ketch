@@ -32,6 +32,7 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentLength
+import io.ktor.http.hostWithPortIfSpecified
 import io.ktor.http.isSecure
 import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
@@ -76,7 +77,7 @@ class KtorHttpEngine private constructor(
    * @param client the Ktor HTTP client to use, or `null` for the engine's own clients, with
    *   infinite timeouts (suitable for large downloads)
    * @param logRequests whether request URLs, response headers, and transport errors may be logged,
-   *   and whether the errors it throws name the request that failed, its URL redacted
+   *   and whether the errors it throws name the request that failed, without its URL's query
    * @param userAgent the `User-Agent` of requests whose headers name none, [DEFAULT_USER_AGENT]
    *   by default; `null` leaves it to [client]
    */
@@ -765,13 +766,19 @@ class KtorHttpEngine private constructor(
 }
 
 /**
- * The request a [KtorHttpEngine] error failed, its cause: [method] and the URL it went to, after
- * redirects, [redacted][redactUrl]. The engine logs each attempt's failure at debug level only,
- * so through it the failure a caller reports, such as a download that gives up retrying, says
- * where it failed ([describeCauses]).
+ * The request a [KtorHttpEngine] error failed, its cause: [method] and where it went, after
+ * redirects, as the scheme, host, port and path of its URL. The engine logs each attempt's failure
+ * at debug level only, so through it the failure a caller reports, such as a download that gives
+ * up retrying, says where it failed ([describeCauses]). Its user information and query are left
+ * out: they may hold credentials [redactUrl] does not know, such as the tokens of a signed link,
+ * and callers show the failure to users too, as an update's.
  */
 internal class FailedRequest(method: String, url: Url, cause: Throwable? = null) :
-  Exception("$method ${redactUrl(url.toString())}", cause)
+  Exception("$method ${url.originAndPath()}", cause)
+
+/** This URL's scheme, host, port and path, without its user information, query or fragment. */
+private fun Url.originAndPath(): String =
+  "${protocol.name}://$hostWithPortIfSpecified$encodedPath"
 
 /** What the caller's callback threw while a response was read, kept apart from the request's. */
 private class CallbackFailure(override val cause: Exception) : Exception(cause)

@@ -382,9 +382,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   transport failures, 5xx and 429 at debug, as callers retry them (`DownloadExecution` warns at
   each retry, `DownloadCoordinator` reports the failure), and only other refusals of a GET or
   probe as errors, naming the URL. Its errors name the request that failed in a cause
-  (`FailedRequest`: the method and the URL after redirects, `redactUrl`ed), so those warnings
-  say where; not with `logRequests = false`, nor for what an `onData` callback throws, which
-  stays the `KetchError.Network`'s cause
+  (`FailedRequest`: the method and the URL after redirects, without user info or query, whose
+  tokens `redactUrl` may miss and which update failures show users), so those warnings say
+  where; not with `logRequests = false`, nor for what an `onData` callback throws, which stays
+  the `KetchError.Network`'s cause
 - Names from a server (`Content-Disposition`), a URL or an FTP path pass through
   `sanitizeFileName()` (last `/` or `\` segment, no control, bidi or Windows-reserved characters
   or device names, at most 255 UTF-8 bytes, `null` when nothing is left), in the sources and again

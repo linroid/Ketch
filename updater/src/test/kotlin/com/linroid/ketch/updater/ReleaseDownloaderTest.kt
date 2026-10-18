@@ -1,6 +1,13 @@
 package com.linroid.ketch.updater
 
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.engine.KtorHttpEngine
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.nio.file.Files
@@ -70,6 +77,31 @@ class ReleaseDownloaderTest {
       downloader(engine).download(asset(sha256 = "00"), File(dir, "ketch.tar.gz"))
     }
     assertTrue(engine.requests.isEmpty())
+  }
+
+  @Test
+  fun download_signedTargetRefused_saysWhereWithoutItsQuery() = runTest {
+    // GitHub sends release files to a signed link, whose query holds tokens not every one of
+    // which a log redacts; the message shows in the apps' settings and on stderr.
+    val signed = "https://release-assets.example/asset/1?sp=r&sig=abc&jwt=eyJhbGciOi.e30.c2ln"
+    val engine = {
+      KtorHttpEngine(HttpClient(MockEngine { request ->
+        if (request.url.toString() == url) {
+          respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, signed))
+        } else {
+          respond("", HttpStatusCode.Forbidden)
+        }
+      }))
+    }
+    val error = assertFailsWith<UpdateException> {
+      ReleaseDownloader(engine, Logger.None)
+        .download(asset(sha256 = sha256Of(content)), File(dir, "ketch.tar.gz"))
+    }
+
+    val message = error.message.orEmpty()
+    assertContains(message, "Couldn't download ketch.tar.gz: Http: HTTP error 403")
+    assertContains(message, "GET https://release-assets.example/asset/1")
+    assertFalse('?' in message, message)
   }
 
   private fun downloader(engine: FakeHttpEngine) = ReleaseDownloader({ engine }, Logger.None)

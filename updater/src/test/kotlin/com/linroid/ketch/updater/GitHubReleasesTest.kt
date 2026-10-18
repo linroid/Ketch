@@ -1,10 +1,17 @@
 package com.linroid.ketch.updater
 
+import com.linroid.ketch.engine.KtorHttpEngine
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -100,6 +107,21 @@ class GitHubReleasesTest {
     assertEquals("", releases[0].notes)
     // A time GitHub never sends is no reason to lose the notes.
     assertNull(releases[1].publishedAt)
+  }
+
+  @Test
+  fun releases_unreachable_saysWhereWithoutTheQuery() = runTest {
+    val client = { HttpClient(MockEngine { throw IOException("Connection reset") }) }
+    val feed = GitHubReleases({ KtorHttpEngine(client()) }, apiUrl = api)
+    // The engine answers on its own threads, which the test's virtual time would outrun.
+    val error = withContext(Dispatchers.Default) {
+      assertFailsWith<UpdateException> { feed.releases(1) }
+    }
+
+    val message = error.message.orEmpty()
+    assertContains(message, "Couldn't reach GitHub: ")
+    assertContains(message, "GET $api/repos/linroid/Ketch/releases")
+    assertFalse('?' in message, message)
   }
 
   @Test
