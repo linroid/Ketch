@@ -245,6 +245,33 @@ class UtpEndpointTest {
   }
 
   @Test
+  fun engine_listenPortTakenForUdp_picksAPortFreeForBoth() = endpoints { network, scope ->
+    // The first port the system picks for TCP is held for UDP, as by another socket or a
+    // Windows excluded port range: peers dialing the listen port over uTP would reach nothing.
+    var taken = -1
+    val crowded = object : TorrentNetwork by network {
+      override suspend fun listen(local: PeerEndpoint) = network.listen(local).also {
+        if (taken < 0) taken = it.local.port
+      }
+
+      override suspend fun bindUdp(local: PeerEndpoint): TorrentDatagramSocket {
+        if (local.port == taken) throw IOException("Address already in use")
+        return network.bindUdp(local)
+      }
+    }
+    val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false), rawNetwork = crowded,
+      listenHost = "127.0.0.1")
+    try {
+      engine.start()
+      assertTrue(engine.listenPort != taken)
+      val a = side(network, scope, dialOptions = UtpOptions(synRetries = 1))
+      a.endpoint.dial(PeerEndpoint("127.0.0.1", engine.listenPort)).close()
+    } finally {
+      engine.stop()
+    }
+  }
+
+  @Test
   fun fallback_peersKnownForUtp_skipTcp() = endpoints { network, scope ->
     val b = side(network, scope)
     val a = side(network, scope)

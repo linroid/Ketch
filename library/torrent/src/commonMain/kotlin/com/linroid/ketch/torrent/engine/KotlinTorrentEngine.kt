@@ -366,7 +366,7 @@ internal class KotlinTorrentEngine(
   override suspend fun start() = mutex.withLock {
     check(!closed && shutdown.load() == null) { "Torrent runtime is closed" }
     if (running.load()) return@withLock
-    val listener = network.listen(PeerEndpoint(listenHost, config.listenPort))
+    val listener = listenForPeers()
     advertisedPort.setListen(listener.local.port)
     running.store(true)
     acceptIncoming(listener)
@@ -390,6 +390,34 @@ internal class KotlinTorrentEngine(
         ", dht=${config.dhtEnabled}, maxActiveTorrents=${config.maxActiveTorrents}, " +
         "maxConnections=${config.maxConnections}, extraTrackers=${additionalTrackers.load().size}"
     }
+  }
+
+  /**
+   * Listens on [TorrentConfig.listenPort], or on a port the system picks whose UDP port is free
+   * too, as DHT and uTP bind the listen port over UDP: another socket, or on Windows an excluded
+   * port range, may hold it for UDP while TCP had it free, and peers dialing it over uTP would
+   * reach nothing. After [SHARED_PORT_ATTEMPTS] the last port picked is kept anyway.
+   */
+  private suspend fun listenForPeers(): TorrentListener {
+    val local = PeerEndpoint(listenHost, config.listenPort)
+    if (config.listenPort != 0) return network.listen(local)
+    repeat(SHARED_PORT_ATTEMPTS - 1) {
+      val listener = network.listen(local)
+      val udp = try {
+        attempt { network.bindUdp(PeerEndpoint(WILDCARD_IPV4, listener.local.port)) }
+      } catch (e: CancellationException) {
+        listener.close()
+        throw e
+      }
+      // Free: closed again for udpPort to bind, as uTP or DHT may never run.
+      if (udp != null) {
+        udp.close()
+        return listener
+      }
+      log.d { "UDP port ${listener.local.port} is taken, picking another listen port" }
+      listener.close()
+    }
+    return network.listen(local)
   }
 
   private fun acceptIncoming(listener: TorrentListener) = scope.launch {
@@ -1777,6 +1805,9 @@ internal class KotlinTorrentEngine(
 private const val WILDCARD_IPV4 = "0.0.0.0"
 /** The hosts DHT and uTP bind UDP on: every IPv4 and every IPv6 interface. */
 private val UDP_HOSTS = listOf(WILDCARD_IPV4, "::")
+
+/** How many system-picked listen ports [KotlinTorrentEngine] tries for one UDP has free too. */
+private const val SHARED_PORT_ATTEMPTS = 8
 
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128

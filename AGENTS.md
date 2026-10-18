@@ -1174,7 +1174,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   multicast (skipped where the system refuses it)
 - `TorrentConfig.listenPort` is the incoming TCP port; DHT binds the same port over UDP when it
   can (else any port), so one forwarded port reaches both. `0` lets the system pick at every
-  start. Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
+  start, a port whose UDP port is free too (up to 8 tries, as another socket or a Windows
+  excluded range may hold it for UDP alone). Only `ketch server` sets one (`[torrent] listenPort`, `KETCH_TORRENT_PORT`,
   `--torrent-port`; 16881 in the Docker image): the apps and other commands may run beside it
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
   app) and resolve their content through `KetchApi.resolve`, like dropped files (dropped files
