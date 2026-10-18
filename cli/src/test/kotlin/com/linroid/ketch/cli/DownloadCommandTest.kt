@@ -77,9 +77,13 @@ class DownloadCommandTest {
         in message,
       message,
     )
-    assertFalse("\tat " in message, message)
+    // The console logger writes warnings, and any stack trace they carry, to stdout.
     val stdout = out.toString(Charsets.UTF_8)
+    assertFalse("\tat " in message, message)
+    assertFalse("\tat " in stdout, stdout)
     assertFalse("[INFO]" in stdout, stdout)
+    assertEquals(1, Regex("""\[WARN] .*Download failed for taskId=""").findAll(stdout).count(),
+      stdout)
   }
 
   @Test
