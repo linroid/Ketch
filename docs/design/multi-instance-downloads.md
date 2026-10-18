@@ -941,9 +941,11 @@ Every checkpoint is **snapshot → sync → persist**: export segments, provenan
 in one mutex section, call `fileAccessor.flush()`, then `record.update(…)`. Every byte in the
 snapshot was written before the flush began, so persisted progress never exceeds durable bytes.
 This covers the periodic save (`DownloadExecution.runDownload`'s `saveJob` never flushes today),
-the `NonCancellable` final save (no flush today) and shutdown. `DownloadCoordinator.pause` flushes
-right after `job.cancel()`, before the execution's final save, so writes still in flight can land
-after that flush yet be counted; fixing the final save fixes pause.
+the `NonCancellable` final save (no flush today) and shutdown. `DownloadCoordinator.pause` never
+touches the file: a run that a pause or `remove(deleteFiles = false)` stops before its last flush
+flushes the file it keeps in `cleanupAfterExecution`, after its final save and before closing it,
+so a crash between the two counts bytes that may not be on disk; fixing the final save fixes
+pause. A failure or `Ketch.close()` closes the file unflushed, so neither waits for the disk.
 
 #359 covers one case: when the flush after a finished transfer throws, `discardProgress` keeps the
 file and the segment layout, zeroes every prefix in memory and in the record, and the task fails
@@ -1543,7 +1545,7 @@ are this design's alone:
 | # | Hazard | Evidence at HEAD | Fix |
 | --- | --- | --- | --- |
 | 1 | A record without segments restarts under a new name beside its own file | `HttpDownloadSource.download` and `FtpDownloadSource.download` publish their segments and then `preallocate` the full size, but `runDownload` first saves after `saveIntervalMs` (5 s). A crash in between, or `Ketch.close()` before the final save runs (item 3), leaves `segments = null` (#359) beside a full-size file. On restart `DownloadCoordinator.resume` returns `false`, and `start` → `DownloadExecution.executeFresh` → `resolveDestPath(deduplicate = true)` picks "name (1).ext" for a folder or default destination, leaving the preallocated file (#359's `pause_unknownSizeStream_resumesIntoSameFile` names the same rename). A legacy `[]` record beside a preallocated file, which #359 restarts, does the same | `executeFresh` reuses `record.outputPath` when the record has one, so a restart overwrites its own file |
-| 2 | Checkpoints can exceed durable bytes | `saveJob` and the `NonCancellable` final save never flush; the flush after a finished transfer runs after the final save, and #359's `discardProgress` resets progress only when that flush throws, not when the process dies between the two; `DownloadCoordinator.pause` flushes right after `job.cancel()`, before the final save; on Apple targets okio's flush is `fflush` | Snapshot → sync → persist; `F_FULLFSYNC` on Apple; a failed sync persists nothing and keeps #359's reset (§9.7) |
+| 2 | Checkpoints can exceed durable bytes | `saveJob` and the `NonCancellable` final save never flush; the flush after a finished transfer runs after the final save, and #359's `discardProgress` resets progress only when that flush throws, not when the process dies between the two; a paused run flushes the file it keeps only in `cleanupAfterExecution`, after the final save; on Apple targets okio's flush is `fflush` | Snapshot → sync → persist; `F_FULLFSYNC` on Apple; a failed sync persists nothing and keeps #359's reset (§9.7) |
 | 3 | `Ketch.close()` does not wait for final checkpoints | `DownloadCoordinator.close` sets `closing`, so tasks pause for `Shutdown` and records stay `DOWNLOADING` or `QUEUED` (#353), and files stay because nothing marked the execution as a discard (#359). But `Ketch.close` then cancels the coordinator scope and closes the source resolver, engine and dispatchers at once, so nothing joins each execution's `NonCancellable` final save or `FileAccessor.close`, and the record keeps the last periodic save | `Ketch.shutdown(grace)` joins the executions (snapshot → sync → persist, §9.7) before `close()` |
 | 4 | Writes after close recreate the file | `PathFileAccessor.getOrCreateHandle` reopens and creates parents | Closed flag; `writeAt` after `close()` throws |
 | 5 | One execution's `Error` can cancel every execution | `DownloadCoordinator.scope = CoroutineScope(dispatchers.network)` | Add `SupervisorJob()` |

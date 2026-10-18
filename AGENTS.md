@@ -803,13 +803,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   validates it with `DownloadSource.planSelection` against metadata the source holds, never
   client sizes (the torrent source names unknown IDs with core's `@InternalKetchApi`
   `unknownFilesMessage`, as Ketch does), fitting a running download's latest segments (else the
-  saved ones), saves it (selection, total, segments and `TaskControl.selectionGeneration` in one record write; the
-  task shows the plan first, so its new request never comes with the old selection's size: a
-  running task the plan's progress, dropping its transfer's reports until the selection is
-  delivered, a paused one (waiting for files too) the saved segments' progress and a completed
-  one the new size, also when it reopens, which the queue then shows `Queued`; a failed save
-  shows the state as it was again, never of another kind; a started task still `Queued` as its
-  first report was dropped then shows it as the plan),
+  saved ones), saves it (selection, total, segments and `TaskControl.selectionGeneration` in one
+  record write; the task shows the plan first, so its new request never comes with the old
+  selection's size: a running task the plan's progress, dropping its transfer's reports until the
+  selection is delivered, a paused one (waiting for files too) the saved segments' progress and a
+  completed one the new size, also when it reopens, which the queue then shows `Queued`; a failed
+  save shows the state as it was again, never of another kind; a started task still `Queued` as
+  its first report was dropped then shows it as the plan),
   then delivers it: a running task takes it live as a new `DownloadContext.selection` revision,
   whose files the source reports from then on and acknowledges (a run that ends with an
   unacknowledged selection runs again through `resume`, so completion covers the latest one);
