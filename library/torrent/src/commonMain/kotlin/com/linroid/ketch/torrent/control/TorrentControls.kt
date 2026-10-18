@@ -208,9 +208,12 @@ internal class TorrentControls(
       return null
     }
     val outcome = try {
+      // Its selection is read again as it opens, before it checks and once it seeds: one saved
+      // before the seeder can take it.
       source.startSeeding(
         SeedingTask(taskId, record.request.url, sourceState, record.resolvedSource, outputPath,
-          record.request.selectedFileIds, host.connections(task))
+          record.request.selectedFileIds, host.connections(task),
+          selection = { task.request.selectedFileIds })
       )
     } catch (e: CancellationException) {
       throw e

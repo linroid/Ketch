@@ -102,6 +102,38 @@ internal class DownloadExecution(
   fun stopReportingProgress() { reportsProgress.value = false }
 
   @Volatile
+  private var progressHeld = false
+
+  // The transfer's last report, written before the hold is read.
+  @Volatile
+  private var lastReport: DownloadProgress? = null
+
+  /**
+   * Drops the transfer's progress reports until [releaseProgress], so the task keeps the state
+   * shown meanwhile, as while Ketch saves and delivers a new selection, which the source reports
+   * only once it receives it.
+   */
+  fun holdProgress() { progressHeld = true }
+
+  /**
+   * Ends [holdProgress]. A started task that still shows [DownloadState.Queued] had its first
+   * report dropped, and a source may report only once while it waits, as a torrent waiting for an
+   * engine slot does: the task then shows its last report as [shown] makes it.
+   */
+  fun releaseProgress(shown: (DownloadProgress) -> DownloadProgress) {
+    progressHeld = false
+    // Read after the hold ends: a report that saw the hold had written itself before it looked.
+    val report = lastReport ?: return
+    handle.mutableState.update { current ->
+      if (current is DownloadState.Queued && reportsProgress.value) {
+        DownloadState.Downloading(shown(report))
+      } else {
+        current
+      }
+    }
+  }
+
+  @Volatile
   private var discardsPartialFile = false
 
   /**
@@ -494,6 +526,12 @@ internal class DownloadExecution(
       currentCoroutineContext().ensureActive()
       val (prepared, ctx) = handle.controlLock.withLock {
         val prepared = prepare() ?: return
+        // The run starts with the selection saved last, also one saved after this execution was
+        // built from the task's request as it was then.
+        val saved = handle.record.value.request.selectedFileIds
+        if (selection.value.fileIds != saved) {
+          selection.value = SelectionUpdate(saved, selection.value.revision + 1)
+        }
         val accessor = if (selfManagedIo) {
           NoOpFileAccessor
         } else {
@@ -926,10 +964,11 @@ internal class DownloadExecution(
           lastBytes = downloaded
           lastMark = now
         }
+        val report = DownloadProgress(downloaded, total, reportedSpeed.value ?: speed)
+        lastReport = report
+        // The hold is read on every attempt, so no report replaces a state shown once it began.
         handle.mutableState.update { current ->
-          if (reportsProgress.value) DownloadState.Downloading(
-            DownloadProgress(downloaded, total, reportedSpeed.value ?: speed),
-          ) else current
+          if (reportsProgress.value && !progressHeld) DownloadState.Downloading(report) else current
         }
       },
       throttle = { bytes ->

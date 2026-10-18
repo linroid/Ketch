@@ -252,6 +252,8 @@ val InstanceEntry.deviceId: String
  * @param discoverHistory keeps the Discover sessions between runs of the app.
  * @param listDispatcher where the task list samples task changes and builds its rows, off the
  *   main thread by default.
+ * @param finishActions what the host can do once the embedded device's downloads finish
+ *   ([whenDownloadsFinish]); `null` where it can do nothing.
  * @property incoming downloads and pairing links opened from outside the app; the shell asks
  *   before it connects to a device a pairing link names.
  * @property clock current time of the task list, the speed history and the time labels.
@@ -272,9 +274,18 @@ class AppState(
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
   listDispatcher: CoroutineDispatcher = Dispatchers.Default,
   val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
+  finishActions: FinishActions? = null,
 ) {
   private val log = KetchLogger("AppState")
   private val lanServerDiscovery = LanServerDiscovery()
+
+  /**
+   * What happens once this device's downloads finish; `null` where the host can do nothing then,
+   * or where this app runs no downloads of its own.
+   */
+  val whenDownloadsFinish: WhenDownloadsFinish? =
+    finishActions?.takeIf { instanceManager.embedded != null }
+      ?.let { WhenDownloadsFinish(it, messages, scope) }
 
   /** Undo for removals, clearing, discarding progress, moves and bulk pauses. */
   val pendingOps: PendingOps = PendingOps(scope)
@@ -626,6 +637,12 @@ class AppState(
       }
     }
     scope.launch { announceApprovals() }
+    val embedded = instanceManager.embedded
+    if (whenDownloadsFinish != null && embedded != null) {
+      scope.launch {
+        whenDownloadsFinish.follow(ForegroundPolicy.statuses(embedded.tasks, serverState))
+      }
+    }
     scope.launch { announcePairingRequests() }
     scope.launch { endPairingWindows() }
     scope.launch {

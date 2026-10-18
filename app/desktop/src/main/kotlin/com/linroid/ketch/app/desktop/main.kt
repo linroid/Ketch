@@ -164,6 +164,7 @@ import java.awt.EventQueue
 import java.awt.desktop.QuitResponse
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 import kotlin.time.Duration
@@ -392,6 +393,8 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     }
   }
   val localSpeed = remember { LocalSpeedMode(configStore) }
+  // Quitting once downloads finish goes through the close behavior, which needs the controller.
+  val quitWhenDone = remember { AtomicReference<() -> Unit> {} }
   val controller = remember {
     val manager = createInstanceManager(launch, configStore, unreadableFiles)
     AppController(
@@ -401,6 +404,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       speedMode = localSpeed.attach(manager),
       unreadableFiles = unreadableFiles,
       discoverHistory = launch.discoverHistory,
+      finishActions = DesktopFinishActions(quit = { quitWhenDone.get()() }),
     ).also { localSpeed.follow(it.pulse) }
   }
   LaunchedEffect(controller) {
@@ -443,6 +447,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       },
     )
   }
+  remember(behavior) { quitWhenDone.set(behavior::quitWithoutAsking) }
   val hooks = remember {
     DesktopHooksImpl(behavior, desktopSettings, File(launch.configDir, LOGS_DIR), files)
   }

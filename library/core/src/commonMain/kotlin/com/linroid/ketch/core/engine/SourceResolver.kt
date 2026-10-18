@@ -1,6 +1,7 @@
 package com.linroid.ketch.core.engine
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.redactUrl
@@ -26,6 +27,17 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
   /** Each source once, though one may be registered twice. */
   private val uniqueSources: List<DownloadSource<*>> = buildList {
     for (source in sources) if (none { it === source }) add(source)
+  }
+
+  /** Tells every source that Ketch begins to close ([DownloadSource.stopping]). */
+  fun stopping() {
+    for (source in uniqueSources) {
+      try {
+        source.stopping()
+      } catch (e: Exception) {
+        log.w(e) { "Failed to begin stopping source '${source.type}'" }
+      }
+    }
   }
 
   /** [Stops][DownloadSource.stop] every source side by side and returns once each has. */
@@ -59,7 +71,11 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
     }
   }
 
-  /** The first source that [DownloadSource.canHandle]s [input]. */
+  /**
+   * The first source that [DownloadSource.canHandle]s [input].
+   *
+   * @throws KetchError.Unsupported caused by a [NoDownloadSourceException] when none does
+   */
   fun resolve(input: ResolveInput): DownloadSource<*> {
     check(!closed.load()) { "Download sources are closed" }
     val source = sources.firstOrNull { it.canHandle(input) }
@@ -68,7 +84,7 @@ internal class SourceResolver(private val sources: List<DownloadSource<*>>) {
       return source
     }
     log.e { "No source found for ${input.describe()}" }
-    throw KetchError.Unsupported()
+    throw KetchError.Unsupported(NoDownloadSourceException())
   }
 
   /** The first source that downloads [url]. */

@@ -18,6 +18,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -96,7 +97,10 @@ class ResolveContentRoutesTest {
     application {
       with(createTestServer(ketch)) { configureServer() }
     }
-    val client = createClient { install(ContentNegotiation) { json() } }
+    // As clients read it: the body also carries an ErrorResponse's code.
+    val client = createClient {
+      install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+    }
     try {
       val response = client.post("/api/resolve/content?fileName=broken.torrent") {
         contentType(ContentType.Application.OctetStream)

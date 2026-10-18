@@ -131,6 +131,12 @@
   <string name="settings_general_power">电源</string>
   <string name="settings_general_keep_awake">下载时保持唤醒</string>
   <string name="settings_general_keep_awake_hint">下载进行时，%1$s不会自动进入睡眠。屏幕仍可关闭。</string>
+  <string name="settings_general_when_done">下载完成后</string>
+  <string name="settings_general_when_done_hint">这台电脑上没有正在下载或排队的任务后，提前一分钟提醒再执行。只执行一次，退出 Ketch 后不再保留。</string>
+  <string name="settings_general_when_done_nothing">不执行操作</string>
+  <string name="settings_general_when_done_quit">退出 Ketch</string>
+  <string name="settings_general_when_done_sleep">睡眠</string>
+  <string name="settings_general_when_done_shut_down">关机</string>
 
   <string name="settings_notifications_downloads">下载</string>
   <string name="settings_notifications_footer">“通知”使用系统通知。“仅在应用内”只在 Ketch 中显示。</string>
@@ -687,6 +693,7 @@
   <string name="settings_search_badge">程序坞或任务栏图标显示的内容</string>
   <string name="settings_search_badge_keywords">数字, 角标, 程序坞, dock, 任务栏</string>
   <string name="settings_search_keep_awake_keywords">睡眠, 休眠, 电源, 电池, 防止睡眠, 唤醒锁</string>
+  <string name="settings_search_when_done_keywords">关机, 关闭电脑, 睡眠, 休眠, 退出, 下载后, 队列, 完成</string>
   <string name="settings_search_shortcuts">所有键盘快捷键</string>
   <string name="settings_search_shortcuts_keywords">按键, 快捷键, 热键, 键位</string>
   <string name="settings_search_finished_keywords">完成, 下载完成, 提醒</string>

@@ -28,10 +28,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okio.IOException
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.fetchAndUpdate
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.atomics.update
 
@@ -131,22 +133,93 @@ private const val HEX = "0123456789ABCDEF"
 /**
  * Web seed counters of one swarm, for its periodic summary and stall checks; any worker may
  * count. [wasted] is the part of [payload] thrown away: bytes of pieces that failed their hash
- * check or that a failed request cut off. [unsettled] is the part that may still be: bytes of
- * pieces not stored yet, counted before [payload] as they arrive and settled after [wasted].
+ * check or that a failed request cut off. Stall checks take web seed payload from [checked], which
+ * counts them: each byte [arrive]s after some number of checks, which tells the check that counts
+ * it, and workers tally their pieces' bytes by it ([WebSeedArrivals]), so the bytes of a piece
+ * stored ([keep]) or thrown away ([throwAway]) settle the checks that counted them, and no other.
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedStats {
   val payload = AtomicLong(0)
-  val wasted = AtomicLong(0)
-  val unsettled = AtomicLong(0)
   val pieces = AtomicInt(0)
   val failures = AtomicInt(0)
   val dropped = AtomicInt(0)
+  private val thrownAway = AtomicLong(0)
+  // One value, so a stall check reads what changed and starts the next check at once.
+  private val ledger = AtomicReference(WebSeedLedger(checks = 0, arrived = 0))
+
+  /** The part of [payload] thrown away so far. */
+  val wasted: Long get() = thrownAway.load()
+
+  /**
+   * [count] bytes arrived, which the next stall check counts; returns the checks before them, by
+   * which [WebSeedArrivals] tally them.
+   */
+  fun arrive(count: Int): Long =
+    ledger.fetchAndUpdate { it.copy(arrived = it.arrived + count) }.checks
+
+  /** The bytes [arrivals] tally were stored: nothing throws them away any more. */
+  fun keep(arrivals: List<WebSeedArrivals>) {
+    val bytes = merged(arrivals)
+    if (bytes.isNotEmpty()) ledger.update { it.copy(kept = it.kept.plusBytes(bytes)) }
+  }
+
+  /**
+   * The bytes [arrivals] tally were thrown away. The ledger takes them before [wasted] counts
+   * them, so a stall check made once [wasted] grew finds them.
+   */
+  fun throwAway(arrivals: List<WebSeedArrivals>) {
+    val bytes = merged(arrivals)
+    if (bytes.isEmpty()) return
+    ledger.update { it.copy(wasted = it.wasted.plusBytes(bytes)) }
+    thrownAway.addAndFetch(bytes.values.sum())
+  }
+
+  /** What changed since the last stall check, for one: the bytes arriving next come after it. */
+  fun checked(): WebSeedLedger =
+    ledger.fetchAndUpdate { WebSeedLedger(checks = it.checks + 1, arrived = 0) }
 
   fun summary(running: Int, total: Int): String =
     "webSeeds=$running/$total (dropped=${dropped.load()}), webSeedPieces=${pieces.load()}, " +
-      "webSeedPayload=${payload.load()}, webSeedWasted=${wasted.load()}, " +
+      "webSeedPayload=${payload.load()}, webSeedWasted=$wasted, " +
       "webSeedFailures=${failures.load()}"
+
+  private fun merged(arrivals: List<WebSeedArrivals>): Map<Long, Long> =
+    arrivals.fold(emptyMap()) { bytes, tally -> bytes.plusBytes(tally.byChecks) }
+
+  private fun Map<Long, Long>.plusBytes(other: Map<Long, Long>): Map<Long, Long> {
+    if (other.isEmpty()) return this
+    val sum = HashMap(this)
+    for ((checks, bytes) in other) sum[checks] = (sum[checks] ?: 0L) + bytes
+    return sum
+  }
+}
+
+/**
+ * Web seed payload as a stall check takes it ([WebSeedStats.checked]): the bytes [arrived] after
+ * [checks] checks, which this check counts, and of the bytes that arrived so far, those stored
+ * ([kept]) or thrown away ([wasted]) since the last check, by the checks before they arrived.
+ */
+internal data class WebSeedLedger(
+  val checks: Long,
+  val arrived: Long,
+  val kept: Map<Long, Long> = emptyMap(),
+  val wasted: Map<Long, Long> = emptyMap(),
+)
+
+/**
+ * The bytes of a piece, or of the part of it one request fills, by the stall checks before they
+ * arrived ([WebSeedStats.arrive]). One writer at a time.
+ */
+internal class WebSeedArrivals {
+  private val bytes = HashMap<Long, Long>()
+
+  val byChecks: Map<Long, Long> get() = bytes
+
+  /** [count] bytes arrived after [checks] stall checks. */
+  fun add(checks: Long, count: Int) {
+    bytes[checks] = (bytes[checks] ?: 0L) + count
+  }
 }
 
 /**
@@ -220,7 +293,8 @@ internal interface WebSeedPieces<P : WebSeedPiece> {
  * One worker serves its seed for the whole transfer: [run] starts it again after it was
  * dropped, keeping what it learned. Started again, it is asked once more for what it could not
  * serve, as its mirror may have fixed it, and a piece it sent corrupt before is given up again
- * after one more corrupt copy.
+ * after one more corrupt copy. Until it answers again, sending payload or verifying or refusing a
+ * piece, stall checks judge it by what it could not serve before ([unproven], [refusals]).
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class WebSeedWorker<P : WebSeedPiece>(
@@ -255,6 +329,35 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private val corrupted = mutableSetOf<Int>()
   // Requests for other files a run sends at once, also kept.
   private var parallel = PARALLEL_REQUESTS
+  // Whether it was dropped and has not answered since, and whether it was then dropped again so;
+  // the swarm reads both.
+  private val quiet = AtomicBoolean(false)
+  private val gone = AtomicBoolean(false)
+  // Whether it stopped and has not answered since, and what it could not serve as of its last
+  // answer; the swarm reads both.
+  private val stale = AtomicBoolean(false)
+  private val refusedPieces = AtomicReference(emptySet<Int>())
+
+  /**
+   * Whether this seed was dropped, started again and dropped again, without answering in between
+   * (sending payload, or verifying or refusing a piece): its mirror looks down rather than briefly
+   * unavailable, so what it may serve is no evidence of anything until a later start finds it
+   * answering, however soon its mirror is back.
+   */
+  val downAcrossRelaunch: Boolean get() = gone.load()
+
+  /**
+   * Whether this seed stopped, dropped or no longer needed, and has not answered since: started
+   * again, it offers every piece but has yet to show what its mirror serves, so stall checks take
+   * it as stopped, by its [refusals], until it does.
+   */
+  val unproven: Boolean get() = stale.load()
+
+  /**
+   * The pieces this seed could not serve as of its last answer: since it last started, or, while
+   * it is [unproven], before. Stall checks read them, also once it stopped.
+   */
+  val refusals: Set<Int> get() = refusedPieces.load()
 
   /** Fetches until the transfer cancels it or it is dropped; never twice at once. */
   suspend fun run() {
@@ -267,6 +370,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         val claimed = pieces.claim()
         if (claimed.isEmpty() && refused && !served && !pieces.servable()) {
           // Every piece it could still be asked for failed: a mirror without the torrent.
+          dropped()
           stats.dropped.incrementAndFetch()
           log.i { "Dropped web seed $label of $logLabel: it served none of the pieces asked" }
           return
@@ -328,6 +432,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         if (unservable.isNotEmpty()) {
           refused = true
           withContext(NonCancellable) { pieces.unavailable(unservable) }
+          // Once the swarm can see the refusal, so it never sees the seed answered without it.
+          answered(unservable)
         }
         // A failure that may pass sends fewer requests at once before it counts.
         if (unservable.isEmpty() && failure !is CorruptWebSeedPiece && parallel > 1) {
@@ -336,6 +442,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
           strikes++
         }
         if (strikes >= MAX_FAILURES) {
+          dropped()
           stats.dropped.incrementAndFetch()
           log.i {
             "Dropped web seed $label of $logLabel after $failures failures: " +
@@ -359,13 +466,20 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         delay(backoff)
       }
     } finally {
+      // Before the swarm can see it stop: started again, it counts as stopped until it answers.
+      stale.store(true)
       disconnect()
       withContext(NonCancellable) { pieces.stop() }
     }
   }
 
-  /** The [length] bytes of a response that fill run piece [piece] from [offset]. */
-  private class Part(val piece: Int, val offset: Int, val length: Int)
+  /**
+   * The [length] bytes of a response that fill run piece [piece] from [offset], and those that
+   * arrived so far by the stall checks before them; only its request's coroutine adds to them.
+   */
+  private class Part(val piece: Int, val offset: Int, val length: Int) {
+    val arrivals = WebSeedArrivals()
+  }
 
   /** One range request of a run, from [first]; [last] grows as following spans join it. */
   private class Request(val url: String, val first: Long, var last: Long) {
@@ -395,9 +509,10 @@ internal class WebSeedWorker<P : WebSeedPiece>(
    * is answered, those for the other files go out [parallel] at a time: one at a time, a
    * run of many small files spent most of its time waiting for answers, and on mirrors that
    * redirect each file, as archive.org does, for two of them per file. A mirror that fails sees
-   * one request per run. What arrived for the pieces a failed run gives back unstored counts as
-   * [WebSeedStats.wasted]; until stored or thrown away, it is [WebSeedStats.unsettled]. Once the
-   * run ends, whatever arrived that no verified piece keeps goes to [discardPayload].
+   * one request per run. Each piece's bytes are tallied by the stall checks before they arrived
+   * ([Part.arrivals]), and the piece tells [stats] they were kept once stored, or thrown away
+   * ([WebSeedStats.wasted]) when the run fails without storing it. Once the run ends, whatever
+   * arrived that no verified piece keeps goes to [discardPayload].
    */
   private suspend fun fetch(run: MutableList<P?>) {
     val handle = connection ?: open().also { connection = it }
@@ -406,22 +521,22 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     val missing = IntArray(run.size)
     for (request in requests) for (part in request.parts) missing[part.piece] += part.length
     val asked = missing.copyOf()
-    // What arrived for the run, of it what was stored and so settled, and of that what verified
-    // pieces keep.
+    val parts = requests.flatMap { it.parts }.groupBy { it.piece }
+    fun arrivalsOf(piece: Int) = parts[piece].orEmpty().map { it.arrivals }
+    // What arrived for the run, and of it what verified pieces keep.
     val arrived = AtomicLong(0)
-    val stored = AtomicLong(0)
     val verified = AtomicLong(0)
     try {
       for (piece in run.indices) if (run[piece] != null && missing[piece] == 0) store(run, piece)
-      // A piece spanning files completes from whichever request brings its last part.
+      // A piece spanning files completes from whichever request brings its last part, after
+      // every request filling it tallied its bytes.
       val completion = Mutex()
       val received: suspend (Int, Int) -> Unit = { piece, length ->
         completion.withLock {
           missing[piece] -= length
           if (missing[piece] == 0) {
             if (store(run, piece)) verified.addAndFetch(asked[piece].toLong())
-            stored.addAndFetch(asked[piece].toLong())
-            stats.unsettled.addAndFetch(-asked[piece].toLong())
+            stats.keep(arrivalsOf(piece))
           }
         }
       }
@@ -434,13 +549,10 @@ internal class WebSeedWorker<P : WebSeedPiece>(
         }
       }
     } catch (e: Throwable) {
-      // Every piece stored had all its bytes; the rest of what arrived is thrown away.
-      val kept = run.indices.sumOf { if (run[it] == null) asked[it].toLong() else 0L }
-      stats.wasted.addAndFetch((arrived.load() - kept).coerceAtLeast(0))
+      // Every request has ended: what arrived for the pieces not stored is thrown away.
+      stats.throwAway(run.indices.filter { run[it] != null }.flatMap(::arrivalsOf))
       throw e
     } finally {
-      // The rest is settled once counted as wasted, so none of it looks kept meanwhile.
-      stats.unsettled.addAndFetch(stored.load() - arrived.load())
       // Counted as it arrived, before the throttle, so a run stopped while it waits still counts
       // the chunk; a piece the selection dropped is discarded too.
       val discarded = arrived.load() - verified.load()
@@ -449,8 +561,8 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   }
 
   /**
-   * Fetches [request] into [run]'s buffers, adding what comes to [arrived] and telling [received]
-   * of each part as it fills.
+   * Fetches [request] into [run]'s buffers, adding what comes to [arrived] and its parts' tallies,
+   * and telling [received] of each part as it fills.
    */
   private suspend fun fetch(
     handle: ConnectionHandle,
@@ -471,25 +583,33 @@ internal class WebSeedWorker<P : WebSeedPiece>(
           try {
             if (bytes.size > length - total) throw IOException("Web seed sent more than asked")
             total += bytes.size
+            // A mirror that sends data is not down.
+            answered()
             handle.received(bytes.size)
-            // At risk until its piece is stored, which counts before it is payload.
+            // In the next stall check's payload, and tallied by it in the parts it fills, before
+            // anything suspends: a run stopped meanwhile throws away all of it.
+            val checks = stats.arrive(bytes.size)
             arrived.addAndFetch(bytes.size.toLong())
-            stats.unsettled.addAndFetch(bytes.size.toLong())
             stats.payload.addAndFetch(bytes.size.toLong())
-            downloadPayload(bytes.size)
             var read = 0
+            var filled = 0
             while (read < bytes.size) {
               val target = request.parts[part]
               val count = minOf(bytes.size - read, target.length - position)
               val buffer = checkNotNull(run[target.piece]).bytes
               bytes.copyInto(buffer, target.offset + position, read, read + count)
+              target.arrivals.add(checks, count)
               read += count
               position += count
               if (position == target.length) {
                 part++
                 position = 0
-                received(target.piece, target.length)
+                filled++
               }
+            }
+            downloadPayload(bytes.size)
+            for (done in request.parts.subList(part - filled, part)) {
+              received(done.piece, done.length)
             }
           } catch (e: Exception) {
             if (e !is CancellationException) thrown = e
@@ -525,6 +645,7 @@ internal class WebSeedWorker<P : WebSeedPiece>(
     if (verified) {
       stats.pieces.incrementAndFetch()
       verifiedPieces.incrementAndFetch()
+      answered()
     }
     run[piece] = null
     withContext(NonCancellable) { pieces.release(claim, verified) }
@@ -566,6 +687,27 @@ internal class WebSeedWorker<P : WebSeedPiece>(
   private fun disconnect() {
     connection?.close()
     connection = null
+  }
+
+  /** The seed is dropped, before the swarm can see it stop: a second time if still [quiet]. */
+  private fun dropped() {
+    if (quiet.load()) gone.store(true)
+    quiet.store(true)
+  }
+
+  /**
+   * The seed sent payload, verified a piece or could not serve [refused]: its mirror answers.
+   * Started again, what it could not serve before no longer counts.
+   */
+  private fun answered(refused: Set<Int> = emptySet()) {
+    // Every chunk answers: one that changes nothing writes nothing. [gone] implies [quiet].
+    if (refused.isEmpty() && !stale.load() && !quiet.load()) return
+    // [refusals] before [unproven], so the swarm never sees the seed answered without them.
+    if (stale.load()) refusedPieces.store(refused)
+    else if (refused.isNotEmpty()) refusedPieces.update { it + refused }
+    stale.store(false)
+    quiet.store(false)
+    gone.store(false)
   }
 
   companion object {
@@ -616,12 +758,11 @@ private val UNSERVABLE_STATUSES = setOf(404, 410, 416)
 /**
  * A v1 swarm's pieces for one web seed: to the [scheduler] it is a peer with every piece but those
  * it cannot serve that claims runs of them in order ([TorrentPieceScheduler.claimRun]), so it
- * never fetches what a peer or another seed fetches, except a single piece in the endgame. It
- * outlives the seed's worker: what the seed could not serve is kept when the worker stops.
+ * never fetches what a peer or another seed fetches, except a single piece in the endgame. Its
+ * [id] is the seed's in the [scheduler].
  */
-@OptIn(ExperimentalAtomicApi::class)
 internal class SwarmWebSeedPieces(
-  private val id: Int,
+  val id: Int,
   url: String,
   private val store: TorrentPieceStore,
   private val scheduler: TorrentPieceScheduler,
@@ -629,24 +770,14 @@ internal class SwarmWebSeedPieces(
 ) : WebSeedPieces<TorrentPieceScheduler.Claim> {
   private val layout = WebSeedLayout(store.metadata, url)
   private var joined = false
-  // The pieces the seed could not serve since it last joined: the swarm reads them while it
-  // checks for a stall, also once the seed stopped.
-  private val refused = AtomicReference(emptySet<Int>())
-
-  /**
-   * The pieces this seed could not serve since it last started, whether it runs or stopped: its
-   * files are missing there or not the torrent's.
-   */
-  val unservable: Set<Int> get() = refused.load()
 
   /**
    * Tells the [scheduler] of this seed, which has every piece; [claim] does if it was not. Joining
-   * again, it is asked once more for the pieces it could not serve, and forgets that it could not
-   * until it fails again: its mirror may have them by now.
+   * again, it is asked once more for the pieces it could not serve: its mirror may have them by
+   * now.
    */
   suspend fun join() {
     if (joined) return
-    refused.store(emptySet())
     scheduler.availability(id, BooleanArray(store.pieceCount) { true })
     joined = true
   }
@@ -673,10 +804,7 @@ internal class SwarmWebSeedPieces(
     scheduler.release(id, piece.index)
   }
 
-  override suspend fun unavailable(indices: Set<Int>) {
-    refused.update { it + indices }
-    scheduler.withdraw(id, indices)
-  }
+  override suspend fun unavailable(indices: Set<Int>) = scheduler.withdraw(id, indices)
 
   override fun piecesOf(url: String): Set<Int> = layout.piecesOf(url)
 

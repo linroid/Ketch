@@ -18,10 +18,17 @@ import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.monotonicClock
+import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentHttp
+import com.linroid.ketch.torrent.net.TorrentListener
 import com.linroid.ketch.torrent.net.createTorrentNetwork
+import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
+import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.PeerOrigin
+import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import com.linroid.ketch.torrent.v2.PeerTopic
 import com.linroid.ketch.torrent.v2.TorrentV2DiscoverySink
 import com.linroid.ketch.torrent.v2.TorrentV2DownloadSession
 import com.linroid.ketch.torrent.v2.TorrentV2PieceScheduler
@@ -31,6 +38,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -39,6 +47,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
@@ -436,6 +445,231 @@ class TorrentV2WebSeedTest {
   }
 
   @Test
+  fun relaunchedSeed_keepsWhatWasMissingUntilItsBytesArrive() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    val good = "http://mirror.test/pub/pack/good.bin"
+    // The only source lacks bad.bin, the one file wanted, until it is fixed; started again, it
+    // sends it slowly, a part when the test lets it, and no peer connects.
+    val lacking = MirrorEngine(mapOf(good to fixture.payloads[1]))
+    val fixed = Stepped(MirrorEngine(mapOf(bad to fixture.payloads[0],
+      good to fixture.payloads[1])))
+    val holding = AtomicBoolean(false)
+    val mirror = object : HttpEngine by lacking {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) = (if (holding.load()) fixed else lacking).download(url, range, headers, onData)
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      while (lacking.requests.none { it.first == bad }) delay(10)
+      delay(2_000)
+      run.skip(40_000)
+      assertEquals(TorrentStallReason.MISSING_PIECES,
+        run.session.stall.first { it != null }?.reason)
+      // Two minutes into the stall the seed starts again and asks once more: it offers every
+      // piece, but has yet to answer, so bad.bin stays missing as long as the answer takes.
+      holding.store(true)
+      run.skip(90_000)
+      fixed.asked.await()
+      run.skip(20_000)
+      // A check a second sees it.
+      delay(1_500)
+      val waiting = assertNotNull(run.session.stall.value)
+      assertEquals(TorrentStallReason.MISSING_PIECES, waiting.reason)
+      assertEquals(1, waiting.missingPieces)
+      assertEquals(listOf(wanted), waiting.missingFileIds)
+      // The first bytes of bad.bin arrive: the mirror serves it, so it is not missing while the
+      // rest of its piece comes.
+      fixed.steps.send(Unit)
+      while (fixed.delivered == 0) delay(10)
+      delay(1_500)
+      val streaming = assertNotNull(run.session.stall.value)
+      assertEquals(TorrentStallReason.NO_PEERS, streaming.reason)
+      assertEquals(0, streaming.missingPieces)
+      // The rest arrives: the download finishes.
+      coroutineScope {
+        val sending = launch { while (true) fixed.steps.send(Unit) }
+        run.session.downloadedBytes.first { it == 20_000L }
+        sending.cancel()
+      }
+    }
+  }
+
+  @Test
+  fun peerReconnectingAfterARelaunch_clearsWhatWasMissingOnlyWithThosePieces() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    // The only web seed lacks bad.bin, the one file wanted, and once started again its request
+    // waits.
+    val lacking = MirrorEngine(mapOf("http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
+    val holding = AtomicBoolean(false)
+    val asked = CompletableDeferred<Unit>()
+    val mirror = object : HttpEngine by lacking {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        if (!holding.load()) return lacking.download(url, range, headers, onData)
+        asked.complete(Unit)
+        awaitCancellation()
+      }
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      val network = createTorrentNetwork()
+      val first = network.listen(PeerEndpoint("127.0.0.1", 0))
+      val again = network.listen(PeerEndpoint("127.0.0.1", 0))
+      val holder = network.listen(PeerEndpoint("127.0.0.1", 0))
+      try {
+        coroutineScope {
+          // A peer with [bitfield] (bad.bin is piece 0, good.bin pieces 1 and 2) that never
+          // unchokes, until [leave] completes.
+          fun peer(
+            listener: TorrentListener,
+            id: Byte,
+            bitfield: Byte,
+            leave: CompletableDeferred<Unit>,
+          ) = launch {
+            val connection = listener.accept()
+            try {
+              PeerIdentityHandshake(fixture.document.identity).respond(connection,
+                ByteArray(20) { id }.toByteString(), TorrentBufferBudget(1024 * 1024))
+              PeerWire(connection, pieceCount = 3).send(PeerMessage.Bitfield(byteArrayOf(bitfield)))
+              leave.await()
+            } finally {
+              connection.close()
+            }
+          }
+          while (lacking.requests.none { it.first == bad }) delay(10)
+          delay(2_000)
+          // A peer with good.bin alone connects; nothing arrives for 40 s: bad.bin is missing.
+          val leave = CompletableDeferred<Unit>()
+          peer(first, 2, 0x60, leave)
+          run.sink.offer(first.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          run.skip(40_000)
+          val missing = assertNotNull(run.session.stall.first { it?.peers == 1 })
+          assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
+          // Two minutes into the stall the seed starts again, and asks once more.
+          holding.store(true)
+          run.skip(90_000)
+          asked.await()
+          // The peer leaves and comes back, still without bad.bin: it changes nothing.
+          leave.complete(Unit)
+          first.close()
+          run.session.stall.first { it?.peers == 0 }
+          val stay = CompletableDeferred<Unit>()
+          peer(again, 3, 0x60, stay)
+          run.sink.offer(again.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          val back = assertNotNull(run.session.stall.first { it?.peers == 1 })
+          assertEquals(TorrentStallReason.MISSING_PIECES, back.reason)
+          assertEquals(1, back.missingPieces)
+          assertEquals(listOf(wanted), back.missingFileIds)
+          // A peer with bad.bin connects: nothing is missing now.
+          peer(holder, 4, 0xE0.toByte(), stay)
+          run.sink.offer(holder.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          val heard = assertNotNull(run.session.stall.first { it?.peers == 2 })
+          assertEquals(TorrentStallReason.CHOKED, heard.reason)
+          assertEquals(0, heard.missingPieces)
+          stay.complete(Unit)
+        }
+      } finally {
+        first.close()
+        again.close()
+        holder.close()
+        network.close()
+      }
+    }
+  }
+
+  @Test
+  fun deadRelaunchedSeed_keepsWhatWasMissingThroughItsRetriesAndOnceDropped() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    // The only web seed lacks bad.bin, the one file wanted, and once started again it is down:
+    // each request fails when the test lets it. The one peer lacks bad.bin too.
+    val lacking = MirrorEngine(mapOf("http://mirror.test/pub/pack/good.bin" to fixture.payloads[1]))
+    val holding = AtomicBoolean(false)
+    val asked = AtomicLong(0)
+    val failures = Channel<Unit>(Channel.UNLIMITED)
+    val mirror = object : HttpEngine by lacking {
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        if (!holding.load()) return lacking.download(url, range, headers, onData)
+        asked.addAndFetch(1)
+        failures.receive()
+        throw KetchError.Network()
+      }
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirror, selected = setOf(wanted)) { run ->
+      val network = createTorrentNetwork()
+      val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+      try {
+        coroutineScope {
+          val peer = launch {
+            val connection = listener.accept()
+            try {
+              PeerIdentityHandshake(fixture.document.identity).respond(connection,
+                ByteArray(20) { 2 }.toByteString(), TorrentBufferBudget(1024 * 1024))
+              // bad.bin is piece 0, good.bin pieces 1 and 2.
+              PeerWire(connection, pieceCount = 3).send(PeerMessage.Bitfield(byteArrayOf(0x60)))
+              awaitCancellation()
+            } finally {
+              connection.close()
+            }
+          }
+          while (lacking.requests.none { it.first == bad }) delay(10)
+          run.sink.offer(listener.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          delay(2_000)
+          run.skip(40_000)
+          val missing = assertNotNull(run.session.stall.first { it?.peers == 1 })
+          assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
+          // Two minutes into the stall the seed starts again, and every request it sends fails:
+          // bad.bin stays missing while it tries, and once it is dropped again.
+          holding.store(true)
+          run.skip(90_000)
+          var failed = 0L
+          while (true) {
+            withTimeoutOrNull(1_500) { while (asked.load() == failed) delay(10) } ?: break
+            // A check a second sees it, at the first try and the last.
+            if (failed == 0L || failed == 1L + WebSeedWorker.MAX_FAILURES) {
+              delay(1_100)
+              val trying = assertNotNull(run.session.stall.value)
+              assertEquals(TorrentStallReason.MISSING_PIECES, trying.reason)
+              assertEquals(listOf(wanted), trying.missingFileIds)
+            }
+            failures.send(Unit)
+            failed++
+          }
+          assertEquals(2L + WebSeedWorker.MAX_FAILURES, failed)
+          val dropped = assertNotNull(run.session.stall.value)
+          assertEquals(TorrentStallReason.MISSING_PIECES, dropped.reason)
+          assertEquals(1, dropped.missingPieces)
+          assertEquals(listOf(wanted), dropped.missingFileIds)
+          assertEquals(1, dropped.peers)
+          peer.cancel()
+        }
+      } finally {
+        listener.close()
+        network.close()
+      }
+    }
+  }
+
+  @Test
   fun droppedSeedWithoutPeers_reportsTheCorruptFileAsMissing() = runTest {
     val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
       webSeeds = listOf("http://mirror.test/pub/"))
@@ -492,6 +726,133 @@ class TorrentV2WebSeedTest {
   }
 
   @Test
+  fun pieceOneSeedLacked_isMissingOnceTheOtherIsDownAcrossARelaunch() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror0.test/pub/", "http://mirror1.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    val files = mapOf(bad to fixture.payloads[0],
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1])
+    // The first seed lacks bad.bin, the one file wanted; the second stays down. Both are dropped,
+    // and no peer connects.
+    val lacking = MirrorEngine(files - bad)
+    val down = Outage(MirrorEngine(files)) { true }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirrorHosts(lacking, down), selected = setOf(wanted)) { run ->
+      while (lacking.requests.none { it.first == bad }) delay(10)
+      awaitDropped(down)
+      // Nothing arrives for 40 s: the second seed may only be down for a while, and serve bad.bin
+      // once started again, so it is not missing yet.
+      run.skip(40_000)
+      val stall = assertNotNull(run.session.stall.first { it != null })
+      assertEquals(TorrentStallReason.NO_PEERS, stall.reason)
+      assertEquals(0, stall.missingPieces)
+      // Two minutes into the stall both start again: the first lacks bad.bin again, and the
+      // second, still down, is dropped again without an answer, which says nothing of bad.bin
+      // any more: missing.
+      val refused = down.refused
+      run.skip(90_000)
+      while (down.refused < refused + WebSeedWorker.MAX_FAILURES) delay(10)
+      val missing = run.session.stall.first { it?.reason == TorrentStallReason.MISSING_PIECES }
+      assertEquals(1, missing?.missingPieces)
+      assertEquals(listOf(wanted), missing?.missingFileIds)
+      assertEquals(2, lacking.requests.count { it.first == bad })
+    }
+  }
+
+  @Test
+  fun pieceTheRunningSeedLacks_isMissingOnlyOnceTheStoppedSeedLacksItToo() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror0.test/pub/", "http://mirror1.test/pub/"))
+    val bad = "http://mirror.test/pub/pack/bad.bin"
+    val files = mapOf(bad to fixture.payloads[0],
+      "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1])
+    // The first seed lacks bad.bin and serves good.bin, so it keeps running; the second is down,
+    // so it is dropped, and lacks bad.bin too once back. No peer connects.
+    val lacking = MirrorEngine(files - bad)
+    val second = MirrorEngine(files - bad)
+    val back = AtomicBoolean(false)
+    val down = Outage(second) { !back.load() }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, mirrorHosts(lacking, down)) { run ->
+      run.session.downloadedBytes.first { it == 40_000L }
+      while (lacking.requests.none { it.first == bad }) delay(10)
+      awaitDropped(down)
+      // Nothing arrives for 40 s: the dropped seed may still serve bad.bin once started again, so
+      // it is not missing while the other seed runs, and the download waits for a source.
+      run.skip(40_000)
+      val stall = assertNotNull(run.session.stall.first { it != null })
+      assertEquals(TorrentStallReason.NO_PEERS, stall.reason)
+      assertEquals(0, stall.missingPieces)
+      // Two minutes into the stall the dropped seed starts again, without bad.bin either: missing.
+      back.store(true)
+      run.skip(90_000)
+      val missing = run.session.stall.first { it?.reason == TorrentStallReason.MISSING_PIECES }
+      assertEquals(1, missing?.missingPieces)
+      assertEquals(listOf(wanted), missing?.missingFileIds)
+      assertEquals(1, second.requests.count { it.first == bad })
+    }
+  }
+
+  @Test
+  fun peerLackingAPiece_isMissingOnceTheDownSeedFailsAcrossARelaunch() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    // The only web seed stays down, and the one peer has good.bin but not bad.bin.
+    val down = Outage(MirrorEngine(emptyMap())) { true }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, down) { run ->
+      val network = createTorrentNetwork()
+      val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
+      val interested = CompletableDeferred<Unit>()
+      try {
+        coroutineScope {
+          val peer = launch {
+            val connection = listener.accept()
+            try {
+              PeerIdentityHandshake(fixture.document.identity).respond(connection,
+                ByteArray(20) { 2 }.toByteString(), TorrentBufferBudget(1024 * 1024))
+              val wire = PeerWire(connection, pieceCount = 3)
+              // bad.bin is piece 0, good.bin pieces 1 and 2.
+              wire.send(PeerMessage.Bitfield(byteArrayOf(0x60)))
+              // Interested, the session took the peer's pieces; the peer never unchokes it.
+              do {
+                val message = wire.read()
+              } while (message != PeerMessage.Control(PeerMessage.Signal.INTERESTED))
+              interested.complete(Unit)
+              awaitCancellation()
+            } finally {
+              connection.close()
+            }
+          }
+          run.sink.offer(listener.local, PeerTopic.V2, PeerOrigin.TRACKER)
+          interested.await()
+          awaitDropped(down)
+          // Nothing arrives for 40 s: the seed may only be down for a while, and serve bad.bin
+          // once started again, so it is not missing yet.
+          run.skip(40_000)
+          val choked = assertNotNull(run.session.stall.first { it != null })
+          assertEquals(TorrentStallReason.CHOKED, choked.reason)
+          assertEquals(0, choked.missingPieces)
+          assertEquals(1, choked.peers)
+          // Two minutes into the stall it starts again, and is dropped again without an answer:
+          // it says nothing of bad.bin any more, and the peer lacks it: missing.
+          val refused = down.refused
+          run.skip(90_000)
+          while (down.refused < refused + WebSeedWorker.MAX_FAILURES) delay(10)
+          val missing = run.session.stall.first { it?.reason == TorrentStallReason.MISSING_PIECES }
+          assertEquals(1, missing?.missingPieces)
+          assertEquals(listOf(wanted), missing?.missingFileIds)
+          assertEquals(1, missing?.peers)
+          peer.cancel()
+        }
+      } finally {
+        listener.close()
+        network.close()
+      }
+    }
+  }
+
+  @Test
   fun corruptPieceAfterAStall_isNoProgress() = runTest {
     val fixture = TorrentV2Fixture.build(listOf("bad.bin" to 20_000, "good.bin" to 40_000),
       webSeeds = listOf("http://mirror.test/pub/"))
@@ -501,10 +862,10 @@ class TorrentV2WebSeedTest {
       "http://mirror.test/pub/pack/good.bin" to fixture.payloads[1])))
     val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
     stalling(fixture, mirror, selected = setOf(wanted)) { run ->
-      // Nothing for longer than a piece may take: a stall.
+      // Nothing for longer than a piece may take: a stall, and no peer to help.
       mirror.asked.await()
       run.skip(70_000)
-      assertEquals(TorrentStallReason.UNKNOWN, run.session.stall.first { it != null }?.reason)
+      assertEquals(TorrentStallReason.NO_PEERS, run.session.stall.first { it != null }?.reason)
       // The piece arrives, corrupt, twice, a part a second: what may still be thrown away is no
       // progress, and once thrown away it never was.
       val seen = AtomicReference(emptyList<TorrentStall?>())
@@ -519,6 +880,50 @@ class TorrentV2WebSeedTest {
         watching.cancel()
       }
       assertTrue(seen.load().all { it != null }, seen.load().toString())
+    }
+  }
+
+  @Test
+  fun corruptPieceWithinOneCheck_stallsHalfAMinuteAfterTheLastKeptPayload() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("data.bin" to 65_536, "other.bin" to 20_000),
+      webSeeds = listOf("http://mirror.test/pub/"))
+    val data = "http://mirror.test/pub/pack/data.bin"
+    // The only source sends a part of 7,001 bytes when the test lets it, and its first copy of
+    // piece 1 is corrupt.
+    val mirror = MirrorEngine(mapOf(data to fixture.payloads[0],
+      "http://mirror.test/pub/pack/other.bin" to fixture.payloads[1]),
+      damage = mapOf(data to 32_768L + 100))
+    val stepped = Stepped(mirror)
+    suspend fun deliver(parts: Int) {
+      val delivered = stepped.delivered + parts
+      repeat(parts) { stepped.steps.send(Unit) }
+      while (stepped.delivered < delivered) delay(10)
+    }
+    val wanted = fixture.layout.files.single { it.v2Index == 0 }.id
+    stalling(fixture, stepped, selected = setOf(wanted)) { run ->
+      stepped.asked.await()
+      // Payload that may still be kept is payload: a part at 25 s, though nothing verified yet,
+      // keeps the download from stalling 15 s later.
+      run.skip(25_000)
+      deliver(1)
+      run.skip(14_000)
+      delay(1_200)
+      assertNull(run.session.stall.value)
+      // The next parts verify piece 0 and bring the first bytes of piece 1: the last payload
+      // kept, which a check counts before the clock moves on.
+      deliver(4)
+      delay(1_200)
+      // 20 s later the rest of piece 1 comes within one check, corrupt: the last part fails the
+      // run, and the seed asks for the piece again.
+      run.skip(20_000)
+      deliver(4)
+      stepped.steps.send(Unit)
+      withTimeout(5_000) { while (mirror.requests.count { it.first == data } < 2) delay(10) }
+      // Thrown away, piece 1 never was payload: only the no-payload clock can stall the download
+      // before a minute has passed since piece 0, and it does once 30 s have.
+      run.skip(15_000)
+      val stall = withTimeout(5_000) { run.session.stall.first { it != null } }
+      assertEquals(TorrentStallReason.NO_PEERS, stall?.reason)
     }
   }
 

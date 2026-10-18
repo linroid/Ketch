@@ -135,6 +135,12 @@
   <string name="settings_general_power">Énergie</string>
   <string name="settings_general_keep_awake">Rester éveillé pendant les téléchargements</string>
   <string name="settings_general_keep_awake_hint">%1$s ne se met pas en veille automatiquement pendant les téléchargements. L'écran peut tout de même s'éteindre.</string>
+  <string name="settings_general_when_done">À la fin des téléchargements</string>
+  <string name="settings_general_when_done_hint">S'exécute quand plus rien ne se télécharge ni n'attend sur cet ordinateur, après un avertissement d'une minute. Ne s'applique qu'une fois et s'oublie quand Ketch se ferme.</string>
+  <string name="settings_general_when_done_nothing">Ne rien faire</string>
+  <string name="settings_general_when_done_quit">Quitter Ketch</string>
+  <string name="settings_general_when_done_sleep">Mettre en veille</string>
+  <string name="settings_general_when_done_shut_down">Éteindre</string>
 
   <string name="settings_notifications_downloads">Téléchargements</string>
   <string name="settings_notifications_footer">« Notifier » utilise les notifications du système. « Dans l'app uniquement » affiche les alertes dans Ketch.</string>
@@ -707,6 +713,7 @@
   <string name="settings_search_badge">Ce qu'affiche l'icône du Dock ou de la barre des tâches</string>
   <string name="settings_search_badge_keywords">compteur, pastille, dock, barre des tâches</string>
   <string name="settings_search_keep_awake_keywords">veille, énergie, batterie, empêcher la veille, wake lock</string>
+  <string name="settings_search_when_done_keywords">éteindre, arrêter, veille, quitter, après les téléchargements, file d'attente, terminé</string>
   <string name="settings_search_shortcuts">Tous les raccourcis clavier</string>
   <string name="settings_search_shortcuts_keywords">touches, raccourcis clavier, combinaisons de touches</string>
   <string name="settings_search_finished_keywords">terminé, fini, alerte</string>

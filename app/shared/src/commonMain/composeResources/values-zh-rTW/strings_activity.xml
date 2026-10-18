@@ -199,4 +199,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$s 已離線</string>
   <string name="feedback_device_online">已重新連線至 %1$s</string>
+  <string name="finish_warning_quit">Ketch 將在一分鐘後結束</string>
+  <string name="finish_warning_sleep">這台電腦將在一分鐘後睡眠</string>
+  <string name="finish_warning_shut_down">這台電腦將在一分鐘後關機</string>
+  <string name="finish_warning_detail">這台電腦上的下載已完成。</string>
+  <string name="finish_failed_quit">無法結束 Ketch</string>
+  <string name="finish_failed_sleep">無法讓這台電腦睡眠</string>
+  <string name="finish_failed_shut_down">無法關閉這台電腦</string>
 </resources>

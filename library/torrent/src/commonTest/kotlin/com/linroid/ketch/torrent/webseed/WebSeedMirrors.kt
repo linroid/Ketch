@@ -143,11 +143,14 @@ internal class Gate(private val engine: HttpEngine) : HttpEngine by engine {
 
 /**
  * Sends what [engine] answers a part at a time: each part waits until [steps] lets it through;
- * [asked] once a request comes.
+ * [asked] once a request comes, and [delivered] counts the parts the caller took.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class Stepped(private val engine: HttpEngine) : HttpEngine by engine {
   val steps = Channel<Unit>()
   val asked = CompletableDeferred<Unit>()
+  private val parts = AtomicInt(0)
+  val delivered: Int get() = parts.load()
 
   override suspend fun download(
     url: String,
@@ -159,6 +162,7 @@ internal class Stepped(private val engine: HttpEngine) : HttpEngine by engine {
     engine.download(url, range, headers) { part ->
       steps.receive()
       onData(part)
+      parts.incrementAndFetch()
     }
   }
 }
@@ -194,17 +198,26 @@ internal class OneAtATime(private val engine: HttpEngine) : HttpEngine by engine
 }
 
 /** Runs [block] with the info lines Ketch logs meanwhile, which [block] gets as they come. */
-internal suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) {
+internal suspend fun withInfoLog(block: suspend (Channel<String>) -> Unit) =
+  withLog(LogLevel.INFO, block)
+
+/**
+ * Runs [block] with the lines Ketch logs meanwhile at [least] or above, which [block] gets as they
+ * come; warnings and errors are left out.
+ */
+internal suspend fun withLog(least: LogLevel, block: suspend (Channel<String>) -> Unit) {
   val lines = Channel<String>(Channel.UNLIMITED)
   KetchLogger.setLogger(object : Logger {
-    override fun v(message: String) = Unit
-    override fun d(message: String) = Unit
-    override fun i(message: String) {
-      lines.trySend(message)
-    }
+    override fun v(message: String) = line(LogLevel.VERBOSE, message)
+    override fun d(message: String) = line(LogLevel.DEBUG, message)
+    override fun i(message: String) = line(LogLevel.INFO, message)
     override fun w(message: String, throwable: Throwable?) = Unit
     override fun e(message: String, throwable: Throwable?) = Unit
-    override fun isLoggable(level: LogLevel): Boolean = level >= LogLevel.INFO
+    override fun isLoggable(level: LogLevel): Boolean = level >= least
+
+    private fun line(level: LogLevel, message: String) {
+      if (isLoggable(level)) lines.trySend(message)
+    }
   })
   try {
     block(lines)

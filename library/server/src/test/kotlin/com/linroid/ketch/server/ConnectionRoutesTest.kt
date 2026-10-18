@@ -163,6 +163,19 @@ class ConnectionRoutesTest {
   }
 
   @Test
+  fun get_carriesTotalsAndClosedConnections() = testApplication {
+    val closed = snapshot(1).connections.single()
+      .copy(id = 9, downloadBps = 0, closedAt = Instant.fromEpochMilliseconds(900))
+    val sent = snapshot(1).copy(receivedBytes = 12_345, sentBytes = 67, closed = listOf(closed))
+    val ketch = scripted { flow { emit(sent) } }
+    application { with(createTestServer(ketch)) { configureServer() } }
+
+    val response = client.get("/api/connections")
+
+    assertEquals(sent, ServerJson.decodeFromString(response.bodyAsText()))
+  }
+
+  @Test
   fun get_withoutLimit_usesTheDefault() = testApplication {
     val ketch = scripted { flow { emit(snapshot(0)) } }
     application { with(createTestServer(ketch)) { configureServer() } }
@@ -204,7 +217,9 @@ class ConnectionRoutesTest {
     val response = client.get("/api/connections")
 
     assertEquals(HttpStatusCode.OK, response.status)
-    assertEquals(0, ServerJson.decodeFromString<ActiveConnections>(response.bodyAsText()).total)
+    val snapshot = ServerJson.decodeFromString<ActiveConnections>(response.bodyAsText())
+    assertEquals(0, snapshot.total)
+    assertEquals(0L, snapshot.receivedBytes)
   }
 
   @Test

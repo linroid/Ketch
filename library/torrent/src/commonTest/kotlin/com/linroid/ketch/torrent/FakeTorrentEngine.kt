@@ -124,6 +124,9 @@ internal class FakeTorrentSession(
   /** Holds every [changeSelection] until it completes; null lets them through. */
   var changeSelectionGate: CompletableDeferred<Unit>? = null
 
+  /** Runs as each [changeSelection] begins, with its files; may hold it. */
+  var beforeChange: suspend (Set<String>) -> Unit = {}
+
   /** The state [resume] enters, such as [TorrentSessionState.CHECKING_FILES]. */
   var stateOnResume = TorrentSessionState.DOWNLOADING
   var changeSelectionError: Exception? = null
@@ -137,7 +140,11 @@ internal class FakeTorrentSession(
     private set
   var savedResumeData: ByteArray? = null
 
+  /** Holds every [pause] until it completes, as trackers hearing it stopped do; null does not. */
+  var pauseGate: CompletableDeferred<Unit>? = null
+
   override suspend fun pause() {
+    pauseGate?.await()
     paused = true
     _state.value = TorrentSessionState.PAUSED
   }
@@ -148,6 +155,7 @@ internal class FakeTorrentSession(
   }
 
   override suspend fun changeSelection(fileIds: Set<String>): Boolean {
+    beforeChange(fileIds)
     changeSelectionGate?.await()
     selectionChanges += fileIds
     changeSelectionError?.let { throw it }

@@ -22,6 +22,7 @@ import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
+import com.linroid.ketch.torrent.storage.TorrentCheckpoint
 import com.linroid.ketch.torrent.storage.TorrentStorageException
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
 import com.linroid.ketch.torrent.storage.torrentFileSystem
@@ -322,6 +323,61 @@ class TorrentDownloadSourceTest {
         sourceState = state, outputPath = output.toString()))
       assertTrue(plan.expands)
       assertEquals(40_005L, plan.totalBytes)
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
+  fun planSelection_fileAddedBack_countsWhatItsCheckpointVerified() = runTest {
+    // Pieces of 16 KiB: f1 spans pieces 6 to 10 and shares piece 10 with f2.
+    val verified = BooleanArray(pack.pieceCount).also {
+      it[7] = true
+      it[10] = true
+    }
+    val checkpoint = TorrentCheckpoint("task", pack.metadata, "/ketch-plan/pack", setOf(0, 2),
+      verified, emptyList(), emptyList())
+    val state = TorrentSourceState(pack.metadata.infoHash.hex, pack.sizeOf(0, 2),
+      encodeBase64(checkpoint.encode()), setOf("0", "2"), "/ketch-plan/pack",
+      encodeBase64(pack.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+    val segments = listOf(Segment(0, 0, 99_999, 40_000), Segment(2, 100_000, 186_143))
+
+    val plan = source.planSelection(selection(setOf("0", "1", "2"), current = setOf("0", "2"),
+      sourceState = state, segments = segments))
+
+    // f1 counts piece 7 whole and the 6_160 bytes of piece 10 before f2 starts.
+    assertEquals(listOf(40_000L, 22_544L, 0L), plan.segments?.map { it.downloadedBytes })
+  }
+
+  @Test
+  fun planSelection_v2FileAddedBack_countsWhatItsCheckpointVerified() = runTest {
+    // Pieces of 32 KiB: a is pieces 0 and 1, b is piece 2.
+    val fixture = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 20_000))
+    val root = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+      "ketch-plan-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}"
+    val output = root / "out"
+    torrentFileSystem.createDirectories(root)
+    try {
+      val store = TorrentV2PieceStore(fixture.document, output, setOf("0", "1"), "task",
+        TorrentBufferBudget(4 * 1024 * 1024), Semaphore(1))
+      val checkpoint = try {
+        store.initialize()
+        fixture.seed(store, 1..2)
+        store.checkpoint()
+      } finally {
+        store.close()
+      }
+      // a was deselected since.
+      val state = TorrentSourceState(fixture.document.info.hash.hex, 20_000,
+        encodeBase64(checkpoint.encode()), setOf("1"), output.toString(),
+        encodeBase64(fixture.metainfo), version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+
+      val plan = source.planSelection(selection(setOf("0", "1"), current = setOf("1"),
+        sourceState = state, outputPath = output.toString(),
+        segments = listOf(Segment(1, 0, 19_999, 20_000))))
+
+      // The 7_232 bytes of a that piece 1 holds.
+      assertEquals(listOf(7_232L, 20_000L), plan.segments?.map { it.downloadedBytes })
     } finally {
       torrentFileSystem.deleteRecursively(root, mustExist = false)
     }

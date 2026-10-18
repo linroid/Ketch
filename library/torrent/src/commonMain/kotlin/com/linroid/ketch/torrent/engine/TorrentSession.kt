@@ -73,6 +73,13 @@ internal interface TorrentSession {
    * @return raw resume data bytes, or null if unavailable
    */
   suspend fun saveResumeData(): ByteArray?
+
+  /**
+   * The resume data [saveResumeData] would return now, read without writing anything or waiting
+   * for a [pause] under way, for a host that cannot wait for a disk, such as one shutting down.
+   * Sessions that keep their resume data in memory return what [saveResumeData] does.
+   */
+  suspend fun currentResumeData(): ByteArray? = saveResumeData()
 }
 
 /**

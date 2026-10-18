@@ -56,7 +56,9 @@ interface KetchApi {
    * It runs until it has an answer, as a magnet link waits for peers to come online; cancel the
    * call to stop it.
    *
-   * @throws KetchError.Unsupported if no source handles the URL or recognizes the content
+   * @throws KetchError.Unsupported if no source handles the URL or recognizes the content, caused
+   *   by a [NoDownloadSourceException], or if the source that does lacks something it needs, such
+   *   as a usable proxy, with a cause that says what
    * @throws UnsupportedOperationException if this backend cannot resolve content
    */
   suspend fun resolve(input: ResolveInput): ResolvedSource
