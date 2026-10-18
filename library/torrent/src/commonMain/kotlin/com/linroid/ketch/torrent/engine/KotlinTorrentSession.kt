@@ -621,7 +621,7 @@ internal class KotlinTorrentSession(
 
   /**
    * The checkpoint [saveResumeData] writes, encoded as the store holds it now without writing
-   * it, and without the lifecycle lock [pause] holds while the torrent says goodbye. The sidecar
+   * it, and without the lifecycle lock [pause] holds while the torrent stops. The sidecar
    * keeps the last one written, the one a pause writes included, which a restart reads too.
    */
   override suspend fun currentResumeData(): ByteArray? {

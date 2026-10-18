@@ -229,6 +229,8 @@ internal class KotlinTorrentEngine(
   private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.engine + runtimeContext +
     CoroutineExceptionHandler { _, error -> log.e(error) { "Torrent background task failed" } })
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
+  /** The `stopped` announces of torrents that stopped ([sayGoodbye]). */
+  private val goodbyes = SupervisorJob(checkNotNull(scope.coroutineContext[Job]))
   /** Sockets to the local router, outside the peer budget and encryption. */
   private val directNetwork = rawNetwork
   private var portMapper: TorrentPortMapper? = null
@@ -548,6 +550,10 @@ internal class KotlinTorrentEngine(
             }
           }
         }
+        // Their `stopped` announces, and those of torrents that stopped before, have what is
+        // left of the window.
+        goodbyes.complete()
+        withTimeoutOrNull(stoppedAnnounceTime()) { goodbyes.join() }
         // Meanwhile, since the window opened, the router forgot our ports rather than forward
         // them to whoever gets this address.
         portMappingRemoval.join()
@@ -583,6 +589,18 @@ internal class KotlinTorrentEngine(
    */
   private fun stoppedAnnounceTime(): Duration =
     stoppedDeadline.load()?.let { -it.elapsedNow() } ?: STOPPED_ANNOUNCE_TIME
+
+  /**
+   * Sends a stopped torrent's `stopped` announces ([announce]) from the engine, within
+   * [stoppedAnnounceTime] from now, rather than hold up what stopped it: a task canceled, paused
+   * or removed stops at once, whatever its trackers. Callers read what the announces report
+   * first, as the torrent's files may be gone by then. [stopRuntime] waits for them within the
+   * stopped window.
+   */
+  private fun sayGoodbye(announce: suspend () -> Unit) {
+    val time = stoppedAnnounceTime()
+    scope.launch(goodbyes) { withTimeoutOrNull(time) { announce() } }
+  }
 
   /** The key [lookupPeers] keeps a swarm's peers under: its wire tag. */
   private fun lookupTag(topic: TrackerTopic): String = topic.wireBytes().toByteString().hex()
@@ -1163,12 +1181,12 @@ internal class KotlinTorrentEngine(
       TrackerDiscovery(document, layout, peerId, advertisedPort::current,
         TrackerTiers(urls, ::announceToTracker), onChanged,
         announceCompletion = store::selectsAll, topic = topic)
+    suspend fun announceState() =
+      AnnounceState(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
     suspend fun poll(
       discovery: TrackerDiscovery,
-      stopped: Boolean = false,
       manual: Boolean = false,
-    ): TrackerResponse? = discovery.poll(store.verifiedPieces(), sink.receivedBytes(),
-      sink.uploadedBytes(), stopped = stopped, manual = manual)
+    ): TrackerResponse? = announceState().poll(discovery, manual = manual)
     suspend fun publish(topic: TrackerTopic, peers: List<PeerEndpoint>) {
       // Admit the hosts first: a restricted owner accepts only peers its trackers name.
       sink.trackerPeers(topic, peers)
@@ -1187,12 +1205,9 @@ internal class KotlinTorrentEngine(
           delay(1000)
         }
       } finally {
-        withContext(NonCancellable) {
-          withTimeoutOrNull(stoppedAnnounceTime()) {
-            attempt {
-              group.stop(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
-            }
-          }
+        val last = withContext(NonCancellable) { attempt { announceState() } }
+        if (last != null) sayGoodbye {
+          attempt { group.stop(last.verified, last.received, last.uploaded) }
         }
       }
     } else if (tiers.isNotEmpty()) for (topic in topics) launch {
@@ -1211,11 +1226,10 @@ internal class KotlinTorrentEngine(
           delay(1000)
         }
       } finally {
-        withContext(NonCancellable) {
-          withTimeoutOrNull(stoppedAnnounceTime()) {
-            attempt { poll(discovery) }
-            attempt { poll(discovery, stopped = true) }
-          }
+        val last = withContext(NonCancellable) { attempt { announceState() } }
+        if (last != null) sayGoodbye {
+          attempt { last.poll(discovery) }
+          attempt { last.poll(discovery, stopped = true) }
         }
       }
     }
@@ -1223,7 +1237,7 @@ internal class KotlinTorrentEngine(
       for (url in extraTrackers(tiers.flatten())) launch {
         // One coroutine per tracker polls the topics in turn, so a hybrid adds no sockets.
         announceExtra(topics.map { discovery(it, listOf(listOf(url))) {} },
-          { extra, stopped -> poll(extra, stopped) }) { extra, found ->
+          ::announceState) { extra, found ->
           found.forEach { sink.offer(it, peerTopic(extra.topic), PeerOrigin.TRACKER) }
         }
       }
@@ -1319,16 +1333,12 @@ internal class KotlinTorrentEngine(
       } finally {
         discovery.observeStatus {}
         session.updateTrackerStatus(emptyList())
-        withContext(NonCancellable) {
-          withTimeoutOrNull(stoppedAnnounceTime()) {
-            if (session.state.value == TorrentSessionState.FINISHED ||
-              session.state.value == TorrentSessionState.SEEDING) {
-              attempt { discovery.poll(session.verifiedPieces(), session.receivedBytes,
-                session.uploadedBytes) }
-            }
-            attempt { discovery.poll(session.verifiedPieces(), session.receivedBytes,
-              session.uploadedBytes, stopped = true) }
-          }
+        val complete = session.state.value == TorrentSessionState.FINISHED ||
+          session.state.value == TorrentSessionState.SEEDING
+        val last = withContext(NonCancellable) { attempt { announceState(session) } }
+        if (last != null) sayGoodbye {
+          if (complete) attempt { last.poll(discovery) }
+          attempt { last.poll(discovery, stopped = true) }
         }
       }
     }
@@ -1338,10 +1348,9 @@ internal class KotlinTorrentEngine(
           TrackerTiers(listOf(listOf(url)), ::announceToTracker), nowMs = nowMs,
           announceCompletion = session::selectsAllFiles,
         )
-        announceExtra(listOf(discovery), { topic, stopped ->
-          topic.poll(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes,
-            stopped = stopped)
-        }) { _, found -> found.forEach { output.send(it) } }
+        announceExtra(listOf(discovery), { announceState(session) }) { _, found ->
+          found.forEach { output.send(it) }
+        }
       }
       magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
@@ -1753,31 +1762,44 @@ internal class KotlinTorrentEngine(
 
   /**
    * Announces one extra tracker for each of [discoveries] (one per topic) until cancelled, then
-   * sends a best-effort stop to each within one shared bound. Each extra runs on its own because
-   * tier traversal stops at the first tracker that answers, and would otherwise wait behind every
-   * unreachable tracker of the torrent's own list. Topics are polled in sequence, so a torrent
-   * with two topics does not double the concurrent requests to a tracker.
+   * sends a best-effort stop to each within one shared bound ([sayGoodbye]). Each extra runs on
+   * its own because tier traversal stops at the first tracker that answers, and would otherwise
+   * wait behind every unreachable tracker of the torrent's own list. Topics are polled in
+   * sequence, so a torrent with two topics does not double the concurrent requests to a tracker.
    */
   private suspend fun announceExtra(
     discoveries: List<TrackerDiscovery>,
-    poll: suspend (TrackerDiscovery, stopped: Boolean) -> TrackerResponse?,
+    state: suspend () -> AnnounceState,
     publish: suspend (TrackerDiscovery, List<PeerEndpoint>) -> Unit,
   ) {
     try {
       while (currentCoroutineContext().isActive) {
         for (discovery in discoveries) {
-          attempt { poll(discovery, false) }?.let { publish(discovery, it.peers.distinct()) }
+          attempt { state().poll(discovery) }?.let { publish(discovery, it.peers.distinct()) }
         }
         delay(1000)
       }
     } finally {
-      withContext(NonCancellable) {
-        withTimeoutOrNull(stoppedAnnounceTime()) {
-          for (discovery in discoveries) attempt { poll(discovery, true) }
-        }
+      val last = withContext(NonCancellable) { attempt { state() } }
+      if (last != null) sayGoodbye {
+        for (discovery in discoveries) attempt { last.poll(discovery, stopped = true) }
       }
     }
   }
+
+  /** What a v1 [session]'s announces report now. */
+  private suspend fun announceState(session: KotlinTorrentSession) =
+    AnnounceState(session.verifiedPieces(), session.receivedBytes, session.uploadedBytes)
+}
+
+/** What a torrent's announces report: its verified pieces and payload counters. */
+private class AnnounceState(val verified: BooleanArray, val received: Long, val uploaded: Long) {
+  suspend fun poll(
+    discovery: TrackerDiscovery,
+    stopped: Boolean = false,
+    manual: Boolean = false,
+  ): TrackerResponse? =
+    discovery.poll(verified, received, uploaded, stopped = stopped, manual = manual)
 }
 
 private const val WILDCARD_IPV4 = "0.0.0.0"

@@ -27,6 +27,7 @@ import okio.FileSystem
 import okio.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -89,14 +90,98 @@ class TorrentEngineStopTest {
     .also { FileSystem.SYSTEM.createDirectories(it) }
 
   /** A one-piece v1 task announcing to [tracker], started. */
-  private suspend fun KotlinTorrentEngine.addV1(index: Int, tracker: String, root: Path) {
+  private suspend fun KotlinTorrentEngine.addV1(
+    index: Int,
+    tracker: String,
+    root: Path,
+  ): KotlinTorrentSession {
     val bytes = byteArrayOf(index.toByte(), 2, 3, 4)
     val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf(
       "announce" to tracker, "info" to mapOf("name" to "payload", "length" to 4L,
         "piece length" to 4L, "pieces" to sha1Digest(bytes))
     )))
-    addTask(TorrentTaskSpec("stop-$index", metadata, (root / "$index").toString(), emptySet()))
-      .resume()
+    return addTask(TorrentTaskSpec("stop-$index", metadata, (root / "$index").toString(),
+      emptySet())).also { it.resume() }
+  }
+
+  @Test
+  fun removeAndPause_returnAtOnce_whileTheTrackersNeverAnswerStopped() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(20_000) {
+        val trackers = SilentTrackers()
+        val root = root()
+        val removed = "http://removed/announce"
+        val paused = "http://paused/announce"
+        val removedV2 = "http://removed-v2/announce"
+        val urls = listOf(removed, paused, removedV2)
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          http = TorrentHttp(trackers))
+        try {
+          engine.start()
+          val first = engine.addV1(0, removed, root)
+          val second = engine.addV1(1, paused, root)
+          val fixture = TorrentV2Fixture.build(listOf("a" to 5))
+          val third = engine.addV2Task(TorrentV2TaskSpec("stop-v2", fixture.document,
+            (root / "v2").toString(), trackerTiers = listOf(listOf(removedV2)),
+            privacy = TorrentDiscoveryPrivacy.PUBLIC)).also { it.resume() }
+          trackers.requests.first { requests ->
+            urls.all { url -> requests.any { it.startsWith(url) } }
+          }
+          trackers.stopping.complete(TimeSource.Monotonic.markNow())
+          val took = listOf(
+            suspend { engine.removeTorrent(first.infoHash, deleteFiles = false) },
+            suspend { second.pause() },
+            suspend { engine.removeTorrent(third.infoHash, deleteFiles = false) }
+          ).map { stop ->
+            val stopping = TimeSource.Monotonic.markNow()
+            stop()
+            stopping.elapsedNow()
+          }
+          // None waited for its tracker to answer `stopped`...
+          assertTrue(took.all { it < 1.seconds }, "Removing, pausing and removing took $took")
+          // ...which still heard it, for as long as it would have waited.
+          val windows = trackers.stopped.first { it.keys.containsAll(urls) }
+          for (url in urls) {
+            assertEquals(1, trackers.stoppedAnnounces(url), "$url heard ${trackers.requests.value}")
+            val (began, ended) = windows.getValue(url)
+            assertTrue(ended - began >= 1_500.milliseconds, "$url said goodbye $began to $ended")
+          }
+        } finally {
+          engine.stop()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun stop_waitsForTheStoppedAnnouncesOfTorrentsRemovedBefore() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(20_000) {
+        val trackers = SilentTrackers()
+        val root = root()
+        val removed = "http://removed/announce"
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          http = TorrentHttp(trackers))
+        try {
+          engine.start()
+          val session = engine.addV1(0, removed, root)
+          trackers.requests.first { requests -> requests.any { it.startsWith(removed) } }
+          val stopping = TimeSource.Monotonic.markNow()
+          trackers.stopping.complete(stopping)
+          engine.removeTorrent(session.infoHash, deleteFiles = false)
+          engine.stop()
+          val took = stopping.elapsedNow()
+          // The engine waited for the announce still on its way, until its window ended.
+          val (_, ended) = assertNotNull(trackers.stopped.value[removed], "No goodbye ended")
+          assertTrue(ended >= 1_500.milliseconds, "Said goodbye until $ended")
+          assertTrue(took < 2_600.milliseconds, "Stopping took $took")
+        } finally {
+          engine.stop()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
   }
 
   @Test

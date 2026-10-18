@@ -186,8 +186,8 @@ class KotlinTorrentV2SeedTest {
         assertClosed(peer)
       } finally { network.close() }
       assertEquals(TorrentSessionState.STOPPED, session.state.value)
-      // Removal announces the stop.
-      assertEquals("stopped", http.announces.value.last().event)
+      // Removal announces the stop, from the engine once removal returned.
+      withTimeout(5_000) { http.announces.first { it.last().event == "stopped" } }
       assertTrue(http.announces.value.none { it.left != 0L })
     }
   }
