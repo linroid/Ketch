@@ -14,6 +14,9 @@
 # The server's unused JVM registrar references this factory. Android supplies its own
 # AndroidMdnsRegistrar, compiled against NetService_androidKt in the Android DNS-SD artifact.
 -dontwarn com.appstractive.dnssd.NetService_jvmKt
+# The server's macOS NativeMdnsRegistrar, never used on Android, stops dns-sd through
+# Process.descendants(), whose ProcessHandle Android lacks.
+-dontwarn java.lang.ProcessHandle
 
 # Koog AI framework and its transitive dependencies — many optional
 # classes are not present at runtime (OpenTelemetry, gRPC, Reactor,
