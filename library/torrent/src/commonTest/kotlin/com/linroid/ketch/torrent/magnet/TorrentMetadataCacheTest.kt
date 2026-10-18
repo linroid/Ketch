@@ -8,22 +8,27 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class TorrentMetadataCacheTest {
   @Test
@@ -312,6 +317,31 @@ class TorrentMetadataCacheTest {
         cache.close()
       }
     }
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun close_fetchWhoseGraceEndedStillEnding_waitsForIt() = runTest {
+    val cache = TorrentMetadataCache(backgroundScope)
+    var ended = false
+    val left = async {
+      cache.resolve(fixture("a").infoHash) {
+        try { awaitCancellation() } finally {
+          // What it says as it ends, such as its trackers' `stopped`, takes a while.
+          withContext(NonCancellable) { delay(1.seconds) }
+          ended = true
+        }
+      }
+    }
+    runCurrent()
+    left.cancelAndJoin()
+    // Its grace over, it is no longer pending, but has yet to end...
+    advanceTimeBy(ABANDONED_LOOKUP_GRACE + 1.milliseconds)
+    assertEquals(0, cache.pendingFetches)
+    assertFalse(ended)
+    // ...which the cache's close waits for.
+    cache.close()
+    assertTrue(ended)
   }
 
   @Test

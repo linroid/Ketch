@@ -487,7 +487,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   canceling, pausing or removing a task, or a lookup that ends, never waits on its trackers,
   while the next announces that start the same topic, a lookup's included, wait for them
   (`awaitGoodbyes`), so a task resumed or retried at once never reaches a tracker before its
-  `stopped`; the engine's stop waits for them within the window. Ketch
+  `stopped`; the engine's stop ends its magnet lookups beside its sessions, those in their grace
+  too, and waits for them within the window. Ketch
   closes dispatchers it was given only once every cancelled coroutine has finished, never under
   them, and never `KetchDispatchers.Default`, whose `close()` does nothing.
   `KetchApi.shutdown(timeout)` (5 s by default; `close()` for other implementations) does the

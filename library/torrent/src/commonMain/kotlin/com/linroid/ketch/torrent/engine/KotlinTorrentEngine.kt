@@ -116,6 +116,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -238,6 +239,9 @@ internal class KotlinTorrentEngine(
   private val goodbyes = SupervisorJob(checkNotNull(scope.coroutineContext[Job]))
   /** Those of [goodbyes] still on their way, by the topic they stop. */
   private val farewells = AtomicReference(emptyMap<TrackerTopic, Set<Job>>())
+  /** Runs the v2 magnet lookups ([fetchV2Metadata]); btih ones run in [cache]. */
+  private val v2Lookups = CoroutineScope(scope.coroutineContext +
+    SupervisorJob(checkNotNull(scope.coroutineContext[Job])))
   /** Sockets to the local router, outside the peer budget and encryption. */
   private val directNetwork = rawNetwork
   private var portMapper: TorrentPortMapper? = null
@@ -589,6 +593,10 @@ internal class KotlinTorrentEngine(
               log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
             }
           }
+          // Magnet lookups end beside them, those in their grace too, so a tracker-only one's
+          // `stopped` has the window as well.
+          launch { cache.close() }
+          launch { v2Lookups.coroutineContext.job.cancelAndJoin() }
         }
         // Their `stopped` announces, and those of torrents that stopped before, have what is
         // left of the window.
@@ -751,7 +759,7 @@ internal class KotlinTorrentEngine(
     magnetUri: String,
     privacy: TorrentDiscoveryPrivacy,
   ): ByteArray {
-    val pending = scope.async { resolveV2Metadata(magnetUri, privacy) }
+    val pending = v2Lookups.async { resolveV2Metadata(magnetUri, privacy) }
     try { return pending.await() } finally {
       withContext(NonCancellable) { pending.cancelAndJoin() }
     }

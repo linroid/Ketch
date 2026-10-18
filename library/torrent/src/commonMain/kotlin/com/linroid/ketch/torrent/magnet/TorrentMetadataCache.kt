@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -55,6 +56,9 @@ internal class TorrentMetadataCache(
   /** How many fetches [pending] holds, which callers past [MAX_PENDING_METADATA] wait on. */
   private val pendingCount = MutableStateFlow(0)
   internal val pendingFetches: Int get() = pendingCount.value
+  /** Runs every fetch, also those that left [pending] and are still ending, which [close] ends. */
+  private val fetches = CoroutineScope(scope.coroutineContext +
+    SupervisorJob(scope.coroutineContext[Job]))
   private var closed = false
   private var cleanupJob: Job? = null
 
@@ -123,7 +127,7 @@ internal class TorrentMetadataCache(
   private fun start(
     key: PendingKey,
     fetch: suspend () -> TorrentMetadata,
-  ): Deferred<TorrentMetadata> = scope.async {
+  ): Deferred<TorrentMetadata> = fetches.async {
     val self = coroutineContext.job
     try {
       val metadata = get(key.hash) ?: fetch()
@@ -199,18 +203,19 @@ internal class TorrentMetadataCache(
     }
   }
 
-  /** Reject future use, release retained entries, and await canceled shared fetches. */
+  /**
+   * Reject future use, release retained entries, and cancel every fetch, those in their grace
+   * too, and await them.
+   */
   suspend fun close(): Unit = withContext(NonCancellable) {
     cleanupJob?.cancel()
-    val operations = mutex.withLock {
+    mutex.withLock {
       closed = true
       entries.values.forEach { it.lease.close() }
       entries.clear()
-      pending.values.map { it.fetch }
     }
     // Fetch finalizers take the same mutex, so never await them while holding it.
-    operations.forEach { it.cancel() }
-    operations.forEach { it.cancelAndJoin() }
+    fetches.coroutineContext.job.cancelAndJoin()
   }
 
   private fun evictOldest() {

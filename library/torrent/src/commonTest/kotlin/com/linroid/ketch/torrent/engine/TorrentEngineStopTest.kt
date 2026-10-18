@@ -7,6 +7,7 @@ import com.linroid.ketch.torrent.TorrentDiscoveryPrivacy
 import com.linroid.ketch.torrent.TorrentV2Fixture
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
+import com.linroid.ketch.torrent.magnet.ABANDONED_LOOKUP_GRACE
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
@@ -39,6 +40,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -189,12 +191,16 @@ class TorrentEngineStopTest {
     }
 
   /**
-   * Runs [body] with a started engine whose tracker-only v2 magnet lookups ask [tracker] at
-   * `http://busy/announce`, and get from it a peer that takes their connection and never
-   * answers: [body] waits for one with `dialed`.
+   * Runs [body] with a started engine whose tracker-only lookups of [magnet], a v2 one unless
+   * given, ask [tracker] at `http://busy/announce`, going on for [grace] once nothing waits for
+   * them, and get from it a peer that takes their connection and never answers: [body] waits for
+   * one with `dialed`.
    */
-  private fun v2TrackerOnlyLookup(
+  private fun trackerOnlyLookup(
     busy: Duration,
+    magnet: String = "magnet:?xt=urn:btmh:1220${"ab".repeat(32)}" +
+      "&tr=http%3A%2F%2Fbusy%2Fannounce",
+    grace: Duration = ABANDONED_LOOKUP_GRACE,
     body: suspend CoroutineScope.(
       engine: KotlinTorrentEngine,
       tracker: BusyTracker,
@@ -208,7 +214,7 @@ class TorrentEngineStopTest {
         val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
         val tracker = BusyTracker(busy, peer = listener.local)
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
-          http = TorrentHttp(tracker))
+          http = TorrentHttp(tracker), magnetLookupGrace = grace)
         val accepted = MutableStateFlow<List<TorrentConnection>>(emptyList())
         try {
           engine.start()
@@ -220,8 +226,6 @@ class TorrentEngineStopTest {
               }
             }
             var dials = 0
-            val magnet = "magnet:?xt=urn:btmh:1220${"ab".repeat(32)}" +
-              "&tr=http%3A%2F%2Fbusy%2Fannounce"
             body(engine, tracker, magnet) {
               dials++
               accepted.first { it.size >= dials }
@@ -240,7 +244,7 @@ class TorrentEngineStopTest {
 
   @Test
   fun v2TrackerOnlyLookup_canceled_returnsAtOnce() =
-    v2TrackerOnlyLookup(busy = Duration.INFINITE) { engine, tracker, magnet, dialed ->
+    trackerOnlyLookup(busy = Duration.INFINITE) { engine, tracker, magnet, dialed ->
       val lookup = async { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
       // The lookup asks the peer its tracker named.
       dialed()
@@ -255,13 +259,41 @@ class TorrentEngineStopTest {
 
   @Test
   fun v2TrackerOnlyLookup_askedAgainAtOnce_startsOnceTheTrackerAppliedStopped() =
-    v2TrackerOnlyLookup(busy = 1.seconds) { engine, tracker, magnet, dialed ->
+    trackerOnlyLookup(busy = 1.seconds) { engine, tracker, magnet, dialed ->
       val first = async { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
       dialed()
       first.cancelAndJoin()
       val second = async { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
       assertTrue(tracker.restartedOnceStoppedApplied(), "Heard ${tracker.events.value}")
       second.cancelAndJoin()
+    }
+
+  @Test
+  fun stop_trackerOnlyLookupInItsGrace_saysStoppedWithinTheWindow() =
+    trackerOnlyLookup(busy = Duration.INFINITE, magnet = "magnet:?xt=urn:btih:${"ab".repeat(20)}" +
+      "&tr=http%3A%2F%2Fbusy%2Fannounce", grace = 1.minutes) { engine, tracker, magnet, dialed ->
+      val lookup = async { engine.fetchMetadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
+      dialed()
+      lookup.cancelAndJoin()
+      // Nothing waits for it, so it goes on for its grace, still started at its tracker...
+      assertEquals(1, engine.pendingMetadataLookups)
+      assertTrue("stopped" !in tracker.events.value, "Heard ${tracker.events.value}")
+      // ...until the engine stops, which ends it while its `stopped` can still go out.
+      engine.stop()
+      assertTrue("stopped" in tracker.events.value, "Heard ${tracker.events.value}")
+    }
+
+  @Test
+  fun stop_v2TrackerOnlyLookupAwaited_saysStoppedWithinTheWindow() =
+    trackerOnlyLookup(busy = Duration.INFINITE) { engine, tracker, magnet, dialed ->
+      val lookup = async {
+        runCatching { engine.fetchV2Metadata(magnet, TorrentDiscoveryPrivacy.TRACKER_ONLY) }
+      }
+      dialed()
+      // A preview still waits for it as the engine stops, which ends it with its `stopped`.
+      engine.stop()
+      assertTrue("stopped" in tracker.events.value, "Heard ${tracker.events.value}")
+      assertTrue(lookup.await().isFailure)
     }
 
   /** A new folder: a v2 owner's output must be in one that exists. */
