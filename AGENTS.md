@@ -996,7 +996,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   peers again) until found or stopped. A btih lookup (`TorrentMetadataCache`) runs while a task
   or preview waits for it, and `ABANDONED_LOOKUP_GRACE` (5 s) after the last left, then is
   canceled: pausing, canceling or removing a task stops its discovery then, while a task resumed,
-  or a preview's link added, meanwhile carries on with it and its peers. Past
+  or a preview's link added, meanwhile carries on with it and its peers, unless that link names a
+  usable tracker or (outside tracker-only lookups) a peer the lookup does not ask
+  (`LookupSources`): the lookup is then canceled at once, and one of the link's starts once it
+  ended. Past
   `MAX_PENDING_METADATA` (16), those in their grace included, new lookups wait for one to end.
   The apps show such a task as Starting, "Finding peers",
   and a preview that takes 2 minutes offers Keep waiting and Add anyway. A peer has

@@ -157,6 +157,39 @@ class MagnetLookupStopTest {
     }
 
   @Test
+  fun linkNamingAnotherTracker_withinTheGrace_isLookedUpThere() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(30_000) {
+        val trackers = HangingTrackers()
+        val engine = AtomicReference<KotlinTorrentEngine?>(null)
+        val source = source(trackers, engine)
+        val hash = InfoHash.fromBytes(torrentRandomBytes(20)).hex
+        fun link(tracker: Int) =
+          "magnet:?xt=urn:btih:$hash&tr=http%3A%2F%2Ftracker$tracker.test%2Fannounce"
+        try {
+          coroutineScope {
+            val first = async { source.resolve(link(0)) }
+            eventually("the lookup to announce") { trackers.asked("tracker0.test") }
+            first.cancelAndJoin()
+            // Within the grace of the lookup it left, the same torrent's link with another
+            // tracker is looked up there, by a lookup that takes the left one's place.
+            val second = async { source.resolve(link(1)) }
+            eventually("the new link's tracker to be asked") { trackers.asked("tracker1.test") }
+            assertTrue(second.isActive)
+            assertEquals(1, engine.load()?.pendingMetadataLookups)
+            second.cancelAndJoin()
+          }
+        } finally {
+          withContext(NonCancellable) {
+            source.stop()
+            source.close()
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   fun previewsGivenUp_leaveNewMagnetsTheirLookups() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(30_000) {

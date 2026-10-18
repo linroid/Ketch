@@ -30,7 +30,8 @@ import kotlin.time.Duration.Companion.seconds
  * never cancels it for the others, and [grace] after the last one left it is cancelled, so a task
  * paused, canceled or removed, or a preview given up, stops its discovery then. A caller that
  * comes back meanwhile, as a task paused and resumed or the download of a preview's link does,
- * carries on with it and the peers it found.
+ * carries on with it and the peers it found, unless its link names a source the fetch does not
+ * ask ([LookupSources]): that fetch then ends at once, and one of the caller's starts.
  */
 internal class TorrentMetadataCache(
   private val scope: CoroutineScope,
@@ -46,8 +47,8 @@ internal class TorrentMetadataCache(
   private class Entry(val metadata: TorrentMetadata, val lease: TorrentBufferBudget.Lease)
   private val entries = linkedMapOf<InfoHash, Entry>()
   private data class PendingKey(val hash: InfoHash, val privacy: TorrentDiscoveryPrivacy)
-  /** A shared fetch and how many callers wait for it, guarded by [mutex]. */
-  private class Pending(val fetch: Deferred<TorrentMetadata>) {
+  /** A shared fetch, where it looks and how many callers wait for it, guarded by [mutex]. */
+  private class Pending(val fetch: Deferred<TorrentMetadata>, val sources: LookupSources) {
     var waiters = 1
     /** Cancels [fetch] once its grace ends, while no caller waits for it. */
     var abandon: Job? = null
@@ -81,16 +82,17 @@ internal class TorrentMetadataCache(
    * behalf, and its rejection of private metadata does not apply to the restricted caller.
    * Completed entries stay shared because the hash authenticates them regardless of discovery.
    * Beyond [MAX_PENDING_METADATA] fetches, those in their grace included, a new one waits for
-   * another to end.
+   * another to end. [fetch] looks in [sources] besides what every fetch of [hash] asks.
    */
   suspend fun resolve(
     hash: InfoHash,
     privacy: TorrentDiscoveryPrivacy = TorrentDiscoveryPrivacy.PUBLIC,
+    sources: LookupSources = LookupSources(),
     fetch: suspend () -> TorrentMetadata,
   ): TorrentMetadata {
     get(hash)?.let { return it }
     val key = PendingKey(hash, privacy)
-    val operation = join(key, fetch)
+    val operation = join(key, sources, fetch)
     try {
       return operation.fetch.await()
     } finally {
@@ -99,20 +101,29 @@ internal class TorrentMetadataCache(
   }
 
   /**
-   * Joins the fetch of [key], also one in its grace, or starts one once fewer than the bound are
-   * pending.
+   * Joins the fetch of [key], also one in its grace that asks every one of [sources], or starts
+   * one once fewer than the bound are pending. One in its grace that misses some is cancelled at
+   * once, and the caller's takes its place.
    */
-  private suspend fun join(key: PendingKey, fetch: suspend () -> TorrentMetadata): Pending {
+  private suspend fun join(
+    key: PendingKey,
+    sources: LookupSources,
+    fetch: suspend () -> TorrentMetadata,
+  ): Pending {
     while (true) {
       val joined = mutex.withLock {
         scope.coroutineContext.ensureActive()
         check(!closed) { "Metadata cache is closed" }
-        pending[key]?.also {
-          it.waiters++
-          it.abandon?.cancel()
-          it.abandon = null
-        } ?: if (pending.size < MAX_PENDING_METADATA) {
-          Pending(start(key, fetch)).also {
+        val current = pending[key]
+        if (current != null && (current.waiters > 0 || current.sources.covers(sources))) {
+          current.waiters++
+          current.abandon?.cancel()
+          current.abandon = null
+          current
+        } else if (current != null || pending.size < MAX_PENDING_METADATA) {
+          current?.abandon?.cancel()
+          current?.fetch?.cancel()
+          Pending(start(key, fetch, after = current?.fetch), sources).also {
             pending[key] = it
             pendingCount.value = pending.size
           }
@@ -123,13 +134,19 @@ internal class TorrentMetadataCache(
     }
   }
 
-  /** Under [mutex]: the fetch of [key], which leaves [pending] as it ends. */
+  /**
+   * Under [mutex]: the fetch of [key], which leaves [pending] as it ends. It begins once [after],
+   * the fetch it replaces, has ended, so what that one says as it ends, such as its trackers'
+   * `stopped`, goes first.
+   */
   private fun start(
     key: PendingKey,
     fetch: suspend () -> TorrentMetadata,
+    after: Job? = null,
   ): Deferred<TorrentMetadata> = fetches.async {
     val self = coroutineContext.job
     try {
+      after?.join()
       val metadata = get(key.hash) ?: fetch()
       require(metadata.infoHash == key.hash)
       put(metadata)
@@ -221,6 +238,20 @@ internal class TorrentMetadataCache(
   private fun evictOldest() {
     entries.remove(entries.keys.first())?.lease?.close()
   }
+}
+
+/**
+ * Where a magnet lookup looks besides what every lookup of its hash asks, such as the DHT: its
+ * link's usable [trackers] and the [peers] it names. A link's web seeds are not among them: they
+ * find no metadata, and each caller's own join what the lookup found.
+ */
+internal data class LookupSources(
+  val trackers: Set<String> = emptySet(),
+  val peers: Set<String> = emptySet(),
+) {
+  /** Whether a lookup from these asks everywhere one from [other] would. */
+  fun covers(other: LookupSources): Boolean =
+    trackers.containsAll(other.trackers) && peers.containsAll(other.peers)
 }
 
 /** Distinct in-flight metadata fetches per runtime; further ones wait for one to end. */

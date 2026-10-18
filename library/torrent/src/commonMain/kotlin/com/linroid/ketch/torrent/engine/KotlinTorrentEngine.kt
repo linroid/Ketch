@@ -24,6 +24,7 @@ import com.linroid.ketch.torrent.lsd.TorrentLocalDiscovery
 import com.linroid.ketch.torrent.magnet.ABANDONED_LOOKUP_GRACE
 import com.linroid.ketch.torrent.magnet.MAX_METADATA_PEERS
 import com.linroid.ketch.torrent.magnet.AnsweringPeers
+import com.linroid.ketch.torrent.magnet.LookupSources
 import com.linroid.ketch.torrent.magnet.METADATA_IDLE_MS
 import com.linroid.ketch.torrent.magnet.MagnetUri
 import com.linroid.ketch.torrent.magnet.MetadataLookupPeers
@@ -699,7 +700,14 @@ internal class KotlinTorrentEngine(
       }
     } else emptyList()
     val hash = logHash(magnet.infoHash.hex)
-    val metadata = cache.resolve(magnet.infoHash, privacy) {
+    // A lookup in its grace carries on for this link only when it asks these too; tracker-only
+    // lookups ask their trackers' peers alone.
+    val sources = LookupSources(
+      TrackerConfiguration.usable(magnet.trackers.map { listOf(it) }).tiers.flatten().toSet(),
+      if (privacy == TorrentDiscoveryPrivacy.TRACKER_ONLY) emptySet()
+      else magnet.explicitPeers.toSet(),
+    )
+    val metadata = cache.resolve(magnet.infoHash, privacy, sources) {
       log.i {
         "Fetching metadata for magnet $hash: privacy=$privacy, trackers=${magnet.trackers.size}, " +
           "peers=${magnet.explicitPeers.size}, timeout=$magnetLookupTime"
