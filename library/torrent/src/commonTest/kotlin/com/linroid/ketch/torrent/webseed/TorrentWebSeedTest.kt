@@ -828,22 +828,26 @@ class TorrentWebSeedTest {
         }
         withStore(staleSetMetadata(), selected = setOf(0)) { store, _ ->
           val network = createTorrentNetwork()
+          val budget = TorrentBufferBudget(4 * 1024 * 1024)
           val first = network.listen(PeerEndpoint("127.0.0.1", 0))
           val again = network.listen(PeerEndpoint("127.0.0.1", 0))
           val holder = network.listen(PeerEndpoint("127.0.0.1", 0))
           val peers = Channel<PeerEndpoint>(1)
-          // Steps the clock a second at a time until the stall says [done].
-          suspend fun awaitStall(done: (TorrentStall) -> Boolean): TorrentStall {
-            while (true) {
-              stall.value?.takeIf(done)?.let { return it }
-              clock += 1_000
-              delay(200)
+          // Moves the clock to [time] and returns the stall the swarm's check then publishes. Only
+          // this moves the clock, and the stall lasts from the start, so its seconds tell that
+          // check apart: it looked at the swarm after everything the test waited for before.
+          suspend fun checkAt(time: Long): TorrentStall {
+            clock = time
+            return withTimeout(5_000) {
+              stall.filterNotNull().first { it.seconds == time / 1_000 }
             }
           }
-          // Connects as a peer holding [held] that never unchokes.
+          // Connects as a peer holding [held] that never unchokes, and reads what the swarm sends
+          // until [taken]: it counts the peer before it sends its bitfield.
           suspend fun connect(
             listener: TorrentListener,
             held: BooleanArray,
+            taken: (PeerMessage) -> Boolean = { it is PeerMessage.Bitfield },
           ): TorrentConnection {
             peers.send(listener.local)
             val connection = listener.accept()
@@ -851,6 +855,9 @@ class TorrentWebSeedTest {
             wire.handshake(PeerHandshake(store.metadata.infoHash, torrentRandomBytes(20),
               extensions = false, dht = false))
             wire.send(PeerMessage.Bitfield(pieceBitfield(held)))
+            do {
+              val message = wire.read()
+            } while (!taken(message))
             return connection
           }
           val lackingStale = booleanArrayOf(false, true, true, true)
@@ -858,35 +865,45 @@ class TorrentWebSeedTest {
           try {
             coroutineScope {
               val swarm = launch {
-                TorrentSwarm(store, network, TorrentBufferBudget(4 * 1024 * 1024),
+                TorrentSwarm(store, network, budget,
                   webSeedHttp = TorrentHttp(mirror), webSeedRetryMs = 5, nowMs = { clock },
                   stall = stall).run(peers)
               }
               while (lacking.requests.isEmpty()) delay(20)
               delay(500)
-              // Late into the stall a peer with good.bin alone connects: stale.bin is missing.
-              clock = 100_000
+              // Late into the stall, so the swarm never gives up on its peers for bringing
+              // nothing, a peer with good.bin alone connects: stale.bin is missing.
+              checkAt(100_000)
               val leaving = connect(first, lackingStale)
-              val missing = awaitStall { it.peers == 1 }
+              val missing = checkAt(101_000)
+              assertEquals(1, missing.peers)
               assertEquals(TorrentStallReason.MISSING_PIECES, missing.reason)
               assertEquals(1, missing.missingPieces)
               // Two minutes into the stall the seed starts again, and asks once more.
               holding.store(true)
-              clock = 130_000
+              checkAt(130_000)
               asked.await()
               // The peer leaves and comes back, as the swarm drops a peer that brings nothing for
-              // 90 s and dials it again: still without stale.bin, it changes nothing.
+              // 90 s and dials it again: still without stale.bin, it changes nothing. The swarm
+              // frees a peer's buffers once it no longer counts it.
+              val held = budget.allocated
               leaving.close()
               first.close()
-              awaitStall { it.peers == 0 }
+              while (budget.allocated >= held) delay(10)
+              assertEquals(0, checkAt(131_000).peers)
               connections += connect(again, lackingStale)
-              val back = awaitStall { it.peers == 1 }
+              val back = checkAt(132_000)
+              assertEquals(1, back.peers)
               assertEquals(TorrentStallReason.MISSING_PIECES, back.reason)
               assertEquals(1, back.missingPieces)
               assertEquals(listOf("0"), back.missingFileIds)
-              // A peer with stale.bin connects: nothing is missing now.
-              connections += connect(holder, booleanArrayOf(true, true, true, true))
-              val heard = awaitStall { it.peers == 2 }
+              // A peer with stale.bin connects: nothing is missing now. Interested, the swarm took
+              // the peer's pieces.
+              connections += connect(holder, booleanArrayOf(true, true, true, true)) {
+                it == PeerMessage.Control(PeerMessage.Signal.INTERESTED)
+              }
+              val heard = checkAt(133_000)
+              assertEquals(2, heard.peers)
               assertEquals(TorrentStallReason.CHOKED, heard.reason)
               assertEquals(0, heard.missingPieces)
               swarm.cancel()
@@ -934,12 +951,17 @@ class TorrentWebSeedTest {
           val network = createTorrentNetwork()
           val listener = network.listen(PeerEndpoint("127.0.0.1", 0))
           val peers = Channel<PeerEndpoint>(1)
-          // Steps the clock a second and returns the stall a check then publishes.
-          suspend fun checked(): TorrentStall {
-            clock += 1_000
-            delay(300)
-            return assertNotNull(stall.value)
+          // Moves the clock to [time] and returns the stall the swarm's check then publishes. Only
+          // this moves the clock, and the stall lasts from the start, so its seconds tell that
+          // check apart: it looked at the swarm after everything the test waited for before.
+          suspend fun checkAt(time: Long): TorrentStall {
+            clock = time
+            return withTimeout(5_000) {
+              stall.filterNotNull().first { it.seconds == time / 1_000 }
+            }
           }
+          // Steps the clock a second and returns the stall the check then publishes.
+          suspend fun checked(): TorrentStall = checkAt(clock + 1_000)
           try {
             coroutineScope {
               val swarm = launch {
@@ -949,8 +971,9 @@ class TorrentWebSeedTest {
               }
               while (lacking.requests.isEmpty()) delay(20)
               delay(500)
-              // Late into the stall a peer with good.bin alone connects: stale.bin is missing.
-              clock = 100_000
+              // Late into the stall, so the swarm never gives up on the peer for bringing
+              // nothing, a peer with good.bin alone connects: stale.bin is missing.
+              checkAt(100_000)
               peers.send(listener.local)
               val connection = listener.accept()
               try {
@@ -959,13 +982,17 @@ class TorrentWebSeedTest {
                   extensions = false, dht = false))
                 wire.send(PeerMessage.Bitfield(pieceBitfield(booleanArrayOf(false, true, true,
                   true))))
-                var connected = checked()
-                while (connected.peers != 1) connected = checked()
+                // The swarm counts the peer before it sends its bitfield.
+                do {
+                  val message = wire.read()
+                } while (message !is PeerMessage.Bitfield)
+                val connected = checked()
+                assertEquals(1, connected.peers)
                 assertEquals(TorrentStallReason.MISSING_PIECES, connected.reason)
                 // Two minutes into the stall the seed starts again, and every request it sends
                 // fails: stale.bin stays missing while it tries, and once it is dropped again.
                 holding.store(true)
-                clock = 130_000
+                checkAt(130_000)
                 var failed = 0
                 while (true) {
                   withTimeoutOrNull(1_000) { while (asked.load() == failed) delay(10) } ?: break
