@@ -36,12 +36,16 @@ internal fun quietLogLevel(verbosity: LogLevel): LogLevel =
 
 /**
  * Why [error] failed a download, in one line: what the source lacks for
- * [KetchError.Unsupported], whose own message is the same whatever the reason, else the error
- * and its causes, as a [KetchError]'s message alone is only a summary such as "Network error
+ * [KetchError.Unsupported], whose own message is the same whatever the reason; the source's own
+ * explanation for a [KetchError.SourceError] that has one, which its cause only repeats; else the
+ * error and its causes, as a [KetchError]'s message alone is only a summary such as "Network error
  * occurred".
  */
-internal fun failureReason(error: Throwable): String =
-  if (error is KetchError.Unsupported) error.reason() else error.describeCauses()
+internal fun failureReason(error: Throwable): String = when (error) {
+  is KetchError.Unsupported -> error.reason()
+  is KetchError.SourceError -> error.detail ?: error.describeCauses()
+  else -> error.describeCauses()
+}
 
 /**
  * Downloads [request] with [ketch] until it completes or fails, printing its progress to [out],

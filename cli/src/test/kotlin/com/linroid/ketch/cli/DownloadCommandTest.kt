@@ -95,6 +95,19 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun downloadUntilDone_sourceExplainsWhy_saysItOnce() {
+    // As a torrent's source reports a refusal: its detail is the cause's message.
+    val reason = "The torrent's pieces are 64 MiB, larger than the 16 MiB Ketch supports"
+    val engine = FailingEngine(
+      KetchError.SourceError("torrent", IllegalArgumentException(reason), detail = reason),
+    )
+    val status = download("https://example.com/a.torrent", engine)
+
+    assertEquals(DownloadExit.FAILED, status)
+    assertEquals("Download failed: $reason", err.toString(Charsets.UTF_8).trim())
+  }
+
+  @Test
   fun quietLogLevel_verboseFlags_keepTheirLevel() {
     assertEquals(LogLevel.WARN, quietLogLevel(LogLevel.INFO))
     assertEquals(LogLevel.DEBUG, quietLogLevel(LogLevel.DEBUG))
