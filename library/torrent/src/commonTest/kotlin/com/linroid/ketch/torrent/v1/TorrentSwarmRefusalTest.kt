@@ -280,8 +280,9 @@ class TorrentSwarmRefusalTest {
   /**
    * Plays a peer with every piece that serves piece 1 and answers requests for piece 0 as
    * [answer] says, rejecting them at first, between the [PeerAction]s a test sends it.
-   * [refusing] completes once the swarm asked for nothing for a while after a rejection;
-   * [askedAgain] once it asks for piece 0 again after that and the peer holds the request back.
+   * [refusing] completes once the peer sent all of piece 1 and the swarm asked for nothing for a
+   * while after a rejection, so no payload arrives once the test moves its clock; [askedAgain]
+   * once it asks for piece 0 again after that and the peer holds the request back.
    */
   private inner class RefusingPeer(
     private val wire: PeerWire,
@@ -295,6 +296,8 @@ class TorrentSwarmRefusalTest {
     private val held = ArrayDeque<PeerMessage.Request>()
     private var heldFirst = false
     private var rejected = false
+    /** Bytes of piece 1 sent: the swarm gets all of its payload before [refusing] completes. */
+    private var servedOther = 0
 
     /** Announces piece 0 (HAVE), as a seeder that verified it again does. */
     suspend fun announce() = wire.send(PeerMessage.Have(0))
@@ -336,7 +339,10 @@ class TorrentSwarmRefusalTest {
           }
           val message = withTimeoutOrNull(300) { messages.receive() }
           if (message == null) {
-            if (rejected && refusing.complete(Unit) && holdsAskedAgain) answer = Answer.HOLD
+            if (rejected && servedOther >= pieceLength && refusing.complete(Unit) &&
+              holdsAskedAgain) {
+              answer = Answer.HOLD
+            }
             continue
           }
           if (message is PeerMessage.Request) receive(message)
@@ -349,6 +355,7 @@ class TorrentSwarmRefusalTest {
     private suspend fun receive(request: PeerMessage.Request) {
       if (request.index != 0) {
         wire.send(block(request))
+        servedOther += request.length
         return
       }
       if (holdsFirst && !heldFirst) {
