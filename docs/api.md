@@ -180,8 +180,8 @@ ketch.download(
 `selectedFileIds` picks which of `ResolvedSource.files` to download:
 
 - `FileSelectionMode.MULTIPLE` takes any subset. An empty set downloads every file.
-- `FileSelectionMode.SINGLE` takes exactly one ID, and defaults to the first file. It is reserved
-  for HLS quality; no built-in source offers it yet.
+- `FileSelectionMode.SINGLE` takes exactly one ID, and defaults to the first file. The HLS and
+  DASH sources offer their qualities this way, best first ([media](media.md#choose-the-quality)).
 - `ResolvedSource.defaultSelection()` returns what an empty selection downloads.
 
 With `awaitFileSelection = true` and no `selectedFileIds`, a download with several files or

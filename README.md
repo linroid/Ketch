@@ -117,8 +117,9 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   change them without starting over; a magnet link added before its details arrive waits for
   your choice. Stop or restart seeding a finished torrent; the ones you keep sharing seed again
   after Ketch restarts.
-- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
-  HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
+- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite streams as one media file, in the quality
+  you choose (the best by default), with separate audio merged in and AES-128 HLS decrypted
+  ([support and limits](docs/media.md)).
 - **Metalink (`.meta4`, `.metalink`)** — Download from every mirror a Metalink lists at once.
   A mirror that fails or sends bad pieces is left out, and the file is checked against the
   Metalink's hashes ([details](docs/metalink.md)).
@@ -242,8 +243,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   the extension in more browser stores and verified installation/update paths
   ([plan](docs/plans/v1-distribution.md))
 - **WebDAV** — Download from WebDAV servers, with resume
-- **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
-  AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
