@@ -52,17 +52,38 @@ class UtpWindowsDiagnosticTest {
   }
 
   @Test
-  fun engineDial() = runBlocking(Dispatchers.Default) {
-    KetchLogger.setLogger(Logger.console(LogLevel.VERBOSE))
+  fun specificThenWildcard() {
     try {
-      for (round in 1..5) {
+      val specific = DatagramChannel.open().bind(InetSocketAddress("127.0.0.1", 0))
+      val port = (specific.localAddress as InetSocketAddress).port
+      val wildcard = try {
+        DatagramChannel.open().bind(InetSocketAddress("0.0.0.0", port))
+          .also { p("wildcard bound beside specific at $port") }
+      } catch (e: Exception) { p("wildcard bind beside specific failed: $e"); null }
+      val sender = DatagramChannel.open().bind(InetSocketAddress("127.0.0.1", 0))
+      sender.send(ByteBuffer.wrap(byteArrayOf(1)), InetSocketAddress("127.0.0.1", port))
+      Thread.sleep(200)
+      listOf("specific" to specific, "wildcard" to wildcard).forEach { (name, c) ->
+        if (c == null) return@forEach
+        c.configureBlocking(false)
+        p("$name received from ${c.receive(ByteBuffer.allocate(16))}")
+      }
+      listOfNotNull(specific, wildcard, sender).forEach { it.close() }
+    } catch (e: Exception) { p("specificThenWildcard failed: $e") }
+  }
+
+  @Test
+  fun engineDial() = runBlocking(Dispatchers.Default) {
+    var failures = 0
+    try {
+      for (round in 1..200) {
+        if (round == 2) KetchLogger.setLogger(Logger.console(LogLevel.INFO))
         val network = createTorrentNetwork()
         val scope = CoroutineScope(Dispatchers.Default)
         val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
           rawNetwork = network, listenHost = "127.0.0.1")
         try {
           engine.start()
-          p("round $round engine listenPort ${engine.listenPort}")
           val incoming = Channel<TorrentConnection>(Channel.UNLIMITED)
           var endpoint: UtpEndpoint? = null
           val port = TorrentUdpPort(network.bindUdp(PeerEndpoint("127.0.0.1", 0)), scope,
@@ -71,8 +92,19 @@ class UtpWindowsDiagnosticTest {
             dialOptions = UtpOptions(synRetries = 1))
           try {
             endpoint.dial(PeerEndpoint("127.0.0.1", engine.listenPort)).close()
-            p("round $round dial ok")
-          } catch (e: Exception) { p("round $round dial failed: $e") }
+          } catch (e: Exception) {
+            failures++
+            p("round $round dial failed: $e (local ${port.local})")
+            try {
+              DatagramChannel.open().bind(InetSocketAddress("127.0.0.1", engine.listenPort)).close()
+              p("127.0.0.1:${engine.listenPort} was free for UDP")
+            } catch (b: Exception) { p("127.0.0.1:${engine.listenPort} held: $b") }
+            if (System.getProperty("os.name").startsWith("Windows")) {
+              val out = ProcessBuilder("netstat", "-ano", "-p", "UDP").redirectErrorStream(true)
+                .start().inputStream.bufferedReader().readText()
+              out.lines().filter { ":${engine.listenPort} " in it }.forEach { p("netstat $it") }
+            }
+          }
         } catch (e: Exception) {
           p("round $round failed: $e")
         } finally {
@@ -83,6 +115,7 @@ class UtpWindowsDiagnosticTest {
       }
     } finally {
       KetchLogger.setLogger(Logger.None)
+      p("failures $failures of 200")
     }
   }
 }
