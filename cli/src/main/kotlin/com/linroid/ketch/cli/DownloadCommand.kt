@@ -113,12 +113,12 @@ internal suspend fun downloadUntilDone(
   val speedLimit = request.speedLimit
   val limitLabel = if (speedLimit.isUnlimited) ""
     else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
-  val stall = MutableStateFlow<TorrentStall?>(null)
-  val stallWatch = launch { stalls(task.taskId).collect { stall.value = it } }
+  val latestStall = MutableStateFlow<TorrentStall?>(null)
+  val stallWatch = launch { stalls(task.taskId).collect { latestStall.value = it } }
   val monitor = launch {
     // How much of the terminal line the progress took last.
     var width = 0
-    combine(task.state, stall) { state, stall ->
+    combine(task.state, latestStall) { state, stall ->
       state to stall?.takeIf { state is DownloadState.Downloading }
     }.distinctUntilChanged().collect { (state, stall) ->
       when (state) {
