@@ -125,24 +125,41 @@ class DownloadCommandTest {
 
   @Test
   fun listFiles_linkNoSourceHandles_saysSo() {
-    val args = assertIs<DownloadArgs.Download>(
-      parseDownloadArgs(listOf("--list-files", "gopher://example.com/a.iso")),
-    )
-
-    val status = runBlocking {
-      val ketch = Ketch(httpEngine = ServingEngine(ByteArray(0)))
-      try {
-        listFiles(ketch, args, outStream, errStream)
-      } finally {
-        ketch.close()
-      }
-    }
+    val status = listFiles("gopher://example.com/a.iso", ServingEngine(ByteArray(0)))
 
     assertEquals(DownloadExit.FAILED, status)
     assertEquals(
       "Couldn't list the files: No download source handles this link",
       err.toString(Charsets.UTF_8).trim(),
     )
+  }
+
+  @Test
+  fun listFiles_hostNotFound_saysWhy() {
+    // The error's own message, "Network error occurred", said nothing of why.
+    val engine = FailingEngine(KetchError.Network(UnknownHostException("host.invalid")))
+    val status = listFiles("https://host.invalid/a.iso", engine)
+
+    assertEquals(DownloadExit.FAILED, status)
+    assertEquals(
+      "Couldn't list the files: Network: Network error occurred <- " +
+        "UnknownHostException: host.invalid",
+      err.toString(Charsets.UTF_8).trim(),
+    )
+  }
+
+  private fun listFiles(url: String, engine: HttpEngine): Int {
+    val args = assertIs<DownloadArgs.Download>(parseDownloadArgs(listOf("--list-files", url)))
+    return runBlocking {
+      val ketch = Ketch(httpEngine = engine)
+      try {
+        listFiles(ketch, args, outStream, errStream)
+      } finally {
+        ketch.close()
+        // Ketch installs its logger for the whole process.
+        KetchLogger.setLogger(Logger.None)
+      }
+    }
   }
 
   private fun download(

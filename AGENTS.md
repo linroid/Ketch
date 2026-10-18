@@ -1978,8 +1978,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `ketch <url> --files <ids>` downloads only those files of a torrent
   (`DownloadRequest.selectedFileIds`); `ketch --list-files <url>` resolves the URL and prints
   `ID  SIZE  PATH` rows instead (`fileListRows`), in the order of `--sort name|size|type` (`type`
-  is the file extension) and `--reverse`, exiting 1 when it cannot list them. Invalid download
-  options, such as `--list-files` with `--files`, exit 2
+  is the file extension) and `--reverse`, exiting 1 when it cannot list them and saying why as
+  `ketch <url>` does (`failureReason`). Invalid download options, such as `--list-files` with
+  `--files`, exit 2
 - Koog's Anthropic, Gemini and OpenAI Responses clients have Ktor find their request and response
   serializers by class, and Gemini parts and Responses items use content-polymorphic serializers,
   so `ai:discover` registers those classes too; the Ollama and chat-completions clients do not

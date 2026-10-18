@@ -127,7 +127,8 @@ internal suspend fun downloadUntilDone(
 /**
  * Prints the files or variants [ketch] resolves for [args]' URL, such as a torrent's files, to
  * [out]: one `ID  SIZE  PATH` row each, in the order `--sort` and `--reverse` ask for. Returns its
- * exit status, one of [DownloadExit]; why the URL could not be listed goes to [err].
+ * exit status, one of [DownloadExit]; why the URL could not be listed goes to [err] in one line
+ * ([failureReason]).
  */
 internal suspend fun listFiles(
   ketch: KetchApi,
@@ -139,12 +140,8 @@ internal suspend fun listFiles(
     ketch.resolve(args.url, args.headers)
   } catch (e: CancellationException) {
     throw e
-  } catch (e: KetchError.Unsupported) {
-    // Its own message is the same whatever the reason.
-    err.println("Couldn't list the files: ${e.reason()}")
-    return DownloadExit.FAILED
   } catch (e: Exception) {
-    err.println("Couldn't list the files: ${e.message}")
+    err.println("Couldn't list the files: ${failureReason(e)}")
     return DownloadExit.FAILED
   }
   val rows = fileListRows(source, args.fileOrder, args.reverse)
