@@ -5,8 +5,11 @@ import com.linroid.ketch.api.log.Logger
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import java.util.concurrent.CyclicBarrier
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
@@ -69,6 +72,41 @@ class ProgressLineTest {
       ),
       screen(),
     )
+  }
+
+  @Test
+  fun above_recordsFromOtherThreadsWhileTheLineIsUpdated_eachTakeARowOfTheirOwn() {
+    // Ketch logs from its own threads while the command's thread writes the progress: a record
+    // written between an update and the line it covers would land in the middle of the line.
+    val logger = PrintingLogger(LogLevel.WARN).above(line)
+    val start = CyclicBarrier(LOGGING_THREADS + 1)
+    val progress = thread {
+      start.await()
+      // Lines of different lengths, so one left behind shows.
+      repeat(UPDATES) { line.show("[Downloading] ${it % 100}%" + " #".repeat(it % 5)) }
+    }
+    val loggers = (1..LOGGING_THREADS).map { id ->
+      thread {
+        start.await()
+        repeat(RECORDS) {
+          if (it % 4 == 0) {
+            logger.e("[ERROR] [Thread $id] record $it")
+          } else {
+            logger.w("[WARN] [Thread $id] record $it")
+          }
+        }
+      }
+    }
+    (loggers + progress).forEach { it.join() }
+
+    val rows = screen()
+    val records = rows.dropLast(1)
+    val record = Regex("""\[(WARN|ERROR)] \[Thread \d] record \d+""")
+    assertEquals(emptyList(), records.filterNot { record.matches(it) })
+    // Each once.
+    assertEquals(LOGGING_THREADS * RECORDS, records.size)
+    assertEquals(records.size, records.toSet().size)
+    assertTrue(Regex("""\[Downloading] \d+%( #)*""").matches(rows.last()), rows.last())
   }
 
   @Test
@@ -143,6 +181,12 @@ class ProgressLineTest {
       stream.println(message)
       stream.flush()
     }
+  }
+
+  private companion object {
+    const val LOGGING_THREADS = 4
+    const val RECORDS = 500
+    const val UPDATES = 20_000
   }
 }
 
