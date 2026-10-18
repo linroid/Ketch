@@ -373,12 +373,12 @@ show nothing.
 
 ## Other suites
 
-- **iOS simulator**: the tests of `library:core`, `library:ftp`, `library:hls`, `library:dash` and
-  `library:torrent` are skipped unless `-PenableIosSimulatorTests=true` is passed to
-  `iosSimulatorArm64Test`.
+- **iOS simulator**: the tests of `library:core`, `library:ftp`, `library:hls`, `library:dash`,
+  `library:metalink` and `library:torrent` are skipped unless `-PenableIosSimulatorTests=true`
+  is passed to `iosSimulatorArm64Test`.
 - **JS**: tests run on Node.js with `jsNodeTest`.
 - **Android host**: CI runs `testAndroidHostTest` of `library:core`, `library:torrent`,
-  `library:hls` and `library:dash` with the app's unit tests.
+  `library:hls`, `library:dash` and `library:metalink` with the app's unit tests.
 - **Published metadata**: `./gradlew compilePublishedMetadata` compiles the common metadata of
   the published libraries, as publishing does. CI runs it in a job of its own, since it fetches
   Kotlin/Native.

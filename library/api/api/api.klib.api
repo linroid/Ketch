@@ -1258,6 +1258,9 @@ final class com.linroid.ketch.api/SourceFile { // com.linroid.ketch.api/SourceFi
     }
 
     final object Companion { // com.linroid.ketch.api/SourceFile.Companion|null[0]
+        final const val FILE_NAME_KEY // com.linroid.ketch.api/SourceFile.Companion.FILE_NAME_KEY|{}FILE_NAME_KEY[0]
+            final fun <get-FILE_NAME_KEY>(): kotlin/String // com.linroid.ketch.api/SourceFile.Companion.FILE_NAME_KEY.<get-FILE_NAME_KEY>|<get-FILE_NAME_KEY>(){}[0]
+
         final val $childSerializers // com.linroid.ketch.api/SourceFile.Companion.$childSerializers|{}$childSerializers[0]
 
         final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SourceFile> // com.linroid.ketch.api/SourceFile.Companion.serializer|serializer(){}[0]
@@ -2062,6 +2065,8 @@ final object com.linroid.ketch.api/KetchFeatures { // com.linroid.ketch.api/Ketc
         final fun <get-FINITE_HLS>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.FINITE_HLS.<get-FINITE_HLS>|<get-FINITE_HLS>(){}[0]
     final const val FINITE_MEDIA // com.linroid.ketch.api/KetchFeatures.FINITE_MEDIA|{}FINITE_MEDIA[0]
         final fun <get-FINITE_MEDIA>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.FINITE_MEDIA.<get-FINITE_MEDIA>|<get-FINITE_MEDIA>(){}[0]
+    final const val METALINK // com.linroid.ketch.api/KetchFeatures.METALINK|{}METALINK[0]
+        final fun <get-METALINK>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.METALINK.<get-METALINK>|<get-METALINK>(){}[0]
     final const val PROXY // com.linroid.ketch.api/KetchFeatures.PROXY|{}PROXY[0]
         final fun <get-PROXY>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.PROXY.<get-PROXY>|<get-PROXY>(){}[0]
     final const val QUEUE_POSITION // com.linroid.ketch.api/KetchFeatures.QUEUE_POSITION|{}QUEUE_POSITION[0]

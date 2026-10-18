@@ -7,18 +7,22 @@ import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
+import com.linroid.ketch.core.engine.HttpBody
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpExchange
 import com.linroid.ketch.core.engine.HttpExchangeObserver
+import com.linroid.ketch.core.engine.HttpReply
 import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.ServerInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareRequest
+import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.request
+import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -26,6 +30,7 @@ import io.ktor.http.HttpProtocolVersion
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
+import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentLength
 import io.ktor.http.isSecure
 import io.ktor.http.isSuccess
@@ -231,6 +236,67 @@ class KtorHttpEngine private constructor(
     }
   }
 
+  override suspend fun request(
+    method: String,
+    url: String,
+    headers: Map<String, String>,
+    body: HttpBody?,
+    maxBodyBytes: Int,
+  ): HttpReply {
+    require(method.isNotEmpty() && method.all { it in 'A'..'Z' || it == '-' }) {
+      "Invalid request method"
+    }
+    require(maxBodyBytes >= 0) { "maxBodyBytes must not be negative" }
+    // The body's own type is sent; Ktor refuses a Content-Type header beside it.
+    val requestHeaders = requestHeaders(headers)
+      .filterKeys { !it.equals(HttpHeaders.ContentType, ignoreCase = true) }
+    return transport {
+      if (logRequests) log.d { "$method request: ${redactUrl(url)}" }
+      val httpMethod = HttpMethod.parse(method)
+      send(httpMethod, url, requestHeaders, range = null, reuseTarget = false, body) { response ->
+        logResponse(method, response)
+        val status = response.status
+        if (!status.isSuccess() && logRequests) log.d {
+          "$method ${status.value} for ${redactUrl(response.request.url.toString())}"
+        }
+        HttpReply(
+          status = status.value,
+          headers = response.headers.entries()
+            .groupBy({ it.key.lowercase() }, { it.value })
+            .mapValues { (_, values) -> values.flatten() },
+          body = if (status.isSuccess() && httpMethod != HttpMethod.Head) {
+            readBody(response, maxBodyBytes)
+          } else {
+            ByteArray(0)
+          },
+          url = response.call.request.url.toString(),
+        )
+      }
+    }
+  }
+
+  /** [response]'s body, failing once it is longer than [limit] bytes. */
+  private suspend fun readBody(response: HttpResponse, limit: Int): ByteArray {
+    val tooLong = { KetchError.Unsupported(IllegalStateException("Response is too long")) }
+    response.contentLength()?.let { if (it > limit) throw tooLong() }
+    val channel = response.bodyAsChannel()
+    var out = ByteArray(minOf(limit, DEFAULT_BUFFER_SIZE))
+    var size = 0
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    while (!channel.isClosedForRead) {
+      val read = channel.readAvailable(buffer)
+      if (read <= 0) continue
+      if (read > limit - size) throw tooLong()
+      if (size + read > out.size) {
+        out = out.copyOf(minOf(limit, maxOf(size + read, out.size * 2)))
+      }
+      buffer.copyInto(out, size, 0, read)
+      size += read
+    }
+    channel.closedCause?.let { throw it }
+    return out.copyOf(size)
+  }
+
   /** `false` when this engine was given its own client, which only follows the system's. */
   override val supportsProxies: Boolean get() = transports.supports(Proxy.Direct)
 
@@ -288,13 +354,14 @@ class KtorHttpEngine private constructor(
     headers: Map<String, String>,
     range: LongRange?,
     reuseTarget: Boolean,
+    body: HttpBody? = null,
     handle: suspend (HttpResponse) -> T,
   ): T {
     val key = RedirectCache.Key(url, headers, proxy)
     val cached = if (reuseTarget) redirects.get(key) else null
     if (cached != null) {
       val result = try {
-        exchange(method, cached.url, cached.headers, range) { response ->
+        exchange(method, cached.url, cached.headers, range, body) { response ->
           // Expired signatures and retired mirrors answer with an error before any data.
           if (response.status.isSuccess()) Hop.Final(handle(response)) else null
         }
@@ -314,7 +381,7 @@ class KtorHttpEngine private constructor(
     var hopHeaders = headers
     var redirectCount = 0
     while (true) {
-      val hop = exchange(method, target, hopHeaders, range) { response ->
+      val hop = exchange(method, target, hopHeaders, range, body) { response ->
         redirectOf(response) ?: Hop.Final(handle(response))
       }
       when (hop) {
@@ -355,6 +422,7 @@ class KtorHttpEngine private constructor(
     target: Url,
     headers: Map<String, String>,
     range: LongRange?,
+    body: HttpBody?,
     onResponse: suspend (HttpResponse) -> R,
   ): R {
     val routed = transports.clientFor(target, proxy)
@@ -367,6 +435,7 @@ class KtorHttpEngine private constructor(
       url(target)
       headers.forEach { (name, value) -> header(name, value) }
       if (range != null) header(HttpHeaders.Range, "bytes=${range.first}-${range.last}")
+      if (body != null) setBody(ByteArrayContent(body.bytes, ContentType.parse(body.contentType)))
     }.execute { response ->
       // Every hop reports; the last one, the final target, is what the caller keeps.
       observer?.onExchange(exchangeOf(response, routed.route))

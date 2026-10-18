@@ -119,6 +119,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **HTTP y HTTPS**, con las cookies y el referente de la página cuando la extensión del navegador
   envía la descarga.
 - **FTP y FTPS**, con conexiones paralelas y reanudación.
+- **WebDAV** — Archivos en Nextcloud, ownCloud, un NAS o cualquier servidor WebDAV (enlaces
+  `davs://`), con conexiones paralelas, reanudación e inicio de sesión Digest o Basic
+  ([detalles](docs/webdav.md)).
 - **BitTorrent y enlaces magnet** — Torrents v1, v2 e híbridos, con selección de archivos,
   sembrado opcional y un motor escrito íntegramente en Kotlin. Habla uTP y cifrado de protocolo,
   descarga desde semillas web, abre su puerto en el router y encuentra pares en tu red local
@@ -130,6 +133,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 - **HLS (`.m3u8`) y DASH (`.mpd`)** — Guarda flujos de duración finita como un único archivo
   multimedia, en la calidad que elijas (la mejor por defecto), con el audio separado combinado y
   el cifrado HLS AES-128 descifrado ([compatibilidad y límites](docs/media.md)).
+- **Metalink (`.meta4`, `.metalink`)** — Descarga a la vez desde todos los servidores espejo que
+  lista un Metalink. Un espejo que falla o envía partes dañadas se descarta, y el archivo se
+  comprueba con las sumas del Metalink ([detalles](docs/metalink.md)).
 - Ketch puede abrir los enlaces magnet y archivos `.torrent` del sistema: un clic en el navegador
   o el gestor de archivos los lleva a Ketch.
 
@@ -260,8 +266,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Distribución antes de v1.0.0** — Versiones firmadas para Windows, firmadas y notarizadas para
   macOS, la extensión en más tiendas de navegadores y procesos de instalación y actualización
   verificados ([plan](docs/plans/v1-distribution.md))
-- **Metalink** — Descargas desde varios servidores espejo a la vez, con sumas de comprobación
-- **WebDAV** — Descargas desde servidores WebDAV, con reanudación
 - **Extracción multimedia** — Guardar contenido multimedia de páginas web
 - **Detector de recursos** — Encontrar los archivos descargables de una página web
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda

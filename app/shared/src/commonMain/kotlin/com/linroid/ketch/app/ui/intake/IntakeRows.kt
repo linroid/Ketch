@@ -46,6 +46,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.app.components.KetchBadge
 import com.linroid.ketch.app.components.KetchBadgeTone
 import com.linroid.ketch.app.components.KetchButton
@@ -198,15 +199,14 @@ internal fun PreviewCard(actions: IntakeActions, entry: IntakeEntry) {
       signingIn = false
       session.signIn(entry, user, password)
     })
-    QualityPicker(entry)
+    QualityPicker(entry, session.variantsOf(entry))
     LanesPreview(actions, entry)
   }
 }
 
-/** The variants of a stream, best first, of which the row downloads the one chosen. */
+/** The [variants] of a stream, best first, of which the row downloads the one chosen. */
 @Composable
-private fun QualityPicker(entry: IntakeEntry) {
-  val variants = entry.variants
+private fun QualityPicker(entry: IntakeEntry, variants: List<SourceFile>) {
   if (variants.isEmpty()) return
   val chosen = entry.variant
   Column(verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s1)) {

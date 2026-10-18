@@ -11,6 +11,7 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.categoryFor
 import com.linroid.ketch.api.isDirectory
@@ -308,7 +309,12 @@ internal class DownloadExecution(
     }
     totalBytes = total
 
-    val fileName = resolvedUrl.suggestedFileName
+    // A single choice may name the file it saves, as each file of a Metalink has its own name.
+    val chosenName = resolvedUrl.files
+      .takeIf { resolvedUrl.selectionMode == FileSelectionMode.SINGLE }
+      ?.firstOrNull { it.id in req.selectedFileIds }
+      ?.metadata?.get(SourceFile.FILE_NAME_KEY)
+    val fileName = chosenName ?: resolvedUrl.suggestedFileName
       ?: fileNameResolver.resolve(req, resolvedUrl)
     val target = resolveDestPath(
       destination = req.destination,

@@ -1314,6 +1314,7 @@ public final class com/linroid/ketch/api/KetchFeatures {
 	public static final field FINITE_HLS Ljava/lang/String;
 	public static final field FINITE_MEDIA Ljava/lang/String;
 	public static final field INSTANCE Lcom/linroid/ketch/api/KetchFeatures;
+	public static final field METALINK Ljava/lang/String;
 	public static final field PROXY Ljava/lang/String;
 	public static final field QUEUE_POSITION Ljava/lang/String;
 	public static final field REQUEST_ID Ljava/lang/String;
@@ -1830,6 +1831,7 @@ public final class com/linroid/ketch/api/Segment$Companion {
 
 public final class com/linroid/ketch/api/SourceFile {
 	public static final field Companion Lcom/linroid/ketch/api/SourceFile$Companion;
+	public static final field FILE_NAME_KEY Ljava/lang/String;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;

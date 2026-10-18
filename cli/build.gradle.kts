@@ -167,6 +167,8 @@ dependencies {
   implementation(projects.library.ftp)
   implementation(projects.library.hls)
   implementation(projects.library.dash)
+  implementation(projects.library.metalink)
+  implementation(projects.library.webdav)
   implementation(projects.library.torrent)
   implementation(projects.library.torrentApi)
   implementation(projects.updater)

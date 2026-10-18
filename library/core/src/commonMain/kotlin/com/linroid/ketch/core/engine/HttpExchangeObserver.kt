@@ -53,7 +53,7 @@ internal fun ConnectionSpec.with(exchange: HttpExchange): ConnectionSpec = copy(
  * Runs [block], whose requests describe [handle] by the hops the engine reports, starting from
  * [spec].
  */
-internal suspend fun <T> observeExchanges(
+suspend fun <T> observeExchanges(
   handle: ConnectionHandle,
   spec: ConnectionSpec,
   block: suspend () -> T,

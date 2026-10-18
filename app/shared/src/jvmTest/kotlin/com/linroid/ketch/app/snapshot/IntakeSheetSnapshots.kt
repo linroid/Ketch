@@ -92,6 +92,13 @@ class IntakeSheetSnapshots {
   }
 
   @Test
+  fun metalink_desktopAndPhone_choosesOneOfItsFiles() {
+    intakeSnapshots("intake-metalink", DESKTOP_AND_PHONE, resolve = ::problemResolve) {
+      state.openIntake(IntakeRequest(METALINK))
+    }
+  }
+
+  @Test
   fun magnetWaiting_desktop_showsTheFetchState() {
     intakeSnapshots("intake-magnet-waiting", DESKTOP_ONLY, resolve = { awaitCancellation() }) {
       state.openIntake(IntakeRequest(MAGNET))
@@ -320,6 +327,7 @@ private val DESKTOP_ONLY = listOf(SnapshotSize.Desktop)
 
 private const val MAGNET =
   "magnet:?xt=urn:btih:3f2a91c0d4b5e6f708192a3b4c5d6e7f8091a2b3&dn=Big.Buck.Bunny"
+private const val METALINK = "https://download.example.org/fedora/41/release.meta4"
 private const val KERNEL = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz"
 private const val STREAM = "https://media.example.com/films/sintel/master.m3u8"
 private const val CLIP = "https://www.python.org/ftp/python/3.13.0/python-3.13.0-macos11.pkg"
@@ -371,6 +379,7 @@ private fun readyResolve(url: String): ResolvedSource = ResolvedSource(
 
 private suspend fun problemResolve(url: String): ResolvedSource = when {
   url.startsWith("magnet:") -> torrent(url)
+  url.endsWith(".meta4") -> metalink(url)
   "intranet" in url -> throw KetchError.Http(403, "Forbidden")
   "mirror.example.edu" in url -> throw KetchError.Http(404, "Not Found")
   "busy.example.com" in url -> throw KetchError.Http(503, "Service Unavailable")
@@ -423,5 +432,26 @@ private fun torrent(url: String): ResolvedSource {
     maxSegments = files.size,
     metadata = mapOf("infoHash" to "3f2a91c0d4b5e6f708192a3b4c5d6e7f8091a2b3"),
     files = files,
+  )
+}
+
+/** A Metalink listing three files, of which a task downloads one. */
+private fun metalink(url: String): ResolvedSource {
+  val files = listOf(
+    "Fedora-Workstation-Live-x86_64-41.iso" to 2_295_853_056L,
+    "Fedora-Workstation-Live-aarch64-41.iso" to 2_252_337_152L,
+    "Fedora-Workstation-41-CHECKSUM" to 1_024L,
+  ).mapIndexed { index, (name, size) ->
+    SourceFile(index.toString(), name, size, mapOf(SourceFile.FILE_NAME_KEY to name))
+  }
+  return ResolvedSource(
+    url = url,
+    sourceType = "metalink",
+    totalBytes = files.first().size,
+    supportsResume = true,
+    suggestedFileName = files.first().name,
+    maxSegments = 16,
+    files = files,
+    selectionMode = FileSelectionMode.SINGLE,
   )
 }

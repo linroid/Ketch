@@ -105,6 +105,8 @@ Downloads one URL, prints its progress, and exits when it completes or fails, en
   unless `--files <id>` picks another of those `--list-files` lists, with separate fragmented MP4
   audio merged in and AES-128 HLS decrypted. Live streams and DRM are not supported; see
   [media support and limits](../docs/media.md).
+- Metalink (`.meta4`, `.metalink`) URLs, downloaded from all their mirrors at once and checked
+  against their hashes; see [Metalink](../docs/metalink.md).
 
 Where the file goes:
 
@@ -388,7 +390,7 @@ ketch server [options]
 `ketch server` runs Ketch as a long-lived server with a REST API, an event stream and the bundled
 web UI, which the Ketch apps and the browser extension connect to. It:
 
-- downloads HTTP(S), FTP/FTPS, BitTorrent and magnet links, and finite HLS/DASH streams
+- downloads HTTP(S), FTP/FTPS, BitTorrent and magnet links, finite HLS/DASH streams and Metalinks
 - stores tasks in the [task database](#database) and restores them when it starts
 - announces itself on the local network over mDNS, unless `mdnsEnabled` is `false`
 - listens on every interface by default, and then requires an [access token](#access-token)

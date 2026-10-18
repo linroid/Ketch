@@ -22,6 +22,12 @@ object KetchFeatures {
   /** Finite, unencrypted DASH downloads, restarted on resume. */
   const val FINITE_DASH: String = "dash.finite"
 
+  /**
+   * Metalink (`.meta4`, `.metalink`) downloads come from every mirror they list at once, checked
+   * against their hashes.
+   */
+  const val METALINK: String = "download.metalink"
+
   /** [DownloadConfig.categories] sort downloads into folders. */
   const val CATEGORY_FOLDERS: String = "download.categories"
 
@@ -50,6 +56,6 @@ object KetchFeatures {
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
     CATEGORY_FOLDERS, TRANSFER_TIMEOUTS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS,
-    CHECKSUM, COUNTRIES,
+    CHECKSUM, COUNTRIES, METALINK,
   )
 }

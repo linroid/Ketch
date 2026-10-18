@@ -466,13 +466,13 @@ class IntakeStateTest {
   @Test
   fun submit_streamWithVariants_downloadsTheBestByDefault() = runTest {
     val url = "https://example.com/video/master.m3u8"
-    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) })
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) }, features = SELECTS_FILES)
     val session = session(api, IntakeRequest(url))
     val entry = session.entries.single()
 
     assertNull(session.torrentStage)
     assertTrue(entry.files.isEmpty())
-    assertEquals(listOf("3fa1c2", "9b04e7", "51d8a0"), entry.variants.map { it.id })
+    assertEquals(listOf("3fa1c2", "9b04e7", "51d8a0"), session.variantsOf(entry).map { it.id })
     assertEquals("3fa1c2", entry.variant?.id)
     session.submit {}
     runCurrent()
@@ -483,7 +483,7 @@ class IntakeStateTest {
   @Test
   fun submit_streamWithChosenVariant_requestsIt() = runTest {
     val url = "https://example.com/video/master.m3u8"
-    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) })
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) }, features = SELECTS_FILES)
     val session = session(api, IntakeRequest(url))
     val entry = session.entries.single()
 
@@ -499,7 +499,7 @@ class IntakeStateTest {
   @Test
   fun submit_streamWithBestVariantChosenAgain_requestsTheDefault() = runTest {
     val url = "https://example.com/video/master.m3u8"
-    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) })
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) }, features = SELECTS_FILES)
     val session = session(api, IntakeRequest(url))
     val entry = session.entries.single()
 
@@ -514,13 +514,70 @@ class IntakeStateTest {
   @Test
   fun variant_noLongerListed_fallsBackToTheBest() = runTest {
     val url = "https://example.com/video/master.m3u8"
-    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) })
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) }, features = SELECTS_FILES)
     val session = session(api, IntakeRequest(url))
     val entry = session.entries.single()
 
     entry.selectedVariant = "e2c7f4"
 
     assertEquals("3fa1c2", entry.variant?.id)
+  }
+
+  @Test
+  fun submit_streamOnDeviceWithoutFileSelection_offersNoQualityAndSendsNone() = runTest {
+    val url = "https://example.com/video/master.m3u8"
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) })
+    val session = session(api, IntakeRequest(url))
+    val entry = session.entries.single()
+
+    entry.selectedVariant = "9b04e7"
+    assertTrue(session.variantsOf(entry).isEmpty())
+    session.submit {}
+    runCurrent()
+
+    assertEquals(emptySet(), api.base.requests.single().selectedFileIds)
+  }
+
+  @Test
+  fun retry_streamWithAnotherQuality_selectsItBeforeResuming() = runTest {
+    val url = "https://example.com/video/master.m3u8"
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) }, features = SELECTS_FILES)
+    val failed = api.base.add(DownloadState.Failed(KetchError.Network()), DownloadRequest(url))
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(url)),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+    runCurrent()
+    session.entries.single().selectedVariant = "51d8a0"
+
+    assertFalse(session.startsOver)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("select 51d8a0", "resume"), failed.calls)
+  }
+
+  @Test
+  fun retry_streamWithItsQuality_showsItAndOnlyResumes() = runTest {
+    val url = "https://example.com/video/master.m3u8"
+    val api = IntakeTestApi(check = { _, _ -> streamWithVariants(url) }, features = SELECTS_FILES)
+    val failed = api.base.add(
+      DownloadState.Failed(KetchError.Network()),
+      DownloadRequest(url, selectedFileIds = setOf("9b04e7")),
+    )
+    val request = IntakeRequest(
+      seeds = listOf(IntakeSeed(url)),
+      retryOf = TaskKey(LOCAL_DEVICE_ID, failed.taskId),
+    )
+    val session = session(api, request)
+    runCurrent()
+
+    assertEquals("9b04e7", session.entries.single().variant?.id)
+    session.submit {}
+    runCurrent()
+
+    assertEquals(listOf("resume"), failed.calls)
   }
 
   @Test
@@ -1224,6 +1281,8 @@ private fun ready(url: String) = ResolvedSource(
   suggestedFileName = extractFilename(url),
   maxSegments = 8,
 )
+
+private val SELECTS_FILES = setOf(KetchFeatures.FILE_SELECTION)
 
 private fun streamWithVariants(url: String) = ResolvedSource(
   url = url,

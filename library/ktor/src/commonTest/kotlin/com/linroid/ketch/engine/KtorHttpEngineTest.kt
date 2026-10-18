@@ -5,6 +5,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.core.engine.HttpBody
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandler
@@ -545,6 +546,95 @@ class KtorHttpEngineTest {
       }
     })
     return records
+  }
+
+  @Test
+  fun request_sendsMethodBodyAndHeaders() = runTest {
+    withServer({ request ->
+      respond(
+        "<multistatus/>",
+        HttpStatusCode.MultiStatus,
+        headersOf("ETag" to listOf("\"a\""), "DAV" to listOf("1", "2")),
+      )
+    }) { engine, requests ->
+      val reply = engine.request(
+        "PROPFIND",
+        "https://example.com/dav/file",
+        mapOf("Depth" to "0", "Content-Type" to "text/plain"),
+        HttpBody("<propfind/>".encodeToByteArray(), "application/xml; charset=utf-8"),
+      )
+      assertEquals(207, reply.status)
+      assertTrue(reply.isSuccess)
+      assertEquals("<multistatus/>", reply.body.decodeToString())
+      assertEquals("\"a\"", reply.header("etag"))
+      assertEquals(listOf("1", "2"), reply.headers("Dav"))
+      val sent = requests.single()
+      assertEquals("PROPFIND", sent.method.value)
+      assertEquals("0", sent.headers["Depth"])
+      assertEquals("application/xml; charset=utf-8", sent.body.contentType.toString())
+      val content = sent.body as io.ktor.http.content.OutgoingContent.ByteArrayContent
+      assertEquals("<propfind/>", content.bytes().decodeToString())
+    }
+  }
+
+  @Test
+  fun request_errorStatus_returnsHeadersWithoutBody() = runTest {
+    withServer({
+      respond(
+        "denied",
+        HttpStatusCode.Unauthorized,
+        headersOf(
+          HttpHeaders.WWWAuthenticate to listOf("Basic realm=\"a\"", "Digest realm=\"a\""),
+        ),
+      )
+    }) { engine, _ ->
+      val reply = engine.request("PROPFIND", "https://example.com/dav/file")
+      assertEquals(401, reply.status)
+      assertFalse(reply.isSuccess)
+      assertEquals(0, reply.body.size)
+      assertEquals(2, reply.headers("WWW-Authenticate").size)
+    }
+  }
+
+  @Test
+  fun request_followsRedirectWithSameMethod() = runTest {
+    withServer({ request ->
+      if (request.url.encodedPath == "/dav/dir") {
+        respond("", HttpStatusCode.MovedPermanently, headersOf(HttpHeaders.Location, "/dav/dir/"))
+      } else {
+        respond("ok", HttpStatusCode.MultiStatus)
+      }
+    }) { engine, requests ->
+      val reply = engine.request("PROPFIND", "https://example.com/dav/dir")
+      assertEquals(207, reply.status)
+      assertEquals(listOf("PROPFIND", "PROPFIND"), requests.map { it.method.value })
+      assertEquals("/dav/dir/", requests.last().url.encodedPath)
+      assertEquals("https://example.com/dav/dir/", reply.url)
+    }
+  }
+
+  @Test
+  fun request_longBody_fails() = runTest {
+    withServer({ respond("abcdefgh", HttpStatusCode.OK) }) { engine, _ ->
+      assertFailsWith<KetchError.Unsupported> {
+        engine.request("PROPFIND", "https://example.com/file", maxBodyBytes = 4)
+      }
+      assertEquals(
+        "abcdefgh",
+        engine.request("PROPFIND", "https://example.com/file", maxBodyBytes = 8)
+          .body.decodeToString(),
+      )
+    }
+  }
+
+  @Test
+  fun request_invalidMethod_isRefused() = runTest {
+    withServer({ respond("", HttpStatusCode.OK) }) { engine, requests ->
+      assertFailsWith<IllegalArgumentException> {
+        engine.request("GET /x", "https://example.com/file")
+      }
+      assertTrue(requests.isEmpty())
+    }
   }
 
   /** Runs [block] against an engine whose requests [handler] answers and records. */
