@@ -164,12 +164,10 @@ internal class DesktopUpdater(
     step = scope.launch {
       try {
         withContext(io) {
-          if (installer.restarts) {
-            record.writeText(version)
-            // Installed now; the next launch must not install it again.
-            File(workDir, READY_UPDATE).delete()
-          }
+          if (installer.restarts) record.writeText(version)
           installer.install(ready.prepared, ProcessHandle.current().pid())
+          // Installing now; the next launch must not install it again.
+          if (installer.restarts) File(workDir, READY_UPDATE).delete()
         }
         if (installer.restarts) {
           log.i { "Quitting to install Ketch $version" }
@@ -323,7 +321,8 @@ internal class DesktopUpdater(
  * Starts installing the update a run before downloaded and did not install, as the app starts,
  * when [installer] replaces the app and opens it again; the caller then exits before it starts
  * anything. Leaves it to [DesktopUpdater.start] to report or offer it otherwise: after an install
- * that did not take, which is not tried again, or with an installer the user finishes.
+ * that did not take, which is not tried again, with an installer the user finishes, or when the
+ * installer cannot start.
  *
  * @param workDir the [DesktopUpdater]'s folder.
  * @param current the running version.
@@ -341,8 +340,9 @@ internal fun installDownloadedUpdate(
   val log = KetchLogger("Updater")
   return try {
     record.writeText(update.version)
-    File(workDir, READY_UPDATE).delete()
     installer.install(update.prepared, ProcessHandle.current().pid())
+    // Kept when the installer cannot start, so the app offers it again.
+    File(workDir, READY_UPDATE).delete()
     log.i { "Installing Ketch ${update.version}, downloaded before, as the app starts" }
     true
   } catch (e: Exception) {

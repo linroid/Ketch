@@ -393,12 +393,26 @@ class DesktopUpdaterTest {
   }
 
   @Test
-  fun installDownloadedUpdate_failure_forgetsTheRecord() = runTest {
+  fun installDownloadedUpdate_failure_keepsTheUpdateForTheAppToOffer() = runTest {
     ready()
     installer.installFailure = IOException("no permission")
 
     assertFalse(installDownloadedUpdate(workDir, ReleaseVersion.parse("0.0.1"), installer))
     assertFalse(File(workDir, "pending-install").exists())
+    val updater = updater()
+    updater.start(checkAutomatically = false, lastVersion = "0.0.1")
+    runCurrent()
+    assertIs<AppUpdateState.Ready>(updater.state.value)
+  }
+
+  @Test
+  fun install_failure_keepsTheUpdateForTheNextLaunch() = runTest {
+    installer.installFailure = IOException("no permission")
+    val updater = ready()
+    updater.install()
+    runCurrent()
+
+    assertTrue(File(workDir, "ready-update.properties").isFile)
   }
 
   @Test
