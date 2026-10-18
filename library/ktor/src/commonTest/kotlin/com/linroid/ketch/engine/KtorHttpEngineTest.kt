@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.HttpBody
 import io.ktor.client.HttpClient
@@ -259,7 +260,7 @@ class KtorHttpEngineTest {
       KetchLogger.setLogger(Logger.None)
     }
     for (secret in listOf("s3cr3t", "t0ken", "pr0xy", "k3y", "r3f")) {
-      assertTrue(logged.none { secret in it }, secret)
+      assertTrue(logged.none { (_, message) -> secret in message }, secret)
     }
   }
 
@@ -517,6 +518,55 @@ class KtorHttpEngineTest {
   }
 
   @Test
+  fun requests_failuresARetryMayFix_areLoggedAtDebugLevel() = runTest {
+    // Callers retry them, warning as they do: an error each attempt said the same thing again.
+    val records = recordLogs()
+    try {
+      for (status in listOf(HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests)) {
+        withServer({ respond("", status) }) { engine, _ ->
+          assertFailsWith<KetchError.Http> { engine.download(URL, 0L..7L) {} }
+          assertFailsWith<KetchError.Http> { engine.probe(URL, emptyMap()) }
+        }
+      }
+      withServer({ throw IllegalStateException("Connection reset") }) { engine, _ ->
+        assertFailsWith<KetchError.Network> { engine.head(URL, emptyMap()) }
+        assertFailsWith<KetchError.Network> { engine.download(URL, null) {} }
+      }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    assertEquals(emptyList(), records.filter { (level, _) -> level > LogLevel.DEBUG })
+    val logged = records.map { (_, message) -> message }
+    val failures = listOf(
+      "HTTP error 503: Service Unavailable for GET $URL",
+      "HTTP error 429: Too Many Requests for GET $URL",
+      "Network error: IllegalStateException: Connection reset",
+    )
+    for (failure in failures) {
+      assertEquals(2, logged.count { failure in it }, logged.joinToString("\n"))
+    }
+  }
+
+  @Test
+  fun download_clientError_isLoggedAsErrorWithItsUrl() = runTest {
+    // No retry helps, and no other record names the URL that refused it.
+    val records = recordLogs()
+    try {
+      withServer({ respond("", HttpStatusCode.NotFound) }) { engine, _ ->
+        assertFailsWith<KetchError.Http> { engine.download(URL, null) {} }
+      }
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
+
+    assertEquals(
+      listOf(LogLevel.ERROR to "[KtorHttpEngine] HTTP error 404: Not Found for GET $URL"),
+      records.filter { (level, _) -> level > LogLevel.DEBUG },
+    )
+  }
+
+  @Test
   fun probe_refused_throwsHttpError() = runTest {
     withServer({ respond("", HttpStatusCode.Forbidden) }) { engine, _ ->
       val error = assertFailsWith<KetchError.Http> { engine.probe(URL, emptyMap()) }
@@ -525,24 +575,24 @@ class KtorHttpEngineTest {
     }
   }
 
-  /** Sends every log record to the returned list until the logger is reset. */
-  private fun recordLogs(): List<String> {
-    val records = mutableListOf<String>()
+  /** Sends every log record, with its level, to the returned list until the logger is reset. */
+  private fun recordLogs(): List<Pair<LogLevel, String>> {
+    val records = mutableListOf<Pair<LogLevel, String>>()
     KetchLogger.setLogger(object : Logger {
       override fun v(message: String) {
-        records += message
+        records += LogLevel.VERBOSE to message
       }
       override fun d(message: String) {
-        records += message
+        records += LogLevel.DEBUG to message
       }
       override fun i(message: String) {
-        records += message
+        records += LogLevel.INFO to message
       }
       override fun w(message: String, throwable: Throwable?) {
-        records += message
+        records += LogLevel.WARN to message
       }
       override fun e(message: String, throwable: Throwable?) {
-        records += message
+        records += LogLevel.ERROR to message
       }
     })
     return records

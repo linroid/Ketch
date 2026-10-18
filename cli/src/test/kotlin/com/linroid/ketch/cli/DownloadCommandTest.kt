@@ -21,6 +21,7 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
 import com.linroid.ketch.torrent.api.TorrentActivity
@@ -48,6 +49,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.PrintStream
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.UnknownHostException
 import java.nio.file.Files
 import kotlin.test.AfterTest
@@ -120,6 +123,32 @@ class DownloadCommandTest {
     assertFalse("[INFO]" in stdout, stdout)
     assertEquals(1, Regex("""\[WARN] .*Download failed for taskId=""").findAll(stdout).count(),
       stdout)
+  }
+
+  @Test
+  fun downloadUntilDone_connectionRefused_logsEachAttemptOnceWithoutErrors() {
+    // As `ketch <url>` logs. The HTTP engine also logged each attempt's failure as an error,
+    // beside the retries' warnings and the final failure.
+    val port = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+    val status = withConsole {
+      download(
+        "http://127.0.0.1:$port/a.iso",
+        KtorHttpEngine(),
+        logger = Logger.console(quietLogLevel(LogLevel.INFO)),
+        config = DownloadConfig(retryCount = 2, retryDelayMs = 1, maxRetryDelayMs = 1),
+      )
+    }
+
+    assertEquals(DownloadExit.FAILED, status)
+    val logged = out.toString(Charsets.UTF_8) + err.toString(Charsets.UTF_8)
+    fun count(pattern: String) = Regex(pattern).findAll(logged).count()
+    assertFalse("[ERROR]" in logged, logged)
+    assertFalse("[KtorHttpEngine]" in logged, logged)
+    assertEquals(2, count("""\[WARN] \[Execution] Retry \d/2 """), logged)
+    assertEquals(1, count("""\[WARN] \[Coordinator] Download failed """), logged)
+    // Only the summary goes to stderr.
+    val summary = err.toString(Charsets.UTF_8).trim()
+    assertTrue(summary.startsWith("Download failed: Network: ") && '\n' !in summary, logged)
   }
 
   @Test
@@ -424,12 +453,13 @@ class DownloadCommandTest {
     logger: Logger = Logger.None,
     stalls: ((taskId: String) -> Flow<TorrentStall?>)? = null,
     sources: List<DownloadSource<*>> = emptyList(),
+    config: DownloadConfig = DownloadConfig(retryCount = 0),
   ): Int = runBlocking {
     // As `ketch <url>` sets them up.
     val progress = ProgressLine(outStream)
     val ketch = Ketch(
       httpEngine = engine,
-      config = DownloadConfig(retryCount = 0),
+      config = config,
       additionalSources = sources,
       logger = logger.above(progress),
     )

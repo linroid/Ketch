@@ -142,7 +142,7 @@ Task-scoped messages include `taskId=`, so you can follow one download with `gre
 | Level | Use | Examples |
 |-------|-----|----------|
 | Verbose | Detailed diagnostics | Speed limiter waits, FTP commands, per-peer torrent events |
-| Debug | Internal operations | Server detection, segments, tracker announces, DHT, swarm summaries |
+| Debug | Internal operations | Server detection, segments, HTTP failures a retry may fix, tracker announces, DHT, swarm summaries |
 | Info | User-facing events | Download start, state changes, completion, torrent lifecycle |
 | Warn | Recoverable problems | Retries, changed server files, corrupt torrent pieces |
 | Error | Failures | A download giving up, an engine that cannot start |

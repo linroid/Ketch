@@ -329,7 +329,10 @@ class KtorHttpEngine private constructor(
     return sendable + (HttpHeaders.UserAgent to agent)
   }
 
-  /** Runs [block], reporting transport failures as [KetchError.Network]. */
+  /**
+   * Runs [block], reporting transport failures as [KetchError.Network]. They are logged at debug
+   * level only: callers retry them, warning as they do, and report the failure they give up on.
+   */
   private inline fun <T> transport(block: () -> T): T {
     try {
       return block()
@@ -338,7 +341,7 @@ class KtorHttpEngine private constructor(
     } catch (e: KetchError) {
       throw e
     } catch (e: Exception) {
-      if (logRequests) log.e { "Network error: ${e.describeCauses()}" }
+      if (logRequests) log.d { "Network error: ${e.describeCauses()}" }
       throw KetchError.Network(e)
     }
   }
@@ -468,7 +471,9 @@ class KtorHttpEngine private constructor(
 
   /**
    * The error for a non-success [response], with the rate limit it reports on 429. Logged as an
-   * error when [fatal], else at debug level for callers that may still recover.
+   * error naming the URL only when [fatal] and no retry can help, as for a 404; else at debug
+   * level, as callers may still recover from what is not [fatal], such as a refused HEAD, and
+   * retry 5xx and 429 ([KetchError.isRetryable]), warning as they do.
    */
   private fun httpError(
     method: String,
@@ -476,17 +481,21 @@ class KtorHttpEngine private constructor(
     fatal: Boolean = true,
   ): KetchError.Http {
     val status = response.status
+    val error = if (status.value != 429) {
+      KetchError.Http(status.value, status.description)
+    } else {
+      val retryAfter = parseRetryAfter(response.headers[HttpHeaders.RetryAfter])
+        ?: findRateLimitReset(response.headers)
+      val remaining = findRateLimitRemaining(response.headers)
+      if (logRequests) log.d { "Rate limit headers: retryAfter=$retryAfter, remaining=$remaining" }
+      KetchError.Http(status.value, status.description, retryAfter, remaining)
+    }
     if (logRequests) {
       val message = "HTTP error ${status.value}: ${status.description} " +
         "for $method ${redactUrl(response.request.url.toString())}"
-      if (fatal) log.e { message } else log.d { message }
+      if (fatal && !error.isRetryable) log.e { message } else log.d { message }
     }
-    if (status.value != 429) return KetchError.Http(status.value, status.description)
-    val retryAfter = parseRetryAfter(response.headers[HttpHeaders.RetryAfter])
-      ?: findRateLimitReset(response.headers)
-    val remaining = findRateLimitRemaining(response.headers)
-    if (logRequests) log.d { "Rate limit headers: retryAfter=$retryAfter, remaining=$remaining" }
-    return KetchError.Http(status.value, status.description, retryAfter, remaining)
+    return error
   }
 
   /** How one request of a redirect chain ended. */

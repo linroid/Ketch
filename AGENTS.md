@@ -378,7 +378,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   only `User-Agent`, `Accept`, `Accept-Encoding`, `Accept-Language` and `Referer` cut to its
   origin, and drops URL user info. `RedirectCache` remembers each request's final target and
   that hop's headers (per URL and headers, 30 minutes, 64 entries); HEAD and probes always follow
-  the redirects and refresh it, GETs reuse it and forget it when the target fails
+  the redirects and refresh it, GETs reuse it and forget it when the target fails. It logs
+  transport failures, 5xx and 429 at debug, as callers retry them (`DownloadExecution` warns at
+  each retry, `DownloadCoordinator` reports the failure), and only other refusals of a GET or
+  probe as errors, naming the URL
 - Names from a server (`Content-Disposition`), a URL or an FTP path pass through
   `sanitizeFileName()` (last `/` or `\` segment, no control, bidi or Windows-reserved characters
   or device names, at most 255 UTF-8 bytes, `null` when nothing is left), in the sources and again
