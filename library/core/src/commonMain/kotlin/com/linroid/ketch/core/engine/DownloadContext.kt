@@ -57,7 +57,8 @@ import kotlin.concurrent.Volatile
  * @property selection the task's file selection while it runs. Its first value is the selection
  *   the run starts with; [com.linroid.ketch.api.DownloadTask.selectFiles] sends a new revision
  *   while it runs. Sources that implement [DownloadSource.planSelection] apply each revision live
- *   and confirm it with [acknowledgeSelection].
+ *   and confirm it with [acknowledgeSelection]. Ketch shows a revision's progress as it delivers
+ *   it, so [onProgress] reports its files from then on, also while the source applies it.
  * @property connections opens the task's live network connections, which
  *   [com.linroid.ketch.api.Interest.Connections] reports. Sources open a handle when a
  *   transfer starts, count its bytes and close it when the transfer ends, also on failure and

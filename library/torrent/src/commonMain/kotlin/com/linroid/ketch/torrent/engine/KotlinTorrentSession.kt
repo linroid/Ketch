@@ -604,6 +604,17 @@ internal class KotlinTorrentSession(
     }
   }
 
+  /**
+   * The checkpoint [saveResumeData] writes, encoded as the store holds it now without writing
+   * it, and without the lifecycle lock [pause] holds while the torrent says goodbye. The sidecar
+   * keeps the last one written, the one a pause writes included, which a restart reads too.
+   */
+  override suspend fun currentResumeData(): ByteArray? {
+    if (scope.coroutineContext[Job]?.isActive != true || !canSaveCheckpoint()) return null
+    return store.checkpoint().copy(receivedBytes = received.load(),
+      uploadedBytes = uploaded.load(), discardedBytes = discarded.load()).encode()
+  }
+
   override fun setDownloadRateLimit(bytesPerSecond: Long) = rate.set(bytesPerSecond)
 
   override fun setTaskThrottle(throttle: suspend (Int) -> Unit) = taskThrottle.store(throttle)

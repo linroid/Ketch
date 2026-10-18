@@ -301,4 +301,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$s не в сети</string>
   <string name="feedback_device_online">Снова подключено к %1$s</string>
+  <string name="finish_warning_quit">Ketch закроется через минуту</string>
+  <string name="finish_warning_sleep">Компьютер перейдёт в режим сна через минуту</string>
+  <string name="finish_warning_shut_down">Компьютер выключится через минуту</string>
+  <string name="finish_warning_detail">Загрузки на этом компьютере завершены.</string>
+  <string name="finish_failed_quit">Не удалось выйти из Ketch</string>
+  <string name="finish_failed_sleep">Не удалось перевести компьютер в режим сна</string>
+  <string name="finish_failed_shut_down">Не удалось выключить компьютер</string>
 </resources>

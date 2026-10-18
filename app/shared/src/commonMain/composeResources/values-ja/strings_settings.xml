@@ -131,6 +131,12 @@
   <string name="settings_general_power">電源</string>
   <string name="settings_general_keep_awake">ダウンロード中はスリープしない</string>
   <string name="settings_general_keep_awake_hint">ダウンロード中は%1$sが自動でスリープしません。画面はオフになる場合があります。</string>
+  <string name="settings_general_when_done">ダウンロード完了後</string>
+  <string name="settings_general_when_done_hint">このコンピュータでダウンロード中や待機中のものがなくなると、1分間の予告のあとに実行します。1回だけ実行され、Ketchを終了すると取り消されます。</string>
+  <string name="settings_general_when_done_nothing">何もしない</string>
+  <string name="settings_general_when_done_quit">Ketchを終了</string>
+  <string name="settings_general_when_done_sleep">スリープ</string>
+  <string name="settings_general_when_done_shut_down">シャットダウン</string>
 
   <string name="settings_notifications_downloads">ダウンロード</string>
   <string name="settings_notifications_footer">「通知」はシステムの通知を使います。「アプリ内のみ」はKetchの中だけに表示します。</string>
@@ -687,6 +693,7 @@
   <string name="settings_search_badge">Dockやタスクバーのアイコンに表示する内容</string>
   <string name="settings_search_badge_keywords">件数, Dock, タスクバー, バッジ</string>
   <string name="settings_search_keep_awake_keywords">スリープ, 電源, バッテリー, スリープ防止, スリープさせない</string>
+  <string name="settings_search_when_done_keywords">シャットダウン, 電源オフ, スリープ, 終了, ダウンロード後, キュー, 完了</string>
   <string name="settings_search_shortcuts">すべてのキーボードショートカット</string>
   <string name="settings_search_shortcuts_keywords">キー, ホットキー, キーボード, キー割り当て</string>
   <string name="settings_search_finished_keywords">完了, 終了, アラート, お知らせ</string>

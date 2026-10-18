@@ -61,6 +61,11 @@ class ActiveConnectionsTest {
     assertEquals(ConnectionDirection.OUTGOING, connection.direction)
     assertNull(connection.peer)
     assertNull(connection.port)
+    assertNull(connection.closedAt)
     assertEquals(0, snapshot.total)
+    // Servers from before totals and closed connections.
+    assertNull(snapshot.receivedBytes)
+    assertNull(snapshot.sentBytes)
+    assertTrue(snapshot.closed.isEmpty())
   }
 }

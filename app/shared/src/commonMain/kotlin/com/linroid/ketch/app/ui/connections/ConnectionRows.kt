@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.connections
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.app.state.ConnectionCell
 import com.linroid.ketch.app.state.ConnectionGridState
+import com.linroid.ketch.app.state.DeviceConnections
 import com.linroid.ketch.app.ui.pulse.endpoint
 
 /**
@@ -27,18 +28,48 @@ internal class ConnectionRow(
 
   /** A torrent peer's client, as the peer names it; `null` when unknown or not a peer. */
   val client: String? get() = connection.peer?.client
+
+  /** Whether the connection closed. */
+  val closed: Boolean get() = cell.closedAgo != null
 }
 
-/** Every connection of [grid], each with its task's and device's names. */
+/**
+ * Every connection of [grid], open ones then closed ones, each with its task's and device's
+ * names. A closed connection a device also lists as open shows once, as open.
+ */
 internal fun connectionRows(
   grid: ConnectionGridState,
   deviceNames: Map<String, String>,
-): List<ConnectionRow> = grid.devices.flatMap { device ->
-  val deviceName = deviceNames[device.deviceId].orEmpty()
-  device.tasks.flatMap { task ->
-    task.cells.map { ConnectionRow(it, task.name, deviceName) }
+): List<ConnectionRow> {
+  fun rows(devices: List<DeviceConnections>) = devices.flatMap { device ->
+    val deviceName = deviceNames[device.deviceId].orEmpty()
+    device.tasks.flatMap { task ->
+      task.cells.map { ConnectionRow(it, task.name, deviceName) }
+    }
+  }
+  val open = rows(grid.devices)
+  val keys = open.mapTo(HashSet()) { it.cell.key }
+  return open + rows(grid.closed).filter { it.cell.key !in keys }
+}
+
+/** Which connections the page lists: open ones, closed ones, or both. */
+internal enum class ConnectionStatus {
+  Open,
+  Closed,
+  All,
+  ;
+
+  /** Whether it lists [row]. */
+  fun lists(row: ConnectionRow): Boolean = when (this) {
+    Open -> !row.closed
+    Closed -> row.closed
+    All -> true
   }
 }
+
+/** The rows [status] lists. */
+internal fun List<ConnectionRow>.withStatus(status: ConnectionStatus): List<ConnectionRow> =
+  if (status == ConnectionStatus.All) this else filter(status::lists)
 
 /**
  * A source type in the page's filter.
@@ -102,7 +133,32 @@ internal enum class ConnectionSort(
 internal data class ConnectionArrangement(
   val sort: ConnectionSort = ConnectionSort.Opened,
   val descending: Boolean = true,
-)
+) {
+  /** This arrangement as `[ui] sort` keeps it, such as `down:desc`. */
+  fun encode(): String = "${sort.name.lowercase()}:${if (descending) DESC else ASC}"
+
+  companion object {
+    /** The `[ui] sort` key the page keeps its arrangement under. */
+    const val KEY = "connections"
+
+    private const val ASC = "asc"
+    private const val DESC = "desc"
+
+    /** Decodes [value] made by [encode]; a missing or malformed one gives the default. */
+    fun decode(value: String?): ConnectionArrangement {
+      val parts = value?.split(':') ?: return ConnectionArrangement()
+      if (parts.size != 2) return ConnectionArrangement()
+      val sort = ConnectionSort.entries.firstOrNull { it.name.lowercase() == parts[0] }
+        ?: return ConnectionArrangement()
+      val descending = when (parts[1]) {
+        DESC -> true
+        ASC -> false
+        else -> return ConnectionArrangement()
+      }
+      return ConnectionArrangement(sort, descending)
+    }
+  }
+}
 
 /**
  * The arrangement after a click on [sort]'s header: its natural direction first (largest first

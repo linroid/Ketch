@@ -82,6 +82,18 @@ class RemoteConnectionsTest {
             assertEquals(8443, connection.port)
           }
 
+          // Pausing closes them: their bytes stay in the totals, and they show as closed.
+          task.pause()
+          val closed = client.subscribe(Interest.Connections())
+            .first { it.total == 0 && it.closed.size == 3 }
+          assertEquals(3L * 1024, closed.receivedBytes)
+          assertEquals(0L, closed.sentBytes)
+          for (connection in closed.closed) {
+            assertNotNull(connection.closedAt)
+            assertEquals(1024L, connection.downloadedBytes)
+            assertEquals(0L, connection.downloadBps)
+          }
+
           val streaming = CompletableDeferred<Unit>()
           val ended = async {
             runCatching {

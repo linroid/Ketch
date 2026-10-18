@@ -1,5 +1,7 @@
 package com.linroid.ketch.app.ui.connections
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
@@ -23,6 +25,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,7 +56,8 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.components.KetchTextField
-import com.linroid.ketch.app.components.KetchTooltip
+import com.linroid.ketch.app.components.KetchHoverCard
+import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.components.focusRing
 import com.linroid.ketch.app.components.ketchClickable
 import com.linroid.ketch.app.components.rememberFocusVisibility
@@ -66,6 +72,7 @@ import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.ConnectionGridState
+import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.state.TrafficDirection
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchTheme
@@ -80,6 +87,7 @@ import com.linroid.ketch.app.ui.pulse.trafficLabel
 import com.linroid.ketch.app.ui.shell.LocalKetchLayout
 import com.linroid.ketch.app.ui.shell.ShellNavigation
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connections_closed_ago
 import ketch.app.shared.generated.resources.connections_column_client
 import ketch.app.shared.generated.resources.connections_column_device
 import ketch.app.shared.generated.resources.connections_column_down
@@ -97,6 +105,8 @@ import ketch.app.shared.generated.resources.connections_column_sent
 import ketch.app.shared.generated.resources.connections_column_task
 import ketch.app.shared.generated.resources.connections_column_up
 import ketch.app.shared.generated.resources.connections_empty_body
+import ketch.app.shared.generated.resources.connections_hide_details
+import ketch.app.shared.generated.resources.connections_show_details
 import ketch.app.shared.generated.resources.connections_filter_all
 import ketch.app.shared.generated.resources.connections_more
 import ketch.app.shared.generated.resources.connections_no_match
@@ -106,17 +116,20 @@ import ketch.app.shared.generated.resources.connections_peer_uploading
 import ketch.app.shared.generated.resources.connections_route_direct
 import ketch.app.shared.generated.resources.connections_route_http_proxy
 import ketch.app.shared.generated.resources.connections_route_socks_proxy
+import ketch.app.shared.generated.resources.connections_row_closed
 import ketch.app.shared.generated.resources.connections_search
+import ketch.app.shared.generated.resources.connections_status_closed
+import ketch.app.shared.generated.resources.connections_status_open
+import ketch.app.shared.generated.resources.connections_total_received
+import ketch.app.shared.generated.resources.connections_total_sent
 import ketch.app.shared.generated.resources.connections_unsupported_body
 import ketch.app.shared.generated.resources.connections_unsupported_title
 import ketch.app.shared.generated.resources.downloads_table_sort_by
 import ketch.app.shared.generated.resources.downloads_table_sorted_ascending
 import ketch.app.shared.generated.resources.downloads_table_sorted_descending
 import ketch.app.shared.generated.resources.pulse_connection_incoming
-import ketch.app.shared.generated.resources.pulse_connection_peer_choking
 import ketch.app.shared.generated.resources.pulse_connection_secure
 import ketch.app.shared.generated.resources.pulse_connection_show_task
-import ketch.app.shared.generated.resources.pulse_connection_upload_slot
 import ketch.app.shared.generated.resources.pulse_connections_none
 import ketch.app.shared.generated.resources.pulse_connections_unsupported
 import ketch.app.shared.generated.resources.shell_destination_connections
@@ -125,13 +138,16 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Connections page (`⌘7`): every live connection of the shown devices, the fastest
- * [PAGE_LIMIT] of them. Wide windows show a table whose headers sort it, narrow ones and phones
- * two-line rows; chips pick a protocol and the field searches endpoints, tasks, protocols and
- * devices. A row shows its task in the Downloads inspector.
+ * [PAGE_LIMIT] of them, and those that closed lately. Wide windows show a table whose headers
+ * sort it, narrow ones and phones two-line rows; a switch picks open or closed connections,
+ * chips a protocol, and the field searches endpoints, tasks, protocols and devices. A table row
+ * shows its details on hover and its task when its task is clicked; a list row opens its details
+ * when tapped, with a button that shows its task.
  *
  * Devices stream their connections only while the page shows, and stop five seconds after it
  * leaves (see [com.linroid.ketch.app.state.ConnectionGridModel]).
@@ -143,11 +159,17 @@ fun ConnectionsScreen(state: AppState) {
   val phone = LocalKetchLayout.current.navigation == ShellNavigation.Phone
   var query by rememberSaveable { mutableStateOf("") }
   var source by rememberSaveable { mutableStateOf<String?>(null) }
-  var sortName by rememberSaveable { mutableStateOf(ConnectionSort.Opened.name) }
-  var descending by rememberSaveable { mutableStateOf(ConnectionArrangement().descending) }
-  val arrangement = ConnectionArrangement(ConnectionSort.valueOf(sortName), descending)
-  val deviceNames = grid.devices.associate { it.deviceId to it.name.resolve() }
-  val all = remember(grid, deviceNames) { connectionRows(grid, deviceNames) }
+  var statusName by rememberSaveable { mutableStateOf(ConnectionStatus.Open.name) }
+  val status = ConnectionStatus.valueOf(statusName)
+  // The sort last chosen here, kept in `[ui] sort` across launches.
+  var sorted by rememberSaveable {
+    mutableStateOf(state.appSettings.ui.sort[ConnectionArrangement.KEY].orEmpty())
+  }
+  val arrangement = ConnectionArrangement.decode(sorted)
+  val deviceNames = (grid.devices + grid.closed).associate { it.deviceId to it.name.resolve() }
+  val every = remember(grid, deviceNames) { connectionRows(grid, deviceNames) }
+  val openCount = every.count { !it.closed }
+  val all = remember(every, status) { every.withStatus(status) }
   val filters = remember(all) { sourceFilters(all) }
   // A protocol whose connections all closed shows every connection again, and stays unpicked
   // when it comes back, rather than hiding the others without a click.
@@ -158,62 +180,85 @@ fun ConnectionsScreen(state: AppState) {
   val rows = remember(all, shownSource, query, arrangement) {
     all.matching(shownSource, query).arranged(arrangement)
   }
+  // Devices send nothing while their connections stay the same, so how long ago one closed
+  // advances here, from when its snapshot arrived, while closed rows show.
+  val timeSource = LocalTimeSource.current
+  val arrived = remember(grid) { timeSource.markNow() }
+  var since by remember(grid) { mutableStateOf(Duration.ZERO) }
+  if (rows.any { it.closed }) {
+    LaunchedEffect(arrived) {
+      while (true) {
+        delay(CLOSED_TICK)
+        since = arrived.elapsedNow()
+      }
+    }
+  }
   val onShow: (ConnectionRow) -> Unit = { row ->
     state.showConnections(row.cell.task, segments = row.connection.source in SEGMENTED_SOURCES)
   }
   val padding = KetchTheme.density.pagePadding
-  Column(Modifier.fillMaxSize()) {
-    if (!phone) PageHeader(grid)
-    Toolbar(
-      filters = filters,
-      total = all.size,
-      source = shownSource,
-      onSource = { source = it },
-      query = query,
-      onQuery = { query = it },
-      stacked = phone,
-    )
-    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-      when {
-        !grid.supported -> Message(
-          title = stringResource(Res.string.connections_unsupported_title),
-          body = stringResource(Res.string.connections_unsupported_body),
-        )
-        all.isEmpty() -> Message(
-          title = stringResource(Res.string.pulse_connections_none),
-          body = stringResource(Res.string.connections_empty_body),
-        )
-        rows.isEmpty() -> Message(title = stringResource(Res.string.connections_no_match))
-        !phone && maxWidth >= TableColumn.TableMinWidth -> ConnectionTable(
-          rows = rows,
-          columns = fitColumns(
-            available = maxWidth - padding * 2 - TablePadding * 2,
-            devices = scope == DeviceScope.All,
-            peers = all.any { it.connection.peer != null },
-          ),
-          arrangement = arrangement,
-          onSort = { sort ->
-            val next = arrangement.next(sort)
-            sortName = next.sort.name
-            descending = next.descending
-          },
-          onShow = onShow,
-          modifier = Modifier.padding(horizontal = padding),
-        )
-        else -> ConnectionList(rows, showDevices = scope == DeviceScope.All, onShow = onShow)
+  CompositionLocalProvider(LocalClosedSince provides since) {
+    Column(Modifier.fillMaxSize()) {
+      if (!phone) PageHeader(grid)
+      Toolbar(
+        status = status,
+        counts = { every.withStatus(it).size },
+        onStatus = { statusName = it.name },
+        showStatus = grid.closed.isNotEmpty() || status != ConnectionStatus.Open,
+        filters = filters,
+        total = all.size,
+        source = shownSource,
+        onSource = { source = it },
+        query = query,
+        onQuery = { query = it },
+        stacked = phone,
+      )
+      BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        when {
+          !grid.supported -> Message(
+            title = stringResource(Res.string.connections_unsupported_title),
+            body = stringResource(Res.string.connections_unsupported_body),
+          )
+          all.isEmpty() -> Message(
+            title = stringResource(Res.string.pulse_connections_none),
+            body = stringResource(Res.string.connections_empty_body),
+          )
+          rows.isEmpty() -> Message(title = stringResource(Res.string.connections_no_match))
+          !phone && maxWidth >= TableColumn.TableMinWidth -> ConnectionTable(
+            rows = rows,
+            columns = fitColumns(
+              available = maxWidth - padding * 2 - TablePadding * 2,
+              devices = scope == DeviceScope.All,
+              peers = all.any { it.connection.peer != null },
+            ),
+            showDevices = scope == DeviceScope.All,
+            arrangement = arrangement,
+            onSort = { sort ->
+              val next = arrangement.next(sort).encode()
+              sorted = next
+              state.appSettings.saveUi {
+                it.copy(sort = it.sort + (ConnectionArrangement.KEY to next))
+              }
+            },
+            onShow = onShow,
+            modifier = Modifier.padding(horizontal = padding),
+          )
+          else -> ConnectionList(rows, showDevices = scope == DeviceScope.All, onShow = onShow)
+        }
       }
+      // The connections past the limit are open ones, which the Closed view leaves out anyway.
+      if (status != ConnectionStatus.Closed) Footer(grid, listed = openCount)
+      // Every shown device, idle ones too, so their later connections carry countries; read with
+      // their presence, as a remote device lists its database once its status arrives.
+      val shown by state.shownInstances.collectAsState()
+      state.instanceManager.presence.collectAsState().value
+      CountryFooter(state, shown.map { it.deviceId })
     }
-    Footer(grid, listed = all.size)
-    // Every shown device, idle ones too, so their later connections carry countries; read with
-    // their presence, as a remote device lists its database once its status arrives.
-    val shown by state.shownInstances.collectAsState()
-    state.instanceManager.presence.collectAsState().value
-    CountryFooter(state, shown.map { it.deviceId })
   }
 }
 
 /** [row]'s endpoint, after the flag of the country its device names for it. */
-private fun endpointText(row: ConnectionRow): String {
+internal fun endpointText(row: ConnectionRow): String {
   val code = row.connection.country ?: return row.endpoint
   return "${flagOf(code)} ${row.endpoint}"
 }
@@ -337,7 +382,7 @@ private fun PageHeader(grid: ConnectionGridState) {
       color = colors.textPrimary,
     )
     Text(
-      text = grid.summaryText().resolve(),
+      text = headerSummary(grid).resolve(),
       style = KetchTheme.typography.bodyS,
       color = colors.textSecondary,
       maxLines = 1,
@@ -347,11 +392,28 @@ private fun PageHeader(grid: ConnectionGridState) {
 }
 
 /**
- * The protocol chips and the search field: side by side, or the field above the chips when
- * [stacked], as on phones.
+ * How many connections are open, with their speeds, and what every connection moved since each
+ * device started, when the devices count it.
+ */
+internal fun headerSummary(grid: ConnectionGridState): UiText {
+  val received = grid.receivedBytes ?: return grid.summaryText()
+  return listOf(
+    grid.summaryText(),
+    Res.string.connections_total_received.text(compactSizeText(received)),
+    Res.string.connections_total_sent.text(compactSizeText(grid.sentBytes ?: 0)),
+  ).joinText()
+}
+
+/**
+ * The open and closed switch, while closed connections are known, the protocol chips and the
+ * search field: side by side, or the field above the chips when [stacked], as on phones.
  */
 @Composable
 private fun Toolbar(
+  status: ConnectionStatus,
+  counts: (ConnectionStatus) -> Int,
+  onStatus: (ConnectionStatus) -> Unit,
+  showStatus: Boolean,
   filters: List<SourceFilter>,
   total: Int,
   source: String?,
@@ -363,6 +425,16 @@ private fun Toolbar(
   val spacing = KetchTheme.spacing
   val padding = KetchTheme.density.pagePadding
   val chips: @Composable RowScope.() -> Unit = {
+    if (showStatus) {
+      KetchSegmented(
+        options = ConnectionStatus.entries,
+        selected = status,
+        onSelect = onStatus,
+        label = { stringResource(it.label) },
+        count = counts,
+        modifier = Modifier.align(Alignment.CenterVertically),
+      )
+    }
     KetchChip(
       label = stringResource(Res.string.connections_filter_all),
       selected = source == null,
@@ -415,6 +487,13 @@ private fun Toolbar(
   }
 }
 
+private val ConnectionStatus.label: StringResource
+  get() = when (this) {
+    ConnectionStatus.Open -> Res.string.connections_status_open
+    ConnectionStatus.Closed -> Res.string.connections_status_closed
+    ConnectionStatus.All -> Res.string.connections_filter_all
+  }
+
 /** A column of the table; the endpoint takes the room the others leave. */
 internal enum class ConnectionColumn(
   val header: StringResource,
@@ -456,6 +535,7 @@ internal fun fitColumns(available: Dp, devices: Boolean, peers: Boolean): List<C
 private fun ConnectionTable(
   rows: List<ConnectionRow>,
   columns: List<ConnectionColumn>,
+  showDevices: Boolean,
   arrangement: ConnectionArrangement,
   onSort: (ConnectionSort) -> Unit,
   onShow: (ConnectionRow) -> Unit,
@@ -495,7 +575,7 @@ private fun ConnectionTable(
     }
     LazyColumn(Modifier.fillMaxSize()) {
       items(rows, key = { "${it.cell.key.deviceId}/${it.cell.key.id}" }) { row ->
-        TableRow(row, columns, onShow)
+        TableRow(row, columns, showDevice = showDevices, onShow)
       }
     }
   }
@@ -561,15 +641,27 @@ private fun SortChevron(descending: Boolean, tint: Color) {
 private fun TableRow(
   row: ConnectionRow,
   columns: List<ConnectionColumn>,
+  showDevice: Boolean,
   onShow: (ConnectionRow) -> Unit,
 ) {
   val colors = KetchTheme.colors
   val type = KetchTheme.typography
   val connection = row.connection
-  RowFrame(row, onShow, Modifier.height(KetchTheme.density.tableRow)) {
+  var taskHovered by remember { mutableStateOf(false) }
+  var taskFocused by remember { mutableStateOf(false) }
+  RowFrame(
+    modifier = Modifier.height(KetchTheme.density.tableRow),
+    card = { ConnectionDetails(row, showDevice, hint = ConnectionColumn.Task in columns) },
+    cardEnabled = !taskHovered,
+    // The task link is the row's one stop for the keyboard, so the card opens with its focus.
+    cardOpen = taskFocused,
+  ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.fillMaxSize().padding(horizontal = TablePadding),
+      modifier = Modifier
+        .fillMaxSize()
+        .alpha(if (row.closed) CLOSED_ALPHA else 1f)
+        .padding(horizontal = TablePadding),
     ) {
       TrafficSwatch(row, Modifier.width(LeadWidth))
       Text(
@@ -584,21 +676,48 @@ private fun TableRow(
         val modifier = Modifier.width(column.width).padding(horizontal = CellPadding)
         when (column) {
           ConnectionColumn.Device -> TextCell(row.deviceName, modifier)
-          ConnectionColumn.Task -> TextCell(row.taskName ?: connection.taskId, modifier)
+          ConnectionColumn.Task -> TaskLink(
+            row = row,
+            onShow = onShow,
+            onHover = { taskHovered = it },
+            onFocus = { taskFocused = it },
+            modifier = Modifier.width(column.width),
+          )
           ConnectionColumn.Protocol -> ProtocolCell(row, modifier)
           ConnectionColumn.Client -> TextCell(row.client, modifier)
           ConnectionColumn.Route -> TextCell(routeText(row)?.resolve(), modifier)
-          ConnectionColumn.Peer -> PeerCell(row, modifier)
-          ConnectionColumn.Down -> NumberCell(
-            text = rateText(connection.downloadBps),
-            modifier = modifier,
-            color = KetchTheme.colors.traffic.download.last(),
-          )
-          ConnectionColumn.Up -> NumberCell(
-            text = rateText(connection.uploadBps),
-            modifier = modifier,
-            color = KetchTheme.colors.traffic.upload.last(),
-          )
+          ConnectionColumn.Peer -> TextCell(peerText(row)?.resolve(), modifier)
+          // A closed one says when it closed across both speeds.
+          ConnectionColumn.Down -> if (row.closed) {
+            val width = column.width +
+              if (ConnectionColumn.Up in columns) ConnectionColumn.Up.width else 0.dp
+            NumberCell(
+              text = closedAgoText(row, since = LocalClosedSince.current).resolve(),
+              modifier = Modifier.width(width).padding(horizontal = CellPadding),
+              color = colors.textSecondary,
+            )
+          } else {
+            NumberCell(
+              text = rateText(connection.downloadBps),
+              modifier = modifier,
+              color = KetchTheme.colors.traffic.download.last(),
+            )
+          }
+          ConnectionColumn.Up -> if (row.closed) {
+            if (ConnectionColumn.Down !in columns) {
+              NumberCell(
+                closedAgoText(row, since = LocalClosedSince.current).resolve(),
+                modifier,
+                colors.textSecondary,
+              )
+            }
+          } else {
+            NumberCell(
+              text = rateText(connection.uploadBps),
+              modifier = modifier,
+              color = KetchTheme.colors.traffic.upload.last(),
+            )
+          }
           ConnectionColumn.Received ->
             NumberCell(compactSizeText(connection.downloadedBytes).resolve(), modifier)
           ConnectionColumn.Sent ->
@@ -610,12 +729,18 @@ private fun TableRow(
   }
 }
 
-/** A row that shows its task when clicked, with the hover fill rows have. */
+/**
+ * A row with the hover fill rows have, showing [card] where the pointer rests on it while
+ * [cardEnabled] and always while [cardOpen], or running [onClick] when clicked if it is given.
+ */
 @Composable
 private fun RowFrame(
-  row: ConnectionRow,
-  onShow: (ConnectionRow) -> Unit,
   modifier: Modifier = Modifier,
+  card: (@Composable () -> Unit)? = null,
+  cardEnabled: Boolean = true,
+  cardOpen: Boolean = false,
+  onClick: (() -> Unit)? = null,
+  onClickLabel: String? = null,
   content: @Composable () -> Unit,
 ) {
   val colors = KetchTheme.colors
@@ -623,44 +748,56 @@ private fun RowFrame(
   val hovered by interactions.collectIsHoveredAsState()
   val focus = rememberFocusVisibility()
   val gap = -KetchTheme.spacing.s0_5
-  Box(
-    modifier
-      .fillMaxWidth()
-      .background(if (hovered) colors.surfaceHover else Color.Transparent)
-      .rowDivider(colors.divider)
-      .focusRing(focus.visible, KetchTheme.shapes.xs, colors.focusRing, gap = gap)
-      .hoverable(interactions)
-      .ketchClickable(
-        interactions = interactions,
-        focus = focus,
-        onClickLabel = stringResource(Res.string.pulse_connection_show_task),
-        onClick = { onShow(row) },
-      ),
-  ) {
-    content()
+  val frame = modifier
+    .fillMaxWidth()
+    .background(if (hovered) colors.surfaceHover else Color.Transparent)
+    .rowDivider(colors.divider)
+    .hoverable(interactions)
+    .then(
+      if (onClick == null) {
+        Modifier
+      } else {
+        Modifier
+          .focusRing(focus.visible, KetchTheme.shapes.xs, colors.focusRing, gap = gap)
+          .ketchClickable(
+            interactions = interactions,
+            focus = focus,
+            onClickLabel = onClickLabel,
+            onClick = onClick,
+          )
+      },
+    )
+  if (card == null) {
+    Box(frame) { content() }
+  } else {
+    KetchHoverCard(card = card, enabled = cardEnabled, open = cardOpen, modifier = frame) {
+      Box { content() }
+    }
   }
 }
 
 /**
  * Which way the connection's bytes move, by shape and color alike: ↓ in the download color, ↑ in
- * the upload color, both for both, and a dot while idle; named in its tooltip.
+ * the upload color, both for both, and a dot while idle; named for screen readers.
  */
 @Composable
 private fun TrafficSwatch(row: ConnectionRow, modifier: Modifier = Modifier) {
   val colors = KetchTheme.colors
-  val label = trafficLabel(row.cell.direction).resolve()
+  val label = if (row.closed) {
+    stringResource(Res.string.connections_status_closed)
+  } else {
+    trafficLabel(row.cell.direction).resolve()
+  }
   Box(modifier, contentAlignment = Alignment.Center) {
-    KetchTooltip(text = label) {
-      Row(Modifier.semantics { contentDescription = label }) {
-        val direction = row.cell.direction
-        if (direction == TrafficDirection.Down || direction == TrafficDirection.Both) {
-          Arrow(DownArrow, colors.traffic.download.last())
-        }
-        if (direction == TrafficDirection.Up || direction == TrafficDirection.Both) {
-          Arrow(UpArrow, colors.traffic.upload.last())
-        }
-        if (direction == TrafficDirection.Idle) Arrow(IdleDot, colors.textTertiary)
+    Row(Modifier.semantics { contentDescription = label }) {
+      val direction = row.cell.direction
+      if (direction == TrafficDirection.Down || direction == TrafficDirection.Both) {
+        Arrow(DownArrow, colors.traffic.download.last())
       }
+      if (direction == TrafficDirection.Up || direction == TrafficDirection.Both) {
+        Arrow(UpArrow, colors.traffic.upload.last())
+      }
+      if (direction == TrafficDirection.Idle) Arrow(IdleDot, colors.textTertiary)
     }
   }
 }
@@ -700,7 +837,7 @@ private fun NumberCell(
   )
 }
 
-/** The protocol, with a shield when the connection is encrypted. */
+/** The protocol, with a shield when the connection is encrypted, as the hover card says. */
 @Composable
 private fun ProtocolCell(row: ConnectionRow, modifier: Modifier = Modifier) {
   val colors = KetchTheme.colors
@@ -719,32 +856,16 @@ private fun ProtocolCell(row: ConnectionRow, modifier: Modifier = Modifier) {
     )
     if (row.connection.secure == true) {
       val encrypted = stringResource(Res.string.pulse_connection_secure)
-      KetchTooltip(text = encrypted) {
-        KetchIconImage(
-          icon = KetchIcon.Shield,
-          size = KetchTheme.spacing.s3,
-          tint = colors.textTertiary,
-          modifier = Modifier.semantics { contentDescription = encrypted },
-        )
-      }
+      KetchIconImage(
+        icon = KetchIcon.Shield,
+        size = KetchTheme.spacing.s3,
+        tint = colors.textTertiary,
+        modifier = Modifier.semantics { contentDescription = encrypted },
+      )
     }
   }
 }
 
-/** A torrent peer's state, in full in its tooltip. */
-@Composable
-private fun PeerCell(row: ConnectionRow, modifier: Modifier = Modifier) {
-  val peer = row.connection.peer ?: return TextCell(null, modifier)
-  val details = listOfNotNull(
-    Res.string.pulse_connection_peer_choking.text().takeIf { peer.peerChoking },
-    Res.string.pulse_connection_upload_slot.text().takeIf { peer.uploadSlot },
-  )
-  Box(modifier) {
-    KetchTooltip(text = details.joinText().resolve(), enabled = details.isNotEmpty()) {
-      TextCell(peerText(row)?.resolve())
-    }
-  }
-}
 
 /** Two-line rows, for narrow windows and phones. */
 @Composable
@@ -775,46 +896,85 @@ private fun ListRow(row: ConnectionRow, showDevices: Boolean, onShow: (Connectio
     routeText(row),
     peerText(row),
   ).joinText()
-  RowFrame(row, onShow, Modifier.heightIn(min = KetchTheme.density.tableRow)) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(spacing.s3),
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = KetchTheme.density.pagePadding, vertical = spacing.s2),
-    ) {
-      TrafficSwatch(row, Modifier.width(LeadWidth))
-      Column(Modifier.weight(1f)) {
-        Text(
-          text = endpointText(row),
-          style = type.monoS,
-          color = colors.textPrimary,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = details.resolve(),
-          style = type.caption,
-          color = colors.textTertiary,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
+  var open by rememberSaveable { mutableStateOf(false) }
+  val motion = KetchTheme.motion
+  RowFrame(
+    modifier = Modifier
+      .heightIn(min = KetchTheme.density.tableRow)
+      .animateContentSize(tween(motion.short, easing = motion.easeStandard)),
+    onClick = { open = !open },
+    onClickLabel = stringResource(
+      if (open) Res.string.connections_hide_details else Res.string.connections_show_details,
+    ),
+  ) {
+    Column {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.s3),
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = KetchTheme.density.pagePadding, vertical = spacing.s2),
+      ) {
+        TrafficSwatch(row, Modifier.width(LeadWidth))
+        Column(Modifier.weight(1f).alpha(if (row.closed) CLOSED_ALPHA else 1f)) {
+          Text(
+            text = endpointText(row),
+            style = type.monoS,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          Text(
+            text = details.resolve(),
+            style = type.caption,
+            color = colors.textTertiary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
+        if (row.closed) {
+          Text(
+            text = closedAgoText(row, since = LocalClosedSince.current).resolve(),
+            style = type.numeralS,
+            color = colors.textTertiary,
+            maxLines = 1,
+            modifier = Modifier.alpha(CLOSED_ALPHA),
+          )
+        } else {
+          Column(horizontalAlignment = Alignment.End) {
+            val down = rateText(connection.downloadBps)
+            val up = rateText(connection.uploadBps)
+            Text(
+              text = "$DownArrow ${down ?: Dash}",
+              style = type.numeral,
+              color = if (down == null) colors.textTertiary else colors.traffic.download.last(),
+              maxLines = 1,
+            )
+            Text(
+              text = "$UpArrow ${up ?: Dash}",
+              style = type.numeralS,
+              color = if (up == null) colors.textTertiary else colors.traffic.upload.last(),
+              maxLines = 1,
+            )
+          }
+        }
       }
-      Column(horizontalAlignment = Alignment.End) {
-        val down = rateText(connection.downloadBps)
-        val up = rateText(connection.uploadBps)
-        Text(
-          text = "$DownArrow ${down ?: Dash}",
-          style = type.numeral,
-          color = if (down == null) colors.textTertiary else colors.traffic.download.last(),
-          maxLines = 1,
-        )
-        Text(
-          text = "$UpArrow ${up ?: Dash}",
-          style = type.numeralS,
-          color = if (up == null) colors.textTertiary else colors.traffic.upload.last(),
-          maxLines = 1,
-        )
+      if (open) {
+        Column(
+          verticalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = KetchTheme.density.pagePadding + LeadWidth + spacing.s3)
+            .padding(end = KetchTheme.density.pagePadding, bottom = spacing.s3),
+        ) {
+          ConnectionDetails(row, showDevice = showDevices, hint = false, endpoint = false)
+          KetchButton(
+            text = stringResource(Res.string.pulse_connection_show_task),
+            onClick = { onShow(row) },
+            variant = KetchButtonVariant.Secondary,
+            size = KetchButtonSize.Small,
+          )
+        }
       }
     }
   }
@@ -869,7 +1029,7 @@ private fun Message(title: String, body: String? = null) {
 }
 
 /** How it reaches its endpoint, or that the peer connected in; `null` when unknown. */
-private fun routeText(row: ConnectionRow): UiText? = when {
+internal fun routeText(row: ConnectionRow): UiText? = when {
   row.incoming -> Res.string.pulse_connection_incoming.text()
   else -> when (row.connection.route) {
     ConnectionRoute.DIRECT -> Res.string.connections_route_direct.text()
@@ -892,9 +1052,24 @@ private fun peerText(row: ConnectionRow): UiText? = row.connection.peer?.let { p
   ).joinText()
 }
 
+/**
+ * How long ago a closed connection closed, by its device's clock and [since] its snapshot
+ * arrived, as its row says it ("Closed 2m 5s ago"), or as its details do after their label when
+ * [detail] ("2m 5s ago"); empty for an open one.
+ */
+internal fun closedAgoText(
+  row: ConnectionRow,
+  detail: Boolean = false,
+  since: Duration = Duration.ZERO,
+): UiText {
+  val ago = (row.cell.closedAgo ?: return UiText.Empty) + since
+  val text = if (detail) Res.string.connections_closed_ago else Res.string.connections_row_closed
+  return text.text(durationText(ago))
+}
+
 /** A speed, or `null` for none, which shows as a dash. */
 @Composable
-private fun rateText(bytesPerSecond: Long): String? =
+internal fun rateText(bytesPerSecond: Long): String? =
   bytesPerSecond.takeIf { it > 0 }?.let { compactSpeedText(it).resolve() }
 
 /** The most connections the page lists; the slowest past it are counted under the list. */
@@ -916,11 +1091,20 @@ private val HideOrder = listOf(
 /** Columns only torrent peers fill. */
 private val PeerColumns = setOf(ConnectionColumn.Client, ConnectionColumn.Peer)
 
+/** How long it has been since the shown snapshots arrived, which closed rows add to their age. */
+internal val LocalClosedSince = compositionLocalOf { Duration.ZERO }
+
+/** How often closed rows say again how long ago they closed. */
+private val CLOSED_TICK = 1.seconds
+
+/** How closed connections' rows are dimmed. */
+private const val CLOSED_ALPHA = 0.55f
+
 private val LeadWidth = 24.dp
 private val EndpointMinWidth = 180.dp
-private val CellPadding = 4.dp
+internal val CellPadding = 4.dp
 private val SearchWidth = 280.dp
-private const val Dash = "–"
+internal const val Dash = "–"
 private const val DownArrow = "↓"
 private const val UpArrow = "↑"
 private const val IdleDot = "·"

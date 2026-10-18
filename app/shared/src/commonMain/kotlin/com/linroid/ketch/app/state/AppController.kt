@@ -46,6 +46,8 @@ import kotlin.time.TimeSource
  *   main thread by default.
  * @param timeSource measures elapsed time: the rate of each connection and the composables'
  *   timers (see [LocalTimeSource]).
+ * @param finishActions what the host can do once this device's downloads finish, such as quit or
+ *   shut the computer down ([AppState.whenDownloadsFinish]); `null` where it can do nothing.
  */
 class AppController(
   val instanceManager: InstanceManager,
@@ -58,6 +60,7 @@ class AppController(
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
   listDispatcher: CoroutineDispatcher = Dispatchers.Default,
   timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
+  finishActions: FinishActions? = null,
 ) {
   private val log = KetchLogger("AppController")
   private var closed = false
@@ -90,6 +93,7 @@ class AppController(
     discoverHistory = discoverHistory,
     listDispatcher = listDispatcher,
     timeSource = timeSource,
+    finishActions = finishActions,
   )
 
   init {

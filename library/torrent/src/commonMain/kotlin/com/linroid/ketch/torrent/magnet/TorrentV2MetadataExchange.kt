@@ -8,6 +8,7 @@ import com.linroid.ketch.torrent.metainfo.TorrentContentLayout
 import com.linroid.ketch.torrent.metainfo.TorrentIdentity
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.TorrentV2Info
+import com.linroid.ketch.torrent.metainfo.requireSupportedPieceLength
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.TorrentConnection
 import com.linroid.ketch.torrent.net.TorrentNetwork
@@ -71,6 +72,7 @@ internal class TorrentV2MetadataExchange(
       // The info matched its hash, so whatever fails to parse in it fails for every peer.
       val info = unusableUnless {
         TorrentV2Info.parse(raw, expectedIdentity = identity).also { info ->
+          requireSupportedPieceLength(info.pieceLength)
           val hashes = info.files.filter { it.length > info.pieceLength }
             .sumOf { (it.length - 1) / info.pieceLength + 1 }
           require(hashes * 32 <= maxBytes - raw.size) { "Piece layers exceed metainfo limit" }

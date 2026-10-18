@@ -302,4 +302,12 @@
   <!-- %1$s is a device name. -->
   <string name="feedback_device_offline">%1$s went offline</string>
   <string name="feedback_device_online">Reconnected to %1$s</string>
+  <!-- What the app is about to do once downloads finished, as chosen under settings_general_when_done; the user can cancel it meanwhile. -->
+  <string name="finish_warning_quit">Ketch quits in a minute</string>
+  <string name="finish_warning_sleep">This computer sleeps in a minute</string>
+  <string name="finish_warning_shut_down">This computer shuts down in a minute</string>
+  <string name="finish_warning_detail">Downloads on this computer finished.</string>
+  <string name="finish_failed_quit">Couldn't quit Ketch</string>
+  <string name="finish_failed_sleep">Couldn't put this computer to sleep</string>
+  <string name="finish_failed_shut_down">Couldn't shut this computer down</string>
 </resources>

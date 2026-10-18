@@ -75,7 +75,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Proxy`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
-  and `resolve(bytes, fileName)` extensions build them),
+  and `resolve(bytes, fileName)` extensions build them; a `KetchError.Unsupported` it throws is
+  caused by a `NoDownloadSourceException` when no source takes the input, else by what the
+  source that does lacks, such as a usable proxy),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `CountryDatabase` (its `Key` is a `ControlKey`) and `CountryDatabaseStatus`,
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
@@ -118,7 +120,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`KetchDispatchers.Default`, shared by every instance)
 - `com.linroid.ketch.core.engine` -- `HttpEngine`, `DownloadCoordinator`, `DownloadExecution`,
   `RangeSupportDetector`, `ServerInfo`, `RequestHeaders`, `DownloadSource`, `HttpDownloadSource`,
-  `SourceResolver`, `SourceState`, `DownloadContext`, `DownloadQueue`, `DownloadScheduler`,
+  `SourceResolver`, `SourceState`, `DownloadContext`,
+  `DownloadQueue`, `DownloadScheduler`,
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
   (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
   `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
@@ -405,19 +408,25 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `awaiting_file_selection`) or `WaitingForCondition` (defined, not produced yet); unknown wire
   types decode as `User`. The reason is not persisted: a `PAUSED` record is a user pause, except
   that a waiting task is derived from its record (`awaitFileSelection` with no selection)
-- `Ketch.close()` pauses running tasks for `Shutdown`, keeping their partial files and their
+- `Ketch.close()` first calls each source's `DownloadSource.stopping()` (non-suspending), then
+  pauses running tasks for `Shutdown`, keeping their partial files and their
   `DOWNLOADING` records, so the next `start()` resumes them, and releases the rest in the
   background, in order (from `Dispatchers.Default`): once the cancelled executions have finished,
   with their final `store()` checkpoints and record writes, it awaits each source's
-  `DownloadSource.stop()` (the torrent source's saves its seeders' checkpoints, then stops its
-  engine, whose sessions announce `stopped`), then closes the sources and the `HttpEngine`, and
+  `DownloadSource.stop()`, then closes the sources and the `HttpEngine`. The torrent source's
+  `stopping()` opens its engine's one 2 s window for `stopped` announces
+  (`TorrentEngine.openStoppedWindow`, which also starts removing the router's port mappings, in
+  2 s at most) and stops its seeders side by side, each saving its state while it announces and
+  again once paused, while the downloads pause, so all of them announce, and the router forgets
+  the port, within that window; its `stop()` waits for them, stops seeders that started since,
+  then stops the engine, whose remaining sessions get what is left of the window. Ketch
   closes dispatchers it was given only once every cancelled coroutine has finished, never under
-  them, and never
-  `KetchDispatchers.Default`, whose `close()` does nothing. `KetchApi.shutdown(timeout)` (5 s by
-  default; `close()` for other implementations) does the same and waits for the sources and the
-  `HttpEngine` to be released, at most `timeout`, leaving the rest to the background: `ketch
-  server`'s and `ketch mcp --standalone`'s shutdown hooks, `ketch <url>` and the desktop app's
-  quit (`InstanceManager.shutdown`) call it, as the process exits next
+  them, and never `KetchDispatchers.Default`, whose `close()` does nothing.
+  `KetchApi.shutdown(timeout)` (5 s by default; `close()` for other implementations) does the
+  same and waits for the sources and the `HttpEngine` to be released, at most `timeout`, leaving
+  the rest to the background: `ketch server`'s and `ketch mcp --standalone`'s shutdown hooks,
+  `ketch <url>` and the desktop app's quit (`InstanceManager.shutdown`) call it, as the process
+  exits next
 - `KetchStatus.features` lists the optional behaviors an instance supports (`KetchFeatures`),
   including registered `DownloadSource.features`: `hls.finite` and `dash.finite` independently,
   plus the legacy `media.finite` when both are present, `download.fileSelection` and
@@ -487,7 +496,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   with `UnsupportedOperationException` when collected. `limit` must be in 1..1024 (default 256): a
   snapshot keeps the fastest connections, ordered by when they opened, while `total`,
   `downloadBps` and `uploadBps` cover all of them
-- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`). Sources open
+- `Ketch` keeps a `ConnectionRegistry` (at most 4096 open, more count as `dropped`, their bytes
+  still in the totals). Sources open
   a `ConnectionHandle` through `DownloadContext.connections` (`SeedingTask.connections` while
   seeding), count bytes with one atomic add per chunk and close it in `finally`; `remove` and
   `close` close what a source leaked. Its sampler reads the counters once a second, rates over
@@ -496,6 +506,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   another (a one-shot `GET /api/connections` included) measures from them; one with nothing
   recent to measure from notes the counters and sends its first sample a second later, so an idle
   connection reads 0 rather than its average since it opened
+- Totals and closed connections: a connection that closes adds its bytes to the registry's
+  counters, so `ActiveConnections.receivedBytes`/`sentBytes` cover every connection since the
+  engine started and never drop (the sampler never reports less than it did), and joins
+  `ActiveConnections.closed`, newest first, with `ActiveConnection.closedAt`, its final counts and
+  no rates: the last `ConnectionRegistry.MAX_CLOSED` (256) for `CLOSED_RETENTION` (10 minutes),
+  at most `limit` per snapshot. A connection still listed as open is left out of `closed`.
+  Closed entries never change, so idle repeats stay deduplicated; their expiry is a change.
+  Older servers send neither (`null` totals, an empty list), and the server routes and
+  `RemoteKetch` pass both through unchanged
 - Countries: `ActiveConnection.country` is the ISO code an engine given a `CountryLookup` names
   for the host, listed as `KetchFeatures.COUNTRIES` (`net.countries`) with
   `controller(CountryDatabase)`. `DbIpCountryDatabase` (desktop app, Android app, `ketch server`)
@@ -662,14 +681,24 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `DownloadTask.selectFiles` changes the selection in every state but canceled (default throws
   `UnsupportedOperationException`; `RemoteDownloadTask` sends `PUT /api/tasks/{id}/files`). Ketch
   validates it with `DownloadSource.planSelection` against metadata the source holds, never
-  client sizes, saves it (selection, total, segments and `TaskControl.selectionGeneration` in one
-  record write), then delivers it: a running task takes it live as a new
-  `DownloadContext.selection` revision, which the source acknowledges (a run that ends with an
+  client sizes, fitting a running download's latest segments (else the saved ones), saves it
+  (selection, total, segments and `TaskControl.selectionGeneration` in one record write; the
+  task shows the plan first, so its new request never comes with the old selection's size: a
+  running task the plan's progress, dropping its transfer's reports until the selection is
+  delivered, a paused one (waiting for files too) the saved segments' progress and a completed
+  one the new size, also when it reopens, which the queue then shows `Queued`; a failed save
+  shows the state as it was again, never of another kind; a started task still `Queued` as its
+  first report was dropped then shows it as the plan),
+  then delivers it: a running task takes it live as a new `DownloadContext.selection` revision,
+  whose files the source reports from then on and acknowledges (a run that ends with an
   unacknowledged selection runs again through `resume`, so completion covers the latest one);
-  paused, queued, scheduled and failed tasks use it when they start; a completed task that gains
-  files reopens into the same folder, adopting its live seeding session, while one that only
-  drops files changes its size, and its seeding session shares the smaller selection
-  (`SourceExtension.selectionChanged`). Re-selecting the current files does nothing
+  paused, queued, scheduled and failed tasks use it when they start (it goes to whatever
+  execution runs once it is saved, and an execution reads the saved selection again under the
+  control lock, so one the queue starts during the planning runs it too); a completed task that
+  gains files reopens into the same folder, adopting its live seeding session, while one that
+  only drops files changes its size, and its seeding session shares the smaller selection
+  (`SourceExtension.selectionChanged`). Once saved, a selection is delivered, queued or shared
+  even if the caller is cancelled meanwhile. Re-selecting the current files does nothing
 - `DownloadRequest.awaitFileSelection`: a download added without a selection, as the apps' "Add
   anyway" adds a magnet, parks as `Paused(AwaitingFileSelection)` once it lists several files or
   variants (either mode), holding no queue slot, output path or segments; `selectFiles` starts it
@@ -711,9 +740,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   parser takes 10,000 content files at any depth (1,000,000 bencode values), and v2 resolution
   and tracker-only lookups skip trackers Ketch cannot announce to, such as `wss://`
   (`TrackerConfiguration.usable`; `prepare` stays strict for edits). New metainfo inputs that
-  are private or resolved tracker-only, with no tracker left and no web seed, are refused
-  (`requireDiscoverable`); a saved task's metainfo is read without that check
-  (`resolveV2Metainfo(checkDiscovery = false)`)
+  are private or resolved tracker-only, with no tracker left and no web seed, are refused when
+  resolved, by a preview or by the first run of a link added directly (`requireDiscoverable`),
+  as are pieces over 16 MiB (`MAX_PIECE_LENGTH`,
+  `requireSupportedPieceLength`: the v1 parser, v2 and hybrid resolution and a v2 magnet's info
+  before its piece layers); the metainfo a task saved is read without those checks when it
+  resumes and when its file table is built (`newInput = false`), and admission refuses its pieces
+  when it starts
 - Metadata that matches a magnet's hash but does not parse ends the lookup with
   `UnusableTorrentMetadataException`, a `MetadataLookupFailure` like
   `PrivateTorrentMagnetException`, which `resolve` reports as `KetchError.SourceError`; v2
@@ -755,9 +788,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   outside the endgame. A run is the first free wanted piece and the free wanted pieces after it,
   at most `WEB_SEED_RUN_PIECES` (16) and `WEB_SEED_RUN_BYTES` (4 MiB), no more than its share of
   the free pieces split between every peer and seed (the swarm joins every seed before any
-  claims, once it wants pieces: one that only seeds never starts them, and a v2 transfer logs
-  its seeds at the first run it hands out), and later pieces only take buffers that leave half the
-  budget free; an endgame
+  claims, once it wants pieces: one that only seeds never starts them, one that completes stops
+  them until it wants pieces again, and a v2 transfer logs its seeds at the first run it hands
+  out), and later pieces only take buffers that leave half the budget free; an endgame
   duplicate is a single piece. `WebSeedLayout` maps a piece to one range request per file it spans
   (multi-file: URL + name + path, segments percent-encoded); the worker joins a run's spans that
   follow each other in a file into one request, and commits and gives back each piece as its last
@@ -769,7 +802,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the whole transfer, so a seed a stall starts again keeps what it learned: it is asked once more
   for every piece it could not serve, as its mirror may have fixed them, and a piece it sent
   corrupt before is given up again after one more corrupt copy. What each seed could not serve
-  stays known for stall reports (`SwarmWebSeedPieces.unservable`, `TorrentV2WebSeeds.refuses`).
+  as of its last answer (payload, or a piece verified or refused) stays known for stall reports
+  (`WebSeedWorker.refusals`), as does a seed dropped again once started again without answering
+  (`WebSeedWorker.downAcrossRelaunch`).
   Payload goes through the swarm's download limits and is reported as a `torrent` connection
   with protocol `HTTP`; the swarm summary adds `WebSeedStats`. V2 and hybrid owners read
   `TorrentV2Document.webSeeds` (v2 magnets keep `ws` in the metainfo `TorrentV2MetadataExchange`
@@ -801,18 +836,25 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   discovery (v1, and v2 as `PeerOrigin.EXPLICIT` in the swarm they answered in)
 - Stalls: each swarm checks itself every second (`TorrentStallWatchdog`): no payload for 30 s, or no
   verified piece for four pieces' worth of time at its rate (1 to 10 minutes, again from payload
-  back after a gap once none of it can be thrown away, once until the next piece; time waiting on
-  speed limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
-  peer or web seed has and their files, with nothing connected those every web seed could not serve,
-  kept 10 s after the last source leaves; no peers, all choking, slow peers) the session publishes
+  back after a gap once some of it is kept, once until the next piece; time waiting on speed
+  limits never counts), is a stall, whose reason (`TorrentStall`: missing pieces no connected
+  peer or running web seed has and every stopped one could not serve, a seed started again
+  counting as stopped until it answers (`WebSeedWorker.unproven`) and one dropped again once
+  started again without answering aside until a later relaunch finds it answering, and their
+  files, kept 10 s after the last source leaves;
+  no peers, all choking, whatever web seeds do; slow peers) the session publishes
   (`TorrentSession.stall`, `LiveTorrent.stall`, `TorrentSnapshot.stall`, the swarm summary). Web
-  seed payload thrown away (`WebSeedStats.wasted`) takes back the checks that counted it, as it may
-  be until its piece is stored (`WebSeedStats.unsettled`, `StallSignals`); a gap is told from any
-  payload, so payload thrown away never makes the next look back after one. After a minute it
+  seed payload thrown away (`WebSeedStats.wasted`), as it may be until its piece is stored, is
+  taken back from the checks that counted it and no other: workers tally each part's bytes by the
+  checks before they arrived (`WebSeedArrivals`), and each check gets the bytes since the last and
+  what was stored or thrown away of earlier ones (`WebSeedStats.checked`, `WebSeedLedger`); a gap
+  is told from any payload, so payload thrown away never makes the next look back after one. After
+  a minute it
   reannounces to trackers (5, 10, up to 30 minutes apart), revives peers it gave up on, and after
   two minutes relaunches dropped web seeds. The inspector says why
   (`StallNotice`), with Skip file for missing pieces. In v1, a block its peer is late with (twice
-  its queue's time at its rate, 4 to 30 s) is asked of another peer with room, and the endgame
+  its queue's time at its rate, 4 to 30 s, never before those it was asked for earlier) is asked
+  of another peer with room, and the endgame
   starts once every unopened piece is one no source has. V2 and hybrid owners do the same
   (`TorrentV2PieceScheduler.planDuplicate`: one copy per block, 8 per peer, 64 per session, none
   while under a quarter of the transfer budget is free; the first copy cancels the other, and in
@@ -824,10 +866,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seeding (`[torrent] upload`, while downloading by default in the apps, the CLI and the server;
   the SDK uploads nothing unless `TorrentConfig.uploadPolicy` or `enableUpload` says so). A run
   publishes its session's progress only once the session checked its files (`DOWNLOADING`,
-  `SEEDING` or `FINISHED`) and, when it took over a seeder, applied the run's selection; until
-  then the task shows each file's progress as Ketch restored or planned it, or as the session
-  last reported it, over the files the run follows now, so a recheck never shows 0 and a
-  selection taken during one, or a run Ketch repeats for a selection, shows its own files and size
+  `SEEDING` or `FINISHED`) and took the last selection the run received (a seeder it took over,
+  the run's own); until then the task shows each file's progress as Ketch restored or planned it,
+  or as the session last reported it, over the files the run follows, which a selection changes
+  as it arrives, so a recheck never shows 0 and a selection taken during one, or while a session
+  takes it, or a run Ketch repeats for a selection, shows its own files and size. `planSelection`
+  plans a file without saved progress, such as one deselected and chosen again, with what the
+  saved checkpoint verified of it (`savedFileProgress`: each verified piece's bytes in the file,
+  from a v1 `TorrentCheckpoint` or a v2 `TorrentV2Checkpoint`'s hint), so a paused task
+  re-adding a file deselected since its last run started shows the pieces that run verified (a
+  run's starting recheck drops a deselected file's bits, and other states show no progress)
 - Live file selection for v1, v2 and hybrid: a running swarm or v2 loop takes a new selection
   without reconnecting its peers. v1 keeps the files it created ("materialized" files) and their
   verified pieces when they are deselected, copies verified spans of boundary pieces from the
@@ -837,9 +885,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   selected files, refuse one whose path holds a file they did not create, keep deselected
   verified pieces readable, and bind their creation log without the selection once it changes.
   A seeding task whose selection grows downloads again and seeds once more, the run that takes
-  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). A lent seeder
-  pays the global limit alone (`DownloadContext.globalThrottle`) should it fetch a piece again,
-  and its discovery keeps only the spec fields it reads, so no finished run stays reachable.
+  the seeder over binding its own task limits (`TorrentSession.setTaskThrottle`). One that
+  shrinks before its restored seeder reads the task's selection as it starts, or while it checks
+  its files, has it check and seed the smaller selection, so a dropped file, deleted maybe, no
+  longer stops it: `startSeeding` opens it with the task's latest smaller selection
+  (`SeedingTask.selection`), `changeSeedingSelection` also changes a seeder that checks, which
+  checks again, and the selection is read again before the check and once it seeds, after each
+  change until it holds, so a newer one applied meanwhile is never undone. A v2 or hybrid seeder
+  missing a selected file fails as it opens, before any check (its checkpoint's ownership no
+  longer holds), and keeps its intent: a drop saved between that read and the check takes effect
+  the next time seeding is restored. A lent seeder pays the global limit alone
+  (`DownloadContext.globalThrottle`) should it fetch a piece again, and its discovery keeps only
+  the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
@@ -872,11 +929,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`TorrentControlSource.saveSessionStates`, completed tasks of the source only, never while a
   run is active), which the source calls about every minute while a task seeds (its seed
   watcher), as a seeder stops (`stopSession`: Stop seeding, the watcher, a waiting download), and
-  as Ketch shuts down: `stop()` lets its seeders save, within 5 s, before it stops the engine
-  (`close()` alone saves nothing). A task's state from before (a lent seeder's last run, or the one
-  `startSeeding` restored) is what each save updates. Without a session, `countersOf` reports the
-  record's checkpoint (`TorrentControlSource.savedPayload`; `checkpointPayload` reads only the
-  counters)
+  as Ketch shuts down: `stopping()` (or `stop()` without it) pauses each seeder while saving it
+  as it is (`TorrentSession.currentResumeData`, which a v1 session reads without writing its
+  sidecar or waiting for the pause), then as the pause left it when that differs, within 5 s:
+  the announce never waits for a slow save, nor the save for the window, as hosts exit 5 s after
+  shutting down began (`close()` alone saves nothing).
+  A task's state from before (a lent seeder's last run, or the one `startSeeding` restored) is
+  what each save updates. Without a session, `countersOf` reports the record's checkpoint
+  (`TorrentControlSource.savedPayload`; `checkpointPayload` reads only the counters)
 - Paused uploads, orthogonal to the upload policy (the phone apps' Wi-Fi gate):
   `TorrentDownloadSource(uploadsPaused = ...)` (so hosts start paused before `Ketch.start()`
   restores seeding) and `setUploadsPaused(paused)` (applied under `engineMutex` like
@@ -912,7 +972,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   that another to the same peer replaced counts for the one kept, dialed again where we dialed the
   peer (v1 `PeerResult.alias`/`inherited`, v2 `Member.inherited`). A source naming a peer that
   brought payload again has it dialed `FOUND_AGAIN_MS` (30 s) after its last dial, at most once
-  every `FOUND_AGAIN_EVERY_MS` (5 minutes), as the DHT names the same peers every minute. A revive
+  every `FOUND_AGAIN_EVERY_MS` (5 minutes), as the DHT names the same peers every minute; named
+  while a dial of it runs, once that dial fails without connecting. A revive
   dials every waiting or given-up endpoint at once and keeps its count; its dial of an endpoint
   given up on leaves when that was (`PeerRedial.spent`), so a source naming it 5 minutes on still
   starts it over during a stall, which revives every minute without a single peer
@@ -947,8 +1008,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentAdvertisedPort.setMapped` announces, and `PortMapLayers` (the layers, that port and
   address, and whether the address is public) what `KotlinTorrentEngine.reachability` reads.
   Mappings last an hour, renew every half hour and are removed outermost first by `stop` within
-  2 s; UPnP tries other ports on 718 and permanent leases on 725. `PortMappingTest` and
-  `NatLayersTest` run them against scripted gateways on loopback
+  2 s, which the engine starts as its stopped window opens; UPnP tries other ports on 718 and
+  permanent leases on 725. `stop` logs once (info, the port and layer counts only) how many layers
+  confirmed removing every mapping asked for, also those of a pass it cut short (UPnP fault 714,
+  no such entry, counts) and, if not all, that the rest may still forward the port until their
+  lease ends, or until the router drops one asked for with lease 0.
+  `PortMappingTest` and
+  `NatLayersTest` run them against scripted gateways on loopback, and `TorrentShutdownTest` an
+  engine's (`portMapGateways`)
 - Reachability (`KotlinTorrentEngine.reachability`, `reachabilityStatus`, through the
   controller): `reachable` once a peer connected in over TCP from a public address (punched uTP
   connections and LAN peers prove nothing), `forwarded` when every layer up to a public address
@@ -975,11 +1042,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`lsdSenderAllowed`, `lsdPeerDialable`: IPv6 link-local senders are dropped, as `PeerEndpoint`
   carries no zone to dial them), never its own cookie, 32 at once then 4 a second, each peer once a
   minute per torrent. `openLsdMulticast` is one dual-stack `MulticastSocket` with `SO_REUSEADDR`
-  (`JvmLsdTransport`, jvmAndAndroidMain) that joins the IPv4 group on each private IPv4 interface
-  (`lsdInterfaces`) and the IPv6 group on each non-point-to-point interface with a link-local or
-  unique local IPv6 address (`lsdIpv6Interfaces`), sending IPv6 announces to the group scoped to
-  each interface (macOS finds no route to `ff15::` otherwise); its `isCurrent` compares both
-  families' interfaces and addresses. It is `null` on iOS (multicast needs Apple's entitlement).
+  (`JvmLsdTransport`, jvmAndAndroidMain) that joins the IPv4 group on each interface with a
+  private IPv4 address (`lsdInterfaces`) and the IPv6 group on each with a link-local or unique
+  local IPv6 address (`lsdIpv6Interfaces`), point-to-point links (VPN tunnels; Windows TUN
+  adapters may not count as such) left out of both, as `LsdInterfaceFacts` decides from each
+  interface's flags and addresses. It sends IPv6 announces to the group scoped to each interface
+  (macOS finds no route to `ff15::` otherwise) and IPv4 ones through an IPv4 `DatagramChannel`
+  on an ephemeral port with `IP_MULTICAST_IF` set per interface, as on macOS the IPv6 socket's
+  interface option does not steer IPv4 multicast (every announce left on the interface holding
+  the route, often a VPN tunnel). Its `isCurrent` compares both families' interfaces and
+  addresses. It is `null` on iOS (multicast needs Apple's entitlement).
   `TorrentDownloadSource(multicastLock = ...)` holds a `TorrentMulticastLock` while the group is
   joined: the Android app's `KetchService` passes a Wi-Fi `MulticastLock`.
   `TorrentLocalDiscoveryTest` uses virtual time and `FakeLsdTransport`, `JvmLsdTransportTest` real
@@ -1063,14 +1135,19 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   shared by every peer that has it, so `maxBufferedBytes` bounds pieces in assembly rather than
   peers transferring. A worker keeps `QUEUE_TIME_MS` (3 s) of its peer's measured rate
   outstanding (4 to `MAX_PIPELINE` 500, within the peer's `reqq`, 250 when it names none; until
-  the first sample it starts at `INITIAL_PIPELINE` 16 and adds one per block received), across piece ends, asked for in batches (`request`,
-  `PeerWire.sendAll`); we advertise `reqq` 500. Choke, reject, cancel and disconnect free only the
-  blocks still owed; a partial piece nobody fetches from gives its buffer up after 10 s when
-  another piece needs it, after 60 s anyway and at once when no connected peer has it, and `close`
-  frees the rest when the swarm stops. The peer that delivers the last block commits the piece
+  the first sample it starts at `INITIAL_PIPELINE` 16 and adds one per block received; time the
+  peer chokes us sending nothing is never sampled), across piece ends, asked for in batches
+  (`request`, `PeerWire.sendAll`); we advertise `reqq` 500. Choke, reject, cancel and disconnect
+  free only the blocks still owed; a partial piece nobody fetches from gives its buffer up after
+  10 s when another piece needs it, after 60 s anyway and at once when no connected peer has it,
+  and `close` frees the rest when the swarm stops. The peer that delivers the last block commits the piece
   (`Arrival.Complete`, then `finish`): a failed hash check blames it only when it sent every block,
   else one peer fetches the piece alone next. Once every wanted piece is open, idle peers also ask
-  for blocks one other peer owes. Each pass, `poll` hands a worker the requests to cancel (the
+  for blocks one other peer owes: any it is late with, and, once they owe none of their own, about
+  a second of their rate on time (`endgameCopies`: at least `ENDGAME_DUPLICATES`, 16, within their
+  pipeline), due last first, so the copy arrives before the owner gets to the block and cancels
+  it; an owner that gives a copied block back leaves it to the copier, due and ordered as its copy
+  was asked for. Each pass, `poll` hands a worker the requests to cancel (the
   other copy arrived, or the piece is done or unwanted), newly verified pieces for HAVEs (an
   append-only log with a cursor per peer) and its interest: workers start not interested and send
   INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A
@@ -1399,6 +1476,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   user's own suspend; GNOME ignores `idle` locks); Android's
   `WakeLockInhibitor` is a partial `WakeLock`, held only while `KetchService` is in the
   foreground, which keeps it out of Android vitals' excessive wake lock count
+- When downloads finish (Settings → General → Power, desktop only): `AppState.whenDownloadsFinish`
+  (`WhenDownloadsFinish`, built when the host passes `AppController(finishActions = ...)` and an
+  embedded device exists) quits Ketch, puts the computer to sleep or shuts it down
+  (`FinishAction`) once the embedded device goes from `ForegroundStatus.keepsAwake` to idle, so a
+  choice made while idle waits for downloads to run and finish; paused and failed tasks never
+  hold it back. A sticky warning (`notify = true`, so also a system notification while the app is
+  not in front) offers Cancel and running it at once for `GRACE` (1 minute); downloads starting
+  again withdraw it until they finish too. The choice is never saved and runs once, so no later
+  launch or wake shuts the computer down unasked; a failure posts an error. The desktop's
+  `DesktopFinishActions` quits through `CloseBehavior.quitWithoutAsking` and runs System Events'
+  `sleep` and `shut down` (macOS asks once to let Ketch control it; `pmset sleepnow` needs root),
+  `SetSuspendState` and `shutdown /s` (Windows), `systemctl suspend`/`poweroff` (Linux)
 - Task states: `waitsInQueue` and `isPausedUntilResumed` (`state/TaskStates.kt`) decide
   everywhere that a task paused for an urgent download counts as waiting (Waiting tab, Start
   now, Pause all) rather than paused. Rows say why the engine paused a task, where a queued one
@@ -1425,8 +1514,19 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and phones show two-line rows. Chips pick a source by its commonest protocol family
   (`sourceFilters`) and the field searches endpoints, tasks, protocols, peer clients and devices
   (`matching`). Each row leads with ↓, ↑, both or a dot, and its speeds are drawn in the traffic
-  colors, so direction never rests on color alone; a row shows its task, on its Connections tab
-  for HTTP and FTP. `ConnectionGridModel` asks each online device for its own stream
+  colors, so direction never rests on color alone. The header adds what the devices received and
+  sent in all once one reports totals (`headerSummary`), and while closed connections are known
+  an Open / Closed / All switch (`ConnectionStatus`, `withStatus`; Open by default, not saved)
+  sits before the chips, whose counts follow it. Closed rows (`ConnectionRow.closed`,
+  `ConnectionCell.closedAgo`, from their device's clock, plus `LocalClosedSince`, the time since
+  the snapshot arrived, ticking each second, as devices send no idle repeats) are dimmed and say
+  how long ago they closed in place of the speeds (`closedAgoText`); their Open column and sort
+  are how long they were open, and their details add Closed and Was open. A table row shows every
+  detail in a hover card
+  (`KetchHoverCard`, `ConnectionDetails`; long-press on touch, and keyboard focus on the task
+  link) and only its task cell shows the
+  task, on its Connections tab for HTTP and FTP; a list row opens its details when tapped, with
+  Show task. The table's sort is kept in `[ui] sort` (`connections`) `ConnectionGridModel` asks each online device for its own stream
   (`AppState.connectionGrid.state(limit)`, the limit split between devices) only while the page
   is on screen, stopping 5 s after, and asks again with backoff (1 s doubling to 30 s) when one
   fails or ends; a device refusing it as unsupported is listed, not asked again. The Pulse bar's
@@ -1519,7 +1619,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   per-task speed limit, priority and connections (0 is Auto; older servers answer 400
   `invalid_connections`, which `RemoteDownloadTask` turns into `UnsupportedOperationException`);
   status (with `KetchStatus.features`), config, network interfaces, and resolving URLs or
-  uploaded file content
+  uploaded file content. Both resolve routes (`respondResolved`) answer 415 `unsupported` for an
+  input no source takes (the `KetchError.Unsupported` a `NoDownloadSourceException` causes)
+  and, with its reason, for one a source lacks something for, such as a usable proxy; and a
+  source's refusal with 422 and the typed `KetchError`, its `detail` saying why, plus
+  `"error": "source_error"`, so clients that read an `ErrorResponse` keep its message.
+  `RemoteKetch.resolve` throws `KetchError.Unsupported` for a 415 `unsupported`, caused by a
+  `NoDownloadSourceException` for the servers' "No download source" wordings and else by the
+  reason after "Not supported: ", and the 422's error again; other bodies are a
+  `RemoteApiException`, as older servers' 500 for a URL's refusals. The apps' add sheet
+  (`toIntakeProblem`) calls a link one Ketch can't download only when no source takes it, and
+  otherwise says it couldn't check it, with the cause's reason
 - Event stream (`StreamRoutes`, `EventHub`; `/api/status` lists `events.stream`): `GET
   /api/stream` opens one SSE stream per client (at most 32, 429 `too_many_streams` beyond; a
   comment every 15 s, which also frees the streams of clients that left). It sends `hello` (the
@@ -2046,11 +2156,9 @@ Planned features not yet implemented:
    [proposal](docs/design/multi-instance-downloads.md), shipped on its own first: connections
    that finish claim the remaining bytes of slower ones, slow tails split, a failed range retries
    alone instead of cancelling the batch, and a minimum segment size keeps small files whole
-6. **Power options** - The apps can quit, sleep or shut down once the queue is empty, driven by
-   the busy signal keep awake already follows (`ForegroundStatus.keepsAwake`)
-7. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
+6. **Cross-device Task Transfer** - Send to / Move to carry a task's downloaded data (partial
    bytes, segment progress, resume state, finished files) between instances, so the destination
    continues instead of starting over; see the [plan](docs/plans/task-transfer.md)
-8. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
+7. **Helper devices** - Paired Ketch instances relay byte ranges of one download through their
    own network and IP, joining or leaving mid-download without pausing it; see the
    [proposal](docs/design/multi-instance-downloads.md). Its scheduler ships first, as item 5

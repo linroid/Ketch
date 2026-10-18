@@ -6,6 +6,8 @@ import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.numericHost
+import com.linroid.ketch.torrent.webseed.drain
+import com.linroid.ketch.torrent.webseed.withInfoLog
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,8 +63,9 @@ class NatLayersTest {
 
   /**
    * A NAT-PMP gateway whose external address is the next of [addresses] at each ask (the last
-   * once they run out), and which maps each internal port to itself plus [offset]. Records each
-   * mapping as (opcode, internal port, lifetime).
+   * once they run out), and which maps each internal port to itself plus [offset], without a
+   * reply for [silentPort], whose replies are lost. Records each mapping as (opcode, internal
+   * port, lifetime).
    */
   private suspend fun natPmpGateway(
     network: TorrentNetwork,
@@ -70,6 +73,7 @@ class NatLayersTest {
     addresses: List<String>,
     offset: Int,
     requests: MutableStateFlow<List<Triple<Int, Int, Int>>>,
+    silentPort: Int? = null,
   ): Int {
     val socket = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
     var asked = 0
@@ -89,6 +93,7 @@ class NatLayersTest {
             val external = input.readShort().toInt() and 0xffff
             val lifetime = input.readInt()
             requests.update { it + Triple(opcode, internal, lifetime) }
+            if (internal == silentPort) continue
             // UDP asks for the port TCP got, which it grants; TCP gets its port plus [offset].
             val granted = if (lifetime == 0) 0 else if (opcode == 1) external else internal + offset
             reply.writeShort(internal).writeShort(granted).writeInt(lifetime)
@@ -178,6 +183,33 @@ class NatLayersTest {
       requests.value,
     )
   }
+
+  @Test
+  fun mapper_stoppedWhileTheOuterNatMaps_saysThatLayerMayStillForwardThePort() =
+    gateways { network, scope ->
+      val requests = MutableStateFlow(emptyList<Triple<Int, Int, Int>>())
+      // The NAT outside the router maps the port the router got, 6981, and removes it, without a
+      // word either time.
+      val port = natPmpGateway(network, scope, listOf("10.0.0.2", "20.0.113.7"), offset = 100,
+        requests = requests, silentPort = 6981)
+      withInfoLog { lines ->
+        val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { null },
+          onMapped = {},
+          natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
+          upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+          networks = { listOf(network127) },
+          outerGateways = { listOf(loopback) })
+        mapper.start()
+        // The router confirmed its layer; the engine stops before the outer one says anything.
+        requests.first { asked -> asked.any { it.second == 6981 } }
+        mapper.stop(timeoutMs = stopMs)
+        assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 1 of 2 NAT " +
+          "layer(s) confirmed it; the others may still forward the port until their lease ends"),
+          lines.drain().filter { "mapping of port" in it })
+        assertEquals(listOf(Triple(2, 6881, 3600), Triple(2, 6981, 3600), Triple(2, 6981, 0),
+          Triple(2, 6881, 0)), requests.value)
+      }
+    }
 
   @Test
   fun mapper_nothingOutsideTheRouterAnswers_reportsItIsNotPublic() = gateways { network, scope ->

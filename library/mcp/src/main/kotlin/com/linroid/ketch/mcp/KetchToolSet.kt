@@ -9,7 +9,9 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
@@ -389,8 +391,14 @@ class KetchToolSet(
   suspend fun resolveUrl(
     url: String,
   ): String {
-    // The files are listed; a torrent's whole metainfo is of no use to an agent.
-    val resolved = connect().resolve(url).withoutBulkMetadata()
+    val resolved = try {
+      connect().resolve(url)
+    } catch (e: KetchError.Unsupported) {
+      // Its own message is the same whatever the reason; the agent is told which it is.
+      throw IllegalStateException(unsupportedReason(e), e)
+    }
+      // The files are listed; a torrent's whole metainfo is of no use to an agent.
+      .withoutBulkMetadata()
     return json.encodeToString(
       json.encodeToJsonElement(resolved),
     )
@@ -767,4 +775,17 @@ private const val LOCAL_CURSOR_PREFIX = "request:"
 private val defaultJson = Json {
   encodeDefaults = true
   ignoreUnknownKeys = true
+}
+
+/**
+ * Why [error] was thrown: no download source takes the input, or the one that does lacks what its
+ * cause names.
+ */
+private fun unsupportedReason(error: KetchError.Unsupported): String {
+  val cause = error.cause
+  return when {
+    cause is NoDownloadSourceException -> "No download source handles this URL"
+    cause?.message.isNullOrBlank() -> "Not supported"
+    else -> "Not supported: ${cause?.message}"
+  }
 }

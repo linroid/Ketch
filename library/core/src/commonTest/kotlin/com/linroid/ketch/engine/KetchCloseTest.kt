@@ -18,9 +18,12 @@ import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -128,8 +131,9 @@ class KetchCloseTest {
       assertEquals(source.encodeState(GoodbyeSource.STOPPED_AT), record?.sourceState)
       assertEquals(TaskState.DOWNLOADING, record?.state)
       assertEquals(PauseReason.Shutdown, assertIs<DownloadState.Paused>(task.state.value).reason)
+      // The source heard Ketch closing before its download was cancelled.
       assertEquals(
-        listOf("checkpoint, HTTP open", "stop, HTTP open", "close"),
+        listOf("stopping, download running", "checkpoint, HTTP open", "stop, HTTP open", "close"),
         source.events,
       )
       assertTrue(http.closed)
@@ -165,6 +169,7 @@ class KetchCloseTest {
   private class GoodbyeSource(private val http: FakeHttpEngine) : DownloadSource<Int> {
     val events = mutableListOf<String>()
     private var checkpoint = 0
+    private var downloading: Job? = null
     override val stateSerializer = Int.serializer()
     override val type = "goodbye"
     override fun canHandle(input: ResolveInput): Boolean {
@@ -179,6 +184,7 @@ class KetchCloseTest {
       )
     }
     override suspend fun download(context: DownloadContext, state: Int?) {
+      downloading = currentCoroutineContext().job
       context.fileAccessor.writeAt(0, byteArrayOf(1, 2, 3, 4))
       context.segments.value = listOf(Segment(0, 0, 7, 4))
       context.onProgress(4, 8)
@@ -194,6 +200,10 @@ class KetchCloseTest {
       }
     }
     override suspend fun store(context: DownloadContext): Int = checkpoint
+    override fun stopping() {
+      val download = if (downloading?.isCancelled == true) "cancelled" else "running"
+      events += "stopping, download $download"
+    }
     override suspend fun stop() {
       delay(50)
       events += "stop, ${http.state()}"

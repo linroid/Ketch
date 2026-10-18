@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.v2
 
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
+import com.linroid.ketch.torrent.metainfo.MAX_PIECE_LENGTH
 import com.linroid.ketch.torrent.monotonicClock
 import com.linroid.ketch.torrent.peer.PeerExchange
 import com.linroid.ketch.torrent.peer.PeerExtensions
@@ -12,9 +13,6 @@ import com.linroid.ketch.torrent.peer.PexIntroductions
 import com.linroid.ketch.torrent.v2.peer.PeerInfo
 import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import kotlinx.coroutines.channels.SendChannel
-
-/** The largest piece a torrent may have, which views without one size their credit for. */
-private const val MAX_PIECE_LENGTH = 16L * 1024 * 1024
 
 /** Session-state charge for one ready peer's loop view on a swarm session. */
 internal const val PEER_VIEW_BYTES = 16 * 1024
