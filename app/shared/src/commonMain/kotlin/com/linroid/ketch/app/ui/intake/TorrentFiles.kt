@@ -95,11 +95,14 @@ internal sealed interface TorrentNode {
  *   (by total size, and by name for Kind).
  * @param selection the chosen files, which the Selected order puts first; a folder counts as
  *   chosen when any of its files is.
+ * @param progress the downloaded share, from 0 to 1, of the files a row stands for, which the
+ *   Progress order follows; `null` when unknown.
  */
 internal class TorrentTree(
   val files: List<SourceFile>,
   sort: FileSort = FileSortSurface.Intake.default,
   selection: Set<String> = emptySet(),
+  private val progress: (fileIds: List<String>) -> Float? = { null },
 ) {
   /** Top-level rows. */
   val roots: List<TorrentNode> = build(
@@ -192,6 +195,7 @@ internal class TorrentTree(
         size = folder.size,
         index = folder.index,
         selected = folder.fileIds.any { it in selection },
+        progress = progress(folder.fileIds),
         folder = true,
       )
     }
@@ -201,6 +205,7 @@ internal class TorrentTree(
         size = node.size,
         index = node.index,
         selected = node.file.id in selection,
+        progress = progress(node.fileIds),
       )
     }
     return sortedFolders + sortedFiles
