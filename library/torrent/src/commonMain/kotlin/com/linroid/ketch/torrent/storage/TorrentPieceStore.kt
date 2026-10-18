@@ -422,7 +422,7 @@ internal class TorrentPieceStore(
    * Whether piece [index], which does not verify and has no owned sidecar that does, lost the
    * bytes of a file outside the selection rather than of a selected one. A deselected file it
    * spans must be gone, cut short or never in place, or have changed since the store last knew
-   * it ([stamps]: another identity, size or modification time) while every selected file it spans
+   * it ([stamps]: another size or modification time) while every selected file it spans
    * is as the store last knew it. Either way the selected files must hold their part of it, and
    * none may have changed since the store last knew it: a piece whose chosen file changed is
    * never set aside, and neither is one where nothing tells which file changed.
@@ -464,8 +464,7 @@ internal class TorrentPieceStore(
   private fun stampOf(file: Int): TorrentFileStamp? {
     val path = filePath(file)
     val info = fileSystem.metadataOrNull(path)?.takeIf { it.isRegularFile } ?: return null
-    return TorrentFileStamp(torrentFileIdentity(path), info.size ?: return null,
-      info.lastModifiedAtMillis ?: return null)
+    return TorrentFileStamp(info.size ?: return null, info.lastModifiedAtMillis ?: return null)
   }
 
   /**

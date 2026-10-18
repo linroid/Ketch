@@ -7,6 +7,7 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.storage.TorrentCheckpoint
+import com.linroid.ketch.torrent.storage.TorrentFileStamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -68,6 +69,26 @@ class TorrentSessionAdmissionTest {
     // The selection may grow while the session runs, so it never lowers the charge.
     assertEquals(sessionStateWeight(all), sessionStateWeight(one))
     assertEquals(sessionStateWeight(all), sessionStateWeight(one.copy(selected = emptySet())))
+  }
+
+  @Test
+  fun sessionStateWeight_fileStamps_costLittlePerFile() {
+    val metadata = TorrentMetadata.fromBencode(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "pack", "piece length" to 1L, "pieces" to ByteArray(0),
+      "files" to List(1000) { mapOf("path" to listOf("f$it"), "length" to 0L) }
+    ))))
+    val output = "/tmp/admission/pack"
+    val bare = TorrentCheckpoint("task", metadata, output, emptySet(), BooleanArray(0),
+      emptyList(), emptyList())
+    // Every file of the checkpoint stamped, as a completed task's are.
+    val stamped = bare.copy(stamps = metadata.files.indices.associateWith {
+      TorrentFileStamp(4_000_000_000, 1_760_000_000_000)
+    })
+    val spec = TorrentTaskSpec("task", metadata, output, emptySet())
+    val added = sessionStateWeight(spec.copy(resumeData = stamped.encode())) -
+      sessionStateWeight(spec.copy(resumeData = bare.encode()))
+    // A fifth of what a stamp with the file's identity, in a dictionary of its own, cost.
+    assertTrue(added <= metadata.files.size * 200L, "stamps added $added bytes")
   }
 
   @Test

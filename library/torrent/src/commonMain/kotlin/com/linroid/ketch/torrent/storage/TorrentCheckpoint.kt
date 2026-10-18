@@ -5,20 +5,17 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.tracker.TrackerConfiguration
+import okio.Buffer
 import okio.Path
 import okio.Path.Companion.toPath
 
 internal data class TorrentOwnedPath(val path: String, val identity: String)
 
 /**
- * A payload file as a store last knew it: its OS [identity] (null where it has none), [size] and
- * modification time. A file whose stamp differs now was replaced, resized or written since.
+ * A payload file as a store last knew it: its [size] and modification time. A file whose stamp
+ * differs now was resized or written since; a change that keeps both cannot be seen.
  */
-internal data class TorrentFileStamp(
-  val identity: String?,
-  val size: Long,
-  val modifiedAtMillis: Long,
-)
+internal data class TorrentFileStamp(val size: Long, val modifiedAtMillis: Long)
 
 /** Versioned Kotlin state. The bitmap is a hint; recovery always rehashes the actual output. */
 internal data class TorrentCheckpoint(
@@ -58,16 +55,19 @@ internal data class TorrentCheckpoint(
     "files" to files.map { mapOf("path" to it.path, "identity" to it.identity) },
     "directories" to directories.map { mapOf("path" to it.path, "identity" to it.identity) },
     // Older builds ignore it, and read a checkpoint without it as knowing no file.
-    "stamps" to stamps.entries.sortedBy { it.key }.map { (file, stamp) ->
-      mapOf("file" to file.toLong(), "size" to stamp.size, "modified" to stamp.modifiedAtMillis) +
-        (stamp.identity?.let { mapOf("identity" to it) } ?: emptyMap())
-    }
+    "file-stamps" to encodeStamps(stamps),
   ) + (trackerConfiguration?.let { mapOf("tracker-tiers" to it.tiers) } ?: emptyMap()) +
     (if (trackerRevision > 0) mapOf("tracker-revision" to trackerRevision) else emptyMap()),
     maxBytes = MAX_BYTES - MAGIC.size).let { MAGIC + it }.also { require(it.size <= MAX_BYTES) }
 
   companion object {
     const val MAX_BYTES = 16 * 1024 * 1024
+
+    /**
+     * Each stamp's share of the checkpoint: the file index, its size and its modification time,
+     * packed, so a torrent of many files adds little to the state its session is admitted with.
+     */
+    const val STAMP_BYTES = 20
     private val MAGIC = "KETCH-TORRENT\n".encodeToByteArray()
     private const val KIND = "ketch-kotlin-torrent"
 
@@ -135,18 +135,9 @@ internal data class TorrentCheckpoint(
           TorrentOwnedPath(path, identity)
         }.also { paths -> require(paths.map { it.path }.distinct().size == paths.size) }
       }
-      val stampList = root["stamps"]?.let { requireNotNull(it.list) }.orEmpty()
-      require(stampList.size <= metadata.files.size)
-      val stamps = stampList.associate {
-        val file = requireNotNull(it["file"]?.integer)
-        require(file in 0 until metadata.files.size.toLong())
-        val size = requireNotNull(it["size"]?.integer)
-        require(size >= 0)
-        val identity = it["identity"]?.let { value -> requireNotNull(value.text()) }
-        require(identity == null || identity.length in 1..512)
-        file.toInt() to TorrentFileStamp(identity, size, requireNotNull(it["modified"]?.integer))
-      }
-      require(stamps.size == stampList.size)
+      val stamps = root["file-stamps"]?.let {
+        decodeStamps(requireNotNull(it.bytes), metadata.files.size)
+      }.orEmpty()
       val receivedBytes = root["received"]?.integer ?: 0L
       val uploadedBytes = root["uploaded"]?.integer ?: 0L
       val discardedBytes = root["discarded"]?.integer ?: 0L
@@ -154,6 +145,31 @@ internal data class TorrentCheckpoint(
       return TorrentCheckpoint(task, metadata, output, selected, verified,
         owned("files"), owned("directories"), receivedBytes, uploadedBytes,
         trackerConfiguration, trackerRevision, discardedBytes, stamps)
+    }
+
+    private fun encodeStamps(stamps: Map<Int, TorrentFileStamp>): ByteArray {
+      val output = Buffer()
+      for ((file, stamp) in stamps.entries.sortedBy { it.key }) {
+        output.writeInt(file).writeLong(stamp.size).writeLong(stamp.modifiedAtMillis)
+      }
+      return output.readByteArray()
+    }
+
+    /** Stamps of files of a torrent of [files], in increasing file order. */
+    private fun decodeStamps(bytes: ByteArray, files: Int): Map<Int, TorrentFileStamp> {
+      require(bytes.size % STAMP_BYTES == 0 && bytes.size / STAMP_BYTES <= files)
+      val input = Buffer().write(bytes)
+      var last = -1
+      return buildMap {
+        while (!input.exhausted()) {
+          val file = input.readInt()
+          require(file in last + 1 until files)
+          last = file
+          val size = input.readLong()
+          require(size >= 0)
+          put(file, TorrentFileStamp(size, input.readLong()))
+        }
+      }
     }
   }
 }

@@ -1041,9 +1041,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   only pieces it shares with deselected files that are gone, cut short, never in place or changed
   since the store last knew them, the selected files whole and unchanged, sets them aside
   (`TorrentPieceStore.setAsideLostPieces`): neither wanted, verified nor offered, and wanted again
-  at the next check or once the selection adds a file. Changed means another identity, size or
-  modification time than the file's `TorrentFileStamp`, taken as the store writes a file and by a
-  check that verifies every wanted piece it holds, and saved in the checkpoint (`stamps`); a piece
+  at the next check or once the selection adds a file. Changed means another size or modification
+  time than the file's `TorrentFileStamp`, taken as the store writes a file and by a check that
+  verifies every wanted piece it holds, and saved in the checkpoint (`file-stamps`, 20 bytes a
+  file, as the session's admission charges its resume data eight times over); a piece
   whose selected file changed, or where no stamp tells which file did, is never set aside. It
   seeds the rest, logs a warning and keeps its intent. Its store (`seedOnly`) sets a piece aside
   the same way while its selection is complete when a peer's request finds it unreadable or

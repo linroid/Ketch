@@ -75,8 +75,7 @@ class TorrentCheckpointTest {
 
   @Test
   fun stamps_roundTripAndOlderCheckpointsKnowNoFile() {
-    val stamps = mapOf(0 to TorrentFileStamp("(dev=1,ino=2)", 3, 1_000),
-      2 to TorrentFileStamp(null, 4, 2_000))
+    val stamps = mapOf(0 to TorrentFileStamp(3, 1_000), 2 to TorrentFileStamp(4, -2_000))
     val checkpoint = TorrentCheckpoint("test", metadata, "/tmp/pack", setOf(0),
       BooleanArray(metadata.pieceHashes.size / 20), emptyList(), emptyList(), stamps = stamps)
     val encoded = checkpoint.encode()
@@ -85,12 +84,12 @@ class TorrentCheckpointTest {
     @Suppress("UNCHECKED_CAST")
     val fields = Bencode.parse(encoded.copyOfRange(prefix.size, encoded.size)).legacyValue()
       as Map<String, Any>
-    val older = prefix + Bencode.encode(fields - "stamps")
+    val older = prefix + Bencode.encode(fields - "file-stamps")
     assertEquals(emptyMap(), assertNotNull(TorrentCheckpoint.decode(older)).stamps)
     // A stamp of a file the torrent does not have is malformed state.
-    val foreign = listOf(mapOf("file" to 9L, "size" to 0L, "modified" to 0L))
+    val foreign = Buffer().writeInt(9).writeLong(0).writeLong(0).readByteArray()
     assertFailsWith<IllegalArgumentException> {
-      TorrentCheckpoint.decode(prefix + Bencode.encode(fields + ("stamps" to foreign)))
+      TorrentCheckpoint.decode(prefix + Bencode.encode(fields + ("file-stamps" to foreign)))
     }
   }
 
