@@ -622,6 +622,22 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun setAside_openPiece_closesItAndCancelsItsRequests() = runTest {
+    val budget = TorrentBufferBudget(piece)
+    val scheduler = scheduler(pieces = 1, budget)
+    scheduler.availability(1, all(1))
+    val requests = scheduler.request(1, max = 4).requests
+    assertEquals(4, requests.size)
+    scheduler.setAside(0)
+    assertEquals(0, budget.allocated)
+    assertEquals(requests, scheduler.poll(1, 0).cancels)
+    assertFalse(scheduler.isWanted(0))
+    assertTrue(scheduler.request(1, max = 4).requests.isEmpty())
+    scheduler.remove(1)
+    assertEquals(0, budget.allocated)
+  }
+
+  @Test
   fun webSeedRuns_andPeersNeverFetchTheSamePieceOutsideTheEndgame() = runTest {
     val budget = TorrentBufferBudget(8 * piece)
     val scheduler = scheduler(pieces = 8, budget)

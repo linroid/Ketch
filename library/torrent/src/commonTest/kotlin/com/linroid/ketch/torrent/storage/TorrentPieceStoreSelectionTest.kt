@@ -280,6 +280,22 @@ class TorrentPieceStoreSelectionTest {
   }
 
   @Test
+  fun revoke_seedOnlyPieceSetAside_saysSoAtEveryRevoke() = runTest {
+    val root = root()
+    try {
+      val store = droppedInPlace(root, seedOnly = true)
+      torrentFileSystem.delete(root / "pack/skip")
+      assertTrue(assertFailsWith<PieceRevokedException> { store.read(0) }.setAside)
+      // Peers that asked for it before are refused the same way, so no swarm wants it again.
+      assertTrue(assertFailsWith<PieceRevokedException> { store.read(0) }.setAside)
+      assertTrue(assertNotNull(store.revoke(0)).setAside)
+      assertTrue(store.completed())
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
   fun revoke_seedOnlyDroppedFileEdited_setsTheSharedPieceAsideAndLeavesIt() = runTest {
     val root = root()
     try {

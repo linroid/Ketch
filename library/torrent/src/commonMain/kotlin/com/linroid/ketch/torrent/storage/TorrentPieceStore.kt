@@ -44,7 +44,8 @@ internal enum class CommitOutcome {
 /**
  * A verified piece that is no longer wanted, or that spans a file outside the selection, could
  * not be read back: the store dropped it, and peers asking for it are refused. [setAside]: a
- * seed-only store set it aside rather than wanting it again ([TorrentPieceStore.seedOnly]).
+ * seed-only store set it aside rather than wanting it again ([TorrentPieceStore.seedOnly]), now
+ * or at an earlier revoke, so the swarm never wants it either.
  */
 internal class PieceRevokedException(val index: Int, val setAside: Boolean = false) :
   IllegalStateException("Torrent piece is no longer stored")
@@ -323,7 +324,8 @@ internal class TorrentPieceStore(
   /**
    * Drops piece [index]. A [seedOnly] store whose selection is complete sets a wanted piece
    * aside instead when a deselected file it spans is what changed ([lostOutsideSelection]):
-   * neither wanted nor verified, so the selection stays complete.
+   * neither wanted nor verified, so the selection stays complete. Every revoke of a piece set
+   * aside says so, as a peer's request queued before the first may revoke it again.
    */
   private fun revokeLocked(index: Int): PieceRevokedException {
     val setsAside = seedOnly && remaining == 0 && wanted[index] &&
@@ -339,7 +341,7 @@ internal class TorrentPieceStore(
     }
     if (verified[index]) unverify(index)
     overlappingFiles(index).forEach(::dropIfVanished)
-    return PieceRevokedException(index, setsAside)
+    return PieceRevokedException(index, setsAside || index in setAside)
   }
 
   /** Clears a verified piece and the progress its in-place spans counted. */

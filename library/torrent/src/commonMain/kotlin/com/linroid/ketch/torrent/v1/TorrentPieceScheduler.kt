@@ -588,8 +588,13 @@ internal class TorrentPieceScheduler(
     }
   }
 
-  /** Forgets a piece the store set aside: neither verified nor wanted, it is never fetched. */
+  /**
+   * Forgets a piece the store set aside: neither verified nor wanted, it is never fetched. An
+   * open piece closes, its requests canceled and its buffer freed, unless a commit holds it,
+   * which the store refuses.
+   */
   suspend fun setAside(index: Int) = mutex.withLock {
+    openPieces[index]?.takeIf { !it.committing }?.let(::close)
     if (verified[index]) verifiedCount-- else countWanted(index, -1)
     track(index) {
       verified[index] = false
