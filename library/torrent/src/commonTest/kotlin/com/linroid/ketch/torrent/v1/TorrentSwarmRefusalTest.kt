@@ -25,6 +25,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -106,6 +107,7 @@ class TorrentSwarmRefusalTest {
     refusalTest(holdsAskedAgain = true) { rig ->
       rig.refusing.await()
       rig.advanceTo(35_000)
+      rig.assertMissing()
       // Every stall published from now on, which the peer's refusal must not leave.
       val reasons = mutableListOf<TorrentStallReason?>()
       val following = launch { rig.stall.collect { reasons += it?.reason } }
@@ -182,18 +184,25 @@ class TorrentSwarmRefusalTest {
     }
 
     /** Checks the swarm stalls for piece 0, missing as the peer refuses it. */
-    fun assertMissing() {
-      val stall = stall.value
+    suspend fun assertMissing() {
+      val stall = settled { it?.reason == TorrentStallReason.MISSING_PIECES }
       assertEquals(TorrentStallReason.MISSING_PIECES, stall?.reason, "Stall: $stall")
       assertEquals(1, stall?.missingPieces)
     }
 
     /** Checks the swarm stalls, but with no piece missing. */
-    fun assertStalledNotMissing() {
-      val stall = assertNotNull(stall.value)
+    suspend fun assertStalledNotMissing() {
+      val stall = assertNotNull(settled { it != null && it.missingPieces == 0 })
       assertNotEquals(TorrentStallReason.MISSING_PIECES, stall.reason, "Stall: $stall")
       assertEquals(0, stall.missingPieces)
     }
+
+    /**
+     * The stall once [check] holds for it, else the last one after [SETTLE_MS]: on a slow machine
+     * the swarm checks itself at the time [advanceTo] set a while after the clock moved.
+     */
+    private suspend fun settled(check: (TorrentStall?) -> Boolean): TorrentStall? =
+      withTimeoutOrNull(SETTLE_MS) { stall.first(check) } ?: stall.value
   }
 
   /**
@@ -370,3 +379,6 @@ class TorrentSwarmRefusalTest {
       PeerMessage.Reject(request.index, request.begin, request.length)
   }
 }
+
+/** How long [TorrentSwarmRefusalTest] waits, in real time, for the swarm to publish a stall. */
+private const val SETTLE_MS = 5_000L
