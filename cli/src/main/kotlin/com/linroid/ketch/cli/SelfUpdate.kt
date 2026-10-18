@@ -2,6 +2,7 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.Release
@@ -154,15 +155,7 @@ private suspend fun install(
   try {
     val archive = File(work, asset.name)
     println("Downloading ${asset.name} (${formatBytes(asset.size)})")
-    val line = ProgressLine.stdout()
-    try {
-      ReleaseDownloader({ KtorHttpEngine() }, logger.above(line)).download(asset, archive) {
-        val pct = (it.percent * 100).toInt()
-        line.show("  $pct%  ${formatBytes(it.downloadedBytes)} / ${formatBytes(asset.size)}")
-      }
-    } finally {
-      line.end()
-    }
+    downloadWithProgress(asset, archive, ProgressLine.stdout(), logger)
     println("Verified the SHA-256 checksum")
     val extracted = File(work, "extracted")
     extractArchive(archive, extracted)
@@ -171,6 +164,30 @@ private suspend fun install(
     println("Release notes: ${release.pageUrl}")
   } finally {
     work.deleteRecursively()
+  }
+}
+
+/**
+ * Downloads [asset] to [archive] with [ReleaseDownloader] over [httpEngine], writing its progress
+ * over [line] and the records of [logger], the downloading engine's, above it. The line ends once
+ * the download does, also when it fails, so what follows, such as why, starts a row of its own.
+ *
+ * @throws UpdateException as [ReleaseDownloader.download] does.
+ */
+internal suspend fun downloadWithProgress(
+  asset: ReleaseAsset,
+  archive: File,
+  line: ProgressLine,
+  logger: Logger,
+  httpEngine: () -> HttpEngine = { KtorHttpEngine() },
+) {
+  try {
+    ReleaseDownloader(httpEngine, logger.above(line)).download(asset, archive) {
+      val pct = (it.percent * 100).toInt()
+      line.show("  $pct%  ${formatBytes(it.downloadedBytes)} / ${formatBytes(asset.size)}")
+    }
+  } finally {
+    line.end()
   }
 }
 
