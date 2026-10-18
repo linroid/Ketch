@@ -1378,9 +1378,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   until the peer rejects them; requests left unanswered for `FAST_REJECT_GRACE_MS` (5 s) are
   canceled. A rejected block is free for any peer at once; unchoked, the peer may ask for it
   again until it has rejected as many blocks of the piece as the piece has, then other peers
-  fetch it (v1's `refused` until the peer unchokes us anew, announces the piece or `REFUSAL_MS`, a
-  minute, passes; the scheduler hears of it, `TorrentPieceScheduler.refusing`, and keeps it past
-  the minute until the peer sends a block of the piece, `probing`; `health` counts a wanted piece
+  fetch it (v1's `refused` until the peer unchokes us anew, announces the piece, sends a block of
+  it or `REFUSAL_MS`, a minute, passes; the scheduler hears of it, `TorrentPieceScheduler.refusing`,
+  and keeps it past the minute until one of the others, `probing`; `health` counts a wanted piece
   every connected holder refuses as missing; v2 and hybrid lift `TorrentV2PeerView.refused` only
   on an unchoke). We reject requests we will not serve
   (choked or uninterested peer, a piece we lack, a

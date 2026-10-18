@@ -38,14 +38,16 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
  * A v1 swarm against a Fast peer (BEP 6) that has every piece but refuses piece 0, rejecting
  * each of its blocks, until it announces the piece again: the swarm leaves the piece to other
  * peers meanwhile, asks the peer again once it announces it or a minute later, and calls a
- * stall for it missing pieces rather than an unknown reason, also while it asks again. Two
- * pieces of four blocks.
+ * stall for it missing pieces rather than an unknown reason, also while it asks again, until the
+ * peer sends a block of it, announces it or unchokes the swarm again. Two pieces of four blocks.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentSwarmRefusalTest {
@@ -60,14 +62,14 @@ class TorrentSwarmRefusalTest {
   @Test
   fun refusedPiece_announcedAgain_isAskedForAgain() = refusalTest { rig ->
     rig.refusing.await()
-    rig.peerAnnounces.complete(Unit)
+    rig.peer { answerWith(Answer.SERVE); announce() }
     rig.swarm.join()
   }
 
   @Test
   fun refusedPiece_isAskedForAgainAMinuteLater() = refusalTest { rig ->
     rig.refusing.await()
-    rig.servesAll.complete(Unit)
+    rig.peer { answerWith(Answer.SERVE) }
     // Asked for nothing while the refusal stands, then for the piece once a minute passed.
     rig.advanceTo(55_000)
     assertTrue(rig.swarm.isActive)
@@ -79,12 +81,25 @@ class TorrentSwarmRefusalTest {
   fun refusedPiece_stallsAsMissing() = refusalTest { rig ->
     rig.refusing.await()
     rig.advanceTo(35_000)
-    val stall = rig.stall.value
-    assertEquals(TorrentStallReason.MISSING_PIECES, stall?.reason, "Stall: $stall")
-    assertEquals(1, stall?.missingPieces)
-    rig.peerAnnounces.complete(Unit)
+    rig.assertMissing()
+    rig.peer { answerWith(Answer.SERVE); announce() }
     rig.swarm.join()
   }
+
+  @Test
+  fun refusedPiece_blockStillOwedArrives_isNoLongerMissing() =
+    refusalTest(holdsFirst = true) { rig ->
+      rig.refusing.await()
+      rig.advanceTo(35_000)
+      rig.assertMissing()
+      // Within the refusal's minute, the peer sends the block it held back, and holds the rest.
+      rig.peer { answerWith(Answer.HOLD); sendHeld() }
+      // Stalled again once 30 s pass without payload.
+      rig.advanceTo(70_000)
+      rig.assertStalledNotMissing()
+      rig.peer { answerWith(Answer.SERVE) }
+      rig.swarm.join()
+    }
 
   @Test
   fun refusedPiece_refusedAgainAMinuteLater_staysMissingThroughout() =
@@ -98,13 +113,45 @@ class TorrentSwarmRefusalTest {
       rig.advanceTo(65_000)
       rig.askedAgain.await()
       rig.advanceTo(70_000)
-      rig.refuseAgain.complete(Unit)
+      rig.peer { answerWith(Answer.REJECT) }
       rig.advanceTo(75_000)
       following.cancelAndJoin()
       assertEquals(listOf(TorrentStallReason.MISSING_PIECES), reasons.distinct(),
         "Stalls: $reasons")
-      assertEquals(1, rig.stall.value?.missingPieces)
-      rig.peerAnnounces.complete(Unit)
+      rig.assertMissing()
+      rig.peer { answerWith(Answer.SERVE); announce() }
+      rig.swarm.join()
+    }
+
+  @Test
+  fun probedPiece_announcedAgain_isNoLongerMissing() =
+    probedPieceTest(checkAt = 75_000) { announce() }
+
+  @Test
+  fun probedPiece_unchokedAgain_isNoLongerMissing() =
+    probedPieceTest(checkAt = 75_000) { unchokeAgain() }
+
+  // A block is payload, so the swarm stalls again only once 30 s pass without more.
+  @Test
+  fun probedPiece_blockArrives_isNoLongerMissing() =
+    probedPieceTest(checkAt = 100_000) { sendHeld() }
+
+  /**
+   * Has the peer hold back the requests for piece 0 the swarm makes once its refusal lapsed, a
+   * minute on, and [lift] the refusal while they wait: the stall at [checkAt] names no missing
+   * piece, as the peer is no longer refusing it. [checkAt] comes before the swarm drops the peer,
+   * 90 s after the last useful payload.
+   */
+  private fun probedPieceTest(checkAt: Long, lift: suspend RefusingPeer.() -> Unit) =
+    refusalTest(holdsAskedAgain = true) { rig ->
+      rig.refusing.await()
+      rig.advanceTo(65_000)
+      rig.askedAgain.await()
+      rig.assertMissing()
+      rig.peer(lift)
+      rig.advanceTo(checkAt)
+      rig.assertStalledNotMissing()
+      rig.peer { answerWith(Answer.SERVE) }
       rig.swarm.join()
     }
 
@@ -113,14 +160,9 @@ class TorrentSwarmRefusalTest {
     val stall: MutableStateFlow<TorrentStall?>,
     /** Completes once the peer rejected piece 0 and the swarm stopped asking for it. */
     val refusing: CompletableDeferred<Unit>,
-    /** Has the peer announce piece 0 (HAVE) and serve it from then on. */
-    val peerAnnounces: CompletableDeferred<Unit>,
-    /** Has the peer serve piece 0 from then on, without saying so. */
-    val servesAll: CompletableDeferred<Unit>,
     /** Completes once the swarm asks for piece 0 again after its refusal, held back by the peer. */
     val askedAgain: CompletableDeferred<Unit>,
-    /** Has the peer reject the requests it held back, and any more for piece 0. */
-    val refuseAgain: CompletableDeferred<Unit>,
+    private val actions: Channel<PeerAction>,
     val swarm: Job,
   ) {
     /** Moves the clock on in 5 s steps, each longer than the swarm's tick, up to [until]. */
@@ -131,14 +173,36 @@ class TorrentSwarmRefusalTest {
       }
       delay(300)
     }
+
+    /** Has the peer run [action] between two messages, and waits until it did. */
+    suspend fun peer(action: suspend RefusingPeer.() -> Unit) {
+      val queued = PeerAction(action)
+      actions.send(queued)
+      queued.done.await()
+    }
+
+    /** Checks the swarm stalls for piece 0, missing as the peer refuses it. */
+    fun assertMissing() {
+      val stall = stall.value
+      assertEquals(TorrentStallReason.MISSING_PIECES, stall?.reason, "Stall: $stall")
+      assertEquals(1, stall?.missingPieces)
+    }
+
+    /** Checks the swarm stalls, but with no piece missing. */
+    fun assertStalledNotMissing() {
+      val stall = assertNotNull(stall.value)
+      assertNotEquals(TorrentStallReason.MISSING_PIECES, stall.reason, "Stall: $stall")
+      assertEquals(0, stall.missingPieces)
+    }
   }
 
   /**
    * Runs a swarm on a test clock against the refusing peer, which [body] drives, and checks the
-   * swarm completes. A peer that [holdsAskedAgain] answers requests for piece 0 that come after
-   * its refusal only once [Rig.refuseAgain] completes.
+   * swarm completes. A peer that [holdsFirst] holds back its first request for piece 0, rejecting
+   * the rest; one that [holdsAskedAgain] holds back those that come after its refusal.
    */
   private fun refusalTest(
+    holdsFirst: Boolean = false,
     holdsAskedAgain: Boolean = false,
     body: suspend CoroutineScope.(Rig) -> Unit,
   ) = runTest {
@@ -155,19 +219,16 @@ class TorrentSwarmRefusalTest {
           peers.send(listener.local)
           peers.close()
           val refusing = CompletableDeferred<Unit>()
-          val peerAnnounces = CompletableDeferred<Unit>()
-          val servesAll = CompletableDeferred<Unit>()
           val askedAgain = CompletableDeferred<Unit>()
-          val refuseAgain = CompletableDeferred<Unit>()
-          if (!holdsAskedAgain) refuseAgain.complete(Unit)
+          val actions = Channel<PeerAction>(Channel.UNLIMITED)
           val peer = launch {
             val connection = listener.accept()
             try {
               val wire = PeerWire(connection, metadata)
               wire.handshake(PeerHandshake(metadata.infoHash, torrentRandomBytes(20), false,
                 false, fast = true))
-              servePiecesButZero(wire, refusing, peerAnnounces, servesAll, askedAgain,
-                refuseAgain)
+              RefusingPeer(wire, holdsFirst, holdsAskedAgain, refusing, askedAgain)
+                .play(actions)
             } catch (_: IOException) {
               // The swarm closes its peers once it is done.
             } catch (e: CancellationException) {
@@ -184,8 +245,7 @@ class TorrentSwarmRefusalTest {
               .run(peers)
           }
           try {
-            body(Rig(clock, stall, refusing, peerAnnounces, servesAll, askedAgain, refuseAgain,
-              swarm))
+            body(Rig(clock, stall, refusing, askedAgain, actions, swarm))
             assertTrue(store.completed())
             assertContentEquals(payload, torrentFileSystem.read(root / "data") { readByteArray() })
             assertEquals(0, budget.allocated)
@@ -200,66 +260,113 @@ class TorrentSwarmRefusalTest {
     }
   }
 
+  /** How the peer answers requests for piece 0. */
+  private enum class Answer { REJECT, HOLD, SERVE }
+
+  /** What a test has the peer do ([Rig.peer]), done once it ran. */
+  private class PeerAction(val body: suspend RefusingPeer.() -> Unit) {
+    val done = CompletableDeferred<Unit>()
+  }
+
   /**
-   * Plays a peer with every piece that serves piece 1 and rejects every request for piece 0 until
-   * [announces] or [servesAll] completes, then serves it too, having sent a HAVE for it on
-   * [announces]. [refusing] completes once the swarm asked for nothing for a while after a
-   * rejection. Requests for piece 0 after that wait for [refuseAgain] to be rejected, and
-   * complete [askedAgain].
+   * Plays a peer with every piece that serves piece 1 and answers requests for piece 0 as
+   * [answer] says, rejecting them at first, between the [PeerAction]s a test sends it.
+   * [refusing] completes once the swarm asked for nothing for a while after a rejection;
+   * [askedAgain] once it asks for piece 0 again after that and the peer holds the request back.
    */
-  private suspend fun CoroutineScope.servePiecesButZero(
-    wire: PeerWire,
-    refusing: CompletableDeferred<Unit>,
-    announces: CompletableDeferred<Unit>,
-    servesAll: CompletableDeferred<Unit>,
-    askedAgain: CompletableDeferred<Unit>,
-    refuseAgain: CompletableDeferred<Unit>,
+  private inner class RefusingPeer(
+    private val wire: PeerWire,
+    private val holdsFirst: Boolean,
+    private val holdsAskedAgain: Boolean,
+    private val refusing: CompletableDeferred<Unit>,
+    private val askedAgain: CompletableDeferred<Unit>,
   ) {
-    val messages = Channel<PeerMessage>(Channel.UNLIMITED)
-    val reader = launch {
+    private var answer = Answer.REJECT
+    /** Requests for piece 0 held back, oldest first. */
+    private val held = ArrayDeque<PeerMessage.Request>()
+    private var heldFirst = false
+    private var rejected = false
+
+    /** Announces piece 0 (HAVE), as a seeder that verified it again does. */
+    suspend fun announce() = wire.send(PeerMessage.Have(0))
+
+    /** Chokes the swarm and unchokes it again at once. */
+    suspend fun unchokeAgain() = wire.sendAll(listOf(
+      PeerMessage.Control(PeerMessage.Signal.CHOKE),
+      PeerMessage.Control(PeerMessage.Signal.UNCHOKE)
+    ))
+
+    /** Sends the block of the oldest request held back. */
+    suspend fun sendHeld() = wire.send(block(held.removeFirst()))
+
+    /** Answers the requests held back, and those for piece 0 from now on, as [how] says. */
+    suspend fun answerWith(how: Answer) {
+      answer = how
+      if (how == Answer.HOLD) return
+      wire.sendAll(held.map { if (how == Answer.SERVE) block(it) else reject(it) })
+      held.clear()
+    }
+
+    suspend fun play(actions: Channel<PeerAction>) = coroutineScope {
+      val messages = Channel<PeerMessage>(Channel.UNLIMITED)
+      val reader = launch {
+        try {
+          while (true) messages.send(wire.read())
+        } catch (e: IOException) {
+          messages.close(e)
+        }
+      }
       try {
-        while (true) messages.send(wire.read())
-      } catch (e: IOException) {
-        messages.close(e)
-      }
-    }
-    try {
-      wire.send(PeerMessage.HaveAll)
-      wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
-      var rejected = false
-      val held = mutableListOf<PeerMessage.Reject>()
-      while (true) {
-        if (announces.isCompleted && !servesAll.isCompleted) {
-          wire.send(PeerMessage.Have(0))
-          servesAll.complete(Unit)
-        }
-        if (refuseAgain.isCompleted && held.isNotEmpty()) {
-          wire.sendAll(held)
-          held.clear()
-        }
-        val message = withTimeoutOrNull(300) { messages.receive() }
-        if (message == null) {
-          if (rejected) refusing.complete(Unit)
-          continue
-        }
-        if (message !is PeerMessage.Request) continue
-        if (message.index == 0 && !servesAll.isCompleted) {
-          val reject = PeerMessage.Reject(message.index, message.begin, message.length)
-          if (refusing.isCompleted && !refuseAgain.isCompleted) {
-            held += reject
-            askedAgain.complete(Unit)
-          } else {
-            wire.send(reject)
-            rejected = true
+        wire.send(PeerMessage.HaveAll)
+        wire.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+        while (true) {
+          while (true) {
+            val action = actions.tryReceive().getOrNull() ?: break
+            action.body(this@RefusingPeer)
+            action.done.complete(Unit)
           }
-        } else {
-          val start = message.index * pieceLength + message.begin
-          wire.send(PeerMessage.Piece(message.index, message.begin,
-            payload.copyOfRange(start, start + message.length)))
+          val message = withTimeoutOrNull(300) { messages.receive() }
+          if (message == null) {
+            if (rejected && refusing.complete(Unit) && holdsAskedAgain) answer = Answer.HOLD
+            continue
+          }
+          if (message is PeerMessage.Request) receive(message)
         }
+      } finally {
+        reader.cancel()
       }
-    } finally {
-      reader.cancel()
     }
+
+    private suspend fun receive(request: PeerMessage.Request) {
+      if (request.index != 0) {
+        wire.send(block(request))
+        return
+      }
+      if (holdsFirst && !heldFirst) {
+        heldFirst = true
+        held += request
+        return
+      }
+      when (answer) {
+        Answer.REJECT -> {
+          wire.send(reject(request))
+          rejected = true
+        }
+        Answer.HOLD -> {
+          held += request
+          if (refusing.isCompleted) askedAgain.complete(Unit)
+        }
+        Answer.SERVE -> wire.send(block(request))
+      }
+    }
+
+    private fun block(request: PeerMessage.Request): PeerMessage.Piece {
+      val start = request.index * pieceLength + request.begin
+      return PeerMessage.Piece(request.index, request.begin,
+        payload.copyOfRange(start, start + request.length))
+    }
+
+    private fun reject(request: PeerMessage.Request) =
+      PeerMessage.Reject(request.index, request.begin, request.length)
   }
 }

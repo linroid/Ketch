@@ -898,9 +898,9 @@ internal class TorrentSwarm(
     private var allowedFast: Set<Int> = emptySet()
     /**
      * Pieces the peer rejected though it has them, and when, on [nowMs]: fetched elsewhere until
-     * it unchokes us anew, announces the piece again, as a seeder that verified it again does, or
-     * [REFUSAL_MS] pass and it is asked again ([probing]). The scheduler hears of each change
-     * ([reportRefusals]).
+     * it unchokes us anew, announces the piece again, as a seeder that verified it again does,
+     * sends a block of it, answering a request it still owed, or [REFUSAL_MS] pass and it is asked
+     * again ([probing]). The scheduler hears of each change ([reportRefusals]).
      */
     private val refused = mutableMapOf<Int, Long>()
     /**
@@ -1277,7 +1277,9 @@ internal class TorrentSwarm(
     private suspend fun receiveBlock(message: PeerMessage.Piece) {
       lastBlock = TimeSource.Monotonic.markNow()
       // A piece it refused before that it sends now is one it serves.
-      if (probing.isNotEmpty() && probing.remove(message.index)) reportRefusals()
+      val lifted = refused.isNotEmpty() && refused.remove(message.index) != null
+      val probed = probing.isNotEmpty() && probing.remove(message.index)
+      if (lifted || probed) reportRefusals()
       rateBytes += message.bytes.size
       when (val arrival = scheduler.received(id, message.index, message.begin, message.bytes)) {
         // Another copy came first, or the piece is done: the peer did nothing wrong.
