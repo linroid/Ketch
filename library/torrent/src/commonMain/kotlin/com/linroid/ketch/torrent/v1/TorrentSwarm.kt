@@ -899,9 +899,16 @@ internal class TorrentSwarm(
     /**
      * Pieces the peer rejected though it has them, and when, on [nowMs]: fetched elsewhere until
      * it unchokes us anew, announces the piece again, as a seeder that verified it again does, or
-     * [REFUSAL_MS] pass. The scheduler hears of each change ([TorrentPieceScheduler.refusing]).
+     * [REFUSAL_MS] pass and it is asked again ([probing]). The scheduler hears of each change
+     * ([reportRefusals]).
      */
     private val refused = mutableMapOf<Int, Long>()
+    /**
+     * Pieces whose refusal lapsed ([expireRefusals]), which the peer is asked for again: still
+     * refused to the scheduler until the peer sends a block of one, announces it or unchokes us
+     * anew, so a stall keeps naming them while the peer takes its time to reject them again.
+     */
+    private val probing = mutableSetOf<Int>()
     /** Rejects of each piece's blocks while unchoked; as many as the piece has refuse it. */
     private val rejects = mutableMapOf<Int, Int>()
     /** Requests to keep outstanding: about [QUEUE_TIME_MS] of the peer's rate ([measureRate]). */
@@ -1142,9 +1149,8 @@ internal class TorrentSwarm(
           scheduler.announce(id, message.index)
           // A piece announced again, as a seeder that verified it again does, is asked for again.
           if (rejects.isNotEmpty()) rejects.remove(message.index)
-          if (refused.isNotEmpty() && refused.remove(message.index) != null) {
-            scheduler.refusing(id, refused.keys)
-          }
+          val lifted = refused.isNotEmpty() && refused.remove(message.index) != null
+          if (probing.remove(message.index) || lifted) reportRefusals()
         }
         is PeerMessage.Control -> when (message.signal) {
           PeerMessage.Signal.CHOKE -> if (fast) {
@@ -1159,9 +1165,10 @@ internal class TorrentSwarm(
             scheduler.releasePeer(id)
           }
           PeerMessage.Signal.UNCHOKE -> {
-            if (refused.isNotEmpty()) {
+            if (refused.isNotEmpty() || probing.isNotEmpty()) {
               refused.clear()
-              scheduler.refusing(id, emptySet())
+              probing.clear()
+              reportRefusals()
             }
             rejects.clear()
             // Its rate is measured from now on: the time it choked us says nothing of it.
@@ -1237,18 +1244,28 @@ internal class TorrentSwarm(
       log.v { "Peer $endpoint of $logLabel keeps rejecting piece ${message.index}" }
       rejects.remove(message.index)
       refused[message.index] = nowMs()
-      scheduler.refusing(id, refused.keys)
+      // One it was asked for again stays refused to the scheduler.
+      if (!probing.remove(message.index)) reportRefusals()
     }
 
     /**
      * Asks the peer again for pieces it refused [REFUSAL_MS] ago: one that keeps us unchoked may
-     * never say it would send them now.
+     * never say it would send them now. The scheduler keeps them refused meanwhile ([probing]).
      */
-    private suspend fun expireRefusals() {
+    private fun expireRefusals() {
       if (refused.isEmpty()) return
       val now = nowMs()
-      if (refused.values.removeAll { now - it >= REFUSAL_MS }) scheduler.refusing(id, refused.keys)
+      val lapsed = refused.entries.iterator()
+      while (lapsed.hasNext()) {
+        val (index, at) = lapsed.next()
+        if (now - at < REFUSAL_MS) continue
+        lapsed.remove()
+        probing += index
+      }
     }
+
+    /** Tells the scheduler which pieces the peer refuses: [refused] and [probing] ones. */
+    private suspend fun reportRefusals() = scheduler.refusing(id, refused.keys + probing)
 
     /** Cancels [requests] on the wire, handing their blocks back when [release]. */
     private suspend fun cancel(requests: List<PeerMessage.Request>, release: Boolean) {
@@ -1259,6 +1276,8 @@ internal class TorrentSwarm(
 
     private suspend fun receiveBlock(message: PeerMessage.Piece) {
       lastBlock = TimeSource.Monotonic.markNow()
+      // A piece it refused before that it sends now is one it serves.
+      if (probing.isNotEmpty() && probing.remove(message.index)) reportRefusals()
       rateBytes += message.bytes.size
       when (val arrival = scheduler.received(id, message.index, message.begin, message.bytes)) {
         // Another copy came first, or the piece is done: the peer did nothing wrong.

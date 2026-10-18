@@ -1367,8 +1367,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   canceled. A rejected block is free for any peer at once; unchoked, the peer may ask for it
   again until it has rejected as many blocks of the piece as the piece has, then other peers
   fetch it (`refused` until the peer unchokes us anew, announces the piece or `REFUSAL_MS`, a
-  minute, passes; the scheduler hears of it, `TorrentPieceScheduler.refusing`, and `health` counts
-  a wanted piece every connected holder refuses as missing). We reject requests we will not serve
+  minute, passes; the scheduler hears of it, `TorrentPieceScheduler.refusing`, and keeps it past
+  the minute until the peer sends a block of the piece, `probing`; `health` counts a wanted piece
+  every connected holder refuses as missing). We reject requests we will not serve
   (choked or uninterested peer, a piece we lack, a
   full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
   (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.

@@ -872,8 +872,9 @@ says why, in the most telling order:
 
 - **Missing pieces**: wanted pieces that no connected peer or running web seed has and every web
   seed that stopped could not serve, as it may serve the rest once started again, and the files they
-  belong to; with nothing connected and no such seed, none. A v1 piece every connected peer that
-  has it rejected is missing too. A web seed started again counts as it
+  belong to; with nothing connected and no such seed, none. In a v1 torrent, a piece every
+  connected peer that has it refused is missing too, until one of them sends some of it, announces
+  it again or unchokes Ketch again. A web seed started again counts as it
   did while stopped until it answers, by sending data or by serving or refusing a piece, as it
   offers every piece meanwhile: a mirror retried for minutes hides no more than it did while
   stopped, and a peer that has the missing pieces clears them at once while one that lacks them does
