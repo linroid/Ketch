@@ -444,10 +444,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   uses too; `updater` verifies
   release assets through `DownloadRequest.checksum`
 - Only `cancel()` and `remove(deleteFiles = true)` delete a partial file (the coordinator tells the
-  execution); a pause, a failure, `close()` or `remove(deleteFiles = false)` keeps it and its
-  segments, flushed by the run itself before it closes the file (never by the pause, which would
-  race the close), but a failed final flush resets their progress. For files the engine writes (not torrents), an empty
-  segment list is no progress: it is never saved, and resuming one starts from zero
+  execution; a canceled torrent keeps its files and sidecar until the task is removed, which deletes
+  the files only with `deleteFiles`); a pause, a failure, `close()` or `remove(deleteFiles = false)`
+  keeps it and its segments, flushed by the run itself before it closes the file (never by the
+  pause, which would race the close), but a failed final flush resets their progress. For files the
+  engine writes (not torrents), an empty segment list is no progress: it is never saved, and
+  resuming one starts from zero
 - `DownloadState.Completed` reports the size and the download time, summed over every run and
   excluding time scheduled, queued or paused (`TaskRecord.downloadTime`, unknown for older records),
   and `completedAt`, stamped in whole milliseconds each time the task completes (a selection
@@ -790,8 +792,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `UnsupportedOperationException`; `RemoteDownloadTask` sends `PUT /api/tasks/{id}/files`). Ketch
   validates it with `DownloadSource.planSelection` against metadata the source holds, never
   client sizes (the torrent source names unknown IDs with core's `@InternalKetchApi`
-  `unknownFilesMessage`, as Ketch does), fitting a running download's latest segments (else the saved ones), saves it
-  (selection, total, segments and `TaskControl.selectionGeneration` in one record write; the
+  `unknownFilesMessage`, as Ketch does), fitting a running download's latest segments (else the
+  saved ones), saves it (selection, total, segments and `TaskControl.selectionGeneration` in one record write; the
   task shows the plan first, so its new request never comes with the old selection's size: a
   running task the plan's progress, dropping its transfer's reports until the selection is
   delivered, a paused one (waiting for files too) the saved segments' progress and a completed

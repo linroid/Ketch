@@ -939,6 +939,10 @@ durable `TaskStore` (such as `SqliteTaskStore`) to keep tasks across restarts.
   keeps the downloaded files, and so does `ketch <url>` once its download ends. It is published with a hard link, or, on
   file systems without them (FAT, exFAT and some network shares), by claiming its name with an
   empty file and moving the written log over it, so an existing log is never replaced.
+- Canceling a torrent stops it and deletes nothing, unlike the partial file of an HTTP, FTP, HLS
+  or DASH download: its files and its hidden `.ketch-` files stay on disk until the task is
+  removed. Removing it with its files (`remove(deleteFiles = true)`) deletes the files it created
+  and the hidden ones; removing it without them deletes only the hidden ones.
 - Payload I/O opens files through their parent folder without following symlinks. Do not let an
   untrusted process change the destination during cleanup: checking a file and deleting it are not
   one atomic operation. A crash between creating a file and recording it may leave a file no task

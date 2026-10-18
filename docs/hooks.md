@@ -105,7 +105,7 @@ that is not a positive number counts as 30.
 | `started` | A download starts transferring: after it is added, resumed or restored, or retried after it failed. Pausing and resuming starts it again. |
 | `completed` | A download finishes, once per completion. A torrent that gains files and finishes again completes again. |
 | `failed` | A download stops with an error. |
-| `canceled` | A download is canceled, which deletes its partial file. |
+| `canceled` | A download is canceled, which deletes its partial file (a torrent keeps its files until it is removed). |
 | `removed` | A download is removed from the list. |
 
 ### Filters
