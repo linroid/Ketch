@@ -478,7 +478,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   then stops the engine, whose remaining sessions get what is left of the window. A session's
   `stopped` announces run detached in the engine (`KotlinTorrentEngine.sayGoodbye`, within
   2 s, from a snapshot of its pieces and counters), so canceling, pausing or removing a task
-  never waits on its trackers; the engine's stop waits for them within the window. Ketch
+  never waits on its trackers, while the next announces that start the same topic wait for them
+  (`awaitGoodbyes`), so a task resumed or retried at once never reaches a tracker before its
+  `stopped`; the engine's stop waits for them within the window. Ketch
   closes dispatchers it was given only once every cancelled coroutine has finished, never under
   them, and never `KetchDispatchers.Default`, whose `close()` does nothing.
   `KetchApi.shutdown(timeout)` (5 s by default; `close()` for other implementations) does the

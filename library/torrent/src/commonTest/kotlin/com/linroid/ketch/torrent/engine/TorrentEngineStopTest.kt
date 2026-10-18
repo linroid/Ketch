@@ -84,6 +84,97 @@ class TorrentEngineStopTest {
       requests.value.count { it.startsWith(tracker) && "event=stopped" in it }
   }
 
+  /**
+   * A tracker that takes [busy] to apply a `stopped` announce, as loaded ones do, recording each
+   * announce's event as it arrives (`none` for a regular one) and `stopped applied` once it is.
+   */
+  private class BusyTracker(private val busy: Duration) : HttpEngine {
+    val events = MutableStateFlow<List<String>>(emptyList())
+
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+      error("Unused")
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) {
+      if ("/announce" in url) {
+        val event = url.substringAfter("&event=", "").substringBefore('&').ifEmpty { "none" }
+        events.update { it + event }
+        if (event == "stopped") {
+          delay(busy)
+          events.update { it + "stopped applied" }
+        }
+      }
+      onData(Bencode.encode(mapOf("interval" to 3600L, "peers" to ByteArray(0))))
+    }
+
+    override fun close() = Unit
+
+    /**
+     * Waits for the torrent to start again after its first `stopped`, and tells whether this
+     * tracker had applied that `stopped` by then.
+     */
+    suspend fun restartedOnceStoppedApplied(): Boolean {
+      val heard = events.first { heard ->
+        val stopped = heard.indexOf("stopped")
+        stopped >= 0 && "started" in heard.subList(stopped, heard.size)
+      }
+      val stopped = heard.indexOf("stopped")
+      val restarted = stopped + heard.subList(stopped, heard.size).indexOf("started")
+      return heard.indexOf("stopped applied") in stopped..<restarted
+    }
+  }
+
+  /**
+   * Pauses and resumes a torrent [add] adds at once, once its tracker heard it start, and checks
+   * that both returned at once, and that the tracker applied its `stopped` before it heard it
+   * start again.
+   */
+  private fun pauseAndResume_startsAgainOnceStoppedIsApplied(
+    add: suspend (KotlinTorrentEngine, String, Path) -> TorrentSession,
+  ) = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(20_000) {
+        val tracker = BusyTracker(1.seconds)
+        val root = root()
+        val engine = KotlinTorrentEngine(TorrentConfig(dhtEnabled = false),
+          http = TorrentHttp(tracker))
+        try {
+          engine.start()
+          val session = add(engine, "http://busy/announce", root)
+          tracker.events.first { "started" in it }
+          val stopping = TimeSource.Monotonic.markNow()
+          session.pause()
+          session.resume()
+          val took = stopping.elapsedNow()
+          assertTrue(took < 1.seconds, "Pausing and resuming took $took")
+          assertTrue(tracker.restartedOnceStoppedApplied(), "Heard ${tracker.events.value}")
+        } finally {
+          engine.stop()
+          FileSystem.SYSTEM.deleteRecursively(root, mustExist = false)
+        }
+      }
+    }
+  }
+
+  @Test
+  fun pauseAndResume_v1_startsAgainOnceTheTrackerAppliedStopped() =
+    pauseAndResume_startsAgainOnceStoppedIsApplied { engine, tracker, root ->
+      engine.addV1(0, tracker, root)
+    }
+
+  @Test
+  fun pauseAndResume_v2_startsAgainOnceTheTrackerAppliedStopped() =
+    pauseAndResume_startsAgainOnceStoppedIsApplied { engine, tracker, root ->
+      val fixture = TorrentV2Fixture.build(listOf("a" to 5))
+      engine.addV2Task(TorrentV2TaskSpec("busy-v2", fixture.document, (root / "v2").toString(),
+        trackerTiers = listOf(listOf(tracker)), privacy = TorrentDiscoveryPrivacy.PUBLIC))
+        .also { it.resume() }
+    }
+
   /** A new folder: a v2 owner's output must be in one that exists. */
   private fun root(): Path = (FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
     "ketch-engine-stop-${InfoHash.fromBytes(torrentRandomBytes(20)).hex}")

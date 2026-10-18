@@ -115,6 +115,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
@@ -133,6 +134,7 @@ import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.concurrent.atomics.update
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
@@ -231,6 +233,8 @@ internal class KotlinTorrentEngine(
   private val shutdown = AtomicReference<Deferred<Unit>?>(null)
   /** The `stopped` announces of torrents that stopped ([sayGoodbye]). */
   private val goodbyes = SupervisorJob(checkNotNull(scope.coroutineContext[Job]))
+  /** Those of [goodbyes] still on their way, by the topic they stop. */
+  private val farewells = AtomicReference(emptyMap<TrackerTopic, Set<Job>>())
   /** Sockets to the local router, outside the peer budget and encryption. */
   private val directNetwork = rawNetwork
   private var portMapper: TorrentPortMapper? = null
@@ -630,11 +634,35 @@ internal class KotlinTorrentEngine(
    * [stoppedAnnounceTime] from now, rather than hold up what stopped it: a task canceled, paused
    * or removed stops at once, whatever its trackers. Callers read what the announces report
    * first, as the torrent's files may be gone by then. [stopRuntime] waits for them within the
-   * stopped window.
+   * stopped window, and the next announces of [topics] that start the torrent again wait for
+   * them first ([awaitGoodbyes]).
    */
-  private fun sayGoodbye(announce: suspend () -> Unit) {
+  private fun sayGoodbye(topics: Collection<TrackerTopic>, announce: suspend () -> Unit) {
     val time = stoppedAnnounceTime()
-    scope.launch(goodbyes) { withTimeoutOrNull(time) { announce() } }
+    val goodbye = scope.launch(goodbyes, start = CoroutineStart.LAZY) {
+      withTimeoutOrNull(time) { announce() }
+    }
+    farewells.update { current ->
+      current + topics.associateWith { current[it].orEmpty() + goodbye }
+    }
+    goodbye.invokeOnCompletion {
+      farewells.update { current ->
+        val left = topics.associateWith { current[it].orEmpty() - goodbye }
+        current - topics + left.filterValues { it.isNotEmpty() }
+      }
+    }
+    goodbye.start()
+  }
+
+  /**
+   * Waits for the `stopped` announces of [topics] still on their way ([sayGoodbye]), which end
+   * within the stopped window, so trackers hear a torrent stop before it starts again: a task
+   * paused and resumed, or retried, at once. Trackers that apply announces out of order would
+   * otherwise drop us from the swarm until our next regular announce.
+   */
+  private suspend fun awaitGoodbyes(topics: Collection<TrackerTopic>) {
+    val pending = farewells.load().filterKeys { it in topics }.values.flatten().distinct()
+    if (pending.isNotEmpty()) withTimeoutOrNull(STOPPED_ANNOUNCE_TIME) { pending.joinAll() }
   }
 
   /** The key [lookupPeers] keeps a swarm's peers under: its wire tag. */
@@ -1231,6 +1259,7 @@ internal class KotlinTorrentEngine(
       // BEP 27: both hashes of a private hybrid use one tracker at a time, and move together.
       val group = PrivateTrackerGroup(topics, PrivateTrackerGroup.order(tiers),
         { topic, url -> discovery(topic, listOf(listOf(url))) {} }, sink::reset)
+      awaitGoodbyes(topics)
       try {
         while (isActive) {
           attempt {
@@ -1241,13 +1270,14 @@ internal class KotlinTorrentEngine(
         }
       } finally {
         val last = withContext(NonCancellable) { attempt { announceState() } }
-        if (last != null) sayGoodbye {
+        if (last != null) sayGoodbye(topics) {
           attempt { group.stop(last.verified, last.received, last.uploaded) }
         }
       }
     } else if (tiers.isNotEmpty()) for (topic in topics) launch {
       val discovery = discovery(topic, tiers, sink::reset)
       var reannounced = sink.reannounceRequests()
+      awaitGoodbyes(listOf(topic))
       try {
         while (isActive) {
           // A stalled transfer asks for peers now, sooner than the trackers said (as soon as
@@ -1262,7 +1292,7 @@ internal class KotlinTorrentEngine(
         }
       } finally {
         val last = withContext(NonCancellable) { attempt { announceState() } }
-        if (last != null) sayGoodbye {
+        if (last != null) sayGoodbye(listOf(topic)) {
           attempt { last.poll(discovery) }
           attempt { last.poll(discovery, stopped = true) }
         }
@@ -1340,6 +1370,7 @@ internal class KotlinTorrentEngine(
         nowMs = nowMs,
         announceCompletion = session::selectsAllFiles,
       )
+      awaitGoodbyes(listOf(discovery.topic))
       discovery.observeStatus(session::updateTrackerStatus)
       try {
         TrackerControl.run(trackerState, operation = { manual ->
@@ -1371,7 +1402,7 @@ internal class KotlinTorrentEngine(
         val complete = session.state.value == TorrentSessionState.FINISHED ||
           session.state.value == TorrentSessionState.SEEDING
         val last = withContext(NonCancellable) { attempt { announceState(session) } }
-        if (last != null) sayGoodbye {
+        if (last != null) sayGoodbye(listOf(discovery.topic)) {
           if (complete) attempt { last.poll(discovery) }
           attempt { last.poll(discovery, stopped = true) }
         }
@@ -1812,6 +1843,8 @@ internal class KotlinTorrentEngine(
     state: suspend () -> AnnounceState,
     publish: suspend (TrackerDiscovery, List<PeerEndpoint>) -> Unit,
   ) {
+    val topics = discoveries.map { it.topic }
+    awaitGoodbyes(topics)
     try {
       while (currentCoroutineContext().isActive) {
         for (discovery in discoveries) {
@@ -1821,7 +1854,7 @@ internal class KotlinTorrentEngine(
       }
     } finally {
       val last = withContext(NonCancellable) { attempt { state() } }
-      if (last != null) sayGoodbye {
+      if (last != null) sayGoodbye(topics) {
         for (discovery in discoveries) attempt { last.poll(discovery, stopped = true) }
       }
     }
