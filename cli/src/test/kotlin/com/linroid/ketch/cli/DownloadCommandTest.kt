@@ -1,11 +1,18 @@
 package com.linroid.ketch.cli
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.Interest
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchStatus
+import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
@@ -14,14 +21,27 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.torrent.TorrentConfig
+import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentStallReason
 import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
@@ -36,6 +56,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class DownloadCommandTest {
@@ -243,6 +264,59 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun torrentStalls_torrentTask_followsItsSnapshotsUntilItIsGone() {
+    val stall = TorrentStall(TorrentStallReason.CHOKED, seconds = 40, peers = 3)
+    val ketch = TorrentKetch(flowOf(snapshot(stall), snapshot(stall = null), null))
+
+    val stalls = runBlocking { withTimeout(10.seconds) { torrentStalls(ketch, "t1").toList() } }
+
+    assertEquals(listOf(stall, null, null), stalls)
+    assertEquals(listOf<Interest<*>>(TorrentInterest("t1")), ketch.interests)
+  }
+
+  @Test
+  fun torrentStalls_subscriptionRefused_endsWithoutAStall() {
+    val ketch = TorrentKetch(flow {
+      throw TorrentCommandException(
+        TorrentCommandError.RESOURCE_EXHAUSTED,
+        "Too many torrent subscriptions",
+      )
+    })
+
+    val stalls = runBlocking { withTimeout(10.seconds) { torrentStalls(ketch, "t1").toList() } }
+
+    assertEquals(emptyList(), stalls)
+  }
+
+  @Test
+  fun torrentStalls_httpTaskBesideTheTorrentSource_endsAtOnce() = runBlocking {
+    val torrents = TorrentDownloadSource(
+      config = TorrentConfig(
+        dhtEnabled = false,
+        portMapping = false,
+        localDiscovery = false,
+        stateDirectory = File(folder, "torrent-state").path,
+      ),
+      restoreSeeding = false,
+    )
+    val ketch = Ketch(
+      httpEngine = ServingEngine(byteArrayOf(1, 2, 3)),
+      additionalSources = listOf(torrents),
+    )
+    try {
+      val task = ketch.download(
+        DownloadRequest("https://example.com/a.bin", destination = Destination(folder.path + "/")),
+      )
+
+      val stalls = withTimeout(10.seconds) { torrentStalls(ketch, task.taskId).toList() }
+
+      assertEquals(listOf(null), stalls)
+    } finally {
+      ketch.shutdown()
+    }
+  }
+
+  @Test
   fun quietLogLevel_verboseFlags_keepTheirLevel() {
     assertEquals(LogLevel.WARN, quietLogLevel(LogLevel.INFO))
     assertEquals(LogLevel.DEBUG, quietLogLevel(LogLevel.DEBUG))
@@ -301,7 +375,7 @@ class DownloadCommandTest {
     url: String,
     engine: HttpEngine,
     logger: Logger = Logger.None,
-    stalls: (taskId: String) -> Flow<TorrentStall?> = { emptyFlow() },
+    stalls: ((taskId: String) -> Flow<TorrentStall?>)? = null,
     sources: List<DownloadSource<*>> = emptyList(),
   ): Int = runBlocking {
     val ketch = Ketch(
@@ -311,14 +385,13 @@ class DownloadCommandTest {
       logger = logger,
     )
     try {
+      val request = DownloadRequest(url = url, destination = Destination(folder.path + "/"))
       withTimeout(10.seconds) {
-        downloadUntilDone(
-          ketch = ketch,
-          request = DownloadRequest(url = url, destination = Destination(folder.path + "/")),
-          out = outStream,
-          err = errStream,
-          stalls = stalls,
-        )
+        if (stalls == null) {
+          downloadUntilDone(ketch, request, outStream, errStream)
+        } else {
+          downloadUntilDone(ketch, request, outStream, errStream, stalls)
+        }
       }
     } finally {
       ketch.shutdown()
@@ -344,6 +417,54 @@ class DownloadCommandTest {
       System.setOut(stdout)
       System.setErr(stderr)
     }
+  }
+
+  private fun snapshot(stall: TorrentStall?) = TorrentSnapshot(
+    taskId = "t1",
+    revision = TorrentRevision(epoch = "e", sequence = 1),
+    activity = TorrentActivity.DOWNLOADING,
+    selectionGeneration = 0,
+    selectionComplete = false,
+    stall = stall,
+  )
+
+  /** A backend whose torrent controller reports [snapshots] for every torrent it is asked about. */
+  private class TorrentKetch(private val snapshots: Flow<TorrentSnapshot?>) : KetchApi {
+    /** What [subscribe] was asked to follow. */
+    val interests = mutableListOf<Interest<*>>()
+
+    private val torrents = object : TorrentController {
+      override suspend fun capabilities() = TorrentCapabilities()
+
+      override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+    }
+
+    override val backendLabel = "Fake"
+    override val tasks = MutableStateFlow(emptyList<DownloadTask>())
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> {
+      interests += interest
+      return if (interest is TorrentInterest) snapshots as Flow<T> else emptyFlow()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> controller(key: ControlKey<T>): T? =
+      if (key == TorrentController) torrents as T else null
+
+    override suspend fun download(request: DownloadRequest): DownloadTask =
+      throw UnsupportedOperationException()
+
+    override suspend fun resolve(input: ResolveInput): ResolvedSource =
+      throw UnsupportedOperationException()
+
+    override suspend fun start() = Unit
+
+    override suspend fun status(): KetchStatus = throw UnsupportedOperationException()
+
+    override suspend fun updateConfig(config: DownloadConfig) = Unit
+
+    override fun close() = Unit
   }
 
   /** Fails every request with [error], 404 by default. */
