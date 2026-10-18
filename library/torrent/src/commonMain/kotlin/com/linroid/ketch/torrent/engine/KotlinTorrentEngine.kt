@@ -287,6 +287,8 @@ internal class KotlinTorrentEngine(
   private val lookupPeers = MetadataLookupPeers()
   private val cache = TorrentMetadataCache(scope, config.maxCachedMetadataBytes,
     exchangeBudgets.cache)
+  /** Magnet metadata lookups some caller still waits for; for tests. */
+  internal val pendingMetadataLookups: Int get() = cache.pendingFetches
   private val tracker = TorrentTracker(http, network)
   // One peer ID for every peer, tracker and metadata lookup (BEP 20), as private trackers check.
   private val peerId = TorrentClient.peerId()

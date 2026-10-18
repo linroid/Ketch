@@ -125,6 +125,62 @@ class TorrentMetadataCacheTest {
     assertEquals(1, fetches)
   }
 
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun resolve_lastWaiterLeaves_cancelsTheFetchAndFreesItsPlace() = runTest {
+    val metadata = fixture("a")
+    val cache = TorrentMetadataCache(backgroundScope)
+    var started = 0
+    var stopped = 0
+    val hanging: suspend () -> TorrentMetadata = {
+      started++
+      try { awaitCancellation() } finally { stopped++ }
+    }
+    val first = async { cache.resolve(metadata.infoHash, fetch = hanging) }
+    val second = async { cache.resolve(metadata.infoHash, fetch = hanging) }
+    runCurrent()
+    first.cancelAndJoin()
+    runCurrent()
+    // The other caller still waits for it.
+    assertEquals(0, stopped)
+    second.cancelAndJoin()
+    runCurrent()
+    assertEquals(1, stopped)
+    assertEquals(0, cache.pendingFetches)
+    // A later caller runs a fetch of its own.
+    assertEquals(metadata.infoHash, cache.resolve(metadata.infoHash) { metadata }.infoHash)
+    assertEquals(1, started)
+  }
+
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+  @Test
+  fun resolve_pastTheBound_waitsForAFetchToEnd() = runTest {
+    val cache = TorrentMetadataCache(backgroundScope)
+    val started = mutableListOf<Int>()
+    val stopped = mutableListOf<Int>()
+    val callers = (0..MAX_PENDING_METADATA).map { index ->
+      async {
+        cache.resolve(fixture("m$index").infoHash) {
+          started += index
+          try { awaitCancellation() } finally { stopped += index }
+        }
+      }
+    }
+    runCurrent()
+    // The last one waits rather than failing.
+    assertEquals((0..<MAX_PENDING_METADATA).toList(), started)
+    assertTrue(callers.last().isActive)
+    // Their callers gone, the others stop, and it starts.
+    callers.dropLast(1).forEach { it.cancelAndJoin() }
+    runCurrent()
+    assertEquals((0..<MAX_PENDING_METADATA).toList(), stopped.sorted())
+    assertEquals((0..MAX_PENDING_METADATA).toList(), started)
+    assertEquals(1, cache.pendingFetches)
+    callers.last().cancelAndJoin()
+    runCurrent()
+    assertEquals(0, cache.pendingFetches)
+  }
+
   @Test
   fun evictionReplacementAndCloseReleaseParentReservations() = runTest {
     val first = fixture("a")
