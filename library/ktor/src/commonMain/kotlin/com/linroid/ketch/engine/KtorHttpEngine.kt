@@ -77,7 +77,8 @@ class KtorHttpEngine private constructor(
    * @param client the Ktor HTTP client to use, or `null` for the engine's own clients, with
    *   infinite timeouts (suitable for large downloads)
    * @param logRequests whether request URLs, response headers, and transport errors may be logged,
-   *   and whether the errors it throws name the request that failed, without its URL's query
+   *   and whether its errors for HTTP error statuses and transport failures name the request that
+   *   failed, without its URL's query
    * @param userAgent the `User-Agent` of requests whose headers name none, [DEFAULT_USER_AGENT]
    *   by default; `null` leaves it to [client]
    */
@@ -766,12 +767,15 @@ class KtorHttpEngine private constructor(
 }
 
 /**
- * The request a [KtorHttpEngine] error failed, its cause: [method] and where it went, after
- * redirects, as the scheme, host, port and path of its URL. The engine logs each attempt's failure
- * at debug level only, so through it the failure a caller reports, such as a download that gives
- * up retrying, says where it failed ([describeCauses]). Its user information and query are left
- * out: they may hold credentials [redactUrl] does not know, such as the tokens of a signed link,
- * and callers show the failure to users too, as an update's.
+ * The request an HTTP error status or a transport failure of a [KtorHttpEngine] came from, the
+ * cause of its error: [method] and where it went, after redirects, as the scheme, host, port and
+ * path of its URL. The engine logs each attempt's failure at debug level only, so through it the
+ * failure a caller reports, such as a download that gives up retrying, says where it failed
+ * ([describeCauses]). Its user information and query are left out: they may hold credentials
+ * [redactUrl] does not know, such as the tokens of a signed link, and callers show the failure to
+ * users too, as an update's. The errors the engine raises itself on a response it refuses, such
+ * as one of another range or length or a redirect it will not follow, and after too many
+ * redirects name no request.
  */
 internal class FailedRequest(method: String, url: Url, cause: Throwable? = null) :
   Exception("$method ${url.originAndPath()}", cause)
