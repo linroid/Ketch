@@ -79,7 +79,8 @@ restarts, seeding included: a seeding task saves them about every minute and as 
 
 While a resumed or restarted torrent checks its files, it keeps showing the progress it had, and
 a finished torrent that reopens for files you added shows the new selection from the start. Files
-you check or uncheck during the check change the progress and size shown at once.
+you check or uncheck change the progress and size shown at once, also during the check, which
+starts over with them.
 
 ### Opening `.torrent` files in the apps
 
@@ -120,10 +121,17 @@ What happens next depends on the task's state:
 - **Downloading**: the torrent switches without reconnecting to its peers. Newly chosen files are
   created and downloaded. Files you deselect stop downloading but stay on disk as they are, with
   their verified pieces.
-- **Paused, queued, scheduled or failed**: the new selection applies when the task starts.
+- **Paused, queued, scheduled or failed**: the new selection applies when the task starts. On a
+  paused task, a file you deselected after it last started and choose again shows at once the
+  pieces that run verified; otherwise a file shows its pieces once the task starts and checks
+  its files.
 - **Completed**: adding files downloads them into the same folder (Queued, Downloading, then
   Completed again), taking over the task's seeding if it seeds. Removing files only changes the
-  task's size, and seeding shares the smaller selection from then on.
+  task's size, and seeding shares the smaller selection from then on, also when the task was
+  still checking its files to seed again after a restart: it checks only the files you kept, so
+  one you deleted before removing it no longer keeps the task from seeding. A v2 or hybrid
+  torrent that still has a deleted file selected cannot start seeding again, though; removing
+  that file then lets it seed the next time Ketch restores seeding, such as when it starts again.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
@@ -327,6 +335,10 @@ public magnet can also get its file list from another device at home this way.
 - It works over IPv4 and IPv6. Over IPv6 it only finds devices with a unique local address
   (`fc00::/7`); devices with only a link-local address are heard but cannot be dialed.
 - Devices announce every 5 minutes, so a new one may take that long to be found.
+- VPN tunnels are left out on macOS, Linux and Android, where they are point-to-point links:
+  Ketch announces on each local network interface itself, also when a VPN takes the system's
+  multicast traffic. On Windows, TUN adapters such as Wintun or TAP may not count as
+  point-to-point, so discovery may still use them.
 - Private and tracker-only torrents never take part, and peers found this way are never shared
   with other peers.
 - It runs on desktop and Android. iOS does not support it, as multicast there needs an entitlement
@@ -414,8 +426,10 @@ tracker's staff to allow Ketch if it is refused.
 - Downloads go to ordinary folders. When the default directory is an Android `content://` folder,
   torrents save to the platform's default directory instead. iOS saves inside the app sandbox.
 - Limits: `.torrent` files up to 4 MiB, 10,000 files per torrent (padding files aside) and
-  16 MiB pieces. Many peers or large pieces use more memory. A torrent or magnet keeps its first
-  128 trackers.
+  16 MiB pieces, for v1, v2 and hybrid torrents alike: a torrent with larger pieces is refused,
+  with an error that says so, when it is resolved or previewed, as a link or a file's content, and
+  a link added directly fails as soon as it starts. Many
+  peers or large pieces use more memory. A torrent or magnet keeps its first 128 trackers.
 - Ketch does not create torrents and has no ratio management.
 
 ## For developers
@@ -602,7 +616,13 @@ This section describes the engine's protocol behavior for people who debug swarm
 
 - **Trackers**: HTTP(S) and UDP trackers, with tiers, IPv4 and IPv6, lifecycle events and
   failover. Extra trackers are announced alongside the torrent's own rather than as a later tier.
-  Trackers of other schemes, such as WebTorrent's `wss://`, are skipped.
+  Trackers of other schemes, such as WebTorrent's `wss://`, are skipped. A torrent that stops
+  gives its trackers 2 seconds to hear it. When Ketch shuts down, every torrent shares one such
+  window, from the moment it begins, while the router removes the port mappings: downloading
+  torrents pause and seeding ones stop side by side, each seeder saving its state while it says
+  goodbye and again once it has, so slow trackers and routers hold the shutdown up for about 2
+  seconds and a slow disk still saves before Ketch's host exits. The engine then stops what is
+  left, within what remains of the window.
 - **DHT**: public torrents look up peers in the DHT. With a `stateDirectory`, routing candidates
   are saved, so a restart reaches known nodes even where the bootstrap names do not resolve. Peers
   of public torrents exchange DHT ports (BEP 5 `PORT`), and Ketch pings the nodes they name, so the
@@ -638,7 +658,8 @@ This section describes the engine's protocol behavior for people who debug swarm
   times, over about half an hour, so a peer that restarts is reached again; then it is given up the
   same way. A connection that sent data or stayed up five minutes starts the count over. A tracker,
   the DHT, peer exchange or local discovery naming a peer that sent data again has it dialed 30
-  seconds after its last dial, at most once every five minutes. A stalled download with no peer at
+  seconds after its last dial, at most once every five minutes, also when it names the peer while
+  a dial of it runs and that dial then fails. A stalled download with no peer at
   all dials every peer it knows again every minute, also ones a source named only once, such as a
   magnet's peers. A seeding torrent dials nobody back.
 - **One connection per peer**: a peer reached at two addresses, such as loopback from a magnet's
@@ -681,15 +702,24 @@ directly; it is asked to forward the port the router got to the router's externa
 external port; when another device holds that port, UPnP picks another. Only engines listening on
 every interface map ports.
 
+When Ketch shuts down, the routers get 2 seconds to remove the mappings, also those Ketch was
+still asking for, and the log says once how many of them confirmed it; a router that already lost
+a mapping counts. One that did not confirm may keep forwarding the port until the mapping's lease
+ends, or, when the router only takes permanent UPnP leases, until the router itself drops it.
+
 ### Local discovery details
 
 While a public torrent runs, the engine joins `239.192.152.143:6771` on each interface with a
 private or link-local IPv4 address and `[ff15::efc0:988f]:6771` on each interface with a
-link-local or unique local IPv6 address (not VPN tunnels), on one socket shared with other clients
-(`SO_REUSEADDR`). It sends `BT-SEARCH` announces to both groups with its TCP listen port (never a
+link-local or unique local IPv6 address, leaving out point-to-point links (VPN tunnels) in both
+families, on one socket shared with other clients (`SO_REUSEADDR`). It sends `BT-SEARCH` announces
+to both groups, out of each joined interface in turn, with its TCP listen port (never a
 router-mapped one), a random cookie and up to 20 info hashes, when each torrent starts and every 5
 minutes, at most once a minute per torrent. A v1 torrent announces its info hash, a v2 torrent the
-first 20 bytes of its SHA-256 hash, and a hybrid both.
+first 20 bytes of its SHA-256 hash, and a hybrid both. The shared socket receives every announce
+and sends the IPv6 ones; IPv4 announces leave through a separate IPv4 socket, from an ephemeral
+port rather than 6771, as on macOS the shared socket cannot choose the interface IPv4 multicast
+leaves on.
 
 Announces are accepted only from private (10/8, 172.16/12, 192.168/16, 100.64/10) or link-local
 IPv4 senders and unique local IPv6 senders, with a valid port and at most 20 hashes in 1400 bytes,
@@ -702,8 +732,8 @@ found.
 
 Web seeds (BEP 19: a metainfo's `url-list`, or a magnet's `ws` parameters; `http` and `https` only,
 at most 16) let a torrent download from HTTP mirrors as well as peers, so it completes even with no
-reachable peer. A magnet's metadata still comes from peers. A torrent that only seeds leaves its web
-seeds alone until a selection wants pieces again.
+reachable peer. A magnet's metadata still comes from peers. A torrent that only seeds, or has
+finished downloading, leaves its web seeds alone until a selection wants pieces again.
 
 - A single-file torrent's URL names the file (or, ending in `/`, its folder). A multi-file
   torrent's URL names the folder holding the torrent's folder; each file is fetched from the URL,
@@ -726,7 +756,7 @@ seeds alone until a selection wants pieces again.
   Started again, a seed asks once more for what it could not serve, as its mirror may have fixed
   it by then; a piece it sent corrupt before is given up again after one more corrupt copy. A seed
   that still serves other files is not dropped, so it asks again only when the task is paused and
-  resumed.
+  resumed, or when a finished task's selection grows.
 - Requests go through the source's HTTP engine with the system's proxy settings, count against the
   download limits, fail after 30 seconds without data, and show among the task's live connections
   as `HTTP`.
@@ -769,18 +799,24 @@ answering anything, and a request it never answers is given up after four.
   `maxBufferedBytes` limits the pieces being assembled, not how many peers transfer at once.
 - Each peer is kept about 3 seconds of its own rate in outstanding requests, between 4 and 500,
   within the request queue it announces (BEP 10 `reqq`, 250 when it names none). Until its rate is
-  known, a peer starts at 16 and gets one more request for each block it delivers. Requests run on
-  across piece ends. Ketch announces a queue of 500.
+  known, a peer starts at 16 and gets one more request for each block it delivers. Its rate counts
+  only time it could send: not the time it chokes Ketch without sending anything, allowed-fast
+  blocks included. Requests run on across piece ends. Ketch announces a queue of 500.
 - A peer that chokes, rejects or disconnects gives back the blocks it still owes; the blocks it sent
   stay with their piece. A partial piece nobody fetches gives its buffer up after 10 seconds when
   another piece needs it, and after a minute in any case.
 - A piece that fails its hash check is fetched again. When several peers had sent it, one peer
   fetches it alone next, so a peer that keeps sending bad data is found and disconnected.
 - A block a peer has not delivered within twice the time its queue takes at its rate (4 to 30
-  seconds) is late: a peer with room asks for it too, so a slow peer never holds the download up.
+  seconds) is late, but never before the blocks it was asked for earlier, which it sends first. A
+  peer with room asks for a late block too, so a slow peer never holds the download up.
   Once every wanted piece left is being fetched or is one no connected peer or web seed has, a peer
-  with nothing else to do asks for any block another peer owes. A block has at most two
-  requesters, and the first copy to arrive cancels the other.
+  that owes nothing of its own also asks for blocks other peers owe, those they would send last:
+  about as many as it receives in a second, at least 16, or as many as it keeps outstanding if that
+  is fewer. A block has at most two requesters, and the first copy to arrive cancels the other: a
+  copy of a block far back in a peer's queue arrives before that peer gets to it, so little is
+  downloaded twice. When the first requester gives a block back, the second owes it with the
+  deadline and queue place its own request gave it.
 - Ketch tells a peer it is interested only while the peer has a piece Ketch still wants. Once Ketch
   has every piece, it closes connections to peers that have every piece too.
 
@@ -789,20 +825,35 @@ answering anything, and a request it never answers is given up after four.
 Each download checks itself every second. It has stalled once no payload arrived for 30 seconds,
 or no piece verified for four pieces' worth of time at its rate (between one and ten minutes);
 time spent waiting on a speed limit never counts. Payload thrown away, such as a web seed's piece
-that fails its hash check, is no payload, and payload back after 30 seconds without any gives the
-next piece its full time again once none of it can still be thrown away, but only the first time
-until a piece verifies, so payload that comes and goes does not hide a stall. It then says why, in
-the most telling order:
+that fails its hash check, is no payload. Ketch notes which check counted each byte a web seed
+sends, so the bytes of a piece it throws away are taken back from the checks they arrived in, and
+never another source's payload. What arrives with them, such as the next piece's first bytes,
+still counts. Payload back after 30 seconds without any gives the next piece its full time again
+once some of it is kept (a peer's at once, a web seed's once its piece is stored), but only the
+first time until a piece verifies, so payload that comes and goes does not hide a stall. It then
+says why, in the most telling order:
 
-- **Missing pieces**: wanted pieces that no connected peer or web seed has, and the files they
-  belong to; with nothing connected, the pieces every web seed could not serve, as another one
-  may serve the rest once started again. The download waits for a peer that has them; skipping
-  those files lets the rest finish. A torrent whose files changed at its only web seed stops
-  here, also once that seed was dropped. Pieces missing while a peer was connected stay missing
-  for 10 seconds after the last one leaves, so a peer that reconnects at once does not change the
-  reason.
-- **No peers**: no peer is connected, no web seed is fetching, and no wanted piece is one every
-  web seed could not serve.
+- **Missing pieces**: wanted pieces that no connected peer or running web seed has and every web
+  seed that stopped could not serve, as it may serve the rest once started again, and the files they
+  belong to; with nothing connected and no such seed, none. A web seed started again counts as it
+  did while stopped until it answers, by sending data or by serving or refusing a piece, as it
+  offers every piece meanwhile: a mirror retried for minutes hides no more than it did while
+  stopped, and a peer that has the missing pieces clears them at once while one that lacks them does
+  not. A restarted mirror's first bytes, of any file, clear what it refused before, as it is asked
+  for those pieces again and refuses them anew if it still lacks them. A web seed dropped only for
+  failures that may pass, such as a host that is down or busy, counts as one that may serve every
+  piece it did not refuse until it is started again and dropped again without answering. So a mirror
+  still failing when it is started again (two minutes into the stall, or at the first relaunch after
+  it was dropped; relaunches come 10 minutes apart) counts for nothing once it gives up again, about
+  half a minute later if it fails at once, until a later relaunch finds it answering. Meanwhile
+  Ketch may offer to skip a file that mirror serves once back, while a dead mirror hides missing
+  pieces only until its first restart fails. The download waits for a peer that has them; skipping
+  those files lets the rest finish. A torrent whose files changed at its only web seed stops here,
+  also once that seed was dropped. Pieces missing while a peer was connected stay missing for 10
+  seconds after the last one leaves, so a peer that reconnects at once does not change the reason.
+- **No peers**: no peer is connected, and no wanted piece is missing. A stalled download stores
+  nothing from its web seeds either, so whether they are fetching or waiting to retry never
+  changes the reason.
 - **Choked**: peers are connected, but none of them lets Ketch download yet.
 - **Slow peers**: peers are late with what was asked of them, which other peers are then asked
   for too.

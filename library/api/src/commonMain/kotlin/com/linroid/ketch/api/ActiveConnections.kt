@@ -50,20 +50,21 @@ data class PeerDetails(
 )
 
 /**
- * One live connection of a task, sampled each second. `null` fields are unknown.
+ * One connection of a task, sampled each second while it is open. `null` fields are unknown.
  *
  * @property id unique until the instance restarts
  * @property source the source type, such as `http` or `torrent`
  * @property protocol a display label, such as `HTTP/2` or `BitTorrent`
  * @property secure whether it uses TLS
  * @property host the remote host name or IP (IPv6 without brackets)
- * @property downloadBps bytes per second received, over the last two samples
- * @property uploadBps bytes per second sent, over the last two samples
- * @property downloadedBytes payload bytes received since it opened
- * @property uploadedBytes payload bytes sent since it opened
+ * @property downloadBps bytes per second received, over the last two samples; 0 once closed
+ * @property uploadBps bytes per second sent, over the last two samples; 0 once closed
+ * @property downloadedBytes payload bytes received since it opened, the final count once closed
+ * @property uploadedBytes payload bytes sent since it opened, the final count once closed
  * @property peer torrent peer details
  * @property country the ISO 3166 code of [host]'s country, such as `DE`, from the instance's
  *   [CountryDatabase]; `null` without one, or for reserved and unknown addresses
+ * @property closedAt when it closed, by the instance's clock; `null` while it is open
  */
 @Serializable
 data class ActiveConnection(
@@ -83,6 +84,7 @@ data class ActiveConnection(
   val openedAt: Instant,
   val peer: PeerDetails? = null,
   val country: String? = null,
+  val closedAt: Instant? = null,
 )
 
 /**
@@ -90,6 +92,13 @@ data class ActiveConnection(
  * order they opened. [total], [downloadBps] and [uploadBps] cover them all.
  *
  * @property dropped connections never tracked since the instance started, as too many were open
+ * @property receivedBytes payload bytes received over every connection since the instance
+ *   started, open and closed, listed or not; it never drops. `null` from instances that do not
+ *   count it
+ * @property sentBytes payload bytes sent likewise
+ * @property closed connections that closed lately, newest first, each with its
+ *   [ActiveConnection.closedAt] and final counts: at most the requested limit, of those the
+ *   instance keeps (Ketch keeps the last 256 for 10 minutes). Empty from instances that keep none
  */
 @Serializable
 data class ActiveConnections(
@@ -99,6 +108,9 @@ data class ActiveConnections(
   val downloadBps: Long = 0,
   val uploadBps: Long = 0,
   val dropped: Long = 0,
+  val receivedBytes: Long? = null,
+  val sentBytes: Long? = null,
+  val closed: List<ActiveConnection> = emptyList(),
 ) {
   companion object {
     /** [Interest.Connections]'s default limit. */

@@ -28,8 +28,10 @@ import kotlin.concurrent.Volatile
  * piece that fails its hash check is fetched again; when several peers had sent it, from one peer
  * alone, so a peer that keeps sending bad data ends up alone with it and is blamed. Once every
  * wanted piece is open (the endgame), a peer with nothing else to fetch also asks for blocks
- * another peer has outstanding; the first copy to arrive cancels the other ([poll]). Web seeds
- * claim runs of whole pieces instead ([claimRun]), each with its own buffer.
+ * other peers have outstanding: those they are late with, and of the others about as many as it
+ * receives in a second, those they would send last ([endgame]); the first copy to arrive cancels
+ * the other ([poll]). Web seeds claim runs of whole pieces instead ([claimRun]), each with its own
+ * buffer.
  */
 internal class TorrentPieceScheduler(
   wanted: BooleanArray,
@@ -89,12 +91,20 @@ internal class TorrentPieceScheduler(
   private var verifiedCount = 0
   /** Raised whenever a piece may have become openable, or a buffer freed. */
   private var openings = 0L
+  /** Raised for every block a peer is asked for, owed or copied: the order peers were asked in. */
+  private var asks = 0L
   /** When idle partial pieces were last looked for. */
   private var sweptAt = 0L
   /** When each peer last looked for pieces to open and could not open all it wanted. */
   private val searches = mutableMapOf<Int, Search>()
   // When each peer last looked for late blocks.
   private val lateScans = mutableMapOf<Int, Long>()
+  /**
+   * Per peer: the deadline of the blocks it was last handed. It sends what it is asked for in
+   * order, so it is never late with a block before those it was asked for earlier, while it still
+   * owes any of them ([dueFor]).
+   */
+  private val lastDue = mutableMapOf<Int, Long>()
   // Wanted pieces no connected peer or seed has, and when they were counted ([sourceless]).
   private var sourcelessCount = 0
   private var sourcelessAt = Long.MIN_VALUE / 2
@@ -143,6 +153,12 @@ internal class TorrentPieceScheduler(
 
   private class Search(val openings: Long, val at: Long)
 
+  /**
+   * A block's second requester in the endgame, with the [OpenPiece.dueAt] and [OpenPiece.askedAt]
+   * it takes over should the block's owner give it back.
+   */
+  private class Copy(val peer: Int, val dueAt: Long, val askedAt: Long)
+
   private class OpenPiece(val index: Int, val lease: TorrentBufferBudget.Lease, now: Long) {
     val bytes = ByteArray(lease.bytes)
     val blocks = (bytes.size + BLOCK - 1) / BLOCK
@@ -150,8 +166,10 @@ internal class TorrentPieceScheduler(
     val owner = IntArray(blocks) { FREE }
     /** Per block asked for: when its first requester is late, so another may ask too. */
     val dueAt = LongArray(blocks)
+    /** Per block asked for: the [asks] count when the peer that owes it was asked for it. */
+    val askedAt = LongArray(blocks)
     /** Second requesters of blocks duplicated in the endgame. */
-    var duplicates: MutableMap<Int, Int>? = null
+    var duplicates: MutableMap<Int, Copy>? = null
     var free = blocks
     var received = 0
     /** The first block that may be free. */
@@ -248,20 +266,23 @@ internal class TorrentPieceScheduler(
   /**
    * Blocks for [peer] to ask for, at most [max] and only of pieces it has that [eligible]
    * accepts: free blocks of open pieces first, then those of pieces it opens, rarest first, then
-   * blocks other peers are late with; in the endgame, any block other peers have outstanding.
+   * blocks other peers are late with; in the endgame, also some blocks other peers have
+   * outstanding ([endgame]).
    * [lateAfterMs] is how long [peer] may take to deliver what it is handed before another peer
-   * may ask for it too.
+   * may ask for it too, though never less than what it was handed before has left, and [copies]
+   * the most blocks others owe on time it may hold in the endgame ([endgameCopies]).
    */
   suspend fun request(
     peer: Int,
     max: Int,
     lateAfterMs: Long = DEFAULT_LATE_MS,
+    copies: Int = ENDGAME_DUPLICATES,
     eligible: (Int) -> Boolean = { true },
   ): Grant = mutex.withLock {
     val pieces = availability[peer] ?: return@withLock Grant(emptyList(), false)
     val requests = ArrayList<PeerMessage.Request>(minOf(max, 64))
     val now = nowMs()
-    val dueAt = now + lateAfterMs
+    val dueAt = dueFor(peer, now + lateAfterMs)
     val iterator = withFree.iterator()
     while (requests.size < max && iterator.hasNext()) {
       val piece = iterator.next()
@@ -276,11 +297,14 @@ internal class TorrentPieceScheduler(
     }
     // Pieces no connected peer or seed has cannot be opened: they never hold the endgame back.
     if (requests.size < max && unopened <= sourceless(now)) {
-      starved = endgame(peer, pieces, eligible, max, requests, now, late = false) || starved
+      if (endgame(peer, pieces, eligible, max, copies, requests, now, dueAt, late = false)) {
+        starved = true
+      }
     } else if (requests.size < max && lateScanDue(peer, now)) {
       // An idle peer takes over blocks a slow one sits on, which also frees their buffers.
-      endgame(peer, pieces, eligible, max, requests, now, late = true)
+      endgame(peer, pieces, eligible, max, copies, requests, now, dueAt, late = true)
     }
+    if (requests.isNotEmpty()) lastDue[peer] = dueAt
     Grant(requests, starved)
   }
 
@@ -293,15 +317,23 @@ internal class TorrentPieceScheduler(
 
   /**
    * The swarm's [Health] now, naming at most [limit] missing pieces; with [among], only those of
-   * its pieces can be missing.
+   * its pieces can be missing. The web seeds in [ignoring] count as having and fetching none.
    */
-  suspend fun health(limit: Int, among: Set<Int>? = null): Health = mutex.withLock {
+  suspend fun health(
+    limit: Int,
+    among: Set<Int>? = null,
+    ignoring: Set<Int> = emptySet(),
+  ): Health = mutex.withLock {
     val now = nowMs()
+    val ignored = ignoring.mapNotNull { availability[it] }
+    // A peer or seed not ignored has piece [index], or such a seed fetches it.
+    fun sourced(index: Int): Boolean = rarity[index] > ignored.count { it[index] } ||
+      seedOwned[index] > (seedOwners[index]?.count { it in ignoring } ?: 0)
     val missing = ArrayList<Int>()
     var count = 0
     for (index in among?.sorted() ?: (0 until pieceCount)) {
       if (index !in 0 until pieceCount) continue
-      if (wanted[index] && !verified[index] && seedOwned[index] == 0 && rarity[index] == 0) {
+      if (wanted[index] && !verified[index] && !sourced(index)) {
         count++
         if (missing.size < limit) missing += index
       }
@@ -370,7 +402,7 @@ internal class TorrentPieceScheduler(
       }
       piece.contributors += peer
       piece.activeAt = nowMs()
-      val second = piece.duplicates?.remove(block)
+      val second = piece.duplicates?.remove(block)?.peer
       if (owner >= 0 && owner != peer) cancel(owner, piece.request(block))
       if (second != null && second != peer) cancel(second, piece.request(block))
       if (piece.received < piece.blocks) return@withLock Arrival.Kept
@@ -584,6 +616,7 @@ internal class TorrentPieceScheduler(
     cancels.remove(peer)
     searches.remove(peer)
     lateScans.remove(peer)
+    lastDue.remove(peer)
     for (piece in open.values.toList()) {
       if (!piece.committing && piece.outstanding == 0 &&
         availability.values.none { it[piece.index] }) close(piece)
@@ -625,6 +658,7 @@ internal class TorrentPieceScheduler(
       if (piece.owner[block] == FREE) {
         piece.owner[block] = peer
         piece.dueAt[block] = dueAt
+        piece.askedAt[block] = ++asks
         piece.free--
         requests += piece.request(block)
       }
@@ -720,16 +754,31 @@ internal class TorrentPieceScheduler(
   /**
    * In the endgame, [peer] also asks for blocks one other peer has outstanding, and assembles
    * pieces web seeds fetch alone. Returns whether the budget had no buffer for one.
+   *
+   * It asks for every block whose owner is late with it, as [max] allows. Of the others, only once
+   * it owes no block of its own, and at most [copies] at once, due last first: an owner sends what
+   * it is asked for in order, so the copy of a block far back in its queue arrives first and
+   * cancels it before it is sent, while the copy of one at its head arrives as well. [peer] is
+   * late with what it is handed at [dueAt].
    */
   private fun endgame(
     peer: Int,
     pieces: BooleanArray,
     eligible: (Int) -> Boolean,
     max: Int,
+    copies: Int,
     requests: MutableList<PeerMessage.Request>,
     now: Long,
+    dueAt: Long,
     late: Boolean,
   ): Boolean {
+    var held = 0
+    var owes = false
+    for (piece in open.values) {
+      piece.duplicates?.values?.forEach { if (it.peer == peer) held++ }
+      if (!owes && !piece.committing && peer in piece.owner) owes = true
+    }
+    val onTime = if (late || owes) null else DueLast(copies - held)
     for (piece in open.values) {
       if (requests.size >= max) break
       if (piece.committing || !pieces[piece.index] || !eligible(piece.index) ||
@@ -737,12 +786,19 @@ internal class TorrentPieceScheduler(
       for (block in 0 until piece.blocks) {
         if (requests.size >= max) break
         val owner = piece.owner[block]
-        if (owner < 0 || owner == peer || late && now < piece.dueAt[block]) continue
-        if (piece.duplicates?.containsKey(block) == true) continue
-        val duplicates = piece.duplicates ?: mutableMapOf<Int, Int>().also { piece.duplicates = it }
-        duplicates[block] = peer
-        requests += piece.request(block)
-        piece.activeAt = now
+        if (owner < 0 || owner == peer || piece.duplicates?.containsKey(block) == true) continue
+        if (now >= piece.dueAt[block]) {
+          duplicate(piece, block, peer, requests, now, dueAt)
+          held++
+        } else {
+          onTime?.offer(piece, block)
+        }
+      }
+    }
+    if (onTime != null) {
+      val room = minOf(onTime.size, copies - held, max - requests.size)
+      for (i in 0 until room) {
+        duplicate(onTime.piece(i), onTime.block(i), peer, requests, now, dueAt)
       }
     }
     // Outside the endgame, only late blocks: pieces web seeds fetch alone wait for it.
@@ -752,10 +808,77 @@ internal class TorrentPieceScheduler(
       if (!wanted[index] || verified[index] || openPieces[index] != null ||
         seedOwned[index] != 1 || !pieces[index] || !eligible(index)) continue
       val piece = openPiece(index, now) ?: return true
-      take(piece, peer, max, requests, now, now + DEFAULT_LATE_MS)
+      take(piece, peer, max, requests, now, dueAt)
       if (piece.free > 0) withFree += piece
     }
     return false
+  }
+
+  /**
+   * Asks [peer] for [block] of [piece] too, beside the peer that owes it, by [dueAt]. Should that
+   * peer give the block back, [peer] owes it as it was asked for it: late at [dueAt], and sent in
+   * the order of its asks, not of the old owner's blocks.
+   */
+  private fun duplicate(
+    piece: OpenPiece,
+    block: Int,
+    peer: Int,
+    requests: MutableList<PeerMessage.Request>,
+    now: Long,
+    dueAt: Long,
+  ) {
+    val duplicates = piece.duplicates ?: mutableMapOf<Int, Copy>().also { piece.duplicates = it }
+    duplicates[block] = Copy(peer, dueAt, ++asks)
+    requests += piece.request(block)
+    piece.activeAt = now
+  }
+
+  /**
+   * The [capacity] blocks offered that are due last, latest first; of blocks due together, the
+   * one asked for later ([OpenPiece.askedAt]), which its owner sends later. That is not always
+   * the one offered later: a piece whose blocks are free again is handed out after pieces that
+   * opened after it. An owner is never due sooner for a block it was asked for later
+   * ([lastDue]), so of its blocks those it sends last come first.
+   */
+  private class DueLast(capacity: Int) {
+    private val pieces = arrayOfNulls<OpenPiece>(maxOf(0, capacity))
+    private val blocks = IntArray(pieces.size)
+    private val dues = LongArray(pieces.size)
+    private val asked = LongArray(pieces.size)
+    var size = 0
+      private set
+
+    fun piece(i: Int): OpenPiece = checkNotNull(pieces[i])
+
+    fun block(i: Int): Int = blocks[i]
+
+    fun offer(piece: OpenPiece, block: Int) {
+      val due = piece.dueAt[block]
+      val askedAt = piece.askedAt[block]
+      // Its place: after the blocks due later, or due with it and asked for later. Held ones may
+      // be hundreds, so the place is searched for and the rest moved down at once.
+      var at = 0
+      var end = size
+      while (at < end) {
+        val middle = (at + end) ushr 1
+        if (dues[middle] > due || dues[middle] == due && asked[middle] > askedAt) {
+          at = middle + 1
+        } else {
+          end = middle
+        }
+      }
+      if (at == pieces.size) return
+      val kept = minOf(size, pieces.size - 1)
+      pieces.copyInto(pieces, at + 1, at, kept)
+      blocks.copyInto(blocks, at + 1, at, kept)
+      dues.copyInto(dues, at + 1, at, kept)
+      asked.copyInto(asked, at + 1, at, kept)
+      pieces[at] = piece
+      blocks[at] = block
+      dues[at] = due
+      asked[at] = askedAt
+      if (size < pieces.size) size++
+    }
   }
 
   private fun releaseBlock(peer: Int, index: Int, begin: Int) {
@@ -766,8 +889,9 @@ internal class TorrentPieceScheduler(
     val second = piece.duplicates?.get(block)
     if (piece.owner[block] == peer) {
       if (second != null) {
-        piece.owner[block] = second
-        piece.dueAt[block] = nowMs() + DEFAULT_LATE_MS
+        piece.owner[block] = second.peer
+        piece.dueAt[block] = second.dueAt
+        piece.askedAt[block] = second.askedAt
         piece.duplicates?.remove(block)
       } else {
         piece.owner[block] = FREE
@@ -775,22 +899,40 @@ internal class TorrentPieceScheduler(
         piece.cursor = minOf(piece.cursor, block)
         withFree += piece
       }
-    } else if (second == peer) {
+    } else if (second?.peer == peer) {
       piece.duplicates?.remove(block)
     }
+  }
+
+  /**
+   * When [peer] is late with blocks it is handed now, given [due]: no sooner than those it was
+   * handed before, as it sends them first, unless it owes none of them any more.
+   */
+  private fun dueFor(peer: Int, due: Long): Long {
+    val last = lastDue[peer] ?: return due
+    if (last <= due) return due
+    for (piece in open.values) {
+      if (piece.committing) continue
+      if (peer in piece.owner || piece.duplicates?.values?.any { it.peer == peer } == true) {
+        return last
+      }
+    }
+    lastDue.remove(peer)
+    return due
   }
 
   private fun releasePeerLocked(peer: Int) {
     for (piece in open.values) {
       if (piece.committing) continue
       for (block in 0 until piece.blocks) {
-        if (piece.owner[block] == peer || piece.duplicates?.get(block) == peer) {
+        if (piece.owner[block] == peer || piece.duplicates?.get(block)?.peer == peer) {
           releaseBlock(peer, piece.index, block * BLOCK)
         }
       }
       if (piece.single == peer) piece.single = UNASSIGNED
     }
     searches.remove(peer)
+    lastDue.remove(peer)
   }
 
   /**
@@ -803,7 +945,7 @@ internal class TorrentPieceScheduler(
       val owner = piece.owner[block]
       if (owner >= 0) cancel(owner, piece.request(block))
     }
-    piece.duplicates?.forEach { (block, peer) -> cancel(peer, piece.request(block)) }
+    piece.duplicates?.forEach { (block, copy) -> cancel(copy.peer, piece.request(block)) }
     track(piece.index) {
       open.remove(piece.index)
       openPieces[piece.index] = null
@@ -873,6 +1015,27 @@ internal class TorrentPieceScheduler(
 
     /** How long a peer may take to deliver a block before another may ask for it too. */
     const val DEFAULT_LATE_MS = 6_000L
+
+    /**
+     * The most blocks a peer holds in the endgame that other peers owe and are not late with
+     * while its rate is unknown or slow (256 KiB), or as many as it keeps outstanding if that is
+     * fewer: few enough that copies arriving twice waste little. A faster peer holds more
+     * ([endgameCopies]).
+     */
+    const val ENDGAME_DUPLICATES = 16
+
+    /** How much of its own rate a peer copies on time in the endgame ([endgameCopies]). */
+    private const val ENDGAME_COPY_MS = 1_000L
+
+    /**
+     * The most blocks other peers owe on time that a peer receiving [bytesPerSecond] holds in the
+     * endgame: about [ENDGAME_COPY_MS] of its rate, so a fast peer far away takes a slower or
+     * stalled peer's queue over at its own pace rather than a few blocks a round trip; at least
+     * [ENDGAME_DUPLICATES], or the [pipeline] it keeps if that is fewer, which it never exceeds.
+     */
+    fun endgameCopies(bytesPerSecond: Double, pipeline: Int): Int =
+      (bytesPerSecond * ENDGAME_COPY_MS / 1000 / BLOCK).toInt()
+        .coerceAtLeast(ENDGAME_DUPLICATES).coerceAtMost(pipeline)
 
     /** How often a peer looks for blocks others are late with. */
     private const val LATE_SCAN_MS = 500L

@@ -182,6 +182,26 @@ internal class DownloadCoordinator(
     }
   }
 
+  /**
+   * Runs [block] while the task's running execution, if any, drops its progress reports
+   * ([DownloadExecution.holdProgress]). The caller holds the task's [TaskHandle.controlLock], so
+   * an execution started meanwhile reports nothing before [block] returns. A started task whose
+   * first report was dropped then shows its last report as [shown] makes it
+   * ([DownloadExecution.releaseProgress]).
+   */
+  suspend fun <T> withProgressHeld(
+    taskId: String,
+    shown: (DownloadProgress) -> DownloadProgress,
+    block: suspend () -> T,
+  ): T {
+    val held = mutex.withLock { activeDownloads[taskId]?.execution?.also { it.holdProgress() } }
+    try {
+      return block()
+    } finally {
+      held?.releaseProgress(shown)
+    }
+  }
+
   suspend fun resume(
     handle: TaskHandle,
     destination: Destination? = null,

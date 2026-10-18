@@ -13,7 +13,8 @@ package com.linroid.ketch.torrent.peer
  * stays up [LASTING_MS], counts as the first of its endpoint's dials when it closes. A source
  * naming a peer that brought payload again has it dialed once [FOUND_AGAIN_MS] have passed since
  * its last dial, at most once every [FOUND_AGAIN_EVERY_MS]: the DHT names the same peers every
- * minute.
+ * minute. A source naming it while it is being dialed counts once that dial fails, as a peer that
+ * comes back during a dial announces itself before the dial gives up.
  */
 internal object PeerRedial {
   /** How often an endpoint that never brought payload is dialed again before it is given up. */

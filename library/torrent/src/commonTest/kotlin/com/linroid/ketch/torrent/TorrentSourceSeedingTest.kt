@@ -3,19 +3,26 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
+import com.linroid.ketch.core.task.TaskControl
+import com.linroid.ketch.core.task.TaskRecord
+import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
+import com.linroid.ketch.torrent.control.UnusedHttpEngine
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.engine.TorrentRouteTable
+import com.linroid.ketch.torrent.engine.TorrentSessionState
 import com.linroid.ketch.torrent.magnet.MagnetUri
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
@@ -28,6 +35,7 @@ import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerTraffic
 import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -51,6 +59,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlin.time.TimeSource
 
 /**
@@ -399,6 +408,143 @@ class TorrentSourceSeedingTest {
   }
 
   @Test
+  fun restoredSeeder_shrunkWhileItChecks_checksAndSeedsTheSmallerSelection() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        val torrent = MultiFileTorrent(listOf(40_000, 30_000))
+        val hash = torrent.metadata.infoHash.hex
+        val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+        val total = torrent.sizes.sum().toLong()
+        val state = TorrentSourceState(hash, total, "", ids, "unused-pack",
+          encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+        val session = FakeTorrentSession(hash, torrent.sizes[1].toLong()).apply {
+          stateOnResume = TorrentSessionState.CHECKING_FILES
+          savedResumeData = byteArrayOf(1)
+        }
+        engine.addTorrentResult = session
+        val store = MemoryTaskStore()
+        val at = Instant.fromEpochMilliseconds(1_000)
+        store.save(TaskRecord("seeder",
+          DownloadRequest("http://fixture/pack.torrent", selectedFileIds = ids),
+          outputPath = "unused-pack", state = TaskState.COMPLETED, totalBytes = total,
+          sourceType = TorrentDownloadSource.TYPE, sourceState = state.saved(), createdAt = at,
+          updatedAt = at, completedAt = at, control = TaskControl(sharing = true)))
+        val ketch = Ketch(UnusedHttpEngine(), taskStore = store, additionalSources = listOf(source))
+        try {
+          ketch.start()
+          // The restored seeder checks its files, and a file, deleted maybe, is dropped meanwhile.
+          eventually { session.resumed }
+          ketch.tasks.value.single().selectFiles(setOf("1"))
+          // The check takes the smaller selection, which no longer needs that file.
+          assertEquals(listOf(setOf("1")), session.selectionChanges)
+
+          session.seed()
+          eventually { "seeder" in source.seedingTaskIds.value }
+
+          assertEquals(listOf(setOf("1")), session.selectionChanges)
+          source.stopSeeding("seeder")
+          // The checkpoint it saved as it stopped describes the smaller selection too.
+          val saved = source.decodeState(assertNotNull(store.load("seeder")?.sourceState))
+          assertEquals(setOf("1"), saved.selectedFileIds)
+          assertEquals(torrent.sizes[1].toLong(), saved.totalBytes)
+          source.assertNoLeaks()
+        } finally { ketch.close() }
+      }
+    }
+  }
+
+  @Test
+  fun startSeeding_newerSelectionAppliedFirst_seedsTheNewerOne() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        try {
+          val torrent = MultiFileTorrent()
+          val hash = torrent.metadata.infoHash.hex
+          val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+          val state = TorrentSourceState(hash, torrent.sizes.sum().toLong(), "", ids,
+            "unused-pack", encodeBase64(torrent.metainfo), version = 2,
+            privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val session = FakeTorrentSession(hash).apply {
+            stateOnResume = TorrentSessionState.CHECKING_FILES
+            savedResumeData = byteArrayOf(1)
+          }
+          engine.addTorrentResult = session
+          val saved = MutableStateFlow<SourceState?>(null)
+          source.saveSessionStates { _, state -> saved.value = state }
+          val selection = MutableStateFlow(ids)
+          val held = CompletableDeferred<Unit>()
+          val release = CompletableDeferred<Unit>()
+          session.beforeChange = {
+            if (it == setOf("0", "1")) {
+              held.complete(Unit)
+              release.await()
+            }
+          }
+          val seeding = async {
+            source.startSeeding(SeedingTask("seeder", "http://fixture/pack.torrent", state.saved(),
+              null, "unused-pack", ids, selection = { selection.value }))
+          }
+          eventually { session.resumed }
+          // The task drops a file as the seeder starts seeding, which it reads then...
+          selection.value = setOf("0", "1")
+          session.seed()
+          held.await()
+          // ...and another before it applies that one, which Ketch applies first.
+          selection.value = setOf("0")
+          source.changeSeedingSelection("seeder", setOf("0"))
+          release.complete(Unit)
+
+          assertEquals(SeedingOutcome.SEEDING, seeding.await())
+          assertEquals(listOf(setOf("0"), setOf("0", "1"), setOf("0")), session.selectionChanges)
+          source.stopSeeding("seeder")
+          assertEquals(setOf("0"),
+            source.decodeState(assertNotNull(saved.value)).selectedFileIds)
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
+  fun startSeeding_selectionGrewWhileItChecked_leavesTheSeederAlone() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(10_000) {
+        val engine = FakeTorrentEngine()
+        val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false,
+          uploadPolicy = TorrentUploadPolicy.SEED_AFTER_COMPLETION))
+          .also { it.engineFactory = { engine } }
+        try {
+          val torrent = MultiFileTorrent(listOf(40_000, 30_000))
+          val hash = torrent.metadata.infoHash.hex
+          val ids = TorrentFileTable.parse(torrent.metainfo, TorrentConfig()).ids
+          val state = TorrentSourceState(hash, 40_000, "", setOf("0"), "unused-pack",
+            encodeBase64(torrent.metainfo), version = 2, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+          val session = FakeTorrentSession(hash).apply {
+            stateOnResume = TorrentSessionState.SEEDING
+          }
+          engine.addTorrentResult = session
+          // The task reopens for the added file, and its run takes the seeder over.
+          val outcome = source.startSeeding(SeedingTask("seeder", "http://fixture/pack.torrent",
+            state.saved(), null, "unused-pack", setOf("0"), selection = { ids }))
+
+          assertEquals(SeedingOutcome.SEEDING, outcome)
+          assertEquals(emptyList(), session.selectionChanges)
+          source.stopSeeding("seeder")
+          source.assertNoLeaks()
+        } finally { source.close() }
+      }
+    }
+  }
+
+  @Test
   fun restoreSeedingOff_neverResumesNorDefers() = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(10_000) {
@@ -644,6 +790,28 @@ class TorrentSourceSeedingTest {
       assertEquals(emptySet(), engine().incomingTags())
       assertEquals(0, engine().admittedSessionBytes)
     }
+
+  @Test
+  fun startSeeding_deletedFileDroppedSinceTheTaskWasRead_seeds() = v2Seeding { source, _, root ->
+    val output = root / "seeding"
+    val checkpoint = fixture.preseed(output, "seeder")
+    val resolved = source.resolveMetainfo(fixture.metainfo)
+    val ids = resolved.files.map { it.id }.toSet()
+    val dropped = resolved.files.single { it.name.substringAfterLast('/') == "c" }.id
+    // The owner deleted a file and then dropped it, after the restore read the task.
+    torrentFileSystem.delete(output / "c")
+    val state = TorrentSourceState(fixture.document.info.hash.hex, resolved.totalBytes,
+      encodeBase64(checkpoint.encode()), ids, output.toString(), encodeBase64(fixture.metainfo),
+      version = 3, privacy = TorrentDiscoveryPrivacy.PUBLIC)
+
+    val outcome = source.startSeeding(SeedingTask("seeder", "http://fixture/pack.torrent",
+      state.saved(), null, output.toString(), ids, selection = { ids - dropped }))
+
+    assertEquals(SeedingOutcome.SEEDING, outcome)
+    assertEquals(ids - dropped, source.sessionOf("seeder")?.selectedFileIds)
+    source.stopSeeding("seeder")
+    source.assertNoLeaks()
+  }
 
   @Test
   fun taskUploadLimitAppliesToV2Seeder() = v2Seeding { source, engine, root ->

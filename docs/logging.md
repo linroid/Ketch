@@ -186,8 +186,9 @@ Every 30 seconds each torrent swarm logs one line at debug level with:
   interested peers and uploaded bytes;
 - for v2 and hybrid swarms, also incoming peers, a hybrid's v1 peers, hash requests served and
   rejected, and candidates being dialed;
-- with web seeds (BEP 19), the seeds still running of all, those dropped after repeated failures,
-  the pieces and payload they delivered, and their failed requests.
+- with web seeds (BEP 19), the seeds still running of all (none once a v1 swarm has every piece,
+  as it stops them until the selection grows), those dropped after repeated failures, the pieces
+  and payload they delivered, and their failed requests.
 
 The line ends with how peer connections ended. Each dialed endpoint is counted once, by the
 furthest it got:

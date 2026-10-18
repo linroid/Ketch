@@ -131,6 +131,12 @@
   <string name="settings_general_power">電源</string>
   <string name="settings_general_keep_awake">下載時保持喚醒</string>
   <string name="settings_general_keep_awake_hint">下載進行時，%1$s不會自動進入睡眠。螢幕仍可關閉。</string>
+  <string name="settings_general_when_done">下載完成後</string>
+  <string name="settings_general_when_done_hint">這台電腦上沒有正在下載或排隊的任務後，提前一分鐘提醒再執行。只執行一次，結束 Ketch 後不再保留。</string>
+  <string name="settings_general_when_done_nothing">不執行動作</string>
+  <string name="settings_general_when_done_quit">結束 Ketch</string>
+  <string name="settings_general_when_done_sleep">睡眠</string>
+  <string name="settings_general_when_done_shut_down">關機</string>
 
   <string name="settings_notifications_downloads">下載</string>
   <string name="settings_notifications_footer">「通知」使用系統通知；「僅在應用程式內」只會在 Ketch 中顯示。</string>
@@ -687,6 +693,7 @@
   <string name="settings_search_badge">Dock 或工作列圖示顯示的內容</string>
   <string name="settings_search_badge_keywords">數字, 標記, 徽章, dock, 工作列</string>
   <string name="settings_search_keep_awake_keywords">睡眠, 休眠, 電源, 電池, 防止睡眠, 喚醒鎖</string>
+  <string name="settings_search_when_done_keywords">關機, 關閉電腦, 睡眠, 休眠, 結束, 下載後, 佇列, 完成</string>
   <string name="settings_search_shortcuts">所有快速鍵</string>
   <string name="settings_search_shortcuts_keywords">按鍵, 快速鍵, 熱鍵, 鍵盤</string>
   <string name="settings_search_finished_keywords">完成, 下載完成, 提醒</string>

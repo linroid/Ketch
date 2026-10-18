@@ -199,4 +199,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$sがオフラインになりました</string>
   <string name="feedback_device_online">%1$sに再接続しました</string>
+  <string name="finish_warning_quit">1分後にKetchを終了します</string>
+  <string name="finish_warning_sleep">1分後にこのコンピュータをスリープします</string>
+  <string name="finish_warning_shut_down">1分後にこのコンピュータをシャットダウンします</string>
+  <string name="finish_warning_detail">このコンピュータのダウンロードが完了しました。</string>
+  <string name="finish_failed_quit">Ketchを終了できませんでした</string>
+  <string name="finish_failed_sleep">このコンピュータをスリープできませんでした</string>
+  <string name="finish_failed_shut_down">このコンピュータをシャットダウンできませんでした</string>
 </resources>

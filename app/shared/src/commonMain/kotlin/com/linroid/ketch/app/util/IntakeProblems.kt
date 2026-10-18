@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.util
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.text
@@ -113,7 +114,7 @@ fun Throwable.toIntakeProblem(
 ): IntakeProblem =
   when {
     // No source on the device takes it: a magnet or a .torrent there means no torrents at all.
-    this is KetchError.Unsupported && (file || LinkKind.of(url) == LinkKind.Magnet) -> {
+    noSourceTakesIt && (file || LinkKind.of(url) == LinkKind.Magnet) -> {
       IntakeProblem(title = Res.string.intake_problem_no_torrents.text())
     }
     file && this !is KetchError -> IntakeProblem(
@@ -125,10 +126,14 @@ fun Throwable.toIntakeProblem(
 
 private fun Throwable.linkProblem(url: String, discoverAvailable: Boolean): IntakeProblem =
   when (this) {
-    is KetchError.Unsupported -> IntakeProblem(
-      title = Res.string.intake_problem_unsupported.text(),
-      detail = Res.string.intake_problem_unsupported_detail.text(),
-    )
+    is KetchError.Unsupported -> if (noSourceTakesIt) {
+      IntakeProblem(
+        title = Res.string.intake_problem_unsupported.text(),
+        detail = Res.string.intake_problem_unsupported_detail.text(),
+      )
+    } else {
+      checkFailed(cause?.message)
+    }
     is KetchError.AuthenticationFailed -> SIGN_IN_REQUIRED
     is KetchError.Http -> when (code) {
       401 -> SIGN_IN_REQUIRED
@@ -170,16 +175,28 @@ private fun Throwable.linkProblem(url: String, discoverAvailable: Boolean): Inta
       detail = detail?.takeIf { it.isNotBlank() }?.let(::verbatim),
       actions = listOf(IntakeAction.Retry),
     )
-    else -> IntakeProblem(
-      title = Res.string.intake_problem_check_failed.text(),
+    else -> checkFailed(
       detail = when (this) {
         is KetchError.Unknown -> errorMessage
         is KetchError -> null
         else -> message
-      }?.takeIf { it.isNotBlank() }?.let(::verbatim),
-      actions = listOf(IntakeAction.Retry),
+      },
     )
   }
+
+/**
+ * Whether this says that no source on the device takes the link, rather than that the one that
+ * takes it lacks something, such as a usable proxy, which its cause then says.
+ */
+private val Throwable.noSourceTakesIt: Boolean
+  get() = this is KetchError.Unsupported && (cause == null || cause is NoDownloadSourceException)
+
+/** A link Ketch could not check, with [detail] saying why when there is one. */
+private fun checkFailed(detail: String?) = IntakeProblem(
+  title = Res.string.intake_problem_check_failed.text(),
+  detail = detail?.takeIf { it.isNotBlank() }?.let(::verbatim),
+  actions = listOf(IntakeAction.Retry),
+)
 
 /**
  * This link signed in as [user] with [password], to retry one that needs a sign-in. FTP and FTPS

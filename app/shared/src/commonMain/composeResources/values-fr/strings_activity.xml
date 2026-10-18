@@ -233,4 +233,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$s est hors ligne</string>
   <string name="feedback_device_online">Reconnecté à %1$s</string>
+  <string name="finish_warning_quit">Ketch se fermera dans une minute</string>
+  <string name="finish_warning_sleep">Cet ordinateur se mettra en veille dans une minute</string>
+  <string name="finish_warning_shut_down">Cet ordinateur s'éteindra dans une minute</string>
+  <string name="finish_warning_detail">Les téléchargements de cet ordinateur sont terminés.</string>
+  <string name="finish_failed_quit">Impossible de quitter Ketch</string>
+  <string name="finish_failed_sleep">Impossible de mettre cet ordinateur en veille</string>
+  <string name="finish_failed_shut_down">Impossible d'éteindre cet ordinateur</string>
 </resources>
