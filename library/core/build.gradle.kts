@@ -2,6 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrLink
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
@@ -88,3 +89,19 @@ tasks.withType<KotlinNativeSimulatorTest>().configureEach {
   // Keep regular builds green by requiring explicit opt-in for simulator test execution.
   enabled = providers.gradleProperty("enableIosSimulatorTests").orNull == "true"
 }
+
+// The test runner Kotlin generates for wasmWasi gives Node's WASI no preopened directories, so
+// okio's WasiFileSystem can reach no file. Preopen the root, as the tests write real files.
+tasks.withType<KotlinJsIrLink>()
+  .matching { it.name == "compileTestDevelopmentExecutableKotlinWasmWasi" }
+  .configureEach {
+    val outputDir = destinationDirectory
+    doLast {
+      val runners = outputDir.get().asFile.listFiles { file -> file.extension == "mjs" }.orEmpty()
+      val runner = runners.single { "new WASI(" in it.readText() }
+      val text = runner.readText()
+      val patched = text.replace("env, });", "env, preopens: { '/': '/' } });")
+      check(patched != text || "preopens" in text) { "Unexpected wasmWasi runner: $runner" }
+      runner.writeText(patched)
+    }
+  }
