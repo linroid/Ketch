@@ -896,8 +896,12 @@ internal class TorrentSwarm(
     private var fast = false
     /** Pieces this peer may download while we choke it (BEP 6), offered only while we upload. */
     private var allowedFast: Set<Int> = emptySet()
-    /** Pieces the peer rejected though it has them; fetched elsewhere until it unchokes us anew. */
-    private val refused = mutableSetOf<Int>()
+    /**
+     * Pieces the peer rejected though it has them, and when, on [nowMs]: fetched elsewhere until
+     * it unchokes us anew, announces the piece again, as a seeder that verified it again does, or
+     * [REFUSAL_MS] pass. The scheduler hears of each change ([TorrentPieceScheduler.refusing]).
+     */
+    private val refused = mutableMapOf<Int, Long>()
     /** Rejects of each piece's blocks while unchoked; as many as the piece has refuse it. */
     private val rejects = mutableMapOf<Int, Int>()
     /** Requests to keep outstanding: about [QUEUE_TIME_MS] of the peer's rate ([measureRate]). */
@@ -1134,7 +1138,14 @@ internal class TorrentSwarm(
         // peer cannot force a full snapshot and rarity scan per announcement.
         is PeerMessage.Bitfield, PeerMessage.HaveAll, PeerMessage.HaveNone ->
           scheduler.availability(id, state.availabilitySnapshot())
-        is PeerMessage.Have -> scheduler.announce(id, message.index)
+        is PeerMessage.Have -> {
+          scheduler.announce(id, message.index)
+          // A piece announced again, as a seeder that verified it again does, is asked for again.
+          if (rejects.isNotEmpty()) rejects.remove(message.index)
+          if (refused.isNotEmpty() && refused.remove(message.index) != null) {
+            scheduler.refusing(id, refused.keys)
+          }
+        }
         is PeerMessage.Control -> when (message.signal) {
           PeerMessage.Signal.CHOKE -> if (fast) {
             // Our requests stand until the peer rejects them; the block deadline restarts. A
@@ -1148,7 +1159,10 @@ internal class TorrentSwarm(
             scheduler.releasePeer(id)
           }
           PeerMessage.Signal.UNCHOKE -> {
-            refused.clear()
+            if (refused.isNotEmpty()) {
+              refused.clear()
+              scheduler.refusing(id, emptySet())
+            }
             rejects.clear()
             // Its rate is measured from now on: the time it choked us says nothing of it.
             if (wasChoking) {
@@ -1222,7 +1236,18 @@ internal class TorrentSwarm(
       }
       log.v { "Peer $endpoint of $logLabel keeps rejecting piece ${message.index}" }
       rejects.remove(message.index)
-      refused += message.index
+      refused[message.index] = nowMs()
+      scheduler.refusing(id, refused.keys)
+    }
+
+    /**
+     * Asks the peer again for pieces it refused [REFUSAL_MS] ago: one that keeps us unchoked may
+     * never say it would send them now.
+     */
+    private suspend fun expireRefusals() {
+      if (refused.isEmpty()) return
+      val now = nowMs()
+      if (refused.values.removeAll { now - it >= REFUSAL_MS }) scheduler.refusing(id, refused.keys)
     }
 
     /** Cancels [requests] on the wire, handing their blocks back when [release]. */
@@ -1550,6 +1575,8 @@ internal class TorrentSwarm(
       }
       val poll = scheduler.poll(id, haveCursor)
       haveCursor = poll.haveCursor
+      // A piece the peer heard of that we lost is announced again once it verifies again.
+      poll.revoked?.forEach { advertised[it] = false }
       poll.haves?.let { verified ->
         val haves = verified.filter { !advertised[it] }
         for (index in haves) advertised[index] = true
@@ -1585,6 +1612,7 @@ internal class TorrentSwarm(
           if (wanted) PeerMessage.Signal.INTERESTED else PeerMessage.Signal.NOT_INTERESTED))
       }
       expireChokedRequests()
+      expireRefusals()
       if (state.pendingCount > 0 && lastBlock.elapsedNow().inWholeSeconds >= 20) {
         error("Peer block deadline exceeded")
       }
@@ -1617,6 +1645,9 @@ private const val REQUEST_QUEUE = 500
 
 /** How often a swarm checks whether it stalled. */
 private const val STALL_CHECK_MS = 1_000L
+
+/** How long a piece a peer refused is left to other peers before that peer is asked again. */
+private const val REFUSAL_MS = 60_000L
 
 /** The most missing pieces a stall check looks up the files of. */
 private const val MAX_REPORTED_MISSING_PIECES = 4_096

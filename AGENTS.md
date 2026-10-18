@@ -1318,7 +1318,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it; an owner that gives a copied block back leaves it to the copier, due and ordered as its copy
   was asked for. Each pass, `poll` hands a worker the requests to cancel (the
   other copy arrived, or the piece is done or unwanted), newly verified pieces for HAVEs (an
-  append-only log with a cursor per peer) and its interest: workers start not interested and send
+  append-only log with a cursor per peer, which also logs a piece revoked, `Poll.revoked`, so one
+  verified again is announced again) and its interest: workers start not interested and send
   INTERESTED or NOT_INTERESTED as the peer's count of wanted, unverified pieces crosses zero. A
   swarm holding every piece closes connections to peers holding every piece and never redials
   them. A peer is admitted while everything the engine-wide budget holds but the swarm's own pieces
@@ -1334,7 +1335,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   until the peer rejects them; requests left unanswered for `FAST_REJECT_GRACE_MS` (5 s) are
   canceled. A rejected block is free for any peer at once; unchoked, the peer may ask for it
   again until it has rejected as many blocks of the piece as the piece has, then other peers
-  fetch it (`refused` until the peer unchokes us anew). We reject requests we will not serve (choked or uninterested peer, a piece we lack, a
+  fetch it (`refused` until the peer unchokes us anew, announces the piece or `REFUSAL_MS`, a
+  minute, passes; the scheduler hears of it, `TorrentPieceScheduler.refusing`, and `health` counts
+  a wanted piece every connected holder refuses as missing). We reject requests we will not serve
+  (choked or uninterested peer, a piece we lack, a
   full queue, a cancel), and while uploading offer IPv4 peers BEP 6's canonical allowed-fast set
   (`allowedFastSet`, k = 10, /24) and serve it while they are choked, within the upload limits.
   Fast messages on a connection that did not negotiate it close the peer. The v1 pipeline also

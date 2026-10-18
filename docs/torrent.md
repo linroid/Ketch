@@ -864,7 +864,8 @@ says why, in the most telling order:
 
 - **Missing pieces**: wanted pieces that no connected peer or running web seed has and every web
   seed that stopped could not serve, as it may serve the rest once started again, and the files they
-  belong to; with nothing connected and no such seed, none. A web seed started again counts as it
+  belong to; with nothing connected and no such seed, none. A v1 piece every connected peer that
+  has it rejected is missing too. A web seed started again counts as it
   did while stopped until it answers, by sending data or by serving or refusing a piece, as it
   offers every piece meanwhile: a mirror retried for minutes hides no more than it did while
   stopped, and a peer that has the missing pieces clears them at once while one that lacks them does
@@ -902,8 +903,11 @@ Every connection, v1, v2 and hybrid, negotiates the Fast extension (BEP 6): Have
 rejected rather than dropped requests, a choke that leaves requests to be rejected (those still
 unanswered after 5 seconds are canceled), and allowed-fast pieces requested and served while
 choked. While it uploads, Ketch offers IPv4 peers BEP 6's set of 10 allowed-fast pieces. A rejected
-block goes to other peers without counting against the peer. A torrent at its peer limit closes
-peers that dial it before answering their handshake.
+block goes to other peers without counting against the peer. A piece a peer rejects block by
+block is left to other peers until that peer unchokes Ketch again, announces the piece again or a
+minute passes. Ketch announces a piece it lost and verified again, such as one of a file you
+edited, so its peers ask for it again. A torrent at its peer limit closes peers that dial it
+before answering their handshake.
 
 ### Partial selections
 

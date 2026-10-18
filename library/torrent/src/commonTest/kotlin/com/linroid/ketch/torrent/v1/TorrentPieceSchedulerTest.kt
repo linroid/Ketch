@@ -593,6 +593,67 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun revokedPiece_verifiedAgain_isAnnouncedAgain() = runTest {
+    val budget = TorrentBufferBudget(piece)
+    val scheduler = scheduler(pieces = 2, budget, verified = all(2))
+    val cursor = scheduler.haveCursor()
+    scheduler.revoke(1)
+    // Peers that heard of the piece forget it; none is told it has it while it is gone.
+    val revoked = scheduler.poll(1, cursor)
+    assertContentEquals(intArrayOf(1), revoked.revoked)
+    assertNull(revoked.haves)
+    scheduler.verified(1)
+    val again = scheduler.poll(1, revoked.haveCursor)
+    assertContentEquals(intArrayOf(1), again.haves)
+    assertNull(again.revoked)
+    // A peer that polls across both hears it forget the piece and have it again.
+    val across = scheduler.poll(2, cursor)
+    assertContentEquals(intArrayOf(1), across.revoked)
+    assertContentEquals(intArrayOf(1), across.haves)
+  }
+
+  @Test
+  fun haveLog_revokedAndVerifiedAgainOften_outgrowsTheTorrent() = runTest {
+    val budget = TorrentBufferBudget(piece)
+    val scheduler = scheduler(pieces = 1, budget, verified = all(1))
+    val cursor = scheduler.haveCursor()
+    repeat(40) {
+      scheduler.revoke(0)
+      scheduler.verified(0)
+    }
+    val poll = scheduler.poll(1, cursor)
+    assertContentEquals(intArrayOf(0), poll.haves)
+    assertContentEquals(intArrayOf(0), poll.revoked)
+  }
+
+  @Test
+  fun health_pieceEveryHolderRefused_isMissing() = runTest {
+    val budget = TorrentBufferBudget(2 * piece)
+    val scheduler = scheduler(pieces = 2, budget)
+    scheduler.availability(1, all(2))
+    scheduler.availability(2, booleanArrayOf(true, false))
+    assertEquals(0, scheduler.health(limit = 4).missingCount)
+    // Piece 1 has one holder, which refuses it; piece 0 still has a holder that sends it.
+    scheduler.refusing(1, setOf(0, 1))
+    val health = scheduler.health(limit = 4)
+    assertEquals(1, health.missingCount)
+    assertContentEquals(intArrayOf(1), health.missing)
+    scheduler.refusing(2, setOf(0))
+    assertEquals(2, scheduler.health(limit = 4).missingCount)
+    // A peer that lifts its refusal, or leaves, takes it with it.
+    scheduler.refusing(2, emptySet())
+    assertEquals(1, scheduler.health(limit = 4).missingCount)
+    scheduler.refusing(1, emptySet())
+    assertEquals(0, scheduler.health(limit = 4).missingCount)
+    scheduler.refusing(1, setOf(1))
+    scheduler.remove(1)
+    scheduler.availability(1, all(2))
+    assertEquals(0, scheduler.health(limit = 4).missingCount)
+    scheduler.remove(1)
+    scheduler.remove(2)
+  }
+
+  @Test
   fun revokedPiece_isFetchedAgain() = runTest {
     val budget = TorrentBufferBudget(piece)
     val scheduler = scheduler(pieces = 1, budget)

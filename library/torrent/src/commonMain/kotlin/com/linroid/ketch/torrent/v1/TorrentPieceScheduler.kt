@@ -109,10 +109,16 @@ internal class TorrentPieceScheduler(
   private var sourcelessCount = 0
   private var sourcelessAt = Long.MIN_VALUE / 2
 
-  /** Verified pieces in the order they verified, each once, for HAVEs ([poll]). */
+  /**
+   * What peers hear of our pieces ([poll]), in order: each piece as it verifies, and its bitwise
+   * inverse as it loses that, so one verified again is announced again.
+   */
   private var haveLog = IntArray(16)
   private var haveCount = 0
+  /** Per piece: the log's last entry for it says it verified. */
   private val logged = BooleanArray(pieceCount)
+  /** Per peer: pieces it has but refused to send us ([refusing]). */
+  private val refusals = mutableMapOf<Int, Set<Int>>()
 
   /** A web seed's piece, with a buffer of its own. */
   class Claim(override val index: Int, val lease: TorrentBufferBudget.Lease) : WebSeedPiece {
@@ -136,8 +142,14 @@ internal class TorrentPieceScheduler(
 
   /** What [poll] tells a peer's worker. */
   class Poll(
-    /** Pieces verified since the worker's cursor, to announce; null when none. */
+    /** Pieces verified since the worker's cursor and verified still, to announce; null if none. */
     val haves: IntArray?,
+    /**
+     * Pieces no longer verified since the worker's cursor, such as one whose file changed: the
+     * worker forgets it announced them, so the peer hears of each again once it verifies again
+     * ([haves]). Null when none.
+     */
+    val revoked: IntArray?,
     /** The cursor to pass next time. */
     val haveCursor: Int,
     /** Requests to cancel on the wire; their blocks are no longer the peer's. */
@@ -231,6 +243,15 @@ internal class TorrentPieceScheduler(
   /** Whether [peer] has a wanted piece that is not verified yet. */
   suspend fun hasWanted(peer: Int): Boolean = mutex.withLock { (wantedFrom[peer] ?: 0) > 0 }
 
+  /**
+   * [peer] refuses to send [pieces] though it has them, until a later call says otherwise: a
+   * wanted piece every connected peer that has it refuses is missing to [health], as one nobody
+   * has is.
+   */
+  suspend fun refusing(peer: Int, pieces: Set<Int>): Unit = mutex.withLock {
+    if (pieces.isEmpty()) refusals.remove(peer) else refusals[peer] = pieces.toHashSet()
+  }
+
   /** [peer] no longer has [indices]: a web seed that cannot serve them. */
   suspend fun withdraw(peer: Int, indices: Collection<Int>): Unit = mutex.withLock {
     val pieces = availability[peer] ?: return@withLock
@@ -310,8 +331,8 @@ internal class TorrentPieceScheduler(
 
   /**
    * What a stalled swarm reports: [missingCount] wanted pieces no connected peer or running web
-   * seed has, the first [missing] of them, and [lateBlocks] requested blocks their peer is late
-   * with.
+   * seed has, or will send, the first [missing] of them, and [lateBlocks] requested blocks their
+   * peer is late with.
    */
   class Health(val missingCount: Int, val missing: IntArray, val lateBlocks: Int)
 
@@ -326,9 +347,17 @@ internal class TorrentPieceScheduler(
   ): Health = mutex.withLock {
     val now = nowMs()
     val ignored = ignoring.mapNotNull { availability[it] }
-    // A peer or seed not ignored has piece [index], or such a seed fetches it.
-    fun sourced(index: Int): Boolean = rarity[index] > ignored.count { it[index] } ||
-      seedOwned[index] > (seedOwners[index]?.count { it in ignoring } ?: 0)
+    // Per piece: peers that have it but refused to send it, which are no source of it either.
+    val refusing = if (refusals.isEmpty()) null else IntArray(pieceCount).also { counts ->
+      for ((peer, pieces) in refusals) {
+        val has = availability[peer] ?: continue
+        for (index in pieces) if (index in 0 until pieceCount && has[index]) counts[index]++
+      }
+    }
+    // A peer or seed not ignored has piece [index] and sends it, or such a seed fetches it.
+    fun sourced(index: Int): Boolean =
+      rarity[index] - (refusing?.get(index) ?: 0) > ignored.count { it[index] } ||
+        seedOwned[index] > (seedOwners[index]?.count { it in ignoring } ?: 0)
     val missing = ArrayList<Int>()
     var count = 0
     for (index in among?.sorted() ?: (0 until pieceCount)) {
@@ -466,8 +495,12 @@ internal class TorrentPieceScheduler(
       sweptAt = now
       while (evictIdle(now, ABANDONED_PIECE_MS)) { }
     }
+    val entries = if (haveCursor == haveCount) null else haveLog.copyOfRange(haveCursor, haveCount)
     Poll(
-      haves = if (haveCursor == haveCount) null else haveLog.copyOfRange(haveCursor, haveCount),
+      haves = entries?.filter { it >= 0 && verified[it] }?.distinct()?.toIntArray()
+        ?.takeIf { it.isNotEmpty() },
+      revoked = entries?.filter { it < 0 }?.map { it.inv() }?.distinct()?.toIntArray()
+        ?.takeIf { it.isNotEmpty() },
       haveCursor = haveCount,
       cancels = cancels.remove(peer) ?: emptyList(),
       wanted = (wantedFrom[peer] ?: 0) > 0,
@@ -554,6 +587,7 @@ internal class TorrentPieceScheduler(
     require(view.wanted.size == pieceCount && view.verified.size == pieceCount)
     for (index in 0 until pieceCount) {
       if (view.verified[index] && !verified[index]) logHave(index)
+      if (!view.verified[index] && verified[index]) logRevoked(index)
     }
     wanted = view.wanted.copyOf()
     verified = view.verified.copyOf()
@@ -578,9 +612,13 @@ internal class TorrentPieceScheduler(
     view
   }
 
-  /** Forgets a piece the store could no longer read; it downloads again if still wanted. */
+  /**
+   * Forgets a piece the store could no longer read; it downloads again if still wanted, and peers
+   * hear of it again once it verifies again.
+   */
   suspend fun revoke(index: Int) = mutex.withLock {
     if (verified[index]) {
+      logRevoked(index)
       track(index) { verified[index] = false }
       verifiedCount--
       countWanted(index, 1)
@@ -595,7 +633,10 @@ internal class TorrentPieceScheduler(
    */
   suspend fun setAside(index: Int) = mutex.withLock {
     openPieces[index]?.takeIf { !it.committing }?.let(::close)
-    if (verified[index]) verifiedCount-- else countWanted(index, -1)
+    if (verified[index]) {
+      verifiedCount--
+      logRevoked(index)
+    } else countWanted(index, -1)
     track(index) {
       verified[index] = false
       wanted[index] = false
@@ -625,6 +666,7 @@ internal class TorrentPieceScheduler(
     releasePeerLocked(peer)
     claims.remove(peer)?.forEach { releaseClaim(peer, it) }
     availability.remove(peer)?.forEachIndexed { index, present -> if (present) rarity[index]-- }
+    refusals.remove(peer)
     wantedFrom.remove(peer)
     held.remove(peer)
     cancels.remove(peer)
@@ -997,8 +1039,23 @@ internal class TorrentPieceScheduler(
   private fun logHave(index: Int) {
     if (logged[index]) return
     logged[index] = true
-    if (haveCount == haveLog.size) haveLog = haveLog.copyOf(minOf(pieceCount, haveCount * 2))
-    haveLog[haveCount++] = index
+    appendLog(index)
+  }
+
+  /** Logs that piece [index], announced as verified, no longer is. */
+  private fun logRevoked(index: Int) {
+    if (!logged[index]) return
+    logged[index] = false
+    appendLog(index.inv())
+  }
+
+  private fun appendLog(entry: Int) {
+    if (haveCount == haveLog.size) {
+      // Each piece verifies once, unless revoked: only then does the log outgrow the torrent.
+      val doubled = haveCount * 2
+      haveLog = haveLog.copyOf(if (haveCount < pieceCount) minOf(pieceCount, doubled) else doubled)
+    }
+    haveLog[haveCount++] = entry
   }
 
   /** Runs [change] on piece [index], keeping [unopened] and [remaining] counted. */
