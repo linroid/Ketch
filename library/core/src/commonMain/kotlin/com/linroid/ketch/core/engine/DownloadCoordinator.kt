@@ -93,13 +93,20 @@ internal class DownloadCoordinator(
   /**
    * Stops the task's execution, keeping its progress, and shows it paused for [reason].
    * A task paused for [PauseReason.Preempted] keeps a QUEUED record, so a restart enqueues
-   * it again. A task that already completed, failed or was canceled keeps its state.
+   * it again. A task that already completed, failed or was canceled keeps its state, and one
+   * whose execution is completing ([DownloadExecution.claimStop]) is only waited for.
    */
   suspend fun pause(taskId: String, reason: PauseReason = PauseReason.User) {
     val job = mutex.withLock {
       val entry = activeDownloads[taskId] ?: return@withLock stoppingDownloads[taskId]
       val handle = entry.handle
       val execution = entry.execution
+      if (!execution.claimStop()) {
+        // Its file is verified and it completes whatever stops it: shown paused meanwhile, the
+        // task would flash Paused before Completed.
+        log.d { "Not pausing taskId=$taskId: it is completing" }
+        return@withLock entry.job
+      }
       log.i { "Pausing download for taskId=$taskId" }
 
       val currentSegments = handle.mutableSegments.value

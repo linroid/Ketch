@@ -398,7 +398,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   creation when empty, the move, the `COMPLETED` record and the `Completed` state run under
   `NonCancellable`, so a pause, reschedule, preemption or `close()` landing meanwhile finds the
   task completed rather than downloading the file again beside it, and a cancel landing then
-  came too late: the task stays completed, with its file.
+  came too late: the task stays completed, with its file. The run claims that step
+  (`DownloadExecution.claimCompletion`) against a pause's `claimStop`: a pause, reschedule or
+  preemption that finds the run completing only waits for it, never showing `Paused` first, and
+  one that claimed first stops the run, which keeps its verified file for the resume.
   A file `Destination` is replaced, as it was written in place before.
   Pause, failure, `close()` and `remove(deleteFiles = false)` keep the partial file; cancel and
   `remove(deleteFiles = true)` delete it, never a file at the final name the task did not write.

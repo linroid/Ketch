@@ -44,12 +44,15 @@ import com.linroid.ketch.core.task.TaskRecord
 import com.linroid.ketch.core.task.TaskState
 import com.linroid.ketch.core.task.isKeptWithTask
 import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -79,6 +82,7 @@ import okio.Path.Companion.toPath
  * @param clock stamps [TaskRecord.completedAt] when the download completes
  * @param openFile opens the output file of a source that does not write its own files
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class DownloadExecution(
   private val handle: TaskHandle,
   private val sourceResolver: SourceResolver,
@@ -164,6 +168,28 @@ internal class DownloadExecution(
 
   /** Whether the source returned and this execution is completing; it takes no selections. */
   val isFinishing: Boolean get() = finishing
+
+  // What ends this run first: a pause ([claimStop]) or, once its file is verified, its
+  // completion ([claimCompletion]).
+  private val ending = AtomicInt(RUNNING)
+
+  /**
+   * Claims the end of this run for a pause, reschedule or preemption, which cancels it next.
+   * Returns `false` once the run is completing: its file is verified and it completes whatever
+   * stops it, so the task must not be shown paused on its way there.
+   */
+  fun claimStop(): Boolean {
+    ending.compareAndSet(RUNNING, STOPPING)
+    return ending.load() == STOPPING
+  }
+
+  /**
+   * Claims this run's completion before it runs to the end whatever stops it. A run a pause
+   * claimed first stops instead, as the pause cancels it next, keeping its verified file.
+   */
+  private suspend fun claimCompletion() {
+    if (!ending.compareAndSet(RUNNING, COMPLETING)) awaitCancellation()
+  }
 
   /**
    * Hands a saved selection of [fileIds], [total] bytes in size, to the running download, which
@@ -693,6 +719,7 @@ internal class DownloadExecution(
       // Verified, the download is done. A pause, reschedule or preemption that cancels this job
       // from here on finds it completed: stopped once the move landed, it would resume without
       // its partial file and download the file again beside it.
+      claimCompletion()
       withContext(NonCancellable) {
         if (!selfManagedIo) {
           // Closed before the move: some systems, such as Windows, cannot move an open file.
@@ -810,6 +837,7 @@ internal class DownloadExecution(
     }
     // Created and completed even when a stop lands meanwhile, as a larger download is once
     // verified: a partial file left behind would take the final name from the next run.
+    claimCompletion()
     withContext(NonCancellable) {
       val fa = openFile(target.writePath, dispatchers.disk)
       try {
@@ -1177,4 +1205,10 @@ internal class DownloadExecution(
     val segments: List<Segment>,
   )
 
+  private companion object {
+    // The values of [ending].
+    const val RUNNING = 0
+    const val STOPPING = 1
+    const val COMPLETING = 2
+  }
 }

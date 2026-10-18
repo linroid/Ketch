@@ -13,8 +13,10 @@ import com.linroid.ketch.core.task.InMemoryTaskStore
 import com.linroid.ketch.core.task.TaskState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -294,6 +296,10 @@ class PartialFileTest {
       // The file is on disk; the download has not resumed from it yet.
       assertFalse(task.state.value.isTerminal)
       val requests = engine.headCallCount to engine.downloadCallCount
+      val shown = mutableListOf<DownloadState>()
+      backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+        task.state.collect { shown += it }
+      }
 
       disk.holding = false
       stop(task)
@@ -301,6 +307,11 @@ class PartialFileTest {
       advanceTimeBy(2.minutes)
       runCurrent()
 
+      // The stop came too late, so the task never shows it on its way to completing.
+      assertTrue(
+        shown.none { it is DownloadState.Paused || it is DownloadState.Canceled },
+        "Shown: $shown",
+      )
       val completed = assertIs<DownloadState.Completed>(task.state.value)
       assertEquals(output.toString(), completed.outputPath)
       val record = store.load(task.taskId)
