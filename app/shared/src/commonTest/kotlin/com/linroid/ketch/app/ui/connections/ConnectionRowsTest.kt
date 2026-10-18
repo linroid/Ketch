@@ -3,7 +3,18 @@ package com.linroid.ketch.app.ui.connections
 import com.linroid.ketch.api.ActiveConnection
 import com.linroid.ketch.api.ActiveConnections
 import com.linroid.ketch.api.PeerDetails
+import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.durationText
+import com.linroid.ketch.app.i18n.joinText
+import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.ui.inspector.tabs.compactSizeText
+import com.linroid.ketch.app.ui.pulse.summaryText
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.connections_closed_ago
+import ketch.app.shared.generated.resources.connections_row_closed
+import ketch.app.shared.generated.resources.connections_total_received
+import ketch.app.shared.generated.resources.connections_total_sent
 import com.linroid.ketch.app.state.ConnectionGridState
 import com.linroid.ketch.app.state.DeviceConnections
 import com.linroid.ketch.app.state.TaskConnections
@@ -123,6 +134,69 @@ class ConnectionRowsTest {
         ),
       ),
     )
+
+  @Test
+  fun connectionRows_listClosedAfterOpen_onceEach_andTheSwitchPicksThem() {
+    val closed = connection(7, "ubuntu", "HTTP/2", opened = 90).copy(closedAt = NOW - 30.seconds)
+    // A connection a device lists as both open and closed shows once, as open.
+    val stale = http.copy(closedAt = NOW)
+    val base = grid("mac" to listOf("ubuntu.iso" to listOf(http, proxied)))
+    val snapshot = ActiveConnections(sampledAt = NOW, closed = listOf(closed, stale))
+    val grid = base.copy(
+      closed = listOf(
+        DeviceConnections(
+          deviceId = "mac",
+          name = verbatim("mac"),
+          tasks = listOf(
+            TaskConnections(
+              key = TaskKey("mac", "ubuntu"),
+              name = "ubuntu.iso",
+              cells = snapshot.closed.map { connectionCell("mac", it, snapshot) },
+            ),
+          ),
+        ),
+      ),
+    )
+
+    val all = connectionRows(grid, mapOf("mac" to "This Mac"))
+
+    assertEquals(listOf(1L, 2L, 7L), all.ids())
+    assertEquals(listOf(false, false, true), all.map { it.closed })
+    assertEquals(listOf(1L, 2L), all.withStatus(ConnectionStatus.Open).ids())
+    assertEquals(listOf(7L), all.withStatus(ConnectionStatus.Closed).ids())
+    assertEquals(all, all.withStatus(ConnectionStatus.All))
+    // Closed rows are searched and sorted like open ones: by how long they were open.
+    assertEquals(listOf(7L), all.withStatus(ConnectionStatus.Closed).matching(null, "mac").ids())
+    assertEquals(listOf(7L, 1L, 2L), all.arranged(ConnectionArrangement()).ids())
+    val row = all.last()
+    assertEquals(60.seconds, row.cell.age)
+    assertEquals(
+      Res.string.connections_row_closed.text(durationText(30.seconds)),
+      closedAgoText(row),
+    )
+    // It advances from when the snapshot arrived, as devices send no idle repeats.
+    assertEquals(
+      Res.string.connections_closed_ago.text(durationText(42.seconds)),
+      closedAgoText(row, detail = true, since = 12.seconds),
+    )
+    assertEquals(UiText.Empty, closedAgoText(all.first()))
+  }
+
+  @Test
+  fun headerSummary_addsTotals_onlyWhenTheDevicesCountThem() {
+    val plain = grid("mac" to listOf("ubuntu.iso" to listOf(http)))
+    assertEquals(plain.summaryText(), headerSummary(plain))
+
+    val counted = plain.copy(receivedBytes = 2_048, sentBytes = 0)
+    assertEquals(
+      listOf(
+        plain.summaryText(),
+        Res.string.connections_total_received.text(compactSizeText(2_048)),
+        Res.string.connections_total_sent.text(compactSizeText(0)),
+      ).joinText(),
+      headerSummary(counted),
+    )
+  }
 
   @Test
   fun next_cyclesNaturalReversedThenTheDefault() {

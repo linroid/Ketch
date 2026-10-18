@@ -183,6 +183,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 - **Wach während Downloads** — Die Desktop- und Android-Apps halten das System vom selbstständigen
   Ruhezustand ab, solange Downloads laufen; der Bildschirm kann sich trotzdem ausschalten
   (**Einstellungen → Allgemein**).
+- **Nach den Downloads** — Die Desktop-App kann Ketch beenden, den Computer in den Ruhezustand
+  versetzen oder ausschalten, sobald ihre Downloads fertig sind, nach einer Minute Vorwarnung, die
+  sich abbrechen lässt (**Einstellungen → Allgemein**).
 - **Dein Stil, deine Sprache** — Helles und dunkles Design mit sieben Akzentfarben, in English,
   简体中文, 繁體中文, 日本語, 한국어, Español, Português (Brasil), Deutsch, Français und Русский
   ([Übersetzungen](docs/development/localization.md)).
@@ -270,8 +273,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
 - **Ressourcensuche** — Herunterladbare Dateien auf einer Webseite finden
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer
   Verbindungen, damit der Download nicht auf die langsamste warten muss
-- **Nach den Downloads** — Ketch optional beenden, den Computer in den Ruhezustand versetzen oder
-  herunterfahren, sobald die Warteschlange leer ist
 - **Übertragung zwischen Geräten** — Senden an und Verschieben nach übertragen bereits geladene
   Daten, damit das andere Gerät fortsetzen kann, statt von vorn zu beginnen
   ([Plan](docs/plans/task-transfer.md))

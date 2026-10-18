@@ -35,4 +35,11 @@
   <string name="connections_countries_download">显示国家/地区</string>
   <string name="connections_countries_failed">无法获取国家/地区数据库：%1$s</string>
   <string name="connections_countries_attribution">IP 地理位置数据来自 DB-IP（db-ip.com）</string>
+  <string name="connections_status_open">活动</string>
+  <string name="connections_status_closed">已关闭</string>
+  <string name="connections_closed_ago">%1$s前</string>
+  <string name="connections_row_closed">%1$s前关闭</string>
+  <string name="connections_detail_was_open">持续了</string>
+  <string name="connections_total_received">已接收 %1$s</string>
+  <string name="connections_total_sent">已发送 %1$s</string>
 </resources>

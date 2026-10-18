@@ -177,6 +177,15 @@
   <string name="settings_general_keep_awake">Keep awake while downloading</string>
   <!-- Under Keep awake while downloading. %1$s is how the app names the device it runs on, at the start of the sentence: "This Mac", "This PC", "This phone". -->
   <string name="settings_general_keep_awake_hint">%1$s won't go to sleep on its own while downloads run. The screen can still turn off.</string>
+  <!-- What the desktop app does once the downloads on this computer finish; its choices are settings_general_when_done_*. -->
+  <string name="settings_general_when_done">When downloads finish</string>
+  <string name="settings_general_when_done_hint">Runs once nothing downloads or waits on this computer, after a minute's warning. It runs once and is forgotten when Ketch quits.</string>
+  <string name="settings_general_when_done_nothing">Do nothing</string>
+  <string name="settings_general_when_done_quit">Quit Ketch</string>
+  <!-- Puts the computer to sleep. -->
+  <string name="settings_general_when_done_sleep">Sleep</string>
+  <!-- Shuts the computer down. -->
+  <string name="settings_general_when_done_shut_down">Shut down</string>
 
   <!-- Notifications. -->
   <!-- The group of what Ketch reports about downloads. -->
@@ -940,6 +949,7 @@
   <string name="settings_search_badge">What the Dock or taskbar icon shows</string>
   <string name="settings_search_badge_keywords">count, dock, taskbar</string>
   <string name="settings_search_keep_awake_keywords">sleep, power, battery, prevent sleep, stay awake, wake lock</string>
+  <string name="settings_search_when_done_keywords">shut down, shutdown, power off, sleep, quit, exit, after downloads, queue, done</string>
   <string name="settings_search_shortcuts">All keyboard shortcuts</string>
   <string name="settings_search_shortcuts_keywords">keys, hotkeys, keybindings</string>
   <string name="settings_search_finished_keywords">complete, done, alert</string>

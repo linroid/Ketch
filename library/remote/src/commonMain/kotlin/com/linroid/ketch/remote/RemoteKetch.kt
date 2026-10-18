@@ -15,6 +15,7 @@ import com.linroid.ketch.api.KetchStats
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.NoDownloadSourceException
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
@@ -100,7 +101,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -334,6 +337,8 @@ class RemoteKetch internal constructor(
       contentType(ContentType.Application.Json)
       setBody(ResolveUrlRequest(input.url, input.headers))
     }
+    // Older servers answer these with 500, which stays a RemoteApiException.
+    resolveRefusal(response)?.let { throw it }
     checkSuccess(response)
     return response.body()
   }
@@ -343,16 +348,59 @@ class RemoteKetch internal constructor(
       contentType(ContentType.Application.OctetStream)
       setBody(input.bytes)
     }
+    resolveRefusal(response)?.let { throw it }
     when (response.status) {
-      HttpStatusCode.UnsupportedMediaType -> throw KetchError.Unsupported()
-      HttpStatusCode.UnprocessableEntity ->
-        throw json.decodeFromString(KetchError.tolerantSerializer(), response.bodyAsText())
       HttpStatusCode.PayloadTooLarge -> throw IllegalArgumentException("File is too large")
       HttpStatusCode.NotFound, HttpStatusCode.NotImplemented ->
         throw UnsupportedOperationException("Resolving file content is unavailable")
     }
     checkSuccess(response)
     return response.body()
+  }
+
+  /**
+   * The error a resolve the server refused for its input throws, as [KetchApi.resolve] does: 415
+   * `unsupported` for one no source takes, or that its source lacks something for, with the
+   * [cause][unsupportedCause] that tells them apart, and 422 with a source's own, decoded with its
+   * reason. Other bodies, such as a 415 for a request body that is not JSON or a proxy's page, are
+   * a [RemoteApiException].
+   */
+  private suspend fun resolveRefusal(response: HttpResponse): Exception? =
+    when (response.status) {
+      HttpStatusCode.UnsupportedMediaType -> {
+        val body = response.errorResponse()
+        if (body?.error == "unsupported") {
+          KetchError.Unsupported(unsupportedCause(body.message))
+        } else {
+          response.toRemoteApiException(body)
+        }
+      }
+      HttpStatusCode.UnprocessableEntity ->
+        typedError(response.bodyAsText()) ?: response.toRemoteApiException()
+      else -> null
+    }
+
+  /**
+   * Why the server refused an input with 415 `unsupported` and [message]: a
+   * [NoDownloadSourceException] when no source takes it, which Ketch servers word "No download
+   * source ...", else what the source that takes it lacks, such as a usable proxy: the reason
+   * after the server's "Not supported: ", or none when it gave none.
+   */
+  private fun unsupportedCause(message: String): Exception {
+    if (message.startsWith("No download source")) return NoDownloadSourceException()
+    val reason = message.removePrefix("Not supported").removePrefix(":").trim()
+    return IllegalStateException(reason.ifEmpty { null })
+  }
+
+  /** The [KetchError] [body] holds, or `null` when it is no JSON object with a `type`. */
+  private fun typedError(body: String): KetchError? {
+    val element = try {
+      json.parseToJsonElement(body)
+    } catch (e: SerializationException) {
+      return null
+    }
+    if (element !is JsonObject || "type" !in element) return null
+    return json.decodeFromJsonElement(KetchError.tolerantSerializer(), element)
   }
 
   override suspend fun start() {

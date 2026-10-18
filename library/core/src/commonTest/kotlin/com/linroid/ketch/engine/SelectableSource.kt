@@ -44,11 +44,17 @@ internal class SelectableSource(
   /** Whether the source reports progress when it applies a selection, as a busy transfer does. */
   var reportsOnChange = true
 
+  /** Whether a run reports progress as it starts; when false the test reports for it. */
+  var reportsOnStart = true
+
   /** Holds metadata lookups until completed. */
   var resolveGate: CompletableDeferred<Unit>? = null
 
   /** Holds every [store], the periodic and the final save's, until completed. */
   var saveGate: CompletableDeferred<Unit>? = null
+
+  /** Holds every [planSelection] until completed. */
+  var planGate: CompletableDeferred<Unit>? = null
 
   var resolves = 0
 
@@ -90,6 +96,7 @@ internal class SelectableSource(
 
   override suspend fun planSelection(request: SelectionRequest<Unit>): SelectionPlan {
     check(request.resolved != null) { "The file list is not known yet" }
+    planGate?.await()
     planned += request.fileIds
     val chosen = request.fileIds ?: ids
     require(chosen.isNotEmpty() && chosen.all { it in ids }) { "Unknown file id" }
@@ -123,7 +130,7 @@ internal class SelectableSource(
     val run = Run(context, resumed, initial)
     runs.update { it + run }
     context.acknowledgeSelection(initial.revision)
-    publish(context, initial.fileIds)
+    if (reportsOnStart) publish(context, initial.fileIds)
     val collector = if (collects) {
       launch {
         context.selection.collect { update ->
@@ -168,7 +175,11 @@ internal class RecordingTaskStore : TaskStore {
   private val inner = InMemoryTaskStore()
   val saves = mutableListOf<TaskRecord>()
 
+  /** Sees each record before it is saved, so before its task publishes it; may fail the save. */
+  var onSave: suspend (TaskRecord) -> Unit = {}
+
   override suspend fun save(record: TaskRecord) {
+    onSave(record)
     saves += record
     inner.save(record)
   }

@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.connections
 import com.linroid.ketch.api.ConnectionDirection
 import com.linroid.ketch.app.state.ConnectionCell
 import com.linroid.ketch.app.state.ConnectionGridState
+import com.linroid.ketch.app.state.DeviceConnections
 import com.linroid.ketch.app.ui.pulse.endpoint
 
 /**
@@ -27,18 +28,48 @@ internal class ConnectionRow(
 
   /** A torrent peer's client, as the peer names it; `null` when unknown or not a peer. */
   val client: String? get() = connection.peer?.client
+
+  /** Whether the connection closed. */
+  val closed: Boolean get() = cell.closedAgo != null
 }
 
-/** Every connection of [grid], each with its task's and device's names. */
+/**
+ * Every connection of [grid], open ones then closed ones, each with its task's and device's
+ * names. A closed connection a device also lists as open shows once, as open.
+ */
 internal fun connectionRows(
   grid: ConnectionGridState,
   deviceNames: Map<String, String>,
-): List<ConnectionRow> = grid.devices.flatMap { device ->
-  val deviceName = deviceNames[device.deviceId].orEmpty()
-  device.tasks.flatMap { task ->
-    task.cells.map { ConnectionRow(it, task.name, deviceName) }
+): List<ConnectionRow> {
+  fun rows(devices: List<DeviceConnections>) = devices.flatMap { device ->
+    val deviceName = deviceNames[device.deviceId].orEmpty()
+    device.tasks.flatMap { task ->
+      task.cells.map { ConnectionRow(it, task.name, deviceName) }
+    }
+  }
+  val open = rows(grid.devices)
+  val keys = open.mapTo(HashSet()) { it.cell.key }
+  return open + rows(grid.closed).filter { it.cell.key !in keys }
+}
+
+/** Which connections the page lists: open ones, closed ones, or both. */
+internal enum class ConnectionStatus {
+  Open,
+  Closed,
+  All,
+  ;
+
+  /** Whether it lists [row]. */
+  fun lists(row: ConnectionRow): Boolean = when (this) {
+    Open -> !row.closed
+    Closed -> row.closed
+    All -> true
   }
 }
+
+/** The rows [status] lists. */
+internal fun List<ConnectionRow>.withStatus(status: ConnectionStatus): List<ConnectionRow> =
+  if (status == ConnectionStatus.All) this else filter(status::lists)
 
 /**
  * A source type in the page's filter.

@@ -199,4 +199,11 @@
   </plurals>
   <string name="feedback_device_offline">%1$s 연결 끊김</string>
   <string name="feedback_device_online">%1$s에 다시 연결됨</string>
+  <string name="finish_warning_quit">1분 후 Ketch를 종료합니다</string>
+  <string name="finish_warning_sleep">1분 후 이 컴퓨터가 잠자기 상태가 됩니다</string>
+  <string name="finish_warning_shut_down">1분 후 이 컴퓨터가 종료됩니다</string>
+  <string name="finish_warning_detail">이 컴퓨터의 다운로드가 끝났습니다.</string>
+  <string name="finish_failed_quit">Ketch를 종료하지 못했습니다</string>
+  <string name="finish_failed_sleep">이 컴퓨터를 잠자기 상태로 만들지 못했습니다</string>
+  <string name="finish_failed_shut_down">이 컴퓨터를 종료하지 못했습니다</string>
 </resources>

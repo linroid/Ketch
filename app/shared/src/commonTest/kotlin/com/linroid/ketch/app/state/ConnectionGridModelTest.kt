@@ -69,6 +69,46 @@ class ConnectionGridModelTest {
   }
 
   @Test
+  fun connectionCell_closed_isIdle_andReadsItsTimesFromItsDevice() {
+    val closed = connection(1, "a", down = 900, openedSecondsAgo = 300)
+      .copy(closedAt = NOW - 45.seconds)
+    val snapshot = snapshot().copy(closed = listOf(closed))
+
+    val cell = connectionCell("mac", closed, snapshot)
+
+    assertEquals(TrafficDirection.Idle, cell.direction)
+    assertEquals(0, cell.level)
+    // Open for 255 s, closed 45 s before the device sampled it.
+    assertEquals(255.seconds, cell.age)
+    assertEquals(45.seconds, cell.closedAgo)
+    assertEquals(null, connectionCell("mac", connection(2, "a"), snapshot).closedAgo)
+  }
+
+  @Test
+  fun observe_closedAndTotals_comeApartFromTheOpenCells() = runTest {
+    val closed = connection(9, "a", openedSecondsAgo = 60).copy(closedAt = NOW - 5.seconds)
+    val mac = FakeConnections(
+      snapshot(connection(1, "a")).copy(
+        receivedBytes = 1_000,
+        sentBytes = 10,
+        closed = listOf(closed),
+      ),
+    )
+    val older = FakeConnections(snapshot(connection(2, "b")))
+    val model = model(source("mac", mac), source("old", older))
+
+    val state = model.observe(36).first { it.total > 1 }
+
+    // Closed connections never fill the strip.
+    assertEquals(listOf(1L, 2L), state.cells.map { it.key.id })
+    assertEquals(listOf(9L), state.closed.single().tasks.single().cells.map { it.key.id })
+    // The older device counts nothing, which adds nothing.
+    assertEquals(1_000L, state.receivedBytes)
+    assertEquals(10L, state.sentBytes)
+    assertEquals(null, model(source("old", older)).observe(36).first { it.total > 0 }.receivedBytes)
+  }
+
+  @Test
   fun connectionRetryDelay_failuresInARow_doubleUpTo30Seconds() {
     assertEquals(
       listOf(1, 2, 4, 8, 16, 30, 30).map { it.seconds },

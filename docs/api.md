@@ -169,7 +169,9 @@ ketch.download(
 - An HTTP probe is a `HEAD` request, or a `GET` for the first byte when the server refuses `HEAD`.
 - `resolve` runs until it has an answer; a magnet link, for example, waits for peers. There is no
   timeout, so cancel the call (for example with `withTimeout`) if you need one.
-- It throws `KetchError.Unsupported` when no source handles the URL or recognizes the content.
+- It throws `KetchError.Unsupported` when no source handles the URL or recognizes the content,
+  with a `NoDownloadSourceException` as its cause; a source that takes the input but lacks
+  something it needs, such as a usable proxy, throws it with a cause that says what.
 - To download content you resolved, pass the result as `DownloadRequest.resolvedSource`, with its
   `url` as the request URL. The result does not keep the bytes.
 

@@ -34,4 +34,11 @@
     <item quantity="many">%1$d более медленных подключений не показаны</item>
     <item quantity="other">%1$d более медленного подключения не показаны</item>
   </plurals>
+  <string name="connections_status_open">Открытые</string>
+  <string name="connections_status_closed">Закрытые</string>
+  <string name="connections_closed_ago">%1$s назад</string>
+  <string name="connections_row_closed">Закрыто %1$s назад</string>
+  <string name="connections_detail_was_open">Было открыто</string>
+  <string name="connections_total_received">получено %1$s</string>
+  <string name="connections_total_sent">отправлено %1$s</string>
 </resources>

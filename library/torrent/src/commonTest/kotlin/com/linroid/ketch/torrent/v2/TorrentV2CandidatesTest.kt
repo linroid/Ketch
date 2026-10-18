@@ -165,6 +165,70 @@ class TorrentV2CandidatesTest {
   }
 
   @Test
+  fun peerThatBroughtPayload_foundWhileBeingDialed_isDialedThirtySecondsAfterThatDial() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.connected(assertNotNull(book.next()).endpoint)
+    book.closed(a, violation = false, delivered = true)
+    repeat(3) {
+      now += assertNotNull(book.nextDueMs())
+      book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    }
+    now += assertNotNull(book.nextDueMs())
+    val target = assertNotNull(book.next())
+    // Local discovery names it 5 s into the dial, which times out 2 s later. Its next dial would
+    // come two minutes on, but it may be back: it is dialed 30 s after the dial that failed.
+    now += 5_000
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    now += 2_000
+    book.failed(target, IOException("Connection timed out"))
+    assertEquals(23_000L, book.nextDueMs())
+  }
+
+  @Test
+  fun peerThatBroughtPayload_foundWhileADialReachesIt_waitsAsUsualOnceRefused() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.connected(assertNotNull(book.next()).endpoint)
+    book.closed(a, violation = false, delivered = true)
+    repeat(3) {
+      now += assertNotNull(book.nextDueMs())
+      book.failed(assertNotNull(book.next()), IOException("Connection refused"))
+    }
+    now += assertNotNull(book.nextDueMs())
+    assertNotNull(book.next())
+    // Local discovery names it 5 s into the dial, which reaches it 2 s later, but the session,
+    // full, refuses it after its handshake. It was there, so the naming was no news: its next
+    // dial comes two minutes on, as usual.
+    now += 5_000
+    book.offer(a, PeerTopic.V2, PeerOrigin.LSD)
+    now += 2_000
+    book.closed(a, violation = false)
+    assertEquals(120_000L, book.nextDueMs())
+    // Named a minute later, it is brought forward: that naming was not spent.
+    now += 60_000
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    assertEquals(0L, book.nextDueMs())
+  }
+
+  @Test
+  fun peerThatBroughtPayload_foundWhileConnected_waitsAsUsualOnceItDrops() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.connected(assertNotNull(book.next()).endpoint)
+    book.closed(a, violation = false, delivered = true)
+    now += 5_000
+    book.connected(assertNotNull(book.next()).endpoint)
+    // The DHT names a peer we are connected to again: that says nothing about whether it is back
+    // once it drops.
+    now += 10_000
+    book.offer(a, PeerTopic.V2, PeerOrigin.DHT)
+    now += 50_000
+    book.closed(a, violation = false, delivered = true)
+    assertEquals(5_000L, book.nextDueMs())
+  }
+
+  @Test
   fun connectionThatLasted_countsAsTheFirstDial() {
     val book = book()
     for (endpoint in listOf(a, b)) {

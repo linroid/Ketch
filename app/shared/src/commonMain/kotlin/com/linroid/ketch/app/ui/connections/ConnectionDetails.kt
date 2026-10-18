@@ -43,8 +43,10 @@ import ketch.app.shared.generated.resources.connections_column_peer
 import ketch.app.shared.generated.resources.connections_column_task
 import ketch.app.shared.generated.resources.connections_column_up
 import ketch.app.shared.generated.resources.connections_detail_hint
+import ketch.app.shared.generated.resources.connections_detail_was_open
 import ketch.app.shared.generated.resources.connections_peer_interested
 import ketch.app.shared.generated.resources.connections_peer_unchoked
+import ketch.app.shared.generated.resources.connections_status_closed
 import ketch.app.shared.generated.resources.pulse_connection_peer_choking
 import ketch.app.shared.generated.resources.pulse_connection_received
 import ketch.app.shared.generated.resources.pulse_connection_secure
@@ -55,7 +57,8 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * Everything the page knows about [row]'s connection, label by label: the hover card of a table
- * row, and what a list row shows once tapped open. Values follow the live samples.
+ * row, and what a list row shows once tapped open. Values follow the live samples; a closed
+ * connection says when it closed and how long it was open.
  *
  * @param showDevice whether to name the device, as under All devices.
  * @param hint whether to say that the task name shows the task, as the card cannot be clicked.
@@ -96,6 +99,7 @@ internal fun ConnectionDetails(
       transferText(
         rateText(connection.downloadBps),
         Res.string.pulse_connection_received.text(compactSizeText(connection.downloadedBytes)),
+        closed = row.closed,
       ),
     )
     Detail(
@@ -103,9 +107,18 @@ internal fun ConnectionDetails(
       transferText(
         rateText(connection.uploadBps),
         Res.string.pulse_connection_sent.text(compactSizeText(connection.uploadedBytes)),
+        closed = row.closed,
       ),
     )
-    Detail(Res.string.connections_column_open.text(), durationText(row.cell.age).resolve())
+    if (row.closed) {
+      Detail(
+        Res.string.connections_status_closed.text(),
+        closedAgoText(row, detail = true, since = LocalClosedSince.current).resolve(),
+      )
+      Detail(Res.string.connections_detail_was_open.text(), durationText(row.cell.age).resolve())
+    } else {
+      Detail(Res.string.connections_column_open.text(), durationText(row.cell.age).resolve())
+    }
     if (hint) {
       Text(
         text = stringResource(Res.string.connections_detail_hint),
@@ -154,10 +167,10 @@ private fun peerDetails(row: ConnectionRow): UiText? = row.connection.peer?.let 
   ).joinText()
 }
 
-/** A speed, a dash for none, then what moved in all. */
+/** A speed, a dash for none, then what moved in all; a closed connection's total alone. */
 @Composable
-private fun transferText(rate: String?, total: UiText): String =
-  listOf(verbatim(rate ?: Dash), total).joinText().resolve()
+private fun transferText(rate: String?, total: UiText, closed: Boolean): String =
+  if (closed) total.resolve() else listOf(verbatim(rate ?: Dash), total).joinText().resolve()
 
 /**
  * The task cell of a table row: the one part of the row that shows the task, so it reads as a

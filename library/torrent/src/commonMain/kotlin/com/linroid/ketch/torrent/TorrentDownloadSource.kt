@@ -188,6 +188,8 @@ class TorrentDownloadSource(
   )
   private val engine = AtomicReference<TorrentEngine?>(null)
   private val closed = AtomicBoolean(false)
+  // Set once Ketch begins to close (stopping): the job stopping the seeders, which stop() awaits.
+  private val seedersStopping = AtomicReference<Job?>(null)
   // Set by the first close(), which closes http.
   private val released = AtomicBoolean(false)
   private val engineMutex = Mutex()
@@ -202,6 +204,9 @@ class TorrentDownloadSource(
   // The state each seeding session saves its checkpoint into, by task ([saveSeedingState]): set
   // once it seeds, removed once it stops or a run of the task takes it over.
   private val seedStates = MutableStateFlow<Map<String, TorrentSourceState>>(emptyMap())
+  // The seed-only sessions [startSeeding] lent a slot to while they check their files, by task:
+  // a smaller selection saved meanwhile reaches them ([changeSeedingSelection]).
+  private val checkingSeeders = MutableStateFlow<Map<String, CheckingSeeder>>(emptyMap())
   // Where seeding sessions save their state: the task records, once attached.
   private val sessionStates =
     AtomicReference<(suspend (taskId: String, state: SourceState) -> Unit)?>(null)
@@ -374,6 +379,8 @@ class TorrentDownloadSource(
         throw KetchError.Network(e)
       }
       engine.store(created)
+      // Started once Ketch began to close: its window opens now, as stopping() would have.
+      if (seedersStopping.load() != null) created.openStoppedWindow()
       if (closed.load()) {
         // Stopped under the mutex, which stop() waits for, so it never returns before this engine
         // released its listener and port mappings.
@@ -385,26 +392,72 @@ class TorrentDownloadSource(
   }
 
   /**
+   * Opens the engine's one window for `stopped` announces as Ketch begins to close, and stops
+   * the seeding sessions now, while Ketch pauses the downloads, so every torrent says it stopped
+   * within that window rather than the seeders in one of their own after the downloads; [stop]
+   * waits for them.
+   */
+  override fun stopping() {
+    if (seedersStopping.load() != null) return
+    val stopping = CoroutineScope(TorrentDispatchers.engine).launch(start = CoroutineStart.LAZY) {
+      stopSeeders()
+    }
+    if (!seedersStopping.compareAndSet(null, stopping)) return
+    engine.load()?.openStoppedWindow()
+    stopping.start()
+  }
+
+  /**
    * Stops the engine and returns once it has: its sessions, such as seeding ones, close and
    * announce that they stopped while the HTTP engine still runs. No engine starts after it.
    */
   override suspend fun stop() {
     shutDown()
-    saveSeeders()
+    engine.load()?.openStoppedWindow()
+    // What stopping() began, then seeders that started since, or every seeder without it.
+    seedersStopping.load()?.join()
+    stopSeeders()
     // Taken under the mutex, so an engine that was starting is stopped too.
     engineMutex.withLock { engine.exchange(null) }?.stop()
   }
 
   /**
-   * Saves each seeding session's state before the engine stops them, as no download run saves
-   * it; within [SHUTDOWN_SAVE_MS], so a session that cannot save never holds [stop] up.
+   * Stops the seeding sessions side by side, each pausing, which sends its `stopped` announces,
+   * while it saves its state, with the counters, as no download run saves it: first as the
+   * seeder is now, read without writing anything, so a slow disk saves while the trackers hear
+   * it, within the 5 s hosts wait before they exit, rather than after the window they share;
+   * then, once it paused, as it stopped, when that differs. Within [SHUTDOWN_SAVE_MS], so a
+   * session that cannot save never holds the rest up.
    */
-  private suspend fun saveSeeders() {
-    val seeders = seedStates.getAndUpdate { emptyMap() }
-    if (seeders.isEmpty()) return
-    withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
-      for ((taskId, base) in seeders) {
-        tasks.session(taskId)?.let { saveSeedingState(taskId, it, base) }
+  private suspend fun stopSeeders() {
+    val watched = stateMutex.withLock {
+      seedWatchers.toMap().also {
+        seedWatchers.clear()
+        it.keys.forEach(::unmarkSeeding)
+      }
+    }
+    watched.values.forEach { it.cancel() }
+    val bases = seedStates.getAndUpdate { emptyMap() }
+    coroutineScope {
+      for (taskId in watched.keys + bases.keys) launch {
+        val session = tasks.session(taskId) ?: return@launch
+        val pausing = launch {
+          try {
+            session.pause()
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: Exception) {
+            log.w { "Torrent taskId=$taskId did not stop seeding: ${e.describeCauses()}" }
+          }
+        }
+        val base = bases[taskId] ?: return@launch
+        withTimeoutOrNull(SHUTDOWN_SAVE_MS) {
+          val saved = saveSeedingState(taskId, session, base) { session.currentResumeData() }
+          pausing.join()
+          saveSeedingState(taskId, session, base) {
+            session.currentResumeData()?.takeUnless { it.contentEquals(saved) }
+          }
+        }
       }
     }
   }
@@ -599,11 +652,24 @@ class TorrentDownloadSource(
     privacy: TorrentDiscoveryPrivacy = config.discoveryPrivacy,
   ): ResolvedSource = parseMetainfo(bytes, privacy).logged("metainfo bytes")
 
-  private fun parseMetainfo(bytes: ByteArray, privacy: TorrentDiscoveryPrivacy): ResolvedSource {
+  /**
+   * Parses v2 or hybrid metainfo, else v1. A [newInput] is refused when Ketch could never download
+   * it (see [resolveV2Metainfo]); the metainfo a task saved is read as it was accepted.
+   */
+  private fun parseMetainfo(
+    bytes: ByteArray,
+    privacy: TorrentDiscoveryPrivacy,
+    newInput: Boolean = true,
+  ): ResolvedSource {
     check(!closed.load()) { "Torrent source is closed" }
-    resolveV2Metainfo(null, bytes, config, privacy)?.let { return it }
+    resolveV2Metainfo(null, bytes, config, privacy, newInput = newInput)?.let { return it }
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
-    return resolvedMetainfo("torrent:${metadata.infoHash.hex}", metadata, privacy)
+    val url = "torrent:${metadata.infoHash.hex}"
+    return if (newInput) {
+      resolvedMetainfo(url, metadata, privacy)
+    } else {
+      resolved(url, metadata, privacy)
+    }
   }
 
   /** [resolved] for v1 metainfo a caller supplied, refusing one that could never find a peer. */
@@ -640,12 +706,37 @@ class TorrentDownloadSource(
       requireOwnedPaths(request.taskId, table, state, output, added)
     }
     val saved = request.segments.orEmpty().associateBy { it.index }
+    fun whole(id: String) = request.completed && id in effective
+    // A file without a saved segment, such as one deselected and chosen again, counts what the
+    // saved checkpoint verified of it.
+    val kept = if (ids.any { !whole(it) && saved[it.toInt()] == null }) {
+      keptProgress(request.taskId, state, request.resolved)
+    } else {
+      emptyMap()
+    }
     val segments = table.segments(ids) { file ->
-      if (request.completed && file.id in effective) file.size
-      else saved[file.id.toInt()]?.downloadedBytes ?: 0
+      if (whole(file.id)) file.size
+      else saved[file.id.toInt()]?.downloadedBytes ?: kept[file.id] ?: 0
     }
     return SelectionPlan(ids, table.totalOf(ids), changed = ids != effective,
       expands = added.isNotEmpty(), segments = segments)
+  }
+
+  /** [savedFileProgress] of [state], or none when its checkpoint cannot be read. */
+  private suspend fun keptProgress(
+    taskId: String,
+    state: TorrentSourceState?,
+    resolved: ResolvedSource?,
+  ): Map<String, Long> {
+    if (state == null || state.resumeData.isEmpty()) return emptyMap()
+    return withContext(TorrentDispatchers.engine) {
+      try {
+        savedFileProgress(state, metainfoOf(resolved, state), config)
+      } catch (e: Exception) {
+        log.d { "Torrent taskId=$taskId saved no readable progress: ${e.describeCauses()}" }
+        emptyMap()
+      }
+    }
   }
 
   /**
@@ -766,25 +857,30 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Saves the latest checkpoint of [taskId]'s seeding [session], as [base] with its resume data,
-   * into the task's record through [sessionStates]: no download run saves it, so the payload
-   * counters, what it uploaded above all, would otherwise go back to what the task completed
-   * with after a restart. A failure is logged, and the record keeps its last state.
+   * Saves the latest checkpoint of [taskId]'s seeding [session], as [base] with its resume data
+   * ([resumeData]: what [TorrentSession.saveResumeData] writes, unless the caller reads it
+   * otherwise; null saves nothing), into the task's record through [sessionStates]: no download
+   * run saves it, so the payload counters, what it uploaded above all, would otherwise go back to
+   * what the task completed with after a restart. Returns the resume data it saved. A failure is
+   * logged, and the record keeps its last state.
    */
   private suspend fun saveSeedingState(
     taskId: String,
     session: TorrentSession,
     base: TorrentSourceState,
-  ) {
-    val save = sessionStates.load() ?: return
-    try {
-      val saved = session.saveResumeData() ?: return
+    resumeData: suspend () -> ByteArray? = { session.saveResumeData() },
+  ): ByteArray? {
+    val save = sessionStates.load() ?: return null
+    return try {
+      val saved = resumeData() ?: return null
       save(taskId, encodeState(base.copy(resumeData = encodeBase64(saved))))
       log.d { "Torrent taskId=$taskId saved its seeding state" }
+      saved
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
       log.w { "Torrent taskId=$taskId could not save its seeding state: ${e.describeCauses()}" }
+      null
     }
   }
 
@@ -804,8 +900,11 @@ class TorrentDownloadSource(
   internal suspend fun startSeeding(task: SeedingTask): SeedingOutcome {
     val taskId = task.taskId
     seedingAvailability(taskId)?.let { return it }
+    // A smaller selection saved since the task was read: a file dropped, deleted maybe, is never
+    // opened or checked.
+    val opened = smallerSelection(task, task.selectedFileIds) ?: task.selectedFileIds
     val plan = try {
-      seedPlan(task)
+      seedPlan(task, opened)
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
@@ -840,6 +939,10 @@ class TorrentDownloadSource(
         outcome = SeedingOutcome.NO_SLOT
         return outcome
       }
+      // From here a smaller selection saved meanwhile reaches the session, which checks its
+      // files again with it; one saved as it opened is read before the check.
+      checkingSeeders.update { it + (taskId to CheckingSeeder(session, opened)) }
+      seedLatestSelection(task, opened)
       log.i { "Torrent taskId=$taskId checks its files to seed (${logHash(plan.hash)})" }
       session.resume()
       val reached = session.state.first {
@@ -863,10 +966,17 @@ class TorrentDownloadSource(
         else -> if (pausedUploads.load()) SeedingOutcome.UPLOADS_PAUSED else SeedingOutcome.FAILED
       }
       if (outcome == SeedingOutcome.SEEDING) {
-        seedStates.update { it + (taskId to plan.state) }
+        // The state its checkpoint saves into takes the selection it seeds.
+        val seeded = checkingSeeders.value[taskId]?.selection ?: opened
+        val state = if (seeded == task.selectedFileIds) plan.state else {
+          plan.state.copy(selectedFileIds = seeded, totalBytes = session.totalBytes)
+        }
+        seedStates.update { it + (taskId to state) }
         markSeeding(taskId)
+        checkingSeeders.update { it - taskId }
         watchSeeder(taskId, session)
         log.i { "Torrent taskId=$taskId seeds again" }
+        seedLatestSelection(task, seeded)
       } else {
         log.i { "Torrent taskId=$taskId does not seed: $outcome" }
       }
@@ -878,6 +988,8 @@ class TorrentDownloadSource(
       outcome = SeedingOutcome.FAILED
       return outcome
     } finally {
+      // Only the reservation's holder adds one.
+      if (reserved) checkingSeeders.update { it - taskId }
       if (outcome != SeedingOutcome.SEEDING) withContext(NonCancellable) {
         if (lent) {
           stopSeeder(taskId)
@@ -894,6 +1006,45 @@ class TorrentDownloadSource(
   }
 
   /**
+   * Applies to [task]'s seeder, which seeds [from], the smaller selection its task saved since:
+   * [changeSeedingSelection] changes a seeder only while it checks or seeds, so one saved from
+   * then on reaches it, and one saved before is read here, before the check and once it seeds.
+   * Reads it again after each change, which a newer selection applied meanwhile may have
+   * preceded, until it holds.
+   */
+  private suspend fun seedLatestSelection(task: SeedingTask, from: Set<String>) {
+    var seeded = from
+    while (true) {
+      val latest = smallerSelection(task, seeded) ?: return
+      try {
+        changeSeedingSelection(task.taskId, latest)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w {
+          "Torrent taskId=${task.taskId} seeds its previous selection: ${e.describeCauses()}"
+        }
+        return
+      }
+      seeded = latest
+    }
+  }
+
+  /**
+   * [task]'s current selection when it only drops files from [seeded], which a seeder can take;
+   * else `null`. A selection that adds files reopens the task instead, whose run takes the seeder
+   * over.
+   */
+  private fun smallerSelection(task: SeedingTask, seeded: Set<String>): Set<String>? {
+    val latest = task.selection()
+    if (latest.isEmpty() || latest == seeded) return null
+    return latest.takeIf { seeded.isEmpty() || seeded.containsAll(it) }
+  }
+
+  /** A seed-only session that checks its files, and the selection it checks them for. */
+  private class CheckingSeeder(val session: TorrentSession, val selection: Set<String>)
+
+  /**
    * A completed task's seed-only session: its identity, the state it saves its checkpoint into,
    * and how to open it.
    */
@@ -903,7 +1054,7 @@ class TorrentDownloadSource(
     val open: suspend () -> TorrentSession,
   )
 
-  private suspend fun seedPlan(task: SeedingTask): SeedPlan {
+  private suspend fun seedPlan(task: SeedingTask, selection: Set<String>): SeedPlan {
     val state = decodeState(task.sourceState)
     val checkpoint = if (state.version == 3 || state.resumeData.isEmpty()) null else
       TorrentCheckpoint.decode(decodeBase64(state.resumeData))
@@ -916,7 +1067,7 @@ class TorrentDownloadSource(
     val table = withContext(TorrentDispatchers.engine) {
       fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     }
-    val selected = selectionOf(table, task.selectedFileIds, state)
+    val selected = selectionOf(table, selection, state)
     val magnet = task.url.takeIf { it.startsWith("magnet:", true) }
     val resumeData = state.resumeData.takeIf { it.isNotEmpty() }
     if (table.v2) {
@@ -982,11 +1133,23 @@ class TorrentDownloadSource(
     }
   }
 
-  /** Applies a completed task's smaller selection to its seeding session, if it seeds. */
+  /**
+   * Applies a completed task's smaller selection to its seeding session, if it seeds or checks
+   * its files to seed: the check starts again with it, so a file dropped meanwhile, deleted
+   * maybe, no longer keeps it from seeding.
+   */
   internal suspend fun changeSeedingSelection(taskId: String, fileIds: Set<String>): Boolean {
-    if (taskId !in seedingTaskIds.value) return false
-    val session = tasks.session(taskId) ?: return false
+    // Not once a download took a checking seeder's slot, or the task's own run took it over.
+    val checking = if (taskId in seedingTaskIds.value) null else {
+      checkingSeeders.value[taskId]?.session
+        ?.takeIf { slots.isLent(taskId) && tasks.session(taskId) === it } ?: return false
+    }
+    val session = checking ?: tasks.session(taskId) ?: return false
     val live = session.changeSelection(fileIds)
+    checkingSeeders.update { seeders ->
+      if (checking == null || seeders[taskId]?.session !== checking) return@update seeders
+      seeders + (taskId to CheckingSeeder(checking, fileIds))
+    }
     stateMutex.withLock {
       states[taskId]?.let {
         states[taskId] = it.copy(selectedFileIds = fileIds, totalBytes = session.totalBytes)
@@ -1017,7 +1180,10 @@ class TorrentDownloadSource(
       is ResolveInput.Content -> resolveContent(input.bytes)
     }
 
-  /** Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. */
+  /**
+   * Resolves dropped or picked `.torrent` bytes via [resolveMetainfo], off the caller thread. A
+   * refusal is a source error that says why, as one for a `.torrent` URL is.
+   */
   private suspend fun resolveContent(content: ByteArray): ResolvedSource =
     withContext(TorrentDispatchers.engine) {
       try {
@@ -1025,7 +1191,8 @@ class TorrentDownloadSource(
       } catch (e: CancellationException) { throw e
       } catch (e: Exception) {
         if (e is KetchError) throw e
-        throw KetchError.SourceError(TYPE, e)
+        // Content in memory never fails on a disk, whatever the parser throws.
+        throw torrentSourceError(e)
       }
     }
 
@@ -1186,7 +1353,9 @@ class TorrentDownloadSource(
     val privacy = state.privacy ?: config.discoveryPrivacy
     val metainfo = metainfoOf(context.preResolved, state)
     val resolved = when {
-      metainfo != null -> resolveMetainfo(metainfo, privacy)
+      // Saved with the task, which passed the checks of new inputs when it was added or predates
+      // them; admission still refuses pieces too large to assemble.
+      metainfo != null -> parseMetainfo(metainfo, privacy, newInput = false)
       checkpoint != null -> resolved(context.url, checkpoint.metadata, privacy)
       else -> resolveUntilFound(context.url, privacy, context.headers)
     }
@@ -1216,7 +1385,7 @@ class TorrentDownloadSource(
     val hash = requireNotNull(resolved.metadata[META_INFO_HASH])
     val bytes = decodeBase64(requireNotNull(resolved.metadata[ResolvedSource.METAINFO_KEY]))
     val v2 = resolveV2Metainfo(resolved.url, bytes, config, resolvedPrivacy(resolved),
-      checkDiscovery = false)
+      newInput = false)
     if (v2 != null) {
       require(v2.metadata[META_INFO_HASH] == hash) { "Resolved torrent hash mismatch" }
       executeV2(context, v2, previous)
@@ -1500,6 +1669,9 @@ class TorrentDownloadSource(
    * the files an earlier run gave it. Should it check them again, the task keeps what the session
    * reported last. Either way the task shows that progress over the files it follows now, which
    * a selection taken meanwhile changes, as [planSelection] fits saved progress to a selection.
+   * The task follows a new selection from the moment Ketch delivers it, as Ketch shows it then,
+   * also while the session takes it or an earlier one, which can last: until it has, the session
+   * reports the files it had, and one checking its files checks them again.
    */
   private suspend fun track(
     context: DownloadContext,
@@ -1514,18 +1686,33 @@ class TorrentDownloadSource(
     // All guarded by gate.
     var attached = true
     var appliedRevision = if (adopted) -1 else revision
-    // The files the run follows: the ones it started with until it applies a selection. Ketch
-    // may run it again for a selection that came as the last run finished, with segments that
-    // still describe that run's files.
+    // Whether the session is taking a selection.
+    var applying = false
+    // The files the run follows: the ones it started with until it receives a selection, then
+    // the latest it received, also while the session still takes an earlier one. Ketch may run it
+    // again for a selection that came as the last run finished, with segments that still describe
+    // that run's files.
     var following = files
+    // The selection revision of [following].
+    var followed = revision
     // Each file's progress by file index, as Ketch restored or planned it, or as the session
     // last reported it, kept for files deselected meanwhile.
     val held = context.segments.value.associateTo(HashMap()) { it.index to it.downloadedBytes }
     // The size of the files the segments describe.
     var total = 0L
 
+    /** Under gate: follows the latest selection the run received, which Ketch shows already. */
+    fun follow() {
+      val latest = context.selection.value
+      if (latest.revision > followed) {
+        following = table.ordered(latest.fileIds.ifEmpty { table.ids })
+        followed = latest.revision
+      }
+    }
+
     /** Under gate: shows [held] over the files the run follows. */
     fun hold() {
+      follow()
       context.segments.value = table.segments(following) { held[it.id.toInt()] ?: 0 }
       total = table.totalOf(following)
     }
@@ -1534,6 +1721,16 @@ class TorrentDownloadSource(
       context.selection.collect { update ->
         if (gate.withLock { update.revision <= appliedRevision }) return@collect
         val ids = table.ordered(update.fileIds.ifEmpty { table.ids })
+        // Shown until the session reports the new selection, as taking it can last: one taken
+        // while the session checks its files starts the check again.
+        gate.withLock {
+          if (update.revision >= followed) {
+            following = ids
+            followed = update.revision
+          }
+          applying = true
+          hold()
+        }
         val live = session.changeSelection(ids)
         stateMutex.withLock {
           states[taskId]?.let {
@@ -1542,10 +1739,7 @@ class TorrentDownloadSource(
         }
         gate.withLock {
           appliedRevision = update.revision
-          following = ids
-          // Shown until the session reports the new selection; one taken while the session
-          // checks its files starts the check again.
-          hold()
+          applying = false
           if (attached && live) context.acknowledgeSelection(update.revision)
         }
         log.i {
@@ -1578,7 +1772,17 @@ class TorrentDownloadSource(
           log.d { "Torrent taskId=$taskId session state: $status" }
           lastState = status
         }
-        if (status in CHECKED && gate.withLock { appliedRevision >= revision }) {
+        // The revision the session runs, once its report describes the files the run follows: it
+        // took the last selection the run received.
+        val reporting = if (status in CHECKED) {
+          gate.withLock {
+            follow()
+            appliedRevision.takeIf { it == followed && !applying }
+          }
+        } else {
+          null
+        }
+        if (reporting != null) {
           val chosen = session.selectedFileIds.ifEmpty { files }
           val reported = when (session) {
             is KotlinTorrentSession -> {
@@ -1592,9 +1796,15 @@ class TorrentDownloadSource(
             else -> table.segments(chosen) { 0 }
           }
           gate.withLock {
-            context.segments.value = reported
-            total = table.totalOf(chosen)
-            reported.forEach { held[it.index] = it.downloadedBytes }
+            follow()
+            if (applying || appliedRevision != reporting || followed != reporting) {
+              // A selection arrived as the session reported, which may still describe the last.
+              hold()
+            } else {
+              context.segments.value = reported
+              total = table.totalOf(chosen)
+              reported.forEach { held[it.index] = it.downloadedBytes }
+            }
           }
         } else {
           // The selection may have changed since the session last reported.
@@ -1948,9 +2158,13 @@ internal fun torrentFailure(error: Throwable): KetchError = when (error) {
   is TimeoutCancellationException -> KetchError.Network(error)
   is TorrentStorageException -> KetchError.Disk(error.cause)
   is IOException -> KetchError.Disk(error)
-  else -> KetchError.SourceError(TorrentDownloadSource.TYPE, error,
-    detail = error.message?.let(::withoutUrls)?.trim()?.take(MAX_FAILURE_DETAIL)?.ifEmpty { null })
+  else -> torrentSourceError(error)
 }
+
+/** A [KetchError.SourceError] for [error], with its message, without URLs, as the `detail`. */
+internal fun torrentSourceError(error: Throwable): KetchError.SourceError =
+  KetchError.SourceError(TorrentDownloadSource.TYPE, error,
+    detail = error.message?.let(::withoutUrls)?.trim()?.take(MAX_FAILURE_DETAIL)?.ifEmpty { null })
 
 /** The longest failure message a torrent's source error carries. */
 private const val MAX_FAILURE_DETAIL = 200

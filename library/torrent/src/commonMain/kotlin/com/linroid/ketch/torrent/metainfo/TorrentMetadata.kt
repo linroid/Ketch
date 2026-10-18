@@ -89,10 +89,7 @@ internal data class TorrentMetadata(
       val folder = diskComponent(name)
       val pieceLength = requireNotNull(info["piece length"]?.integer) { "Missing piece length" }
       require(pieceLength > 0) { "Invalid piece length" }
-      require(pieceLength <= 16L * 1024 * 1024) {
-        "The torrent's pieces are ${pieceLength / (1024 * 1024)} MiB, larger than the 16 MiB " +
-          "Ketch supports"
-      }
+      requireSupportedPieceLength(pieceLength)
       val fileNodes = info["files"]
       require(fileNodes == null || info["length"] == null) { "Conflicting file layouts" }
       val files = if (fileNodes != null) {
@@ -209,6 +206,17 @@ internal data class TorrentMetadata(
 
 /** The most content files a v1 torrent lists, besides its padding files. */
 internal const val MAX_FILES = 10_000
+
+/** The largest piece a torrent may have, v1, v2 or hybrid: each is assembled in memory. */
+internal const val MAX_PIECE_LENGTH = 16L * 1024 * 1024
+
+/** Refuses a torrent whose pieces of [pieceLength] bytes are larger than [MAX_PIECE_LENGTH]. */
+internal fun requireSupportedPieceLength(pieceLength: Long) {
+  require(pieceLength <= MAX_PIECE_LENGTH) {
+    "The torrent's pieces are ${pieceLength / (1024 * 1024)} MiB, larger than the " +
+      "${MAX_PIECE_LENGTH / (1024 * 1024)} MiB Ketch supports"
+  }
+}
 
 /** The most trackers a torrent or magnet keeps; later ones are left out. */
 internal const val MAX_TRACKERS = 128

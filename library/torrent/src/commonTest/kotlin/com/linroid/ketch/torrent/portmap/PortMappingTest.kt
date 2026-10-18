@@ -8,6 +8,8 @@ import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.numericHost
 import com.linroid.ketch.torrent.net.privateIpv4
+import com.linroid.ketch.torrent.webseed.drain
+import com.linroid.ketch.torrent.webseed.withInfoLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,57 +79,6 @@ class PortMappingTest {
       }
     }
 
-  /**
-   * A NAT-PMP gateway: external address 203.0.113.7, mappings to the internal port plus
-   * [offset], or the result code [refuse] when set. Records each request's opcode.
-   */
-  private suspend fun natPmpGateway(
-    network: TorrentNetwork,
-    scope: CoroutineScope,
-    offset: Int = 0,
-    /** Added to UDP mappings only, as a gateway that gives UDP another port. */
-    udpOffset: Int = 0,
-    refuse: Int = 0,
-    /** Grants mappings without replying, as a gateway whose replies are lost. */
-    silentGrants: Boolean = false,
-    /** Opcode and lifetime of each mapping request; the test reads it while the gateway runs. */
-    requests: MutableStateFlow<List<Pair<Int, Int>>> = MutableStateFlow(emptyList()),
-  ): Int {
-    val socket = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
-    scope.launch {
-      try {
-        while (true) {
-          val datagram = socket.receive()
-          val input = Buffer().write(datagram.bytes)
-          input.readByte()
-          val opcode = input.readByte().toInt()
-          val reply = Buffer().writeByte(0).writeByte(128 + opcode).writeShort(refuse).writeInt(1)
-          if (opcode == 0) {
-            reply.write(byteArrayOf(203.toByte(), 0, 113, 7))
-          } else {
-            input.readShort()
-            val internal = input.readShort().toInt() and 0xffff
-            val external = input.readShort().toInt() and 0xffff
-            val lifetime = input.readInt()
-            requests.update { it + (opcode to lifetime) }
-            if (silentGrants && lifetime != 0) continue
-            reply.writeShort(internal)
-              .writeShort(if (lifetime == 0) 0 else {
-                // A port asked for that is not the internal one is granted, as a free port is.
-                (external.takeIf { it != 0 && it != internal } ?: (internal + offset)) +
-                  if (opcode == 1) udpOffset else 0
-              })
-              .writeInt(lifetime)
-          }
-          socket.send(datagram.remote, reply.readByteArray())
-        }
-      } finally {
-        socket.close()
-      }
-    }
-    return socket.local.port
-  }
-
   @Test
   fun natPmp_externalAddressAndMappings() = gateways { network, scope ->
     val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
@@ -164,7 +116,16 @@ class PortMappingTest {
     val taken = mutableSetOf<Int>()
     /** External ports held for UDP only. */
     val takenUdp = mutableSetOf<Int>()
+    /** Refuses leases other than permanent ones (725), as some routers do. */
+    var permanentOnly = false
+    /** The fault DeletePortMapping answers, when set. */
+    var deleteFault: Int? = null
   }
+
+  /** A SOAP fault with UPnP error [code]. */
+  private fun upnpFault(code: Int) = 500 to "<s:Envelope><s:Body><s:Fault><detail><UPnPError>" +
+    "<errorCode>$code</errorCode><errorDescription>Refused</errorDescription></UPnPError>" +
+    "</detail></s:Fault></s:Body></s:Envelope>"
 
   /** An SSDP responder pointing at an HTTP server with an IGD description and SOAP control. */
   private suspend fun upnpGateway(network: TorrentNetwork, scope: CoroutineScope, igd: Igd): Int {
@@ -190,10 +151,14 @@ class PortMappingTest {
                 igd.actions.update { it + "$action ${UpnpClient.tag(body, "NewProtocol")} $port" }
                 val udp = UpnpClient.tag(body, "NewProtocol") == "UDP"
                 val taken = port in igd.taken || udp && port in igd.takenUdp
+                val lease = UpnpClient.tag(body, "NewLeaseDuration")
+                val deleteFault = igd.deleteFault
                 if (action == "AddPortMapping" && taken) {
-                  500 to "<s:Envelope><s:Body><s:Fault><detail><UPnPError>" +
-                    "<errorCode>718</errorCode><errorDescription>ConflictInMappingEntry" +
-                    "</errorDescription></UPnPError></detail></s:Fault></s:Body></s:Envelope>"
+                  upnpFault(718)
+                } else if (action == "AddPortMapping" && igd.permanentOnly && lease != "0") {
+                  upnpFault(725)
+                } else if (action == "DeletePortMapping" && deleteFault != null) {
+                  upnpFault(deleteFault)
                 } else {
                   200 to "<s:Envelope><s:Body><u:${action}Response>" +
                     "<NewExternalIPAddress>203.0.113.7</NewExternalIPAddress>" +
@@ -399,6 +364,151 @@ class PortMappingTest {
     mapper.stop(timeoutMs = stopMs)
     assertEquals(listOf(2 to 3600, 2 to 0), requests.value)
   }
+
+  /** Maps TCP port 6881 alone through the NAT-PMP gateway on [port], and returns its mapper. */
+  private suspend fun mapThroughNatPmp(network: TorrentNetwork, scope: CoroutineScope, port: Int) =
+    CompletableDeferred<Int?>().let { mapped ->
+      TorrentPortMapper(scope, tcpPort = 6881, udpPort = { null },
+        onMapped = { mapped.complete(it) },
+        natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
+        upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+        networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
+        .also {
+          it.start()
+          assertEquals(6881, mapped.await())
+        }
+    }
+
+  /**
+   * Maps TCP port 6881 alone through the UPnP gateway answering SSDP on [ssdp], NAT-PMP being
+   * silent on [silent], and returns its mapper.
+   */
+  private suspend fun mapThroughUpnp(
+    network: TorrentNetwork,
+    scope: CoroutineScope,
+    ssdp: Int,
+    silent: Int,
+  ) = CompletableDeferred<Int?>().let { mapped ->
+    TorrentPortMapper(scope, tcpPort = 6881, udpPort = { null },
+      onMapped = { mapped.complete(it) },
+      natPmp = NatPmpClient(network, silent, retryMs = listOf(50)),
+      upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", ssdp), searchMs = 300),
+      networks = { listOf(loopbackNetwork) })
+      .also {
+        it.start()
+        assertEquals(6881, mapped.await())
+      }
+  }
+
+  /** The lines about removing port mappings among [lines] so far. */
+  private fun removals(lines: Channel<String>) =
+    lines.drain().filter { "mapping of port" in it }
+
+  @Test
+  fun mapper_stop_logsOnceThatTheMappingIsRemoved() = gateways { network, scope ->
+    val port = natPmpGateway(network, scope)
+    withInfoLog { lines ->
+      val mapper = mapThroughNatPmp(network, scope, port)
+      mapper.stop(timeoutMs = stopMs)
+      // Removed and forgotten: another stop has nothing to remove or tell.
+      mapper.stop(timeoutMs = stopMs)
+      assertEquals(
+        listOf("[TorrentEngine] Removed the mapping of port 6881 through 1 NAT layer(s)"),
+        removals(lines),
+      )
+    }
+  }
+
+  @Test
+  fun mapper_stop_unconfirmedRemoval_saysTheGatewayForwardsItUntilItsLeaseEnds() =
+    gateways { network, scope ->
+      val port = natPmpGateway(network, scope, silentRemovals = true)
+      withInfoLog { lines ->
+        mapThroughNatPmp(network, scope, port).stop(timeoutMs = stopMs)
+        assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 0 of 1 NAT " +
+          "layer(s) confirmed it; the others may still forward the port until their lease ends"),
+          removals(lines))
+      }
+    }
+
+  @Test
+  fun mapper_stop_timedOut_saysWhatTheGatewaysStillForward() = gateways { network, scope ->
+    val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
+    val port = natPmpGateway(network, scope, silentRemovals = true, requests = requests)
+    withInfoLog { lines ->
+      mapThroughNatPmp(network, scope, port).stop(timeoutMs = 300)
+      assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881 timed out after " +
+        "300ms: 0 of 1 NAT layer(s) confirmed it; the others may still forward the port until " +
+        "their lease ends"), removals(lines))
+      assertEquals(listOf(2 to 3600, 2 to 0), requests.first { it.size == 2 })
+    }
+  }
+
+  @Test
+  fun mapper_stop_permanentLeaseLeft_saysTheRouterForwardsItUntilItDropsIt() =
+    gateways { network, scope ->
+      val igd = Igd().apply {
+        permanentOnly = true
+        deleteFault = 501
+      }
+      val ssdp = upnpGateway(network, scope, igd)
+      val silent = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+      try {
+        withInfoLog { lines ->
+          mapThroughUpnp(network, scope, ssdp, silent.local.port).stop(timeoutMs = stopMs)
+          // A lease of 0 never ends.
+          assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 0 of 1 NAT " +
+            "layer(s) confirmed it; the others may still forward the port until the router drops " +
+            "it, as UPnP leased it for good"), removals(lines))
+        }
+        assertEquals(listOf("AddPortMapping TCP 6881", "AddPortMapping TCP 6881",
+          "GetExternalIPAddress null null", "DeletePortMapping TCP 6881"), igd.actions.value)
+      } finally {
+        silent.close()
+      }
+    }
+
+  @Test
+  fun mapper_stop_duringTheFirstPass_saysTheGatewayMayStillForwardThePort() =
+    gateways { network, scope ->
+      val requests = MutableStateFlow(emptyList<Pair<Int, Int>>())
+      val port = natPmpGateway(network, scope, silentGrants = true, silentRemovals = true,
+        requests = requests)
+      withInfoLog { lines ->
+        val mapper = TorrentPortMapper(scope, tcpPort = 6881, udpPort = { 6881 },
+          onMapped = {},
+          natPmp = NatPmpClient(network, port, retryMs = listOf(replyMs)),
+          upnp = UpnpClient(network, ssdp = PeerEndpoint("127.0.0.1", 9), searchMs = 100),
+          networks = { listOf(LocalIpv4Network(ip("127.0.0.2"), 8)) })
+        mapper.start()
+        // The gateway mapped TCP, but no reply says so before the engine stops, nor after.
+        requests.first { it.isNotEmpty() }
+        mapper.stop(timeoutMs = stopMs)
+        assertEquals(listOf("[TorrentEngine] Removing the mapping of port 6881: 0 of 1 NAT " +
+          "layer(s) confirmed it; the others may still forward the port until their lease ends"),
+          removals(lines))
+        assertEquals(listOf(2 to 3600, 2 to 0), requests.value)
+      }
+    }
+
+  @Test
+  fun mapper_stop_upnpRouterHoldsNoSuchEntry_countsTheMappingRemoved() =
+    gateways { network, scope ->
+      // NoSuchEntryInArray: the router lost the mapping already.
+      val ssdp = upnpGateway(network, scope, Igd().apply { deleteFault = 714 })
+      val silent = network.bindUdp(PeerEndpoint("127.0.0.1", 0))
+      try {
+        withInfoLog { lines ->
+          mapThroughUpnp(network, scope, ssdp, silent.local.port).stop(timeoutMs = stopMs)
+          assertEquals(
+            listOf("[TorrentEngine] Removed the mapping of port 6881 through 1 NAT layer(s)"),
+            removals(lines),
+          )
+        }
+      } finally {
+        silent.close()
+      }
+    }
 
   @Test
   fun mapper_udpBoundLater_isMappedWithoutWaitingForRenewal() = gateways { network, scope ->

@@ -18,6 +18,8 @@ import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.FinishAction
+import com.linroid.ketch.app.state.FinishActions
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsTarget
@@ -64,6 +66,19 @@ class SettingsSnapshots {
       for (theme in SnapshotTheme.entries) {
         windowSnapshot("settings-${page.name.lowercase()}", WindowSize, theme, SettingsTarget(page))
       }
+    }
+  }
+
+  @Test
+  fun settingsWindow_generalPage_offersWhatToDoWhenDownloadsFinish() {
+    for (theme in SnapshotTheme.entries) {
+      windowSnapshot(
+        name = "settings-general-power",
+        size = TallWindowSize,
+        theme = theme,
+        target = SettingsTarget(SettingsTarget.Page.General),
+        finishActions = true,
+      )
     }
   }
 
@@ -231,9 +246,10 @@ class SettingsSnapshots {
     query: String = "",
     lastPage: SettingsTarget.Page? = null,
     access: PageAccessSettings = PageAccessSettings(),
+    finishActions: Boolean = false,
     interact: suspend SnapshotScene.() -> Unit = {},
   ) {
-    withSettings(theme, size.density, lastPage, access) { environment ->
+    withSettings(theme, size.density, lastPage, access, finishActions) { environment ->
       SnapshotHarness.capture("$name-${theme.id}-${size.id}", size, interact) {
         SettingsFrame(environment, theme, size.density, desktop = true) {
           SettingsContent(environment.controller.state, target, onClose = {}, initialQuery = query)
@@ -338,12 +354,15 @@ internal fun SettingsFrame(
  *
  * @param lastPage the Settings page shown last, which a generic open reopens.
  * @param access when Discover may open websites.
+ * @param finishActions whether the host can quit, sleep or shut down once downloads finish, as
+ *   the desktop app can.
  */
 internal class SettingsEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   lastPage: SettingsTarget.Page? = null,
   access: PageAccessSettings = PageAccessSettings(),
+  finishActions: Boolean = false,
 ) : SnapshotEnvironment {
   private val nas = SampleData.NAS.copy(name = "NAS-Basement", watch = true)
   override val data = SampleData(
@@ -411,6 +430,7 @@ internal class SettingsEnvironment(
     timeSource = SnapshotClock.timeSource,
     speedMode = speedMode,
     clock = SampleData.CLOCK,
+    finishActions = DesktopFinishActions.takeIf { finishActions },
   )
 
   init {
@@ -426,16 +446,24 @@ internal class SettingsEnvironment(
 
 /**
  * Runs [block] over a [SettingsEnvironment] in [theme] at [density] that shows [lastPage] when
- * Settings opens without a page, with Discover's [access].
+ * Settings opens without a page, with Discover's [access], where the host can act once downloads
+ * finish when [finishActions].
  */
 internal fun <T> withSettings(
   theme: SnapshotTheme,
   density: KetchDensity,
   lastPage: SettingsTarget.Page? = null,
   access: PageAccessSettings = PageAccessSettings(),
+  finishActions: Boolean = false,
   block: (SettingsEnvironment) -> T,
 ): T = withEnvironment(
-  { SettingsEnvironment(theme, density.toMode(), lastPage, access) },
+  { SettingsEnvironment(theme, density.toMode(), lastPage, access, finishActions) },
   block = block,
 )
 
+/** The desktop app's choices once downloads finish, carrying out none of them. */
+private object DesktopFinishActions : FinishActions {
+  override val supported = listOf(FinishAction.Quit, FinishAction.Sleep, FinishAction.ShutDown)
+
+  override suspend fun perform(action: FinishAction) = Unit
+}

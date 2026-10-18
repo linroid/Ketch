@@ -70,8 +70,11 @@ data class ConnectionCellKey(val deviceId: String, val id: Long)
  * @property task the task the connection transfers for.
  * @property direction which way its bytes move.
  * @property level how busy it is, from 0 (idle) to 4; see [trafficLevel].
- * @property age how long it has been open when its device sampled it.
+ * @property age how long it has been open when its device sampled it; for a closed one, how long
+ *   it was open.
  * @property connection what its device reports.
+ * @property closedAgo how long before its device sampled it the connection closed; `null` while
+ *   it is open.
  */
 data class ConnectionCell(
   val key: ConnectionCellKey,
@@ -80,6 +83,7 @@ data class ConnectionCell(
   val level: Int,
   val age: Duration,
   val connection: ActiveConnection,
+  val closedAgo: Duration? = null,
 )
 
 /**
@@ -117,6 +121,10 @@ data class DeviceConnections(
  * @property uploadBps bytes per second sent over every connection.
  * @property supported whether a shown device reports its connections at all.
  * @property unsupported names of the online devices that do not report connections.
+ * @property closed each device's connections that closed lately, grouped like [devices].
+ * @property receivedBytes bytes received over every connection since each device started,
+ *   summed over the devices that count them; `null` when none does.
+ * @property sentBytes bytes sent likewise.
  */
 data class ConnectionGridState(
   val devices: List<DeviceConnections> = emptyList(),
@@ -125,6 +133,9 @@ data class ConnectionGridState(
   val uploadBps: Long = 0,
   val supported: Boolean = false,
   val unsupported: List<UiText> = emptyList(),
+  val closed: List<DeviceConnections> = emptyList(),
+  val receivedBytes: Long? = null,
+  val sentBytes: Long? = null,
 ) {
   /** Every cell, oldest first, as the Pulse bar's strip fills them. */
   val cells: List<ConnectionCell> = devices
@@ -236,33 +247,41 @@ class ConnectionGridModel(
         taskNames[key] = name
       }
     }
+    fun tasksOf(cells: List<ConnectionCell>): List<TaskConnections> = cells
+      .groupBy { it.task }
+      .map { (key, cells) ->
+        TaskConnections(
+          key = key,
+          name = taskNames[key],
+          cells = cells.sortedWith(compareBy({ it.connection.openedAt }, { it.key.id })),
+        )
+      }
+      .sortedWith(
+        compareBy(
+          { position[it.key] ?: Int.MAX_VALUE },
+          { it.cells.first().connection.openedAt },
+          { it.key.taskId },
+        ),
+      )
     val devices = ArrayList<DeviceConnections>()
+    val closed = ArrayList<DeviceConnections>()
     var total = 0
     var down = 0L
     var up = 0L
+    var received: Long? = null
+    var sent: Long? = null
     for ((source, sample) in samples) {
       val snapshot = (sample as? DeviceSample.Data)?.connections ?: continue
       total += snapshot.total
       down += snapshot.downloadBps
       up += snapshot.uploadBps
-      val tasks = snapshot.connections
-        .map { connectionCell(source.deviceId, it, snapshot) }
-        .groupBy { it.task }
-        .map { (key, cells) ->
-          TaskConnections(
-            key = key,
-            name = taskNames[key],
-            cells = cells.sortedWith(compareBy({ it.connection.openedAt }, { it.key.id })),
-          )
-        }
-        .sortedWith(
-          compareBy(
-            { position[it.key] ?: Int.MAX_VALUE },
-            { it.cells.first().connection.openedAt },
-            { it.key.taskId },
-          ),
-        )
+      snapshot.receivedBytes?.let { received = (received ?: 0) + it }
+      snapshot.sentBytes?.let { sent = (sent ?: 0) + it }
+      val tasks =
+        tasksOf(snapshot.connections.map { connectionCell(source.deviceId, it, snapshot) })
       if (tasks.isNotEmpty()) devices += DeviceConnections(source.deviceId, source.name, tasks)
+      val ended = tasksOf(snapshot.closed.map { connectionCell(source.deviceId, it, snapshot) })
+      if (ended.isNotEmpty()) closed += DeviceConnections(source.deviceId, source.name, ended)
     }
     val refused = samples.filter { it.second == DeviceSample.Unsupported }
       .mapTo(HashSet()) { it.first.deviceId }
@@ -275,6 +294,9 @@ class ConnectionGridModel(
       unsupported = sources
         .filter { it.online && (!it.supported || it.deviceId in refused) }
         .map { it.name },
+      closed = closed,
+      receivedBytes = received,
+      sentBytes = sent,
     )
   }
 
@@ -294,20 +316,33 @@ class ConnectionGridModel(
   }
 }
 
-/** The cell of [connection] on the device [deviceId], sampled in [snapshot]. */
+/**
+ * The cell of [connection] on the device [deviceId], sampled in [snapshot]. Its times come from
+ * the device's own clock alone, never this one's.
+ */
 internal fun connectionCell(
   deviceId: String,
   connection: ActiveConnection,
   snapshot: ActiveConnections,
 ): ConnectionCell {
-  val direction = trafficDirection(connection.downloadBps, connection.uploadBps)
+  val closedAt = connection.closedAt
+  val direction = if (closedAt == null) {
+    trafficDirection(connection.downloadBps, connection.uploadBps)
+  } else {
+    TrafficDirection.Idle
+  }
   return ConnectionCell(
     key = ConnectionCellKey(deviceId, connection.id),
     task = TaskKey(deviceId, connection.taskId),
     direction = direction,
-    level = trafficLevel(maxOf(connection.downloadBps, connection.uploadBps)),
-    age = (snapshot.sampledAt - connection.openedAt).coerceAtLeast(Duration.ZERO),
+    level = if (closedAt == null) {
+      trafficLevel(maxOf(connection.downloadBps, connection.uploadBps))
+    } else {
+      0
+    },
+    age = ((closedAt ?: snapshot.sampledAt) - connection.openedAt).coerceAtLeast(Duration.ZERO),
     connection = connection,
+    closedAgo = closedAt?.let { (snapshot.sampledAt - it).coerceAtLeast(Duration.ZERO) },
   )
 }
 

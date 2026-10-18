@@ -39,6 +39,7 @@ import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import com.linroid.ketch.torrent.v2.peer.PeerV2Origin
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
 import com.linroid.ketch.torrent.webseed.TorrentV2WebSeeds
+import com.linroid.ketch.torrent.webseed.WebSeedLedger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.ChannelResult
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -315,7 +316,8 @@ internal object TorrentV2SessionLoop {
       val cancels = ArrayDeque<TorrentV2PieceScheduler.Cancel>()
       // Notices a download that stopped making progress, says why and recovers ([checkStall]).
       val watchdog = swarm?.stall?.let { TorrentStallWatchdog(nowMs) }
-      val payloadAtStart = store.receivedBytes()
+      // Payload received from peers; stall checks count web seeds' in [mirrors].
+      var peerPayload = 0L
       // Time requests waited on speed limits, which is never a stall.
       var throttledMs = 0L
 
@@ -592,6 +594,7 @@ internal object TorrentV2SessionLoop {
             (value.value as? PeerBlockExchange.Response.Rejected)?.let { rejected(view, it) }
             if (block != null) {
               store.recordReceived(block.ticket.request.length)
+              peerPayload += block.ticket.request.length
               // What crossed the wire: on a v1 route, the canonical block with its padding.
               view.traffic?.received(block.ticket.wire.length)
               view.receivedSinceRechoke += block.ticket.request.length
@@ -846,21 +849,28 @@ internal object TorrentV2SessionLoop {
         val published = swarm?.stall ?: return
         val stallWatchdog = watchdog ?: return
         val downloading = !complete && !seeding
-        // Some web seed may serve piece [index]: one that runs, or one that stopped without
-        // finding it could not.
-        fun unrefused(index: Int): Boolean = mirrors == null ||
-          mirrors.urls.indices.any { it !in stoppedMirrors || !mirrors.refuses(it, index) }
-        // With nothing connected, only the pieces every web seed found it could not serve are
-        // known to be missing: the rest wait for peers, or for a seed started again.
-        val connected = peers.size + mirrorsRunning > 0
-        val missing = if (!downloading || !connected && mirrors == null) null else {
-          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES,
-            if (connected) ::sourced else ::unrefused)
+        // Web seeds that run, but those started again that have yet to answer: they offer every
+        // piece, so they count as stopped until they do.
+        val answering = mirrors?.let { seeds ->
+          seeds.urls.indices.filter { it !in stoppedMirrors && !seeds.unproven(it) }
+        }.orEmpty()
+        // The others may serve again: one that was down across a relaunch says nothing of what it
+        // serves.
+        val returning = mirrors?.let { seeds ->
+          seeds.urls.indices.filter { it !in answering && !seeds.downAcrossRelaunch(it) }
+        }.orEmpty()
+        // Some source may still bring piece [index]: a connected peer or answering web seed that
+        // has it, or another web seed that did not find it could not serve it.
+        fun obtainable(index: Int): Boolean = rarity.hasAny(index) || mirrors != null &&
+          (answering.any { mirrors.serves(it, index) } ||
+            returning.any { !mirrors.refuses(it, index) })
+        // A piece is missing once no source may bring it, so those a stopped web seed may serve
+        // wait for it to start again and answer. With nothing connected and no such web seed,
+        // nothing is known to be missing: the download waits for peers.
+        val connected = peers.size + answering.size > 0
+        val missing = if (!downloading || !connected && returning.isEmpty()) null else {
+          pieces.missing(MAX_REPORTED_MISSING_PIECES, TorrentStall.MAX_MISSING_FILES, ::obtainable)
         }
-        // In this order, so no web seed byte looks kept before it is (see StallSignals).
-        val payload = store.receivedBytes() - payloadAtStart
-        val unsettled = mirrors?.unsettledBytes ?: 0
-        val wasted = mirrors?.wastedBytes ?: 0
         val due = stallWatchdog.check(StallSignals(
           downloading = downloading,
           peers = peers.size,
@@ -868,11 +878,10 @@ internal object TorrentV2SessionLoop {
           missingPieces = missing?.count ?: 0,
           missingFileIds = missing?.fileIds.orEmpty(),
           lateBlocks = if (downloading) pieces.lateCount() else 0,
-          webSeeds = mirrorsRunning,
+          webSeeds = answering.size,
           droppedWebSeeds = stoppedMirrors.size,
-          payloadBytes = payload,
-          unsettledBytes = unsettled,
-          wastedBytes = wasted,
+          peerPayloadBytes = peerPayload,
+          webSeedPayload = mirrors?.checkPayload() ?: WebSeedLedger(checks = 0, arrived = 0),
           throttledMs = throttledMs + swarm.webSeedThrottledMs(),
           pieceLength = layout.pieceLength,
         ))

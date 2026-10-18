@@ -45,11 +45,19 @@ interface DownloadSource<S : Any> {
   fun attach(host: SourceHost): SourceExtension? = null
 
   /**
+   * Tells this source that Ketch begins to close: it stops the downloads next, and calls [stop]
+   * once they have. A source can begin to stop what it runs apart from its downloads now, so it
+   * stops alongside them rather than after them, as seeding torrents do, whose `stopped`
+   * announces then share the time the downloads' take. Must return at once; Ketch calls it once.
+   */
+  fun stopping() {}
+
+  /**
    * Stops what this source runs apart from its downloads, such as seeding torrents and the peers
    * and trackers behind them, and returns once it has. Ketch calls it while it closes, after
-   * every download stopped and saved its state and before it closes the [HttpEngine], so a
-   * source can still say goodbye over the network, as a torrent's `stopped` announce does;
-   * [close] follows. Must be safe to call twice.
+   * [stopping], once every download stopped and saved its state, and before it closes the
+   * [HttpEngine], so a source can still say goodbye over the network, as a torrent's `stopped`
+   * announce does; [close] follows. Must be safe to call twice.
    */
   suspend fun stop() {}
 

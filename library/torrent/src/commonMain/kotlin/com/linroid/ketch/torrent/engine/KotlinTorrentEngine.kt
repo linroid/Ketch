@@ -64,6 +64,7 @@ import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.peer.classifyPeerOutcome
 import com.linroid.ketch.torrent.portmap.NatPmpClient
 import com.linroid.ketch.torrent.portmap.PcpClient
+import com.linroid.ketch.torrent.portmap.PortMapGateways
 import com.linroid.ketch.torrent.portmap.PortMapLayers
 import com.linroid.ketch.torrent.portmap.TorrentPortMapper
 import com.linroid.ketch.torrent.portmap.UpnpClient
@@ -198,6 +199,12 @@ internal class KotlinTorrentEngine(
    */
   private val portMapping: Boolean = false,
   /**
+   * Test hook: the gateways port mapping asks while [portMapping] allows it, wherever the engine
+   * listens. Null asks this machine's routers, and only for an engine listening on every
+   * interface.
+   */
+  private val portMapGateways: PortMapGateways? = null,
+  /**
    * Joins the LAN's local service discovery group (BEP 14); null, as for engines built directly,
    * never announces or listens there. Whether it does is [TorrentConfig.localDiscovery], which
    * [setLocalDiscovery] changes.
@@ -223,6 +230,18 @@ internal class KotlinTorrentEngine(
   private var portMapper: TorrentPortMapper? = null
   // Guards portMapper while it starts or stops.
   private val mapperMutex = Mutex()
+  /**
+   * Removes the router's port mappings for good, started when the stopped window opens
+   * ([openStoppedWindow]) so the router forgets our ports while the torrents say goodbye rather
+   * than after; [stopRuntime] waits for it. Announces still name the mapped port, which removing
+   * leaves as it was.
+   */
+  private val portMappingRemoval = scope.launch(start = CoroutineStart.LAZY) {
+    mapperMutex.withLock {
+      portMapper?.stop()
+      portMapper = null
+    }
+  }
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMappingEnabled = AtomicBoolean(config.portMapping)
   // Encryption over the connection budget over TCP, falling back to uTP.
@@ -311,6 +330,8 @@ internal class KotlinTorrentEngine(
   private val active: Int get() = entries.values.count { !it.closing }
   private val running = AtomicBoolean(false)
   private var closed = false
+  /** When every `stopped` announce must have ended, once [openStoppedWindow]; null until then. */
+  private val stoppedDeadline = AtomicReference<TimeSource.Monotonic.ValueTimeMark?>(null)
   internal val advertisedPort = TorrentAdvertisedPort()
   val listenPort: Int get() = advertisedPort.listenPort
   private var nodes: List<DhtNode>? = null
@@ -504,24 +525,27 @@ internal class KotlinTorrentEngine(
       }
     }
     log.i { "Stopping torrent engine with ${owners.size} session(s)" }
+    openStoppedWindow()
     withContext(NonCancellable) {
       try {
-        // v1, v2 and hybrid owners alike; a v2 close joins its discovery before admission returns.
-        for (owner in owners) {
-          try {
-            owner.pause()
-            owner.close(deleteFiles = false)
-          } catch (e: Exception) {
-            val hash = logHash(owner.session.infoHash)
-            log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
+        coroutineScope {
+          // Owners stop side by side, so their `stopped` announces share one window rather than
+          // queue up past a host's shutdown. v1, v2 and hybrid owners alike; a v2 close joins its
+          // discovery before admission returns.
+          for (owner in owners) launch {
+            try {
+              owner.pause()
+              owner.close(deleteFiles = false)
+            } catch (e: Exception) {
+              val hash = logHash(owner.session.infoHash)
+              log.w { "Torrent $hash did not close while stopping: ${e.describeWithoutUrls()}" }
+            }
           }
         }
+        // Meanwhile, since the window opened, the router forgot our ports rather than forward
+        // them to whoever gets this address.
+        portMappingRemoval.join()
         nodes?.forEach { it.close() }
-        // The router forgets our ports rather than forward them to whoever gets this address.
-        mapperMutex.withLock {
-          portMapper?.stop()
-          portMapper = null
-        }
         udpMutex.withLock {
           udpPorts.values.forEach { it.close() }
           udpPorts.clear()
@@ -541,6 +565,18 @@ internal class KotlinTorrentEngine(
       }
     }
   }
+
+  override fun openStoppedWindow() {
+    stoppedDeadline.compareAndSet(null, TimeSource.Monotonic.markNow() + STOPPED_ANNOUNCE_TIME)
+    portMappingRemoval.start()
+  }
+
+  /**
+   * How long `stopped` announces may take: [STOPPED_ANNOUNCE_TIME], and once the host shuts down
+   * ([openStoppedWindow]), what is left of the one such window every torrent's announces share.
+   */
+  private fun stoppedAnnounceTime(): Duration =
+    stoppedDeadline.load()?.let { -it.elapsedNow() } ?: STOPPED_ANNOUNCE_TIME
 
   /** The key [lookupPeers] keeps a swarm's peers under: its wire tag. */
   private fun lookupTag(topic: TrackerTopic): String = topic.wireBytes().toByteString().hex()
@@ -716,7 +752,7 @@ internal class KotlinTorrentEngine(
             }
           } finally {
             if (started) withContext(NonCancellable) {
-              withTimeoutOrNull(2000) {
+              withTimeoutOrNull(stoppedAnnounceTime()) {
                 attempt { trackerSet.announce(TrackerAnnounce(topic, peerId,
                   advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED)) }
               }
@@ -783,7 +819,7 @@ internal class KotlinTorrentEngine(
           }
         } finally {
           if (contacted) withContext(NonCancellable) {
-            withTimeoutOrNull(2000) {
+            withTimeoutOrNull(stoppedAnnounceTime()) {
               attempt {
                 tiers.announce(TrackerAnnounce(magnet.infoHash, peerId,
                   advertisedPort.current(), 0, 1, event = TrackerEvent.STOPPED))
@@ -1146,7 +1182,7 @@ internal class KotlinTorrentEngine(
         }
       } finally {
         withContext(NonCancellable) {
-          withTimeoutOrNull(2000) {
+          withTimeoutOrNull(stoppedAnnounceTime()) {
             attempt {
               group.stop(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
             }
@@ -1170,7 +1206,7 @@ internal class KotlinTorrentEngine(
         }
       } finally {
         withContext(NonCancellable) {
-          withTimeoutOrNull(2000) {
+          withTimeoutOrNull(stoppedAnnounceTime()) {
             attempt { poll(discovery) }
             attempt { poll(discovery, stopped = true) }
           }
@@ -1278,7 +1314,7 @@ internal class KotlinTorrentEngine(
         discovery.observeStatus {}
         session.updateTrackerStatus(emptyList())
         withContext(NonCancellable) {
-          withTimeoutOrNull(2000) {
+          withTimeoutOrNull(stoppedAnnounceTime()) {
             if (session.state.value == TorrentSessionState.FINISHED ||
               session.state.value == TorrentSessionState.SEEDING) {
               attempt { discovery.poll(session.verifiedPieces(), session.receivedBytes,
@@ -1637,13 +1673,17 @@ internal class KotlinTorrentEngine(
   }
 
   /**
-   * Starts asking the router to forward the listen port, unless it already does or this engine
-   * may not ([portMapping], [listenHost] other than every interface).
+   * Starts asking the router to forward the listen port, unless it already does, the engine
+   * stops ([openStoppedWindow]) or this engine may not ([portMapping], [listenHost] other than
+   * every interface).
    */
   private suspend fun startPortMapping() = mapperMutex.withLock {
-    if (!portMapping || listenHost != WILDCARD_IPV4 || portMapper != null) return@withLock
-    // Once stopRuntime has stopped the mapper, a new one's ports would stay on the router.
-    if (!running.load()) return@withLock
+    if (!portMapping || portMapper != null) return@withLock
+    if (portMapGateways == null && listenHost != WILDCARD_IPV4) return@withLock
+    // Once the mapper is removed for good, a new one's ports would stay on the router.
+    if (!running.load() || stoppedDeadline.load() != null) return@withLock
+    val gateways = portMapGateways ?: PortMapGateways(NatPmpClient(directNetwork),
+      UpnpClient(directNetwork), PcpClient(directNetwork))
     portMapper = TorrentPortMapper(scope, advertisedPort.listenPort,
       // The socket DHT and uTP share on IPv4, once bound.
       udpPort = {
@@ -1652,8 +1692,8 @@ internal class KotlinTorrentEngine(
       onMapped = advertisedPort::setMapped,
       onExternalAddress = mappedAddress::store,
       onLayers = mappedLayers::store,
-      natPmp = NatPmpClient(directNetwork), upnp = UpnpClient(directNetwork),
-      pcp = PcpClient(directNetwork),
+      natPmp = gateways.natPmp, upnp = gateways.upnp, pcp = gateways.pcp,
+      networks = gateways.networks,
     ).also { it.start() }
   }
 
@@ -1726,7 +1766,7 @@ internal class KotlinTorrentEngine(
       }
     } finally {
       withContext(NonCancellable) {
-        withTimeoutOrNull(2000) {
+        withTimeoutOrNull(stoppedAnnounceTime()) {
           for (discovery in discoveries) attempt { poll(discovery, true) }
         }
       }
@@ -1741,6 +1781,13 @@ private val UDP_HOSTS = listOf(WILDCARD_IPV4, "::")
 private const val DHT_BOOTSTRAP_RETRY_MS = 30_000L
 internal const val MAX_ADDITIONAL_TRACKERS = 128
 private const val DHT_REFRESH_MS = 15 * 60_000L
+
+/**
+ * How long a torrent's `stopped` announces may take. A host that shuts down gives every torrent's
+ * the same window, from when Ketch begins to close or else the engine stops, which leaves most of
+ * its shutdown time (5 s in Ketch) for the rest.
+ */
+private val STOPPED_ANNOUNCE_TIME: Duration = 2_000.milliseconds
 
 /**
  * How long one magnet metadata lookup runs. The source starts another until the metadata is

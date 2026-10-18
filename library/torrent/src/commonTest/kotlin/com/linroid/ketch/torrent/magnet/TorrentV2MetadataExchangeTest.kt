@@ -76,13 +76,42 @@ class TorrentV2MetadataExchangeTest {
     }
   }
 
+  @Test
+  fun info_piecesLargerThanSupported_isUnusable() = runTest {
+    withContext(Dispatchers.Default) {
+      withTimeout(15_000) {
+        coroutineScope {
+          // Pieces of 32 MiB, which Ketch does not take: every peer would send the same info.
+          val large = TorrentV2Fixture.build(listOf("a.bin" to 40_000),
+            pieceLength = 32 * 1024 * 1024)
+          val network = createTorrentNetwork()
+          val peer = PartialPeer(network.listen(local), emptySet(), large)
+          val job = peer.serve(this)
+          try {
+            val error = assertFailsWith<UnusableTorrentMetadataException> {
+              TorrentV2MetadataExchange(network).fetch(large.document.identity,
+                peer.listener.local)
+            }
+            assertEquals("The torrent's pieces are 32 MiB, larger than the 16 MiB Ketch supports",
+              error.cause?.message)
+          } finally {
+            job.cancelAndJoin()
+            network.close()
+          }
+        }
+      }
+    }
+  }
+
   /** Serves the info dictionary, and the piece layers of [serves] only, rejecting the rest. */
   private inner class PartialPeer(
     val listener: TorrentListener,
     private val serves: Set<ByteString>,
+    private val torrent: TorrentV2Fixture = fixture,
   ) {
+    private val document = torrent.document
     val requests = AtomicInt(0)
-    private val hashes = TorrentV2HashServer(document, fixture.layout,
+    private val hashes = TorrentV2HashServer(document, torrent.layout,
       TorrentBufferBudget(1_000_000))
 
     fun serve(scope: CoroutineScope): Job = scope.launch {
@@ -108,7 +137,7 @@ class TorrentV2MetadataExchangeTest {
               val selector = request.selector
               val answer = if (selector.root in serves) {
                 requests.incrementAndFetch()
-                val bounds = checkNotNull(peerHashServeBounds(document, fixture.layout, selector))
+                val bounds = checkNotNull(peerHashServeBounds(document, torrent.layout, selector))
                 PeerHashMessage.Hashes(selector,
                   checkNotNull(hashes.respond(selector, bounds) { error("No piece reads") }))
               } else PeerHashMessage.Reject(selector)

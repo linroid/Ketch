@@ -103,11 +103,11 @@ internal class TorrentV2WebSeeds private constructor(
   private val log = KetchLogger("TorrentWebSeed")
   val stats = WebSeedStats()
 
-  /** Payload the seeds received and threw away so far ([WebSeedStats.wasted]). */
-  val wastedBytes: Long get() = stats.wasted.load()
-
-  /** Payload the seeds received that may still be thrown away ([WebSeedStats.unsettled]). */
-  val unsettledBytes: Long get() = stats.unsettled.load()
+  /**
+   * The seeds' payload since the last stall check, for one, which the bytes arriving next come
+   * after ([WebSeedStats.checked]).
+   */
+  fun checkPayload(): WebSeedLedger = stats.checked()
   private val events = Channel<Event>(Channel.UNLIMITED)
   // A run no seed took goes back to the loop, which returns its pieces to the scheduler.
   private val assignments = urls.indices.map { seed ->
@@ -120,10 +120,8 @@ internal class TorrentV2WebSeeds private constructor(
   }
 
   // The pieces each seed cannot serve, which its workers report and the loop reads: those it is
-  // not asked for until it starts again, and all it could not serve since it last started, kept
-  // once it stops.
+  // not asked for until it starts again.
   private val unservable = urls.indices.map { AtomicReference(emptySet<Int>()) }
-  private val refused = urls.indices.map { AtomicReference(emptySet<Int>()) }
 
   // One worker per seed for the whole transfer: started again, a seed keeps what it learned.
   private val workers = urls.indices.map { seed ->
@@ -144,10 +142,19 @@ internal class TorrentV2WebSeeds private constructor(
   fun serves(seed: Int, index: Int): Boolean = index !in unservable[seed].load()
 
   /**
-   * Whether [seed] could not serve piece [index] since it last started, whether it runs or
-   * stopped.
+   * Whether [seed] could not serve piece [index] as of its last answer, whether it runs or stopped
+   * ([WebSeedWorker.refusals]).
    */
-  fun refuses(seed: Int, index: Int): Boolean = index in refused[seed].load()
+  fun refuses(seed: Int, index: Int): Boolean = index in workers[seed].refusals
+
+  /** Whether [seed] is down across a relaunch ([WebSeedWorker.downAcrossRelaunch]). */
+  fun downAcrossRelaunch(seed: Int): Boolean = workers[seed].downAcrossRelaunch
+
+  /**
+   * Whether [seed] stopped and has not answered since ([WebSeedWorker.unproven]): started again,
+   * it counts as stopped for stalls until it does.
+   */
+  fun unproven(seed: Int): Boolean = workers[seed].unproven
 
   sealed interface Event {
     /** [seed] waits for a piece. */
@@ -190,7 +197,6 @@ internal class TorrentV2WebSeeds private constructor(
    */
   fun relaunch(seed: Int): Boolean {
     unservable[seed].store(emptySet())
-    refused[seed].store(emptySet())
     return relaunches.trySend(seed).isSuccess
   }
 
@@ -266,7 +272,6 @@ internal class TorrentV2WebSeeds private constructor(
     }
 
     override suspend fun unavailable(indices: Set<Int>) {
-      refused[seed].update { it + indices }
       unservable[seed].update { it + indices }
     }
 

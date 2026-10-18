@@ -31,6 +31,14 @@ internal data class PortMapLayers(
   val public: Boolean,
 )
 
+/** The gateways a [TorrentPortMapper] asks, and the networks it looks for them on. */
+internal class PortMapGateways(
+  val natPmp: NatPmpClient,
+  val upnp: UpnpClient,
+  val pcp: PcpClient?,
+  val networks: suspend () -> List<LocalIpv4Network> = ::localIpv4Networks,
+)
+
 /**
  * Asks the routers in front of us to forward our listen port, so peers behind other NATs can
  * reach us, through as many NAT layers as answer, up to [MAX_LAYERS]: the home router first,
@@ -101,8 +109,17 @@ internal class TorrentPortMapper(
     }
   }
 
-  /** A mapping [gateway] of NAT [layer] may hold for us: asked for, and not removed since. */
-  private class Requested(val gateway: Gateway, val mapping: PortMapping, val layer: Int) {
+  /**
+   * A mapping [gateway] of NAT [layer] may hold for us: asked for, and not removed since;
+   * [permanent] once it was asked for with UPnP's lease 0, which the gateway keeps until it is
+   * removed.
+   */
+  private class Requested(
+    val gateway: Gateway,
+    val mapping: PortMapping,
+    val layer: Int,
+    var permanent: Boolean,
+  ) {
     fun matches(gateway: Gateway, mapping: PortMapping) =
       this.gateway.sameAs(gateway) && gateway.sameMapping(this.mapping, mapping)
   }
@@ -178,18 +195,71 @@ internal class TorrentPortMapper(
     }
   }
 
-  /** Stops renewing and removes the mappings, giving the gateways at most [timeoutMs]. */
+  /**
+   * Stops renewing and removes the mappings, giving the gateways at most [timeoutMs], and logs
+   * once whether they did. A mapping whose removal its gateway did not confirm may stay until its
+   * lease ends, or until the router drops it where UPnP leased it permanently.
+   */
   suspend fun stop(timeoutMs: Long = 2_000) {
     job?.cancel()
     withContext(NonCancellable) {
-      withTimeoutOrNull(timeoutMs) {
+      // Every mapping asked for, the ones of a pass stop() cut short included, read once that
+      // pass let go, and the removals confirmed.
+      var removing: List<Requested>? = null
+      val confirmed = mutableSetOf<Requested>()
+      val finished = withTimeoutOrNull(timeoutMs) {
         mutex.withLock {
-          outermostFirst(requested).forEach { unmap(it.gateway, it.mapping) }
+          val asked = outermostFirst(requested)
+          removing = asked
+          for (request in asked) {
+            if (unmap(request.gateway, request.mapping)) confirmed += request
+          }
           requested.clear()
           current = emptyList()
         }
+      } != null
+      logRemoval(removing, confirmed, finished, timeoutMs)
+    }
+  }
+
+  /**
+   * Logs how removing [removing], every mapping asked for, went, naming only the port and the
+   * NAT layers: a layer may still forward the port when its gateway did not confirm every
+   * removal, whether or not it ever confirmed the mapping. [removing] is null when the removal
+   * timed out before it began; nothing asked for, nothing is logged.
+   */
+  private fun logRemoval(
+    removing: List<Requested>?,
+    confirmed: Set<Requested>,
+    finished: Boolean,
+    timeoutMs: Long,
+  ) {
+    if (removing != null && removing.isEmpty()) return
+    val head = if (finished) "Removing the mapping of port $tcpPort" else {
+      "Removing the mapping of port $tcpPort timed out after ${timeoutMs}ms"
+    }
+    val layers = removing?.distinctBy { it.layer }?.size
+    val kept = removing?.filterNot { it in confirmed }
+    log.i {
+      when {
+        layers == null || kept == null ->
+          "$head; the gateways may still forward the port ${until(null)}"
+        kept.isEmpty() -> "Removed the mapping of port $tcpPort through $layers NAT layer(s)"
+        else -> {
+          val keptLayers = kept.distinctBy { it.layer }.size
+          "$head: ${layers - keptLayers} of $layers NAT layer(s) confirmed it; " +
+            "the others may still forward the port ${until(kept)}"
+        }
       }
     }
+  }
+
+  /** Until when the gateways may forward the port: [kept] mappings, or unknown ones when null. */
+  private fun until(kept: List<Requested>?): String = when {
+    kept == null || kept.any { it.permanent } && !kept.all { it.permanent } ->
+      "until their lease ends, a permanent UPnP lease until the router drops it"
+    kept.all { it.permanent } -> "until the router drops it, as UPnP leased it for good"
+    else -> "until their lease ends"
   }
 
   /** Maps (or renews) the ports through every layer that answers; empty when none did. */
@@ -367,7 +437,7 @@ internal class TorrentPortMapper(
       try {
         for ((protocol, internal) in listOfNotNull(MappedProtocol.TCP to target.tcp,
           target.udp?.let { MappedProtocol.UDP to it })) {
-          val added = requesting(upnpGateway, protocol, internal, external)
+          val added = requesting(upnpGateway, protocol, internal, external, lease)
           try {
             try {
               upnp.addPortMapping(gateway, protocol, external, internal, client, lease)
@@ -375,6 +445,7 @@ internal class TorrentPortMapper(
               // Some gateways only keep permanent mappings; those are renewed the same way.
               if (e.code != 725 || lease == 0L) throw e
               lease = 0
+              requesting(upnpGateway, protocol, internal, external, lease)
               upnp.addPortMapping(gateway, protocol, external, internal, client, lease)
             }
           } catch (e: UpnpException) {
@@ -410,18 +481,23 @@ internal class TorrentPortMapper(
   }
 
   /**
-   * Notes that [gateway] may forward [internal] on [external] from now on; call before asking.
-   * Returns the entry when this request added it, or null when one held already, as on renewal.
+   * Notes that [gateway] may forward [internal] on [external] from now on, for good when [lease]
+   * is UPnP's 0; call before asking. Returns the entry when this request added it, or null when
+   * one held already, as on renewal.
    */
   private fun requesting(
     gateway: Gateway,
     protocol: MappedProtocol,
     internal: Int,
     external: Int,
+    lease: Long = LIFETIME_SECONDS,
   ): Requested? {
     val mapping = PortMapping(protocol, internal, external, LIFETIME_SECONDS)
-    if (requested.any { it.matches(gateway, mapping) }) return null
-    return Requested(gateway, mapping, asking).also { requested += it }
+    requested.firstOrNull { it.matches(gateway, mapping) }?.let { held ->
+      if (lease == 0L) held.permanent = true
+      return null
+    }
+    return Requested(gateway, mapping, asking, permanent = lease == 0L).also { requested += it }
   }
 
   /** Removes [mapping] from [gateway] now. */
@@ -445,21 +521,28 @@ internal class TorrentPortMapper(
    */
   private fun outermostFirst(requests: List<Requested>) = requests.sortedByDescending { it.layer }
 
-  private suspend fun unmap(gateway: Gateway, mapping: PortMapping) {
-    try {
-      when (gateway) {
-        is Gateway.NatPmp ->
-          natPmp.map(gateway.address, mapping.protocol, mapping.internalPort, 0, 0)
-        is Gateway.Pcp -> pcp?.map(gateway.address, gateway.client, mapping.protocol,
-          mapping.internalPort, 0, 0, gateway.nonce)
-        is Gateway.Upnp ->
-          upnp.deletePortMapping(gateway.gateway, mapping.protocol, mapping.externalPort)
+  /** Removes [mapping] from [gateway]; true once the gateway confirmed it holds no such mapping. */
+  private suspend fun unmap(gateway: Gateway, mapping: PortMapping): Boolean = try {
+    when (gateway) {
+      is Gateway.NatPmp ->
+        natPmp.map(gateway.address, mapping.protocol, mapping.internalPort, 0, 0) != null
+      is Gateway.Pcp -> pcp?.map(gateway.address, gateway.client, mapping.protocol,
+        mapping.internalPort, 0, 0, gateway.nonce) != null
+      is Gateway.Upnp -> {
+        upnp.deletePortMapping(gateway.gateway, mapping.protocol, mapping.externalPort)
+        true
       }
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      log.d { "Removing a port mapping failed: ${e.describeWithoutUrls()}" }
     }
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: UpnpException) {
+    // NoSuchEntryInArray: the router holds no such mapping, as when it already lost it.
+    val gone = e.code == UPNP_NO_SUCH_ENTRY
+    if (!gone) log.d { "Removing a port mapping failed: ${e.describeWithoutUrls()}" }
+    gone
+  } catch (e: Exception) {
+    log.d { "Removing a port mapping failed: ${e.describeWithoutUrls()}" }
+    false
   }
 
   companion object {
@@ -471,6 +554,9 @@ internal class TorrentPortMapper(
 
     /** Gateways a layer's PCP request goes to, one after another. */
     private const val MAX_PCP_GATEWAYS = 4
+
+    /** The UPnP fault a router answers for a mapping it does not hold. */
+    private const val UPNP_NO_SUCH_ENTRY = 714
   }
 }
 
