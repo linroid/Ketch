@@ -1039,14 +1039,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   longer holds), and keeps its intent: a drop saved between that read and the check takes effect
   the next time seeding is restored. A v1 seed-only session (`startSeeding`) whose check misses
   only pieces it shares with deselected files that are gone, cut short, never in place or changed
-  since the store last knew them, the selected files whole and unchanged, sets them aside
-  (`TorrentPieceStore.setAsideLostPieces`): neither wanted, verified nor offered, and wanted again
-  at the next check or once the selection adds a file. Changed means another size or modification
-  time than the file's `TorrentFileStamp`, taken as the store writes a file and by a check that
-  verifies every wanted piece it holds, and saved in the checkpoint (`file-stamps`, 20 bytes a
-  file, as the session's admission charges its resume data eight times over); a piece
-  whose selected file changed, or where no stamp tells which file did, is never set aside. It
-  seeds the rest, logs a warning and keeps its intent. Its store (`seedOnly`) sets a piece aside
+  since the store last knew them, the selected files whole and not known to have changed, sets them
+  aside (`TorrentPieceStore.setAsideLostPieces`): neither wanted, verified nor offered, and wanted
+  again at the next check or once the selection adds a file. Changed means another size or
+  modification time than the file's `TorrentFileStamp`, taken as the store writes a file and by a
+  check that verifies every wanted piece it holds, and saved in the checkpoint (`file-stamps`, 20
+  bytes a file, as the session's admission charges its resume data eight times over). A piece whose
+  selected file is known to have changed is never set aside, nor one whose deselected file only
+  changed while no stamp tells whether the selected file did; one whose deselected file is gone is
+  set aside even when nothing tells whether the selected file changed too, and a change that keeps a
+  file's size and modification time cannot be seen. It seeds the rest, logs a warning and keeps its
+  intent. Its store (`seedOnly`) sets a piece aside
   the same way while its selection is complete when a peer's request finds it unreadable or
   changed (`PieceRevokedException.setAside`, `TorrentPieceScheduler.setAside`), so it stays
   SEEDING rather than downloading it; a lent seeder downloads such a piece again. A run that takes

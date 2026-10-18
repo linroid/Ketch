@@ -424,8 +424,9 @@ internal class TorrentPieceStore(
    * spans must be gone, cut short or never in place, or have changed since the store last knew
    * it ([stamps]: another size or modification time) while every selected file it spans
    * is as the store last knew it. Either way the selected files must hold their part of it, and
-   * none may have changed since the store last knew it: a piece whose chosen file changed is
-   * never set aside, and neither is one where nothing tells which file changed.
+   * none may be known to have changed since: a piece whose chosen file did is never set aside,
+   * while one whose deselected file is gone is set aside even when nothing tells whether a chosen
+   * file changed too. A change that keeps a file's size and modification time cannot be seen.
    */
   private fun lostOutsideSelection(index: Int, chunk: ByteArray): Boolean {
     val path = sidecar / "$index.piece"

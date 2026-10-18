@@ -140,12 +140,14 @@ What happens next depends on the task's state:
   it, before or after removing it, the shared pieces that no longer verify are set aside: the task
   never offers them, seeds every other piece of the files you kept and keeps seeding. Ketch tells
   which file changed from each file's size and modification time, noted as it writes and checks
-  them: a shared piece that fails because a file you kept changed, or where nothing tells which
-  file did, is not set aside, so the task does not start seeding, or downloads the piece again if
-  it seeds. Seeding finds them as it checks its files, or as a peer asks for one; a task still
-  seeding straight after its own download downloads such a piece again instead. Choosing that
-  file again, or any other, downloads those pieces again: a file you chose is filled in, and one
-  still removed keeps its part in the task's hidden sidecar and stays as you left it.
+  them, so it cannot see a change that keeps both. A shared piece that fails because a file you kept
+  is known to have changed is never set aside, nor one where a file you removed changed but nothing
+  tells whether the file you kept did too: the task does not start seeding, or downloads the piece
+  again if it seeds. One whose removed file is gone is set aside even when nothing tells whether the
+  file you kept changed too. Seeding finds them as it checks its files, or as a peer asks for one; a
+  task still seeding straight after its own download downloads such a piece again instead. Choosing
+  that file again, or any other, downloads those pieces again: a file you chose is filled in, and
+  one still removed keeps its part in the task's hidden sidecar and stays as you left it.
 
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
