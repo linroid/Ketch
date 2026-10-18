@@ -18,6 +18,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -261,7 +262,8 @@ internal class RealFtpClient(
         onData(chunk)
       }
     } finally {
-      withContext(Dispatchers.IO) {
+      // Also when the transfer was cancelled: a pause, or another connection taking its range.
+      withContext(Dispatchers.IO + NonCancellable) {
         try {
           transferSocket.close()
         } catch (_: Exception) {
@@ -287,7 +289,7 @@ internal class RealFtpClient(
     } catch (_: Exception) {
       // Ignore errors during disconnect
     } finally {
-      withContext(Dispatchers.IO) {
+      withContext(Dispatchers.IO + NonCancellable) {
         try { controlSocket?.close() } catch (_: Exception) {}
       }
       controlSocket = null

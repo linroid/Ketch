@@ -130,9 +130,9 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
   o durante la descarga y cámbialos sin empezar de nuevo; un enlace magnet añadido antes de
   recibir sus detalles espera a que elijas. Detén o reanuda el sembrado de un torrent terminado;
   los que sigues compartiendo vuelven a sembrar cuando Ketch se reinicia.
-- **HLS (`.m3u8`) y DASH (`.mpd`)** — Guarda flujos de duración finita y sin cifrar como un único
-  archivo multimedia. Las listas maestras HLS usan la variante de mayor ancho de banda
-  ([compatibilidad y límites](docs/media.md)).
+- **HLS (`.m3u8`) y DASH (`.mpd`)** — Guarda flujos de duración finita como un único archivo
+  multimedia, en la calidad que elijas (la mejor por defecto), con el audio separado combinado y
+  el cifrado HLS AES-128 descifrado ([compatibilidad y límites](docs/media.md)).
 - Ketch puede abrir los enlaces magnet y archivos `.torrent` del sistema: un clic en el navegador
   o el gestor de archivos los lleva a Ketch.
 
@@ -264,8 +264,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   macOS, la extensión en más tiendas de navegadores y procesos de instalación y actualización
   verificados ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Descargas desde varios servidores espejo a la vez, con sumas de comprobación
-- **Más formatos HLS y DASH** — Elegir calidad, combinar pistas separadas de audio y vídeo y
-  admitir cifrado HLS AES-128; ya se admiten descargas de un único flujo finito sin cifrar
 - **Extracción multimedia** — Guardar contenido multimedia de páginas web
 - **Detector de recursos** — Encontrar los archivos descargables de una página web
 - **Descargas segmentadas más rápidas** — Las conexiones que terminan antes asumen lo que les queda

@@ -95,7 +95,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 
 - **Parallel connections** — Ketch splits a file into ranges and downloads them at once. The
   Connections tab shows every connection as a lane with its own speed, and you can add or remove
-  connections while the download runs.
+  connections while the download runs. A connection that finishes early takes over the rest of a
+  slower one, so a download never waits on its slowest connection.
 - **Several networks at once** — Spread one download over Wi-Fi, Ethernet and, on Android,
   cellular data ([how it works](docs/multiple-networks.md)).
 - **Proxies** — Download through the system's proxy, an HTTP or SOCKS5 proxy with a username and
@@ -119,8 +120,9 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
   change them without starting over; a magnet link added before its details arrive waits for
   your choice. Stop or restart seeding a finished torrent; the ones you keep sharing seed again
   after Ketch restarts.
-- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite, unencrypted streams as one media file.
-  HLS master playlists use the highest-bandwidth variant ([support and limits](docs/media.md)).
+- **HLS (`.m3u8`) and DASH (`.mpd`)** — Save finite streams as one media file, in the quality
+  you choose (the best by default), with separate audio merged in and AES-128 HLS decrypted
+  ([support and limits](docs/media.md)).
 - Ketch can open magnet links and `.torrent` files for your system, so a click in the browser or
   the file manager lands in Ketch.
 
@@ -241,12 +243,8 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   the extension in more browser stores and verified installation/update paths
   ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads from several mirrors at once, with checksums
-- **More HLS and DASH formats** — Choose quality, merge separate audio/video tracks, and handle
-  AES-128 HLS encryption; finite, unencrypted single-stream downloads are already supported
 - **Media extraction** — Save the media of web pages
 - **Resource sniffer** — Find the downloadable files on a web page
-- **Faster segmented downloads** — Connections that finish early take over the rest of the slower
-  ones, so a download no longer waits on its slowest connection
 - **Transfers between devices** — Send to and Move to carry what is already downloaded, so the
   other device continues instead of starting over ([plan](docs/plans/task-transfer.md))
 - **Helper devices** — Let your other devices download parts of the same file over their own

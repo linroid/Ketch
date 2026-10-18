@@ -106,4 +106,55 @@ class DashManifestTest {
     }
   }
 
+
+  @Test
+  fun dash_separateAudio_listsVideoVariantsAndMergesMainAudio() {
+    val d = '$'
+    val stream = parseDashStream("""
+      <MPD mediaPresentationDuration="PT4S"><Period>
+        <AdaptationSet contentType="video" mimeType="video/mp4">
+          <SegmentTemplate timescale="1" duration="2"
+            initialization="${d}RepresentationID${d}/i.mp4"
+            media="${d}RepresentationID${d}/${d}Number${d}.m4s"/>
+          <Representation id="low" bandwidth="800000" width="640" height="360"/>
+          <Representation id="high" bandwidth="3000000" width="1920" height="1080" codecs="avc1"/>
+        </AdaptationSet>
+        <AdaptationSet mimeType="audio/mp4" lang="de">
+          <SegmentTemplate timescale="1" duration="1" initialization="de/i.mp4"
+            media="de/${d}Number${d}.m4s"/>
+          <Representation id="de" bandwidth="64000"/>
+        </AdaptationSet>
+        <AdaptationSet mimeType="audio/mp4" lang="en">
+          <Role schemeIdUri="urn:mpeg:dash:role:2011" value="main"/>
+          <SegmentTemplate timescale="1" duration="2" initialization="en/i.mp4"
+            media="en/${d}Number${d}.m4s"/>
+          <Representation id="en-low" bandwidth="64000"/>
+          <Representation id="en" bandwidth="128000"/>
+        </AdaptationSet>
+        <AdaptationSet mimeType="text/vtt"><Representation id="subs"/></AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/index.mpd")
+    assertEquals(listOf(3_000_000L, 800_000L), stream.variants.map { it.bandwidth })
+    assertEquals("1920x1080", stream.variants[0].metadata["resolution"])
+    val plan = stream.plan(1)
+    assertEquals(2, plan.tracks)
+    assertEquals(
+      listOf("low/i.mp4", "en/i.mp4", "low/1.m4s", "en/1.m4s", "low/2.m4s", "en/2.m4s"),
+      plan.parts.map { it.url.removePrefix("https://example.com/") })
+    assertEquals(listOf(0, 1, 0, 1, 0, 1), plan.parts.map { it.track })
+  }
+
+  @Test
+  fun dash_audioOnly_choosesAmongTheMainAudioRepresentations() {
+    val stream = parseDashStream("""
+      <MPD mediaPresentationDuration="PT2S"><Period>
+        <AdaptationSet mimeType="audio/mp4">
+          <SegmentTemplate duration="2" initialization="i.mp4" media="s.m4s"/>
+          <Representation id="a" bandwidth="64000"/><Representation id="b" bandwidth="128000"/>
+        </AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/index.mpd")
+    assertEquals(listOf(128_000L, 64_000L), stream.variants.map { it.bandwidth })
+    assertEquals(1, stream.plan().tracks)
+  }
 }

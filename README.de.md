@@ -131,9 +131,9 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
   Downloads und ändere sie, ohne neu zu beginnen; ein Magnet-Link, der vor seinen Details
   hinzugefügt wurde, wartet auf deine Wahl. Das Seeden fertiger Torrents lässt sich beenden und
   wieder starten; Torrents, die du weiter teilst, seeden auch nach einem Neustart von Ketch weiter.
-- **HLS (`.m3u8`) und DASH (`.mpd`)** — Speichere zeitlich begrenzte, unverschlüsselte Streams als
-  eine Mediendatei. Bei HLS-Master-Playlists wird die Variante mit der höchsten Bandbreite verwendet
-  ([Unterstützung und Grenzen](docs/media.md)).
+- **HLS (`.m3u8`) und DASH (`.mpd`)** — Speichere zeitlich begrenzte Streams als eine Mediendatei,
+  in der gewählten Qualität (standardmäßig der besten), mit eingebundener separater Tonspur und
+  entschlüsseltem AES-128-HLS ([Unterstützung und Grenzen](docs/media.md)).
 - Ketch kann Magnet-Links und `.torrent`-Dateien für dein System öffnen: Ein Klick im Browser oder
   Dateimanager führt direkt zu Ketch.
 
@@ -268,9 +268,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   macOS-Versionen, die Erweiterung in weiteren Browser-Stores und geprüfte Installations- und
   Updatewege ([Plan](docs/plans/v1-distribution.md))
 - **Metalink** — Downloads von mehreren Spiegelservern gleichzeitig, mit Prüfsummen
-- **Weitere HLS- und DASH-Formate** — Qualität wählen, getrennte Audio- und Videospuren verbinden
-  und AES-128-HLS-Verschlüsselung unterstützen; zeitlich begrenzte, unverschlüsselte Downloads aus
-  einem einzelnen Stream werden bereits unterstützt
 - **Medienextraktion** — Medien von Webseiten speichern
 - **Ressourcensuche** — Herunterladbare Dateien auf einer Webseite finden
 - **Schnellere segmentierte Downloads** — Früher fertige Verbindungen übernehmen den Rest langsamer

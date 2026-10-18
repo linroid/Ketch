@@ -14,6 +14,7 @@ import com.linroid.ketch.core.engine.httpConnectionSpec
 import com.linroid.ketch.core.engine.observeExchanges
 import com.linroid.ketch.core.file.sanitizeFileName
 import com.linroid.ketch.core.segment.SegmentCalculator
+import com.linroid.ketch.core.segment.SegmentLane
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -107,8 +108,8 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     SegmentedDownloadHelper(
       progressIntervalMs = context.config.progressIntervalMs,
       tag = "WebDavSource",
-    ).downloadAll(context, segments, totalBytes, ranges, requested) { segment, onProgress ->
-      downloadSegment(context, client, url, inspection.conditions, segment, onProgress)
+    ).downloadAll(context, segments, totalBytes, ranges, requested) { lane ->
+      downloadLane(context, client, url, inspection.conditions, lane)
     }
   }
 
@@ -263,36 +264,42 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
   }
 
   /**
-   * Downloads the bytes [segment] still needs with one ranged `GET` carrying [conditions]; a
+   * Downloads the bytes [lane] still needs with one ranged `GET` carrying [conditions], writing
+   * what [SegmentLane.admit] allows, as another connection may take over its tail meanwhile. A
    * `412` means the file changed since the run inspected it, and fails with
    * [KetchError.FileChanged] rather than mix two versions.
    */
-  private suspend fun downloadSegment(
+  private suspend fun downloadLane(
     context: DownloadContext,
     client: WebDavClient,
     url: WebDavUrl,
     conditions: Map<String, String>,
-    segment: Segment,
-    onProgress: suspend (bytesDownloaded: Long) -> Unit,
-  ): Segment {
-    if (segment.isComplete) return segment
-    var downloaded = segment.downloadedBytes
+    lane: SegmentLane,
+  ) {
+    if (lane.isComplete) return
+    val range = lane.offset..lane.end
+    var writeOffset = range.first
     val spec = httpConnectionSpec(TYPE, url.httpUrl, context.config.proxy)
     val handle = context.connections.open(spec)
     try {
       observeExchanges(handle, spec) {
         context.watchdog.watch { monitor ->
-          client.download(segment.currentOffset..segment.end, conditions) { data ->
+          client.download(range, conditions) { data ->
             currentCoroutineContext().ensureActive()
             monitor.received(data.size)
-            if (data.size > segment.totalBytes - downloaded) {
+            val allowed = lane.admit(data.size)
+            if (allowed > 0) {
+              monitor.throttled { context.throttle(allowed) }
+              val chunk = if (allowed == data.size) data else data.copyOf(allowed)
+              disk { context.fileAccessor.writeAt(writeOffset, chunk) }
+              writeOffset += allowed
+              handle.received(allowed)
+              // Ends the response when another connection took the rest of the range.
+              lane.commit(allowed)
+            }
+            if (allowed < data.size) {
               throw KetchError.Unsupported(IllegalStateException("Response exceeds segment"))
             }
-            monitor.throttled { context.throttle(data.size) }
-            disk { context.fileAccessor.writeAt(segment.start + downloaded, data) }
-            downloaded += data.size
-            handle.received(data.size)
-            onProgress(downloaded)
           }
         }
       }
@@ -303,14 +310,14 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
     } finally {
       handle.close()
     }
-    if (downloaded < segment.totalBytes) {
+    if (!lane.isComplete) {
       throw KetchError.Network(
         IllegalStateException(
-          "Connection closed prematurely: received $downloaded of ${segment.totalBytes} bytes",
+          "Connection closed prematurely: received ${writeOffset - range.first} of " +
+            "${lane.end - range.first + 1} bytes",
         ),
       )
     }
-    return segment.copy(downloadedBytes = downloaded)
   }
 
   /**

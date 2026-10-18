@@ -101,9 +101,10 @@ Downloads one URL, prints its progress, and exits when it completes or fails, en
 - HTTP(S) URLs
 - FTP and FTPS URLs: `ftp://[user:password@]host[:port]/path`
 - magnet links, and `.torrent` URLs or files
-- finite, unencrypted HLS (`.m3u8`) and DASH (`.mpd`) streams, saved as one media file. An HLS
-  master playlist downloads its highest-bandwidth variant. Live streams and separate audio and
-  video tracks are not supported; see [media support and limits](../docs/media.md).
+- finite HLS (`.m3u8`) and DASH (`.mpd`) streams, saved as one media file: the best quality
+  unless `--files <id>` picks another of those `--list-files` lists, with separate fragmented MP4
+  audio merged in and AES-128 HLS decrypted. Live streams and DRM are not supported; see
+  [media support and limits](../docs/media.md).
 
 Where the file goes:
 

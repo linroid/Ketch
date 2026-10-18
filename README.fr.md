@@ -131,9 +131,9 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
   pendant le téléchargement et modifiez-les sans tout reprendre ; un lien magnet ajouté avant
   l'arrivée de ses détails attend votre choix. Arrêtez ou relancez le partage d'un torrent
   terminé ; ceux que vous continuez à partager reprennent le partage après un redémarrage de Ketch.
-- **HLS (`.m3u8`) et DASH (`.mpd`)** — Enregistrez les flux de durée finie non chiffrés dans un
-  seul fichier multimédia. Les listes maîtresses HLS utilisent la variante au débit le plus élevé
-  ([prise en charge et limites](docs/media.md)).
+- **HLS (`.m3u8`) et DASH (`.mpd`)** — Enregistrez les flux de durée finie dans un seul fichier
+  multimédia, dans la qualité choisie (la meilleure par défaut), avec la piste audio séparée
+  fusionnée et le chiffrement HLS AES-128 déchiffré ([prise en charge et limites](docs/media.md)).
 - Ketch peut ouvrir les liens magnet et les fichiers `.torrent` du système : un clic dans le
   navigateur ou le gestionnaire de fichiers les envoie à Ketch.
 
@@ -271,9 +271,6 @@ docker run -d --name ketch --restart unless-stopped -e PUID=1000 -e PGID=1000 \
   l'extension dans d'autres boutiques de navigateurs et parcours d'installation et de mise à
   jour vérifiés ([plan](docs/plans/v1-distribution.md))
 - **Metalink** — Téléchargements depuis plusieurs miroirs à la fois, avec sommes de contrôle
-- **Davantage de formats HLS et DASH** — Choix de la qualité, fusion des pistes audio et vidéo
-  séparées et prise en charge du chiffrement HLS AES-128 ; les téléchargements d'un seul flux de
-  durée finie non chiffré sont déjà pris en charge
 - **Extraction multimédia** — Enregistrer les médias des pages web
 - **Détection de ressources** — Trouver les fichiers téléchargeables d'une page web
 - **Téléchargements segmentés plus rapides** — Les connexions terminées reprennent ce qui reste
