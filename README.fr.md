@@ -28,7 +28,7 @@
 [![Dernière version](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Application web](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](http://ketch.linroid.com/)
-[![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://play.google.com/store/apps/details?id=com.linroid.ketch.app)
 [![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Ordinateur](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![Licence](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -82,7 +82,7 @@ La bibliothèque Kotlin Multiplatform est disponible sur Maven Central.
 | macOS (Apple silicon, Intel) | `.dmg` de la [dernière version][release] |
 | Windows (x64, ARM64) | `.msi` ou `.zip` portable sans installation de la [dernière version][release] ([à propos de la version portable](docs/updates.md#the-portable-windows-app)) |
 | Linux (x64, ARM64) | `.deb` de la [dernière version][release] |
-| Android 8.0+ | `.apk` de la [dernière version][release] |
+| Android 8.0+ | [Google Play](https://play.google.com/store/apps/details?id=com.linroid.ketch.app) ou `.apk` de la [dernière version][release] |
 | iOS 15+ | `.ipa` non signé de la [dernière version][release], à installer avec AltStore, SideStore ou Sideloadly (qui le signent avec votre identifiant Apple) ; ou compiler depuis les sources avec Xcode ([`app/ios`](app/ios/)) |
 | Web | [ketch.linroid.com](http://ketch.linroid.com/), pour contrôler Ketch sur un autre appareil |
 | Extension de navigateur | Chrome, Edge, Brave et autres navigateurs Chromium : [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka) ; Firefox : `.zip` des [versions de l'extension](https://github.com/linroid/Ketch/releases) ([installation](app/browser-extension/README.md#installing)) |

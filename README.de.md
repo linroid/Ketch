@@ -28,7 +28,7 @@
 [![Neueste Version](https://img.shields.io/github/v/release/linroid/Ketch?include_prereleases&filter=v*&label=Download&logo=github)](https://github.com/linroid/Ketch/releases/latest)
 [![Maven Central](https://img.shields.io/maven-central/v/com.linroid.ketch/core?label=Maven%20Central&logo=apache-maven&logoColor=white)](https://central.sonatype.com/namespace/com.linroid.ketch)
 [![Web-App](https://img.shields.io/badge/Web_app-open-4F5DE4.svg?logo=webassembly&logoColor=white)](http://ketch.linroid.com/)
-[![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://github.com/linroid/Ketch/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0+-3DDC84.svg?logo=android&logoColor=white)](https://play.google.com/store/apps/details?id=com.linroid.ketch.app)
 [![iOS](https://img.shields.io/badge/iOS-15+-000000.svg?logo=apple&logoColor=white)](app/ios/)
 [![Desktop](https://img.shields.io/badge/Desktop-macOS_|_Windows_|_Linux-DB380E.svg)](https://github.com/linroid/Ketch/releases/latest)
 [![Lizenz](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -82,7 +82,7 @@ Multiplatform-Bibliothek ist auf Maven Central verfügbar.
 | macOS (Apple silicon, Intel) | `.dmg` der [neuesten Version][release] |
 | Windows (x64, ARM64) | `.msi` oder portable `.zip` ohne Installation aus der [neuesten Version][release] ([zur portablen App](docs/updates.md#the-portable-windows-app)) |
 | Linux (x64, ARM64) | `.deb` der [neuesten Version][release] |
-| Android 8.0+ | `.apk` der [neuesten Version][release] |
+| Android 8.0+ | [Google Play](https://play.google.com/store/apps/details?id=com.linroid.ketch.app) oder `.apk` der [neuesten Version][release] |
 | iOS 15+ | Unsigniertes `.ipa` der [neuesten Version][release] zum Sideloaden mit AltStore, SideStore oder Sideloadly (sie signieren es mit deiner Apple-ID); oder mit Xcode aus dem Quellcode bauen ([`app/ios`](app/ios/)) |
 | Web | [ketch.linroid.com](http://ketch.linroid.com/), um Ketch auf einem anderen Gerät zu steuern |
 | Browsererweiterung | Chrome, Edge, Brave und andere Chromium-Browser: [Chrome Web Store](https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka); Firefox: `.zip` aus den [Versionen der Erweiterung](https://github.com/linroid/Ketch/releases) ([Installation](app/browser-extension/README.md#installing)) |
