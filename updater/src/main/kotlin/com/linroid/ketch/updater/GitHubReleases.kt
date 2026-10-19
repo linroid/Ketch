@@ -152,7 +152,7 @@ class GitHubReleases(
       log.d { "Reading the release from the API, as $tag has no usable $SHA256SUMS: ${e.message}" }
       return null
     }
-    val assets = parseSha256Sums(sums.toString(Charsets.UTF_8)).map { (name, sha256) ->
+    val assets = parseSha256Sums(sums.toString(Charsets.UTF_8.name())).map { (name, sha256) ->
       ReleaseAsset(
         name = name,
         url = "$base/download/$tag/${encodePathSegment(name)}",
