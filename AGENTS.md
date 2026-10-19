@@ -2150,7 +2150,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   them with their notes (`ReleaseFeed.releases`, `releasesBetween`); `Release.asset` /
   `androidAsset` pick the file by the workflow's names, and
   `ReleaseDownloader` downloads it with a private Ketch engine, which checks its SHA-256 digest
-  (from `SHA256SUMS`, else the one GitHub publishes per asset) (`DownloadRequest.checksum`; files without one are refused). Pass it the process's logger:
+  (from `SHA256SUMS`, else the one GitHub publishes per asset; `DownloadRequest.checksum`, and
+  files without one are refused). Pass it the process's logger:
   every `Ketch` installs its logger globally
 - `ReleaseVersion` orders `rc9` before `rc15` and pre-releases before their release
 - `ketch update [--check] [--version <v>]` replaces the native binary (`CliInstallation`): renamed
