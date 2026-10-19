@@ -62,15 +62,31 @@ resolve_version() {
     return
   fi
 
-  info "Fetching latest release..."
-  local tag
-  tag="$(curl -fsSL \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')"
+  info "Fetching latest release..." >&2
+  local tag="" latest_url
+  # The release page redirects to .../releases/tag/<tag>; unlike the API, it is not limited to
+  # 60 anonymous requests an hour.
+  if latest_url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+    "https://github.com/${REPO}/releases/latest")"; then
+    case "$latest_url" in
+      */releases/tag/*) tag="${latest_url##*/releases/tag/}" ;;
+    esac
+  fi
 
   if [ -z "$tag" ]; then
-    error "Failed to determine the latest release version."
+    local auth=()
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+    fi
+    tag="$(curl -fsSL \
+      -H "Accept: application/vnd.github+json" \
+      ${auth[@]+"${auth[@]}"} \
+      "https://api.github.com/repos/${REPO}/releases/latest" \
+      | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')" || true
+  fi
+
+  if [ -z "$tag" ]; then
+    error "Failed to determine the latest release version. Set KETCH_VERSION to install a specific one."
   fi
   echo "${tag#v}"
 }
