@@ -75,7 +75,7 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 
 ## ダウンロード
 
-<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Google Play で手に入れよう" src="https://play.google.com/intl/en_us/badges/static/images/badges/ja_badge_web_generic.png" height="80"></a>
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Google Play で手に入れよう" src="https://play.google.com/intl/en_us/badges/static/images/badges/ja_badge_web_generic.png" height="80" align="middle"></a> <a href="https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka"><img alt="Chrome ウェブストアで入手" src="https://developer.chrome.com/static/docs/webstore/branding/image/HRs9MPufa1J1h5glNhut.png" height="56" align="middle"></a>
 
 | プラットフォーム | 入手方法 |
 |---|---|

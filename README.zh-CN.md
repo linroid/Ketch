@@ -74,7 +74,7 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 
 ## 下载
 
-<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="下载应用，请到 Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/zh-cn_badge_web_generic.png" height="80"></a>
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="下载应用，请到 Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/zh-cn_badge_web_generic.png" height="80" align="middle"></a> <a href="https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka"><img alt="在 Chrome 应用商店获取" src="https://developer.chrome.com/static/docs/webstore/branding/image/HRs9MPufa1J1h5glNhut.png" height="56" align="middle"></a>
 
 | 平台 | 获取方式 |
 |---|---|

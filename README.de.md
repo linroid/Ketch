@@ -77,7 +77,7 @@ Multiplatform-Bibliothek ist auf Maven Central verfügbar.
 
 ## Herunterladen
 
-<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Jetzt bei Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/de_badge_web_generic.png" height="80"></a>
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Jetzt bei Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/de_badge_web_generic.png" height="80" align="middle"></a> <a href="https://chromewebstore.google.com/detail/flnjeochbgpaipiofdjmoijaeooemhka"><img alt="Im Chrome Web Store verfügbar" src="https://developer.chrome.com/static/docs/webstore/branding/image/HRs9MPufa1J1h5glNhut.png" height="56" align="middle"></a>
 
 | Plattform | Bezugsquelle |
 |---|---|
