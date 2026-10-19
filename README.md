@@ -71,6 +71,8 @@ available on Maven Central. [Start integrating Ketch →](docs/developers.md#qui
 
 ## Download
 
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a>
+
 | Platform | Get it |
 |---|---|
 | macOS (Apple silicon, Intel) | `.dmg` from the [latest release][release] |

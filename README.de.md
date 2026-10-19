@@ -77,6 +77,8 @@ Multiplatform-Bibliothek ist auf Maven Central verfügbar.
 
 ## Herunterladen
 
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Jetzt bei Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/de_badge_web_generic.png" height="80"></a>
+
 | Plattform | Bezugsquelle |
 |---|---|
 | macOS (Apple silicon, Intel) | `.dmg` der [neuesten Version][release] |

@@ -75,6 +75,8 @@ Maven Central で公開しています。[Ketch の組み込みを始める →]
 
 ## ダウンロード
 
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Google Play で手に入れよう" src="https://play.google.com/intl/en_us/badges/static/images/badges/ja_badge_web_generic.png" height="80"></a>
+
 | プラットフォーム | 入手方法 |
 |---|---|
 | macOS（Apple silicon、Intel） | [最新リリース][release]の `.dmg` |

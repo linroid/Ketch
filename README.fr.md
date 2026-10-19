@@ -77,6 +77,8 @@ La bibliothèque Kotlin Multiplatform est disponible sur Maven Central.
 
 ## Télécharger
 
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="Disponible sur Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/fr_badge_web_generic.png" height="80"></a>
+
 | Plateforme | Où le trouver |
 |---|---|
 | macOS (Apple silicon, Intel) | `.dmg` de la [dernière version][release] |

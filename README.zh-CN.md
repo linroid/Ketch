@@ -74,6 +74,8 @@ Ketch 将每个下载任务拆分为多个并行连接，并实时显示各连�
 
 ## 下载
 
+<a href="https://play.google.com/store/apps/details?id=com.linroid.ketch.app"><img alt="下载应用，请到 Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/zh-cn_badge_web_generic.png" height="80"></a>
+
 | 平台 | 获取方式 |
 |---|---|
 | macOS（Apple 芯片、Intel） | [最新版本][release]中的 `.dmg` |
