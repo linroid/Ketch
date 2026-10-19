@@ -5,8 +5,10 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.HttpEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -88,21 +90,31 @@ const val MAX_HISTORY_PAGES: Int = 20
 
 /**
  * The releases of a GitHub [repository], read from the GitHub REST API. GitHub allows 60 requests
- * an hour from one address without a token, plenty for a check a day.
+ * an hour from one address without a token, which other programs on a shared address may have
+ * used up, so [latest] reads the website first.
  *
  * @param httpEngine makes the HTTP engine of one request, which closes it afterwards.
+ * @param webUrl the website, where `releases/latest` redirects to the latest release's tag and
+ *   its [SHA256SUMS] file downloads, neither counting against the API's limit.
  * @throws UpdateException from every call when GitHub cannot be reached or has no such release.
  */
 class GitHubReleases(
   private val httpEngine: () -> HttpEngine,
   private val repository: String = KETCH_REPOSITORY,
   private val apiUrl: String = "https://api.github.com",
+  private val webUrl: String = "https://github.com",
   private val timeout: Duration = 30.seconds,
 ) : ReleaseFeed {
   private val log = KetchLogger("GitHubReleases")
 
+  /**
+   * The latest release, with its files and digests from its [SHA256SUMS] file, and without notes
+   * or a publish time; from the API, with them, for releases published before that file or when
+   * the website fails.
+   */
   override suspend fun latest(): Release =
-    single("releases/latest", missing = "$repository has no published release")
+    latestFromWeb()
+      ?: single("releases/latest", missing = "$repository has no published release")
 
   override suspend fun release(version: ReleaseVersion): Release =
     single("releases/tags/v$version", missing = "$repository has no release v$version")
@@ -124,19 +136,91 @@ class GitHubReleases(
     return release.toRelease(version)
   }
 
+  /**
+   * The latest release as the website names it, with the files its [SHA256SUMS] file lists, or
+   * `null` when the website fails or the release has no such file (yet).
+   */
+  private suspend fun latestFromWeb(): Release? {
+    val tag = latestTag() ?: return null
+    val version = ReleaseVersion.parse(tag) ?: return null.also {
+      log.d { "The latest release tag $tag is not a version" }
+    }
+    val base = "$webUrl/$repository/releases"
+    val sums = try {
+      get("$base/download/$tag/$SHA256SUMS", WEB_HEADERS, missing = "no $SHA256SUMS")
+    } catch (e: UpdateException) {
+      log.d { "Reading the release from the API, as $tag has no usable $SHA256SUMS: ${e.message}" }
+      return null
+    }
+    val assets = parseSha256Sums(sums.toString(Charsets.UTF_8)).map { (name, sha256) ->
+      ReleaseAsset(
+        name = name,
+        url = "$base/download/$tag/${encodePathSegment(name)}",
+        size = 0,
+        sha256 = sha256,
+      )
+    }
+    if (assets.isEmpty()) {
+      log.d { "Reading the release from the API, as the $SHA256SUMS of $tag lists no file" }
+      return null
+    }
+    return Release(version = version, pageUrl = "$base/tag/$tag", assets = assets)
+  }
+
+  /** The tag `releases/latest` redirects to, or `null` when it does not. */
+  private suspend fun latestTag(): String? {
+    val url = "$webUrl/$repository/releases/latest"
+    log.d { "Fetching $url" }
+    val engine = httpEngine()
+    val target = try {
+      withTimeoutOrNull(timeout) {
+        engine.request("HEAD", url, WEB_HEADERS).takeIf { it.isSuccess }?.url
+      }
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      log.d { "Reading the release from the API, as $url failed: ${e.describeCauses()}" }
+      null
+    } finally {
+      engine.close()
+    }
+    val tag = target?.substringAfter(TAG_PATH, missingDelimiterValue = "")
+      ?.substringBefore('?')?.substringBefore('#')?.trimEnd('/')
+    if (tag.isNullOrEmpty() || '/' in tag) {
+      log.d { "Reading the release from the API, as $url led to no release tag" }
+      return null
+    }
+    return tag
+  }
+
   /** Reads [path] of the repository's API as [what]; [missing] explains a 404. */
   private suspend fun <T> fetch(
     path: String,
     what: DeserializationStrategy<T>,
     missing: String,
   ): T {
-    val url = "$apiUrl/repos/$repository/$path"
+    val body = get("$apiUrl/repos/$repository/$path", HEADERS, missing)
+    return try {
+      JSON.decodeFromString(what, body.toString(Charsets.UTF_8.name()))
+    } catch (e: SerializationException) {
+      throw UpdateException("Couldn't read GitHub's answer: ${e.message}", e)
+    } catch (e: IllegalArgumentException) {
+      throw UpdateException("Couldn't read GitHub's answer: ${e.message}", e)
+    }
+  }
+
+  /** The body of [url], at most [MAX_BODY_BYTES]; [missing] explains a 404. */
+  private suspend fun get(
+    url: String,
+    headers: Map<String, String>,
+    missing: String,
+  ): ByteArrayOutputStream {
     log.d { "Fetching $url" }
     val body = ByteArrayOutputStream()
     val engine = httpEngine()
     try {
       withTimeout(timeout) {
-        engine.download(url, range = null, headers = HEADERS) { chunk ->
+        engine.download(url, range = null, headers = headers) { chunk ->
           if (body.size() + chunk.size > MAX_BODY_BYTES) {
             throw UpdateException("GitHub's answer is larger than $MAX_BODY_BYTES bytes")
           }
@@ -161,13 +245,7 @@ class GitHubReleases(
     } finally {
       engine.close()
     }
-    return try {
-      JSON.decodeFromString(what, body.toString(Charsets.UTF_8.name()))
-    } catch (e: SerializationException) {
-      throw UpdateException("Couldn't read GitHub's answer: ${e.message}", e)
-    } catch (e: IllegalArgumentException) {
-      throw UpdateException("Couldn't read GitHub's answer: ${e.message}", e)
-    }
+    return body
   }
 
   private fun GitHubRelease.toRelease(version: ReleaseVersion) = Release(
@@ -195,6 +273,7 @@ class GitHubReleases(
 
   private companion object {
     const val SHA256_PREFIX = "sha256:"
+    const val TAG_PATH = "/releases/tag/"
 
     /** A release takes about 25 KiB with its files, so a page about 250 KiB. */
     const val RELEASES_PER_PAGE = 10
@@ -205,7 +284,36 @@ class GitHubReleases(
       // GitHub refuses API requests without one.
       "User-Agent" to "Ketch/${KetchApi.VERSION}",
     )
+    val WEB_HEADERS = mapOf("User-Agent" to "Ketch/${KetchApi.VERSION}")
     val JSON = Json { ignoreUnknownKeys = true }
+  }
+}
+
+/** The file of each release listing its other files' SHA-256 digests, uploaded last. */
+const val SHA256SUMS: String = "SHA256SUMS"
+
+/**
+ * The files and digests of a [SHA256SUMS] file, as `sha256sum` writes them: a lowercase or
+ * uppercase hex digest, a space, a space or `*`, and the file name. Other lines are left out.
+ */
+internal fun parseSha256Sums(text: String): List<Pair<String, String>> =
+  text.lineSequence().mapNotNull { line ->
+    SHA256_LINE.matchEntire(line.trimEnd('\r'))?.destructured?.let { (digest, name) ->
+      name to digest.lowercase()
+    }
+  }.filter { (name, _) -> '/' !in name && '\\' !in name }.distinctBy { it.first }.toList()
+
+private val SHA256_LINE = Regex("([0-9a-fA-F]{64}) [ *](.+)")
+
+/** [segment] percent-encoded for a URL path: anything but unreserved characters. */
+private fun encodePathSegment(segment: String): String = buildString {
+  for (byte in segment.encodeToByteArray()) {
+    val c = byte.toInt().toChar()
+    if (c.isLetterOrDigit() && c.code < 128 || c in "-._~") {
+      append(c)
+    } else {
+      append('%').append("%02X".format(byte.toInt() and 0xFF))
+    }
   }
 }
 

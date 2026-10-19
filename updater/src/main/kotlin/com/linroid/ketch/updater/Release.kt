@@ -38,7 +38,7 @@ data class Release(
  * A file of a [Release].
  *
  * @property url where it downloads from.
- * @property size its size in bytes.
+ * @property size its size in bytes; 0 when the feed does not say, as a [SHA256SUMS] file does not.
  * @property sha256 its SHA-256 digest in lowercase hex, which GitHub computes on upload; `null`
  *   for files uploaded before GitHub did.
  */

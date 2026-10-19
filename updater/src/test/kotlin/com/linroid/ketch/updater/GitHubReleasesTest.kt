@@ -18,6 +18,72 @@ import kotlin.time.Instant
 
 class GitHubReleasesTest {
   private val api = "https://api.test"
+  private val web = "https://web.test"
+
+  @Test
+  fun latest_readsTheWebsitesTagAndSha256Sums() = runTest {
+    val engine = FakeHttpEngine(
+      bodies = mapOf("$web/linroid/Ketch/releases/download/v0.3.1/SHA256SUMS" to SUMS),
+      redirects = mapOf(
+        "$web/linroid/Ketch/releases/latest" to "$web/linroid/Ketch/releases/tag/v0.3.1",
+      ),
+    )
+    val release = GitHubReleases({ engine }, apiUrl = api, webUrl = web).latest()
+
+    assertEquals(ReleaseVersion(0, 3, 1), release.version)
+    assertEquals("$web/linroid/Ketch/releases/tag/v0.3.1", release.pageUrl)
+    val (apk, cli) = release.assets
+    assertEquals("ketch-android-0.3.1.apk", apk.name)
+    assertEquals("$web/linroid/Ketch/releases/download/v0.3.1/ketch-android-0.3.1.apk", apk.url)
+    assertEquals("a".repeat(64), apk.sha256)
+    assertEquals("b".repeat(64), cli.sha256)
+    val platform = ReleasePlatform(ReleaseOs.Linux, ReleaseArch.X64)
+    assertEquals(cli, release.asset(ReleaseProduct.Cli, platform))
+    // Neither request counts against the API's hourly limit.
+    assertTrue(engine.requests.none { (url, _) -> url.startsWith(api) })
+    assertContains(engine.requests.first().second.getValue("User-Agent"), "Ketch/")
+  }
+
+  @Test
+  fun latest_releaseWithoutSha256Sums_readsTheApi() = runTest {
+    val engine = FakeHttpEngine(
+      bodies = mapOf("$api/repos/linroid/Ketch/releases/latest" to RELEASE_JSON),
+      redirects = mapOf(
+        "$web/linroid/Ketch/releases/latest" to "$web/linroid/Ketch/releases/tag/v0.0.2-rc1",
+      ),
+    )
+    val release = GitHubReleases({ engine }, apiUrl = api, webUrl = web).latest()
+
+    assertEquals(ReleaseVersion(0, 0, 2, "rc1"), release.version)
+    assertEquals(41, release.assets.first().size)
+    assertTrue(release.notes.isNotEmpty())
+  }
+
+  @Test
+  fun latest_websiteNamesNoTag_readsTheApi() = runTest {
+    val engine = FakeHttpEngine(
+      bodies = mapOf("$api/repos/linroid/Ketch/releases/latest" to RELEASE_JSON),
+      // A repository without releases.
+      redirects = mapOf("$web/linroid/Ketch/releases/latest" to "$web/linroid/Ketch/releases"),
+    )
+    val release = GitHubReleases({ engine }, apiUrl = api, webUrl = web).latest()
+
+    assertEquals(ReleaseVersion(0, 0, 2, "rc1"), release.version)
+  }
+
+  @Test
+  fun parseSha256Sums_readsSha256sumLinesOnly() {
+    val text = "${"A".repeat(64)}  one.zip\r\n" +
+      "${"b".repeat(64)} *two.tar.gz\n" +
+      "not a digest  three.zip\n" +
+      "${"c".repeat(64)}  dir/four.zip\n" +
+      "\n"
+
+    assertEquals(
+      listOf("one.zip" to "a".repeat(64), "two.tar.gz" to "b".repeat(64)),
+      parseSha256Sums(text),
+    )
+  }
 
   @Test
   fun latest_readsVersionPageAndDigests() = runTest {
@@ -39,7 +105,7 @@ class GitHubReleasesTest {
     val engine = FakeHttpEngine(mapOf("$api/repos/linroid/Ketch/releases/latest" to RELEASE_JSON))
     GitHubReleases({ engine }, apiUrl = api).latest()
 
-    val headers = engine.requests.single().second
+    val headers = engine.requests.single { (url, _) -> url.startsWith(api) }.second
     assertEquals("application/vnd.github+json", headers["Accept"])
     assertContains(headers.getValue("User-Agent"), "Ketch/")
     assertTrue(engine.closed)
@@ -132,6 +198,11 @@ class GitHubReleasesTest {
   }
 
   private companion object {
+    val SUMS = """
+      ${"a".repeat(64)}  ketch-android-0.3.1.apk
+      ${"b".repeat(64)}  ketch-cli-0.3.1-linux-x64.tar.gz
+    """.trimIndent().encodeToByteArray()
+
     val RELEASE_JSON = """
       {
         "tag_name": "v0.0.2-rc1",

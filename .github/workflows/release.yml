@@ -549,3 +549,15 @@ jobs:
           body_path: release-notes.md
           generate_release_notes: true
           files: artifacts/**
+
+      # The updaters read the latest release's files and digests from this file, which downloads
+      # without GitHub's API and its hourly limit. Uploaded last, so every file it names is there.
+      - name: Upload SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find artifacts -type f | sort | while IFS= read -r file; do
+            printf '%s  %s\n' "$(sha256sum "$file" | cut -d ' ' -f 1)" "$(basename "$file")"
+          done > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$KETCH_VERSION" SHA256SUMS --clobber

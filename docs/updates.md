@@ -204,9 +204,15 @@ This section is for developers and release maintainers.
 
 ### Finding and checking a release
 
-- `GitHubReleases` asks the GitHub REST API for the latest release
-  (`/repos/linroid/Ketch/releases/latest`), which leaves out drafts and pre-releases, or for the
-  release of one tag. Unauthenticated requests are limited to 60 an hour from one address.
+- `GitHubReleases.latest` reads the latest release, which leaves out drafts and pre-releases,
+  from the website: `github.com/linroid/Ketch/releases/latest` redirects to its tag, and its
+  `SHA256SUMS` file, which the release workflow uploads after every other file, lists its files
+  and their digests. Neither counts against the GitHub REST API's limit of 60 unauthenticated
+  requests an hour from one address, which other programs on a shared address may use up. When
+  the website fails, or a release has no `SHA256SUMS` (those before it, or one still uploading),
+  it asks the API (`/repos/linroid/Ketch/releases/latest`). A release read from the website has
+  no notes, publish time or file sizes; release notes, the release history and `ketch update
+  --version` always ask the API.
 - Versions come from the tag (`v0.0.1-rc15`) and compare as releases do: a pre-release before its
   release, and `rc9` before `rc15` (`ReleaseVersion`).
 - A release can be published before the workflow uploads its files. Until this system's file is
@@ -218,8 +224,9 @@ This section is for developers and release maintainers.
   `ketch-desktop-<version>-windows-<arch>-portable.zip`, and `ketch-android-<version>.apk`
   (`Release.androidAsset`). Renaming those files in `.github/workflows/release.yml` breaks
   updates of every installed copy.
-- `ReleaseDownloader` downloads the file with a Ketch engine of its own and checks it against the
-  SHA-256 digest GitHub computes for each uploaded asset. A file without a digest is refused. The
+- `ReleaseDownloader` downloads the file with a Ketch engine of its own and checks it against its
+  SHA-256 digest: the one `SHA256SUMS` lists, else the one GitHub computes for each uploaded
+  asset. A file without a digest is refused. The
   release metadata is trusted through GitHub's TLS; Android also enforces APK signing when
   replacing the installed app.
 

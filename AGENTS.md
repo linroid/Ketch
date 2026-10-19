@@ -2144,12 +2144,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   [hooks](docs/hooks.md)
 
 ### Self-update (`updater`)
-- Shared by desktop, direct Android and the CLI: `GitHubReleases` reads the latest (or a tagged)
-  release, or a page of them with their notes (`ReleaseFeed.releases`, `releasesBetween`), from
-  the GitHub API, `Release.asset` / `androidAsset` pick the file by the workflow's
-  names, and
-  `ReleaseDownloader` downloads it with a private Ketch engine, which checks the SHA-256 digest
-  GitHub publishes per asset (`DownloadRequest.checksum`; files without one are refused). Pass it the process's logger:
+- Shared by desktop, direct Android and the CLI: `GitHubReleases` reads the latest release from
+  the website (the `releases/latest` redirect and the release's `SHA256SUMS`, which the release
+  workflow uploads last), else from the GitHub API, as it reads a tagged release or a page of
+  them with their notes (`ReleaseFeed.releases`, `releasesBetween`); `Release.asset` /
+  `androidAsset` pick the file by the workflow's names, and
+  `ReleaseDownloader` downloads it with a private Ketch engine, which checks its SHA-256 digest
+  (from `SHA256SUMS`, else the one GitHub publishes per asset) (`DownloadRequest.checksum`; files without one are refused). Pass it the process's logger:
   every `Ketch` installs its logger globally
 - `ReleaseVersion` orders `rc9` before `rc15` and pre-releases before their release
 - `ketch update [--check] [--version <v>]` replaces the native binary (`CliInstallation`): renamed
