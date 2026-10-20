@@ -1,5 +1,6 @@
 package com.linroid.ketch.config
 
+import com.linroid.ketch.api.DownloadConfig
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
@@ -44,6 +45,16 @@ class FileConfigStoreTest {
       assertEquals(1, reported.size)
       file.delete()
     }
+  }
+
+  @Test
+  fun save_windowsDownloadFolder_loadsUnchanged() {
+    val config = KetchConfig(download = DownloadConfig(defaultDirectory = "F:\\Downloads\\backup"))
+    val store = FileConfigStore(file.path)
+
+    store.save(config)
+
+    assertEquals(config, store.load())
   }
 
   @Test

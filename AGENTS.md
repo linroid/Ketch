@@ -1609,6 +1609,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
   `download.defaultDirectory` expands to the home directory when the file is loaded. The web app
   uses `WebConfigStore` (TOML in localStorage)
+- Both write through `ConfigStore.encode`, never `toml.encodeToString`: ktoml 0.7.1 keeps a
+  backslash before `b`, `t`, `n`, `f`, `r`, `u`, `U` or `"` as it is (`F:\x\backup` reads back
+  with a backspace), so `escapeBackslashes` (`TomlBackslashes.kt`) writes every backslash of a
+  basic string as `\u005C`. `ConfigStore.decode` turns the control characters older versions left
+  in Windows folder paths (default directory, category folders, allowed directories, hook
+  program and working directory, the add sheet's folders) back into a backslash and letter
+  (`repairLostBackslashes`); POSIX paths, which may hold them, are kept
 - A `config.toml` that does not parse, or holds a value no setting takes, makes `load()` throw
   unless the store has an `onUnreadable` callback: the apps pass one, so the file moves aside to
   `config.toml.broken-<UTC time>` and they start with `KetchConfig.Unreadable`, the defaults with

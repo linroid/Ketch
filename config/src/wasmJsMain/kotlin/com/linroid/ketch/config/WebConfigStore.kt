@@ -15,11 +15,6 @@ class WebConfigStore(
   }
 
   override fun save(config: KetchConfig) {
-    window.localStorage.setItem(
-      key,
-      ConfigStore.toml.encodeToString(
-        KetchConfig.serializer(), config,
-      ),
-    )
+    window.localStorage.setItem(key, ConfigStore.encode(config))
   }
 }

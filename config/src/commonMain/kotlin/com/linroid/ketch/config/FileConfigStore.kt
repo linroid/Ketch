@@ -72,9 +72,7 @@ class FileConfigStore(
     file.parent?.let { platformFileSystem.createDirectories(it) }
     val sink = platformFileSystem.sink(tmp).buffer()
     try {
-      val encoded = ConfigStore.toml
-        .encodeToString(KetchConfig.serializer(), config)
-      sink.writeUtf8(encoded)
+      sink.writeUtf8(ConfigStore.encode(config))
     } finally {
       sink.close()
     }
