@@ -21,6 +21,7 @@ globalThis.chrome = {
   downloads: {
     search: async () => [{ url: 'https://example.com/file', paused: true, state: 'in_progress' }],
     resume: async (id) => browserActions.push(['resume', id]),
+    pause: async (id) => browserActions.push(['pause', id]),
     cancel: async (id) => browserActions.push(['cancel', id]),
     erase: async ({ id }) => browserActions.push(['erase', id]),
     download: async (options) => browserActions.push(['download', options]),
@@ -226,6 +227,62 @@ test('downloading in the browser resumes a captured original', async () => {
   assert.deepEqual(browserActions, [['resume', 42]]);
   assert.deepEqual(data, {});
   await assert.rejects(directReview(id));
+});
+
+/** A review of a download the browser holds back, unpaused, as Chromium holds its file name. */
+async function heldReview() {
+  const id = await openReview('server', { url: 'https://example.com/file', browserDownloadId: 43 },
+    { release: async () => browserActions.push(['release', 43]) });
+  return Object.keys(data).find((key) => data[key].download.browserDownloadId === 43)
+    .slice('review:'.length);
+}
+
+async function withUnpausedOriginal(action) {
+  const search = globalThis.chrome.downloads.search;
+  globalThis.chrome.downloads.search = async () =>
+    [{ url: 'https://example.com/file', paused: false, state: 'in_progress' }];
+  try {
+    await action();
+  } finally {
+    globalThis.chrome.downloads.search = search;
+  }
+}
+
+test('a held original goes back to the browser as it was, never as a new download', async () => {
+  reset();
+  await directReview(await heldReview(), 'renamed.bin');
+  assert.deepEqual(browserActions, [['release', 43]]);
+  assert.deepEqual(data, {});
+  reset();
+  await cancelReview(await heldReview());
+  assert.deepEqual(browserActions, [['release', 43]]);
+  assert.deepEqual(data, {});
+});
+
+test('a held original is removed only once Ketch accepts the download', async () => {
+  await withUnpausedOriginal(async () => {
+    reset();
+    const id = await heldReview();
+    await sendReview(id, 'server', '', '', async () => {
+      assert.deepEqual(browserActions, []);
+      return { taskId: 'accepted' };
+    });
+    assert.deepEqual(browserActions, [['cancel', 43], ['erase', 43]]);
+    await cancelReview(id);
+    assert.deepEqual(browserActions, [['cancel', 43], ['erase', 43]]);
+  });
+});
+
+test('after an uncertain send a held original goes back to the browser paused', async () => {
+  await withUnpausedOriginal(async () => {
+    reset();
+    const id = await heldReview();
+    await assert.rejects(sendReview(id, 'server', '', '', async () => {
+      throw { kind: 'uncertain' };
+    }));
+    assert.deepEqual(browserActions, [['release', 43], ['pause', 43]]);
+    assert.equal(data[`review:${id}`].state, 'uncertain');
+  });
 });
 
 test('downloading a reviewed link in the browser starts a download with a valid name', async () => {

@@ -128,9 +128,13 @@ panel may show it for a moment, and if Firefox is set to ask where to save each 
 appears first.
 
 Downloads other extensions start are captured too, such as the videos a media downloader finds on
-a page and saves through the browser. Turn off **Capture downloads from other extensions** in
-settings to leave them to the extension that started them. The extension's own downloads, such as
-**Download in browser**, are never captured.
+a page and saves through the browser. Ketch gets their link, cookies and referrer, but not headers
+the other extension added to its request, so while the dialog is open the browser holds the
+original download instead of canceling it: **Download in browser**, or closing the dialog, lets it
+continue as that extension started it, and it is removed only once Ketch accepts the download.
+Turn off **Capture downloads from other extensions** in settings to leave them to the extension
+that started them. The extension's own downloads, such as **Download in browser**, are never
+captured.
 
 Downloads are left to the browser when:
 

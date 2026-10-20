@@ -149,23 +149,33 @@ async function captureDownload(item, gate) {
   const instance = findInstance(settings);
   const fileName = fileNameFromPath(item.filename);
   if (settings.reviewDownloads) {
-    // Take the download from the browser before it shows its own download UI or Save As
-    // dialog; Download in browser starts it again. One that already finished stays there.
-    try {
-      await ext.downloads.cancel(item.id);
-    } catch {
-      return release();
+    // Another extension's download may need what only it sends, such as headers of its own, so
+    // the browser holds it, still unseen, until the review gives it back or Ketch takes it.
+    const hold = Boolean(item.byExtensionId);
+    if (!hold) {
+      // Take the download from the browser before it shows its own download UI or Save As
+      // dialog; Download in browser starts it again. One that already finished stays there.
+      try {
+        await ext.downloads.cancel(item.id);
+      } catch {
+        return release();
+      }
+      await ext.downloads.erase({ id: item.id }).catch(() => {});
     }
-    await ext.downloads.erase({ id: item.id }).catch(() => {});
     const download = {
       url: item.finalUrl || item.url, referrer: item.referrer, fileName, mime: item.mime,
       cookieStoreId: item.cookieStoreId,
       size: item.totalBytes > 0 ? item.totalBytes : item.fileSize > 0 ? item.fileSize : undefined,
+      browserDownloadId: hold ? item.id : undefined,
     };
     try {
-      await openReview(instance.id, download, { tabId: await pageTabFor(context) });
+      await openReview(instance.id, download, {
+        tabId: await pageTabFor(context), release: hold ? release : undefined,
+      });
     } catch (error) {
       console.error('Ketch: could not open the review, downloading in the browser', error);
+      // A held download went back to the browser when the review failed.
+      if (hold) return;
       await startBrowserDownload(download.url, { cookieStoreId: download.cookieStoreId })
         .catch(() => notify(t('notify_direct_failed'), t('notify_direct_hint')));
     }

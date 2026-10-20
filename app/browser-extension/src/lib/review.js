@@ -14,6 +14,12 @@ const MAX_RECENT_FOLDERS = 5;
 const DIALOG_WIDTH = 460;
 const DIALOG_HEIGHT = 560;
 const locks = new Map();
+/**
+ * Browser downloads a review holds back from the browser, by download id, with what gives each
+ * back: Chromium's pending file name decision, or resuming Firefox's paused download. Lost when
+ * the background stops, which lets Chromium's go on.
+ */
+const heldOriginals = new Map();
 
 // All mutations run in the background context, including sends from the review page.
 function locked(id, action) {
@@ -27,10 +33,14 @@ function locked(id, action) {
  * Opens the review: over the page in `options.tabId` when it can be shown there, otherwise in a
  * window of its own.
  *
- * @param {{ tabId?: number }} [options] the tab the download came from
+ * @param {{ tabId?: number, release?: () => Promise<void> }} [options] the tab the download came
+ *   from, and for a browser download the review holds (`download.browserDownloadId`), what gives
+ *   it back to the browser
  */
-export async function openReview(instanceId, download, { tabId: pageTabId } = {}) {
+export async function openReview(instanceId, download, { tabId: pageTabId, release } = {}) {
   const id = crypto.randomUUID();
+  const browserId = download.browserDownloadId;
+  if (release && Number.isInteger(browserId)) heldOriginals.set(browserId, release);
   return locked(id, async () => {
     try {
       const entry = { instanceId, download, state: 'pending' };
@@ -42,9 +52,23 @@ export async function openReview(instanceId, download, { tabId: pageTabId } = {}
       await ext.tabs.get(tabId);
     } catch (error) {
       await cancelPendingReview(id);
+      if (Number.isInteger(browserId)) await giveBack(browserId).catch(() => {});
       throw error;
     }
   });
+}
+
+/**
+ * Gives a held browser download back to the browser.
+ *
+ * @returns {Promise<boolean>} false when the review no longer holds it
+ */
+async function giveBack(browserId) {
+  const release = heldOriginals.get(browserId);
+  if (!release) return false;
+  heldOriginals.delete(browserId);
+  await release();
+  return true;
 }
 
 /**
@@ -200,7 +224,8 @@ export function sendReview(id, instanceId, fileName, folder, send = sendToKetch)
     const browserId = entry.download.browserDownloadId;
     if (Number.isInteger(browserId)) {
       const [original] = await ext.downloads.search({ id: browserId });
-      if (!original?.paused || original.state !== 'in_progress' ||
+      if (!original || !(original.paused || heldOriginals.has(browserId)) ||
+        original.state !== 'in_progress' ||
         (original.finalUrl || original.url) !== entry.download.url) {
         throw new Error(t('review_unavailable'));
       }
@@ -213,6 +238,11 @@ export function sendReview(id, instanceId, fileName, folder, send = sendToKetch)
       task = await send(instance, { ...entry.download, destination }, settings);
     } catch (error) {
       entry.state = error.kind === 'uncertain' ? 'uncertain' : 'pending';
+      if (entry.state === 'uncertain' && heldOriginals.has(browserId)) {
+        // Ketch may have it: the browser keeps it paused, as when sending without a review.
+        await giveBack(browserId).catch(() => {});
+        await ext.downloads.pause(browserId).catch(() => {});
+      }
       await ext.storage.session.set({ [PREFIX + id]: entry });
       throw error;
     }
@@ -220,6 +250,7 @@ export function sendReview(id, instanceId, fileName, folder, send = sendToKetch)
     entry.state = 'sent';
     await ext.storage.session.set({ [PREFIX + id]: entry });
     if (Number.isInteger(browserId)) {
+      heldOriginals.delete(browserId);
       await ext.downloads.cancel(browserId).catch(() => {});
       await ext.downloads.erase({ id: browserId }).catch(() => {});
     }
@@ -230,8 +261,8 @@ export function sendReview(id, instanceId, fileName, folder, send = sendToKetch)
 }
 
 /**
- * Whether the reviewed download can be saved by the browser instead: a paused original goes
- * back, and an HTTP(S) link starts a new browser download. Chromium's background cannot start
+ * Whether the reviewed download can be saved by the browser instead: a held or paused original
+ * goes back, and an HTTP(S) link starts a new browser download. Chromium's background cannot start
  * one in a private window's context.
  */
 export function canDownloadDirectly(download) {
@@ -240,7 +271,7 @@ export function canDownloadDirectly(download) {
   return /^https?:\/\//i.test(download.url) && !(download.incognito && !isFirefox());
 }
 
-/** Gives the review's download to the browser: the paused original, or a new download. */
+/** Gives the review's download to the browser: its held or paused original, or a new one. */
 export function directReview(id, fileName) {
   return locked(id, async () => {
     const entry = await readReview(id);
@@ -248,7 +279,9 @@ export function directReview(id, fileName) {
     const { download } = entry;
     if (!canDownloadDirectly(download)) throw new Error(t('notify_direct_hint'));
     if (Number.isInteger(download.browserDownloadId)) {
-      await ext.downloads.resume(download.browserDownloadId);
+      if (!await giveBack(download.browserDownloadId)) {
+        await ext.downloads.resume(download.browserDownloadId);
+      }
     } else {
       const name = String(fileName ?? '').trim();
       let valid = false;
@@ -423,7 +456,13 @@ async function cancelPendingReview(id) {
   const entry = await readReview(id);
   if (!entry || entry.state !== 'pending') return;
   const browserId = entry.download.browserDownloadId;
-  if (Number.isInteger(browserId)) await ext.downloads.resume(browserId).catch(() => {});
+  if (Number.isInteger(browserId)) {
+    const given = await giveBack(browserId).catch((error) => {
+      console.warn('Ketch: could not give the download back to the browser', error);
+      return true;
+    });
+    if (!given) await ext.downloads.resume(browserId).catch(() => {});
+  }
   await ext.storage.session.remove(PREFIX + id);
 }
 
