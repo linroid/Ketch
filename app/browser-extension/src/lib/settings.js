@@ -31,6 +31,8 @@ export const MAGNET_CAPTURE_KEY = 'captureMagnetLinks';
  * @property {Instance[]} instances Ketch servers downloads can be sent to; never empty
  * @property {string} defaultInstanceId instance that receives captured downloads and magnets
  * @property {boolean} interceptDownloads send downloads the browser starts to Ketch
+ * @property {boolean} captureExtensionDownloads also send the downloads other extensions start,
+ *   such as media downloaders
  * @property {boolean} captureMagnetLinks send clicked magnet links to Ketch
  * @property {boolean} forwardCookies send the site's cookies and referrer with each download
  * @property {number} minFileSizeMb leave smaller downloads to the browser; 0 sends all
@@ -61,6 +63,7 @@ export function defaultSettings() {
     instances: [localInstance()],
     defaultInstanceId: LOCAL_INSTANCE_ID,
     interceptDownloads: !remoteOnly,
+    captureExtensionDownloads: true,
     captureMagnetLinks: true,
     forwardCookies: true,
     reviewDownloads: true,
@@ -167,6 +170,8 @@ export function normalizeSettings(raw) {
     defaultInstanceId,
     interceptDownloads: !remoteOnly &&
       booleanOr(source.interceptDownloads, defaults.interceptDownloads),
+    captureExtensionDownloads:
+      booleanOr(source.captureExtensionDownloads, defaults.captureExtensionDownloads),
     captureMagnetLinks: booleanOr(source.captureMagnetLinks, defaults.captureMagnetLinks),
     forwardCookies: booleanOr(source.forwardCookies, defaults.forwardCookies),
     // A new key: every install saved the old, opt-in `confirmDownloads` as false.

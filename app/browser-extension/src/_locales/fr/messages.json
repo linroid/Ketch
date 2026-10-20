@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "Les téléchargements que vous lancez dans le navigateur vont à Ketch. Si Ketch est injoignable, le navigateur les télécharge comme d'habitude."
   },
+  "options_capture_extensions": {
+    "message": "Intercepter les téléchargements d'autres extensions"
+  },
+  "options_capture_extensions_detail": {
+    "message": "Les fichiers enregistrés par les téléchargeurs de médias et d'autres extensions vont aussi à Ketch. Désactivez cette option pour les laisser à l'extension qui les a lancés."
+  },
   "options_min_size": {
     "message": "Laisser les petits fichiers au navigateur"
   },

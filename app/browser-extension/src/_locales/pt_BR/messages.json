@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "Os downloads que você inicia no navegador vão para o Ketch. Se não for possível acessar o Ketch, o navegador os baixa normalmente."
   },
+  "options_capture_extensions": {
+    "message": "Capturar downloads de outras extensões"
+  },
+  "options_capture_extensions_detail": {
+    "message": "Os arquivos que downloaders de mídia e outras extensões salvam também vão para o Ketch. Desative para deixá-los com a extensão que os iniciou."
+  },
   "options_min_size": {
     "message": "Deixar arquivos pequenos com o navegador"
   },

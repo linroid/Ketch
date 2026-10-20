@@ -2226,8 +2226,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the host's stdout as length-prefixed messages, so nothing else may write there: the launcher
   sends the JVM's own warnings to stderr (`-Xlog` in `app/desktop/build.gradle.kts`)
 - Captures browser downloads (Chromium holds them in `onDeterminingFilename`, Firefox pauses
-  them) and falls back to the browser when Ketch fails; context menus per instance; a content
-  script sends trusted magnet link clicks
+  them), also those other extensions start, such as media downloaders, unless
+  `captureExtensionDownloads` is off (never its own, by `byExtensionId`), and falls back to the
+  browser when Ketch fails; context menus per instance; a content script sends trusted magnet
+  link clicks
 - Forwards cookies, referrer and user agent as `DownloadRequest.headers`; `.torrent` downloads
   whose URL Ketch would not recognize are fetched and resolved via `POST /api/resolve/content`
 - Tags every request with `DownloadRequest.properties["ketch.origin"] = "browser"`. The apps

@@ -127,6 +127,11 @@ Firefox has no such hook, so the extension acts once the download has started: i
 panel may show it for a moment, and if Firefox is set to ask where to save each file, that dialog
 appears first.
 
+Downloads other extensions start are captured too, such as the videos a media downloader finds on
+a page and saves through the browser. Turn off **Capture downloads from other extensions** in
+settings to leave them to the extension that started them. The extension's own downloads, such as
+**Download in browser**, are never captured.
+
 Downloads are left to the browser when:
 
 - capturing is turned off (in the popup or the settings page);
@@ -134,7 +139,7 @@ Downloads are left to the browser when:
 - the link only exists in the browser (`blob:`, `data:`), as with media a page streams itself;
 - they come from a site in the exclusion list, or from a configured Ketch instance itself;
 - the observed request uses a method other than GET, or saves a web document;
-- another extension owns the download;
+- another extension started them and capturing those is turned off;
 - their type is excluded by the file-type rules, including multipart suffixes such as `tar.gz`;
 - they are smaller than the minimum size, if one is set. The unknown-size switch controls files
   without a known size; `.torrent` files bypass the size checks.

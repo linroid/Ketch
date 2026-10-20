@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "ブラウザで開始したダウンロードを、代わりにKetchで行います。Ketchに接続できない場合は、通常どおりブラウザでダウンロードします。"
   },
+  "options_capture_extensions": {
+    "message": "他の拡張機能が開始したダウンロードを取り込む"
+  },
+  "options_capture_extensions_detail": {
+    "message": "メディアダウンローダーなど、他の拡張機能が保存するファイルもKetchで行います。オフにすると、開始した拡張機能に任せます。"
+  },
   "options_min_size": {
     "message": "小さいファイルはブラウザに任せる"
   },

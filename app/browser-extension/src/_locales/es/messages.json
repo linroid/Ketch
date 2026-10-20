@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "Las descargas que inicias en el navegador van a Ketch. Si no se puede conectar con Ketch, el navegador las descarga como siempre."
   },
+  "options_capture_extensions": {
+    "message": "Capturar descargas de otras extensiones"
+  },
+  "options_capture_extensions_detail": {
+    "message": "Los archivos que guardan los descargadores de medios y otras extensiones también van a Ketch. Desactívalo para dejarlos a la extensión que los inició."
+  },
   "options_min_size": {
     "message": "Dejar los archivos pequeños al navegador"
   },

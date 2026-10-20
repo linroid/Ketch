@@ -25,6 +25,7 @@ const $ = (id) => document.getElementById(id);
 localizePage();
 const toggles = {
   interceptDownloads: $('intercept-downloads'),
+  captureExtensionDownloads: $('capture-extension-downloads'),
   forwardCookies: $('forward-cookies'),
   captureMagnetLinks: $('capture-magnet-links'),
   reviewDownloads: $('review-downloads'),
@@ -43,8 +44,9 @@ async function init() {
   const settings = await loadSettings();
   if (remoteOnly) {
     $('browser-limits').hidden = false;
-    for (const id of ['intercept-downloads', 'min-file-size', 'capture-unknown-size',
-      'file-type-mode', 'file-extensions', 'excluded-hosts', 'review-downloads', 'notifications']) {
+    for (const id of ['intercept-downloads', 'capture-extension-downloads', 'min-file-size',
+      'capture-unknown-size', 'file-type-mode', 'file-extensions', 'excluded-hosts',
+      'review-downloads', 'notifications']) {
       $(id).closest('label').hidden = true;
     }
     for (const key of ['options_help_this_computer', 'options_help_this_computer_detail']) {
@@ -253,6 +255,7 @@ async function persist() {
     }),
     defaultInstanceId: defaultCard?.dataset.id,
     interceptDownloads: toggles.interceptDownloads.checked,
+    captureExtensionDownloads: toggles.captureExtensionDownloads.checked,
     forwardCookies: toggles.forwardCookies.checked,
     captureMagnetLinks: toggles.captureMagnetLinks.checked,
     reviewDownloads: toggles.reviewDownloads.checked,

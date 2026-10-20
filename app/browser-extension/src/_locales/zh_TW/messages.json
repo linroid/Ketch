@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "在瀏覽器中開始的下載會改由 Ketch 處理。若無法連線到 Ketch，瀏覽器會照常下載。"
   },
+  "options_capture_extensions": {
+    "message": "擷取其他擴充功能發起的下載"
+  },
+  "options_capture_extensions_detail": {
+    "message": "媒體下載器等其他擴充功能儲存的檔案也會改由 Ketch 處理。關閉後，這些下載會留給發起它們的擴充功能。"
+  },
   "options_min_size": {
     "message": "小檔案交給瀏覽器"
   },

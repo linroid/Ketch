@@ -253,3 +253,19 @@ test('a captured download leaves the browser before it shows any download UI', a
   assert.equal(entry.download.size, 2048);
   assert.equal(entry.download.browserDownloadId, undefined);
 });
+
+test('a download another extension starts, such as a media downloader, is captured', async () => {
+  for (const key of Object.keys(sessionData)) delete sessionData[key];
+  browserActions.length = 0;
+  let suggested = false;
+  await ext.downloads.onDeterminingFilename.emit({
+    id: 100, url: 'https://video.example.net/clip.mp4', filename: '/tmp/clip.mp4',
+    mime: 'video/mp4', totalBytes: 4096, state: 'in_progress', byExtensionId: 'media-downloader',
+  }, () => { suggested = true; });
+  await settle();
+  assert.deepEqual(browserActions, [['cancel', 100], ['erase', 100]]);
+  assert.equal(suggested, false);
+  const [entry] = Object.values(sessionData);
+  assert.equal(entry.download.url, 'https://video.example.net/clip.mp4');
+  assert.equal(entry.download.fileName, 'clip.mp4');
+});

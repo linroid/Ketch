@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "在浏览器中开始的下载会改由 Ketch 下载。如果无法连接 Ketch，浏览器会照常下载。"
   },
+  "options_capture_extensions": {
+    "message": "捕获其他扩展发起的下载"
+  },
+  "options_capture_extensions_detail": {
+    "message": "媒体下载器等其他扩展保存的文件也会改由 Ketch 下载。关闭后，这些下载留给发起它们的扩展处理。"
+  },
   "options_min_size": {
     "message": "小文件交给浏览器"
   },

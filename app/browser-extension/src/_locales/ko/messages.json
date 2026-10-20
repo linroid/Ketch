@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "브라우저에서 시작한 다운로드를 대신 Ketch로 보냅니다. Ketch에 연결할 수 없으면 브라우저가 평소처럼 다운로드합니다."
   },
+  "options_capture_extensions": {
+    "message": "다른 확장 프로그램의 다운로드 가로채기"
+  },
+  "options_capture_extensions_detail": {
+    "message": "미디어 다운로더 등 다른 확장 프로그램이 저장하는 파일도 Ketch로 보냅니다. 끄면 다운로드를 시작한 확장 프로그램에 맡깁니다."
+  },
   "options_min_size": {
     "message": "작은 파일은 브라우저에 맡기기"
   },

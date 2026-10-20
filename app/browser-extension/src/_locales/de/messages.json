@@ -447,6 +447,12 @@
   "options_capture_detail": {
     "message": "Downloads, die du im Browser startest, gehen stattdessen an Ketch. Ist Ketch nicht erreichbar, lädt der Browser sie wie gewohnt herunter."
   },
+  "options_capture_extensions": {
+    "message": "Downloads anderer Erweiterungen abfangen"
+  },
+  "options_capture_extensions_detail": {
+    "message": "Dateien, die Mediendownloader und andere Erweiterungen speichern, gehen ebenfalls an Ketch. Schalte dies aus, um sie der Erweiterung zu überlassen, die sie gestartet hat."
+  },
   "options_min_size": {
     "message": "Kleine Dateien dem Browser überlassen"
   },

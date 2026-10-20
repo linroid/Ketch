@@ -44,8 +44,22 @@ describe('captureDecision', () => {
     assert.equal(decide(download({ incognito: true })).capture, false);
   });
 
-  test('leaves downloads started by other extensions to their owner', () => {
-    assert.equal(decide(download({ byExtensionId: 'other-extension' })).capture, false);
+  test('captures downloads other extensions start, such as media downloaders', () => {
+    const media = download({
+      url: 'https://video.example.net/clip.mp4', byExtensionId: 'media-downloader',
+    });
+    assert.deepEqual(decide(media), { capture: true, reason: '' });
+    // The other rules still apply to them.
+    assert.equal(decide({ ...media, url: 'blob:https://a.com/1' }).capture, false);
+    assert.equal(decide({ ...media, totalBytes: 10 }).capture, false);
+  });
+
+  test('leaves downloads other extensions start to them when that is turned off', () => {
+    const off = { ...settings, captureExtensionDownloads: false };
+    assert.equal(decide(download({ byExtensionId: 'other-extension' }), off).capture, false);
+    assert.equal(decide(download(), off).capture, true);
+    // Its own downloads stay in the browser either way.
+    assert.equal(decide(download({ byExtensionId: EXTENSION_ID }), settings).capture, false);
   });
 
   test('skips downloads that are no longer running', () => {

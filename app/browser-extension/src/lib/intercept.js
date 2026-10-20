@@ -35,8 +35,12 @@ export function hostMatches(host, patterns) {
  */
 export function captureDecision(item, settings, extensionId) {
   if (!settings.interceptDownloads) return skip('capturing is turned off');
-  if (item.byExtensionId) {
-    return skip('started by an extension');
+  if (item.byExtensionId && item.byExtensionId === extensionId) {
+    return skip('started by this extension');
+  }
+  // Media downloaders and other extensions that save files hand them to the browser.
+  if (item.byExtensionId && settings.captureExtensionDownloads === false) {
+    return skip('started by another extension');
   }
   if (item.incognito) return skip('private window');
   if (item.requestMethod && item.requestMethod !== 'GET') return skip('requires browser request');

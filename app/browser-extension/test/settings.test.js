@@ -178,3 +178,11 @@ test('the download review is on by default, whatever the old opt-in setting save
   assert.equal(normalizeSettings({ confirmDownloads: false }).reviewDownloads, true);
   assert.equal(normalizeSettings({ reviewDownloads: false }).reviewDownloads, false);
 });
+
+test('downloads other extensions start are captured unless turned off', () => {
+  assert.equal(normalizeSettings(undefined).captureExtensionDownloads, true);
+  // Settings saved before the switch existed capture them too.
+  assert.equal(normalizeSettings({ interceptDownloads: true }).captureExtensionDownloads, true);
+  assert.equal(
+    normalizeSettings({ captureExtensionDownloads: false }).captureExtensionDownloads, false);
+});

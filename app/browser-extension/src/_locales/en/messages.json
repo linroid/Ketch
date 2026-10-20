@@ -581,6 +581,14 @@
     "message": "Downloads you start in the browser go to Ketch instead. If Ketch can't be reached, the browser downloads them as usual.",
     "description": "Description of options_capture."
   },
+  "options_capture_extensions": {
+    "message": "Capture downloads from other extensions",
+    "description": "Switch that also sends downloads other browser extensions start, such as media downloaders, to Ketch."
+  },
+  "options_capture_extensions_detail": {
+    "message": "Files that media downloaders and other extensions save go to Ketch too. Turn this off to leave them to the extension that started them.",
+    "description": "Description of options_capture_extensions."
+  },
   "options_min_size": {
     "message": "Leave small files to the browser",
     "description": "Label of the field for the size below which downloads stay in the browser."
