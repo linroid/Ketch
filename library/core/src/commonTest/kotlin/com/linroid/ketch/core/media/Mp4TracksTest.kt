@@ -166,6 +166,19 @@ class Mp4TracksTest {
     )
   }
 
+  @Test
+  fun mediaVariantNames_readTheObjectTypeOfMp4aCodecs() {
+    assertEquals(
+      listOf("720p · AAC", "720p · DTS", "720p · Opus", "720p · MP3", "720p · mp4a.dd"),
+      mediaVariantNames(
+        List(5) { 720 },
+        List(5) { 0L },
+        listOf("avc1.64001f,mp4a.40.5", "avc1.64001f,mp4a.A9", "avc1.64001f,mp4a.ad",
+          "avc1.64001f,mp4a.6B", "avc1.64001f,mp4a.DD"),
+      ),
+    )
+  }
+
   private fun u32(bytes: ByteArray, at: Int): Long =
     ((bytes[at].toLong() and 0xff) shl 24) or ((bytes[at + 1].toLong() and 0xff) shl 16) or
       ((bytes[at + 2].toLong() and 0xff) shl 8) or (bytes[at + 3].toLong() and 0xff)

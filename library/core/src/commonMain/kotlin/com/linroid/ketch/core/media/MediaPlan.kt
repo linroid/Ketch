@@ -166,14 +166,35 @@ private fun codecNames(codecs: String?): List<String> =
       tag == "av01" -> "AV1"
       tag == "vp09" || tag == "vp9" -> "VP9"
       tag == "vp8" -> "VP8"
-      entry == "mp4a.69" || entry == "mp4a.6b" || entry == "mp4a.40.34" -> "MP3"
-      tag == "mp4a" -> "AAC"
+      tag == "mp4a" -> mp4aName(entry)
       tag == "ac-3" -> "AC-3"
       tag == "ec-3" -> "E-AC-3"
       tag == "ac-4" -> "AC-4"
       tag == "opus" -> "Opus"
+      tag in setOf("dtsc", "dtse", "dtsh", "dtsl", "dtsx") -> "DTS"
       tag == "flac" || tag == "fla" -> "FLAC"
       tag == "alac" -> "ALAC"
       else -> tag.uppercase()
     }
   }.distinct()
+
+/**
+ * The format an `mp4a.<OTI>[.<AOT>]` codec names, by its MP4 object type indication
+ * (mp4ra.org): MPEG-4 audio (`40`) is AAC unless its audio object type says MP3 (`34`). Types
+ * this does not name keep the manifest's spelling.
+ */
+private fun mp4aName(entry: String): String {
+  val parts = entry.split('.')
+  val objectType = parts.getOrNull(1)?.toIntOrNull(16) ?: return "AAC"
+  return when (objectType) {
+    0x40 -> if (parts.getOrNull(2) == "34") "MP3" else "AAC"
+    0x66, 0x67, 0x68 -> "AAC"
+    0x69, 0x6b -> "MP3"
+    0xa5 -> "AC-3"
+    0xa6 -> "E-AC-3"
+    0xa9, 0xaa, 0xab, 0xac -> "DTS"
+    0xad -> "Opus"
+    0xae -> "AC-4"
+    else -> entry
+  }
+}
