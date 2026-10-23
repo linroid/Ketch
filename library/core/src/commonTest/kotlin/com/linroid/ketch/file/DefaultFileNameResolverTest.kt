@@ -3,6 +3,7 @@ package com.linroid.ketch.file
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.file.DefaultFileNameResolver
+import com.linroid.ketch.core.file.sanitizeFileName
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -333,6 +334,24 @@ class DefaultFileNameResolverTest {
       "https://example.com/download", "https://example.com/files/7d3a",
     ))
     assertEquals("latest", DefaultFileNameResolver.fromUrls("https://example.com/latest", null))
+  }
+
+  @Test
+  fun contentDisposition_isoLatinExtendedFilename_isDecoded() {
+    assertEquals("résumé.pdf", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename*=ISO-8859-1''r%E9sum%E9.pdf"
+    ))
+  }
+
+  @Test
+  fun contentDisposition_quotedStringEscapes_areRead() {
+    assertEquals(sanitizeFileName("a\"b.txt"), DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename=\"a\\\"b.txt\""
+    ))
+    // Old browsers sent Windows paths with their backslashes as they were.
+    assertEquals("file.txt", DefaultFileNameResolver.fromContentDisposition(
+      "attachment; filename=\"C:\\Users\\x\\file.txt\""
+    ))
   }
 }
 

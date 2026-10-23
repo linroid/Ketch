@@ -41,22 +41,29 @@ internal class DefaultFileNameResolver : FileNameResolver {
     internal fun fromContentDisposition(header: String?): String? {
       if (header.isNullOrBlank()) return null
 
-      // Try filename*=UTF-8''<encoded> (RFC 5987)
+      // Try filename*=<charset>'<language>'<encoded> (RFC 5987): UTF-8, or ISO-8859-1 as older
+      // servers send it
       val extRegex = Regex(
-        """filename\*\s*=\s*UTF-8'[^']*'([^;]+)""",
+        """filename\*\s*=\s*(UTF-8|ISO-8859-1)'[^']*'([^;]+)""",
         RegexOption.IGNORE_CASE
       )
-      extRegex.find(header)?.groupValues?.get(1)?.let { encoded ->
-        sanitizeFileName(percentDecode(encoded))?.let { return it }
+      extRegex.find(header)?.groupValues?.let { (_, charset, encoded) ->
+        val decoded = if (charset.equals("UTF-8", ignoreCase = true)) {
+          percentDecode(encoded.trim())
+        } else {
+          percentDecodeLatin1(encoded.trim())
+        }
+        sanitizeFileName(decoded)?.let { return it }
       }
 
-      // Try filename="<value>"
+      // Try filename="<value>", a quoted string whose \" and \\ stand for " and \ (RFC 6266);
+      // other backslashes are kept, as old browsers sent Windows paths unescaped
       val quotedRegex = Regex(
-        """filename\s*=\s*"([^"]+)"""",
+        """filename\s*=\s*"((?:[^"\\]|\\.)+)"""",
         RegexOption.IGNORE_CASE
       )
       quotedRegex.find(header)?.groupValues?.get(1)?.let { value ->
-        sanitizeFileName(value)?.let { return it }
+        sanitizeFileName(value.replace(Regex("""\\([\\"])"""), "$1"))?.let { return it }
       }
 
       // Try filename=<value> (unquoted; a quoted value the regex above rejected stays rejected)
@@ -108,6 +115,21 @@ internal class DefaultFileNameResolver : FileNameResolver {
     private fun String.hasExtension(): Boolean =
       substringAfterLast('.', "").let { it.isNotEmpty() && it.all(Char::isLetterOrDigit) } &&
         indexOf('.') > 0
+
+    /** [encoded] with each `%XX` read as an ISO-8859-1 character. */
+    internal fun percentDecodeLatin1(encoded: String): String = buildString {
+      var index = 0
+      while (index < encoded.length) {
+        val high = encoded.getOrNull(index + 1)?.digitToIntOrNull(16)
+        val low = encoded.getOrNull(index + 2)?.digitToIntOrNull(16)
+        if (encoded[index] == '%' && high != null && low != null) {
+          append((high * 16 + low).toChar())
+          index += 3
+        } else {
+          append(encoded[index++])
+        }
+      }
+    }
 
     internal fun percentDecode(encoded: String): String {
       val input = encoded.encodeToByteArray()
