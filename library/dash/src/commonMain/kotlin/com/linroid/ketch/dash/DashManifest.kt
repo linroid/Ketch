@@ -220,15 +220,20 @@ private fun representationTrack(
     // On-demand profiles store each representation as one file, at its base URL.
     mediaRequire(hasBase && !base.substringBefore('?').endsWith('/'),
       "DASH requires SegmentList, SegmentTemplate or SegmentBase")
-    val segmentBase = levels.mapNotNull { it.child("SegmentBase") }.lastOrNull()
-    val scale = segmentBase?.attributes?.get("timescale")?.toLongOrNull() ?: 1
+    // A level's SegmentBase overrides what it sets and inherits the rest from those above.
+    val bases = levels.mapNotNull { it.child("SegmentBase") }
+    val attrs = bases.fold(emptyMap<String, String>()) { values, element ->
+      values + element.attributes
+    }
+    val scale = attrs["timescale"]?.toLongOrNull() ?: 1
     mediaRequire(scale > 0, "Invalid DASH timescale")
-    val offset = segmentBase?.attributes?.get("presentationTimeOffset")?.toLongOrNull() ?: 0
+    val offset = attrs["presentationTimeOffset"]?.toLongOrNull() ?: 0
     mediaRequire(offset >= 0, "Invalid DASH presentation offset")
+    val initialization = bases.mapNotNull { it.child("Initialization") }.lastOrNull()
     return DashTrack.SingleFile(
       url = base,
-      initRange = dashRange(segmentBase?.child("Initialization")?.attributes?.get("range")),
-      indexRange = dashRange(segmentBase?.attributes?.get("indexRange")),
+      initRange = dashRange(initialization?.attributes?.get("range")),
+      indexRange = dashRange(attrs["indexRange"]),
       timeOffsetSeconds = offset.toDouble() / scale,
     )
   }

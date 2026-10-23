@@ -234,6 +234,27 @@ class DashManifestTest {
   }
 
   @Test
+  fun dash_segmentBase_inheritsWhatARepresentationLeavesOut() {
+    val stream = parseDashStream("""
+      <MPD type="static"><Period>
+        <AdaptationSet contentType="video" mimeType="video/mp4">
+          <SegmentBase timescale="1000" presentationTimeOffset="2000" indexRange="1-2">
+            <Initialization range="0-99"/>
+          </SegmentBase>
+          <Representation id="v" bandwidth="100"><BaseURL>v.mp4</BaseURL>
+            <SegmentBase indexRange="100-155"/>
+          </Representation>
+        </AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/media/index.mpd")
+
+    val track = stream.variants.single().track as DashTrack.SingleFile
+    assertEquals(0L..99L, track.initRange)
+    assertEquals(100L..155L, track.indexRange)
+    assertEquals(2.0, track.timeOffsetSeconds)
+  }
+
+  @Test
   fun dash_otherContainers_areLeftOutBesideMp4() {
     val stream = parseDashStream("""
       <MPD type="static"><Period>
