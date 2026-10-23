@@ -70,6 +70,9 @@ internal class RealFtpClient(
   private var writer: ByteWriteChannel? = null
   private var restSupported: Boolean? = null
 
+  /** False once EPSV failed on this connection: data connections then use PASV. */
+  private var epsvUsable = true
+
   /** True once the server accepted `PROT P`: data connections use TLS. */
   private var protectData = false
 
@@ -334,24 +337,36 @@ internal class RealFtpClient(
   }
 
   /**
-   * Opens a passive data connection using EPSV (preferred) or
-   * PASV as fallback.
+   * Opens a passive data connection using EPSV (preferred) or PASV as fallback: when the server
+   * refuses EPSV, or the port it names cannot be reached, as behind some NATs and proxies. The
+   * connection then skips EPSV.
+   *
+   * Both connect to the control connection's host. The address a PASV reply names is ignored,
+   * as curl does: servers behind NAT name a private address or `0.0.0.0`, and a server must not
+   * send the client to another host.
    */
   private suspend fun openPassiveDataConnection(): Socket {
-    // Try EPSV first (works with IPv6 and IPv4)
-    val epsvReply = sendCommand("EPSV")
-    if (epsvReply.isPositiveCompletion) {
-      val dataPort = parseEpsvPort(epsvReply.message)
+    if (epsvUsable) {
+      // Try EPSV first (works with IPv6 and IPv4)
+      val epsvReply = sendCommand("EPSV")
+      val dataPort = if (epsvReply.isPositiveCompletion) {
+        parseEpsvPort(epsvReply.message)
+          .also { if (it == null) log.d { "EPSV response unparseable, falling back to PASV" } }
+      } else {
+        log.d { "EPSV not supported, falling back to PASV" }
+        null
+      }
       if (dataPort != null) {
         log.d { "EPSV data connection on port $dataPort" }
-        return connectDataSocket(host, dataPort)
+        try {
+          return connectDataSocket(host, dataPort)
+        } catch (e: KetchError.Network) {
+          log.d { "EPSV data connection failed, falling back to PASV: ${e.describeCauses()}" }
+        }
       }
-      log.d { "EPSV response unparseable, falling back to PASV" }
-    } else {
-      log.d { "EPSV not supported, falling back to PASV" }
+      epsvUsable = false
     }
 
-    // Fall back to PASV
     val pasvReply = sendCommand("PASV")
     if (!pasvReply.isPositiveCompletion) {
       log.e { "PASV failed: $pasvReply" }
@@ -362,9 +377,11 @@ internal class RealFtpClient(
       ?: throw KetchError.Network(
         Exception("Failed to parse PASV response: ${pasvReply.message}")
       )
-
-    log.d { "PASV data connection to $dataHost:$dataPort" }
-    return connectDataSocket(dataHost, dataPort)
+    log.d {
+      "PASV data connection on port $dataPort" +
+        if (dataHost != host) ", using the control host for the address the reply named" else ""
+    }
+    return connectDataSocket(host, dataPort)
   }
 
   private suspend fun connectDataSocket(

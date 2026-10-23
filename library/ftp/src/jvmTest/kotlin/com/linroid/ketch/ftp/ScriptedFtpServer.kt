@@ -14,17 +14,25 @@ import kotlin.concurrent.thread
 
 /**
  * Serves one scripted FTP session over real loopback sockets: AUTH TLS, PBSZ, PROT,
- * USER, TYPE, EPSV, RETR and QUIT.
+ * USER, TYPE, EPSV, PASV, RETR and QUIT.
  *
  * Data connections use TLS once PROT P was accepted, unless
  * [sendsPlainData] makes the server ignore it. On clear-text data
  * connections it records what the client sent in [clientDataBytes].
+ *
+ * @param sslContext the server's TLS, for sessions that negotiate it
+ * @param epsvUnreachable answers EPSV with a port nothing listens on, as a server behind a NAT
+ *   or proxy that drops those connections appears
+ * @param pasvAddress the address PASV replies name, comma-separated; the data port listens on
+ *   loopback whatever it says
  */
 internal class ScriptedFtpServer(
   private val content: ByteArray,
-  private val sslContext: SSLContext,
+  private val sslContext: SSLContext? = null,
   private val protReply: String = "200 Protection level set to P",
   private val sendsPlainData: Boolean = false,
+  private val epsvUnreachable: Boolean = false,
+  private val pasvAddress: String = "127,0,0,1",
 ) : AutoCloseable {
   private val loopback = InetAddress.getLoopbackAddress()
   private val control = ServerSocket(0, 1, loopback).apply { soTimeout = TIMEOUT_MS }
@@ -86,9 +94,16 @@ internal class ScriptedFtpServer(
           "USER" -> output.reply("230 Logged in")
           "TYPE" -> output.reply("200 Type set to I")
           "EPSV" -> {
-            val listener = ServerSocket(0, 1, loopback).apply { soTimeout = TIMEOUT_MS }
-            passive = listener
-            output.reply("229 Entering Extended Passive Mode (|||${listener.localPort}|)")
+            val port = if (epsvUnreachable) {
+              ServerSocket(0, 1, loopback).use { it.localPort }
+            } else {
+              listenPassive()
+            }
+            output.reply("229 Entering Extended Passive Mode (|||$port|)")
+          }
+          "PASV" -> {
+            val port = listenPassive()
+            output.reply("227 Entering Passive Mode ($pasvAddress,${port / 256},${port % 256})")
           }
           "RETR" -> {
             output.reply("150 Opening BINARY mode data connection")
@@ -112,8 +127,16 @@ internal class ScriptedFtpServer(
     }
   }
 
+  /** Listens for the next data connection, returning its port. */
+  private fun listenPassive(): Int {
+    passive?.close()
+    val listener = ServerSocket(0, 1, loopback).apply { soTimeout = TIMEOUT_MS }
+    passive = listener
+    return listener.localPort
+  }
+
   private fun acceptTls(socket: Socket): SSLSocket {
-    val factory = sslContext.socketFactory
+    val factory = checkNotNull(sslContext) { "TLS is not configured" }.socketFactory
     val tls = factory.createSocket(socket, socket.inetAddress.hostAddress, socket.port, true)
       as SSLSocket
     tls.useClientMode = false
