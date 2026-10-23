@@ -1,5 +1,7 @@
 package com.linroid.ketch.torrent.tracker
 
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.torrent.TorrentClient
@@ -95,6 +97,41 @@ class TrackerMessageTest {
     }
     assertNull(refused.reason)
     assertEquals("Tracker rejected the request", refused.message)
+  }
+
+  @Test
+  fun refusalsAndWarningsOfAddedTrackersAreNoWarnings() = runTest {
+    val warnings = mutableListOf<String>()
+    KetchLogger.setLogger(object : Logger {
+      override fun v(message: String) = Unit
+      override fun d(message: String) = Unit
+      override fun i(message: String) = Unit
+      override fun w(message: String, throwable: Throwable?) { warnings += message }
+      override fun e(message: String, throwable: Throwable?) { warnings += message }
+    })
+    try {
+      val refuse: suspend (String, TrackerAnnounce, ByteArray?) -> TrackerResponse = { _, _, _ ->
+        throw TrackerFailureException("info hash is not authorized with this tracker")
+      }
+      val warn: suspend (String, TrackerAnnounce, ByteArray?) -> TrackerResponse = { _, _, _ ->
+        TrackerResponse(emptyList(), 60, warning = "Require passkey or authkey")
+      }
+      // Trackers Ketch adds to public torrents: many serve only some torrents.
+      assertFailsWith<IllegalStateException> {
+        TrackerTiers(listOf(listOf(PRIVATE_URL)), added = true, refuse).announce(request)
+      }
+      TrackerTiers(listOf(listOf(PRIVATE_URL)), added = true, warn).announce(request)
+      assertEquals(emptyList(), warnings)
+
+      // The torrent's own trackers still say so.
+      assertFailsWith<IllegalStateException> {
+        TrackerTiers(listOf(listOf(PRIVATE_URL)), refuse).announce(request)
+      }
+      TrackerTiers(listOf(listOf(PRIVATE_URL)), warn).announce(request)
+      assertEquals(2, warnings.size)
+    } finally {
+      KetchLogger.setLogger(Logger.None)
+    }
   }
 
   @Test

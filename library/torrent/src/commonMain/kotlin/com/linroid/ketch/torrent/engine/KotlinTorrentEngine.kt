@@ -967,7 +967,7 @@ internal class KotlinTorrentEngine(
         announce(TrackerTiers(magnet.trackers.map { listOf(it) }, ::announceToTracker))
       }
       for (url in extraTrackers(magnet.trackers)) launch {
-        announce(TrackerTiers(listOf(listOf(url)), ::announceToTracker))
+        announce(TrackerTiers(listOf(listOf(url)), added = true, ::announceToTracker))
       }
       if (config.dhtEnabled) launch {
         while (isActive) {
@@ -1261,10 +1261,14 @@ internal class KotlinTorrentEngine(
     fun peerTopic(topic: TrackerTopic): PeerTopic =
       if (topic is TrackerTopic.V1) PeerTopic.V1 else PeerTopic.V2
     // Tier state follows each topic's own answers, so every topic gets fresh tiers.
-    fun discovery(topic: TrackerTopic, urls: List<List<String>>, onChanged: suspend () -> Unit) =
-      TrackerDiscovery(document, layout, peerId, advertisedPort::current,
-        TrackerTiers(urls, ::announceToTracker), onChanged,
-        announceCompletion = store::selectsAll, topic = topic)
+    fun discovery(
+      topic: TrackerTopic,
+      urls: List<List<String>>,
+      added: Boolean = false,
+      onChanged: suspend () -> Unit,
+    ) = TrackerDiscovery(document, layout, peerId, advertisedPort::current,
+      TrackerTiers(urls, added, ::announceToTracker), onChanged,
+      announceCompletion = store::selectsAll, topic = topic)
     suspend fun announceState() =
       AnnounceState(store.verifiedPieces(), sink.receivedBytes(), sink.uploadedBytes())
     suspend fun poll(
@@ -1296,7 +1300,7 @@ internal class KotlinTorrentEngine(
         }
       }
     } else if (tiers.isNotEmpty()) for (topic in topics) launch {
-      val discovery = discovery(topic, tiers, sink::reset)
+      val discovery = discovery(topic, tiers, onChanged = sink::reset)
       var reannounced = sink.reannounceRequests()
       awaitGoodbyes(listOf(topic))
       try {
@@ -1322,7 +1326,7 @@ internal class KotlinTorrentEngine(
     if (!document.info.privateTorrent && privacy == TorrentDiscoveryPrivacy.PUBLIC) {
       for (url in extraTrackers(tiers.flatten())) launch {
         // One coroutine per tracker polls the topics in turn, so a hybrid adds no sockets.
-        announceExtra(topics.map { discovery(it, listOf(listOf(url))) {} },
+        announceExtra(topics.map { discovery(it, listOf(listOf(url)), added = true) {} },
           ::announceState) { extra, found ->
           found.forEach { sink.offer(it, peerTopic(extra.topic), PeerOrigin.TRACKER) }
         }
@@ -1432,7 +1436,8 @@ internal class KotlinTorrentEngine(
     if (!metadata.isPrivate && privacy != TorrentDiscoveryPrivacy.TRACKER_ONLY) {
       for (url in extraTrackers(trackerTiers.flatten())) launch {
         val discovery = TrackerDiscovery(metadata, peerId, advertisedPort::current,
-          TrackerTiers(listOf(listOf(url)), ::announceToTracker), nowMs = nowMs,
+          TrackerTiers(listOf(listOf(url)), added = true, ::announceToTracker),
+          nowMs = nowMs,
           announceCompletion = session::selectsAllFiles,
         )
         announceExtra(listOf(discovery), { announceState(session) }) { _, found ->

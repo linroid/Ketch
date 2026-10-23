@@ -318,6 +318,14 @@ internal class TrackerTiers(
   tiers: List<List<String>>,
   private val announce: suspend (String, TrackerAnnounce, ByteArray?) -> TrackerResponse,
 ) {
+  /**
+   * Whether the trackers are ones Ketch adds to public torrents
+   * ([com.linroid.ketch.torrent.TorrentConfig.additionalTrackers] and tracker lists), not the
+   * torrent's: many serve only some torrents, so their refusals and warnings are logged at debug
+   * rather than warn.
+   */
+  private var added = false
+
   private val statuses = linkedMapOf<String, TrackerStatus>().apply {
     for (tier in tiers) for (url in tier) {
       if (url !in this) put(url, TrackerStatus(size))
@@ -349,6 +357,15 @@ internal class TrackerTiers(
     for ((url, status) in statuses.toMap()) {
       statuses[url] = status.copy(configurationRevision = revision)
     }
+  }
+
+  /** Tiers of trackers Ketch [added] to a public torrent. */
+  constructor(
+    tiers: List<List<String>>,
+    added: Boolean,
+    announce: suspend (String, TrackerAnnounce, ByteArray?) -> TrackerResponse,
+  ) : this(tiers, announce) {
+    this.added = added
   }
 
   /** Caller serializes replacement with announces. Topic binding is deliberately retained. */
@@ -476,8 +493,9 @@ internal class TrackerTiers(
         warning = result.warning,
       ))
       if (result.warning != null && result.warning != previous.warning) {
-        log.w { "Tracker ${trackerLabel(url)} warns about ${request.topic.logHash()}: " +
-          result.warning }
+        val message = "Tracker ${trackerLabel(url)} warns about ${request.topic.logHash()}: " +
+          result.warning
+        if (added) log.d { message } else log.w { message }
       }
       log.d {
         "Announce ${request.event} for ${request.topic.logHash()} to ${trackerLabel(url)}: " +
@@ -500,10 +518,9 @@ internal class TrackerTiers(
       failed(url, TrackerStatus.Outcome.FAILED, e.reason)
       // Said once at warn: trackers repeat a refusal on every retry until something changes.
       if (e.reason != null && e.reason != previous.failureReason) {
-        log.w {
-          "Tracker ${trackerLabel(url)} refused announce ${request.event} for " +
-            "${request.topic.logHash()}: ${e.reason}"
-        }
+        val message = "Tracker ${trackerLabel(url)} refused announce ${request.event} for " +
+          "${request.topic.logHash()}: ${e.reason}"
+        if (added) log.d { message } else log.w { message }
       } else {
         announceFailed(url, request, e.describeWithoutUrls())
       }
