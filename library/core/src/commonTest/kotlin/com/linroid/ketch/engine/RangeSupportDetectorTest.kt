@@ -57,6 +57,19 @@ class RangeSupportDetectorTest {
     assertFailsWith<KetchError.Network> {
       detector.detect("https://example.com/file")
     }
+    // The ranged GET was tried as well.
+    assertEquals(1, engine.probeCallCount)
+  }
+
+  @Test
+  fun detect_headDroppedOnTheNetwork_probesWithGet() = runTest {
+    // As Hetzner's speed test servers answer HEAD: an empty reply, while GET works.
+    val engine = FakeHttpEngine(failOnHead = true, failOnProbe = false)
+
+    val info = RangeSupportDetector(engine).detect("https://example.com/file")
+
+    assertEquals(engine.serverInfo, info)
+    assertEquals(1, engine.probeCallCount)
   }
 
   @Test

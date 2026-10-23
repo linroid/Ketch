@@ -32,6 +32,8 @@ class FakeHttpEngine(
   var stallTimes: Int = -1,
   var chunkDelayMs: Long = 0,
   var failOnHead: Boolean = false,
+  /** Fails probes with a network error too; a [failOnHead] engine is down by default. */
+  var failOnProbe: Boolean = failOnHead,
   var headErrorCode: Int = 0,
   var httpErrorCode: Int = 0,
   var retryAfterSeconds: Long? = null,
@@ -79,6 +81,9 @@ class FakeHttpEngine(
   override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo {
     probeCallCount++
     lastProbeHeaders = headers
+    if (failOnProbe) {
+      throw KetchError.Network(RuntimeException("Simulated network failure"))
+    }
     if (httpErrorCode > 0) {
       throw KetchError.Http(
         httpErrorCode, "Simulated HTTP error",
