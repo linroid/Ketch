@@ -44,7 +44,7 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
 
   /** Creates the [FtpClient] for a URL and read buffer size. Override for testing. */
   internal var clientFactory: (url: FtpUrl, bufferSize: Int) -> FtpClient = { url, bufferSize ->
-    RealFtpClient(url.host, url.port, bufferSize)
+    RealFtpClient(url.host, url.port, bufferSize, implicitTls = url.implicitTls)
   }
   private val log = KetchLogger("FtpSource")
 

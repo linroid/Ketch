@@ -6,7 +6,9 @@ import com.linroid.ketch.api.log.redactUrl
  * Parsed FTP URL components.
  *
  * Supports the format: `ftp://[user:pass@]host[:port]/path`
- * and `ftps://[user:pass@]host[:port]/path`.
+ * and `ftps://[user:pass@]host[:port]/path`. An `ftps://` URL on port 990, its default, is
+ * implicit FTPS, whose connections start with TLS, as curl and FileZilla read it; on any other
+ * port it is explicit FTPS, which asks for TLS with `AUTH TLS`.
  *
  * @property isTls true for ftps:// URLs
  * @property username FTP username, defaults to "anonymous"
@@ -23,6 +25,9 @@ internal data class FtpUrl(
   val port: Int,
   val path: String,
 ) {
+  /** True for implicit FTPS: an `ftps://` URL on port 990, whose connections start with TLS. */
+  val implicitTls: Boolean get() = isTls && port == DEFAULT_FTPS_PORT
+
   companion object {
     private const val DEFAULT_FTP_PORT = 21
     private const val DEFAULT_FTPS_PORT = 990

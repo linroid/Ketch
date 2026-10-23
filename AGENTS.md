@@ -856,8 +856,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   preliminary reply, checked against the control host; a server refusing `PROT P` fails the
   connection rather than sending clear data, and a failed data handshake is `KetchError.Network`.
   ktor-network-tls cannot resume TLS sessions, so servers requiring data connections to reuse
-  the control session refuse transfers. `RealFtpClientTlsTest` (jvmTest) runs a scripted JSSE
-  server
+  the control session (Rebex, vsftpd's `require_ssl_reuse`, FileZilla Server) refuse transfers:
+  `FtpError` reads their refusal as `KetchError.Unsupported`, which is not retried, and a
+  transfer that ends with an error reply throws it. `ftps://` on port 990, its default, is
+  implicit FTPS (`FtpUrl.implicitTls`: TLS before the greeting, no `AUTH TLS`), as curl and
+  FileZilla read it; on other ports it is explicit. `RealFtpClientTlsTest` (jvmTest) runs a
+  scripted JSSE server
 - Passive mode only: EPSV, else PASV when EPSV is refused or its port cannot be reached (the
   connection then skips EPSV). Data connections always go to the address the control
   connection reached, not a fresh lookup of the host (round-robin DNS): the address a PASV

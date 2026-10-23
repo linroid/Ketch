@@ -23,6 +23,7 @@ class FtpUrlTest {
   fun parse_ftpsUrl_defaultPort() {
     val url = FtpUrl.parse("ftps://example.com/file.zip")
     assertTrue(url.isTls)
+    assertTrue(url.implicitTls)
     assertEquals(990, url.port)
     assertEquals("example.com", url.host)
     assertEquals("file.zip", url.path)
@@ -55,7 +56,18 @@ class FtpUrlTest {
   fun parse_ftpsCustomPort() {
     val url = FtpUrl.parse("ftps://example.com:8990/file.zip")
     assertTrue(url.isTls)
+    assertFalse(url.implicitTls)
     assertEquals(8990, url.port)
+  }
+
+  @Test
+  fun parse_ftpsOnPort21_isExplicit() {
+    assertFalse(FtpUrl.parse("ftps://example.com:21/file.zip").implicitTls)
+  }
+
+  @Test
+  fun parse_ftpOnPort990_isNotTls() {
+    assertFalse(FtpUrl.parse("ftp://example.com:990/file.zip").implicitTls)
   }
 
   @Test

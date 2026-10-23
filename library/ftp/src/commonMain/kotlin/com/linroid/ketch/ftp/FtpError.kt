@@ -26,8 +26,18 @@ internal object FtpError {
    * - 430, 530 (authentication failures) -> AuthenticationFailed
    * - 450, 451, 500-504, 550, 551, 553 -> SourceError
    * - Other 5xx -> SourceError
+   * - A refused data connection that had to resume the control connection's TLS session ->
+   *   Unsupported, as retrying cannot help
    */
   fun fromReply(reply: FtpReply): KetchError {
+    if (reply.isError && TLS_REUSE_REQUIRED.containsMatchIn(reply.message)) {
+      return KetchError.Unsupported(
+        UnsupportedOperationException(
+          "The FTPS server requires data connections to resume the control connection's TLS " +
+            "session, which Ketch cannot do (FTP ${reply.code}: ${reply.message})",
+        ),
+      )
+    }
     return when (reply.code) {
       // Service not available / connection issues
       421 -> KetchError.Network(
@@ -65,6 +75,14 @@ internal object FtpError {
       )
     }
   }
+
+  /**
+   * How servers that require TLS session resumption refuse a data connection that did not
+   * resume: Rebex ("TLS session resumption required"), vsftpd's `require_ssl_reuse` ("session
+   * reuse required") and FileZilla Server ("TLS session of data connection not resumed").
+   */
+  private val TLS_REUSE_REQUIRED =
+    Regex("session reuse|resumption required|not resumed|has not resumed", RegexOption.IGNORE_CASE)
 
   /** Wraps a network-level exception as [KetchError.Network]. */
   fun fromException(e: Exception): KetchError {

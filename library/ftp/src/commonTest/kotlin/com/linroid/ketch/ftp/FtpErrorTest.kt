@@ -3,6 +3,7 @@ package com.linroid.ketch.ftp
 import com.linroid.ketch.api.KetchError
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -35,6 +36,23 @@ class FtpErrorTest {
     )
     assertIs<KetchError.Network>(error)
     assertTrue(error.isRetryable)
+  }
+
+  // --- Data connections that had to resume the TLS session -> Unsupported ---
+
+  @Test
+  fun fromReply_tlsSessionReuseRequired_mapsToUnsupported() {
+    val replies = listOf(
+      FtpReply(425, "Cannot secure data connection - TLS session resumption required."),
+      FtpReply(522, "SSL connection failed: session reuse required"),
+      FtpReply(425, "Unable to build data connection: TLS session of data connection not resumed."),
+      FtpReply(450, "TLS session of data connection has not resumed or the session does not match"),
+    )
+    for (reply in replies) {
+      val error = FtpError.fromReply(reply)
+      assertIs<KetchError.Unsupported>(error, reply.message)
+      assertFalse(error.isRetryable, reply.message)
+    }
   }
 
   // --- Authentication failures -> AuthenticationFailed ---

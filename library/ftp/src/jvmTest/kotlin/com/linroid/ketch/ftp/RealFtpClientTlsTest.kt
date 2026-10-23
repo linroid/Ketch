@@ -21,9 +21,10 @@ class RealFtpClientTlsTest {
   private val content = ByteArray(64 * 1024) { (it * 31 % 251).toByte() }
   private var tlsUpgrades = 0
 
-  private fun client(server: ScriptedFtpServer) = RealFtpClient(
+  private fun client(server: ScriptedFtpServer, implicitTls: Boolean = false) = RealFtpClient(
     host = "localhost",
     port = server.port,
+    implicitTls = implicitTls,
     secureSocket = { connection, serverName, context ->
       tlsUpgrades++
       connection.tls(context) {
@@ -53,6 +54,28 @@ class RealFtpClientTlsTest {
       } finally {
         client.disconnect()
       }
+      assertTrue("PROT P" in server.commands)
+      assertEquals(1, server.dataHandshakes)
+      // The control connection and the data connection
+      assertEquals(2, tlsUpgrades)
+    }
+  }
+
+  @Test
+  fun retrieve_implicitTls_securesBeforeGreeting() = runTest {
+    ScriptedFtpServer(content, testCertificate.sslContext, implicitTls = true).use { server ->
+      val client = client(server, implicitTls = true)
+      try {
+        client.connect()
+        client.upgradeToTls()
+        client.login("anonymous", "guest")
+        client.setBinaryMode()
+
+        assertContentEquals(content, client.download())
+      } finally {
+        client.disconnect()
+      }
+      assertTrue("AUTH TLS" !in server.commands)
       assertTrue("PROT P" in server.commands)
       assertEquals(1, server.dataHandshakes)
       // The control connection and the data connection

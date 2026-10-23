@@ -42,6 +42,8 @@ import kotlin.time.Duration.Companion.seconds
  * @param host FTP server hostname
  * @param port FTP server port
  * @param bufferSize read buffer size for data transfers
+ * @param implicitTls starts the control connection with TLS, before the server's greeting
+ *   (implicit FTPS); [upgradeToTls] then only asks for protected data connections
  * @param secureSocket wraps a connection in TLS, or returns null
  *   where TLS is unavailable
  * @param selector selects for this client's sockets; every client shares
@@ -51,6 +53,7 @@ internal class RealFtpClient(
   private val host: String,
   private val port: Int,
   private val bufferSize: Int = 8192,
+  private val implicitTls: Boolean = false,
   private val secureSocket: suspend (
     connection: Connection,
     serverName: String,
@@ -89,9 +92,15 @@ internal class RealFtpClient(
 
   override suspend fun connect() {
     try {
-      val socket = connectWithin(host, port)
+      var socket = connectWithin(host, port)
       controlSocket = socket
       socket.remoteAddress.numericHost()?.let { serverAddress = it }
+      if (implicitTls) {
+        // Implicit FTPS speaks TLS from the first byte, the greeting included.
+        val output = socket.openWriteChannel(autoFlush = true)
+        socket = secure(Connection(socket, socket.openReadChannel(), output), "control")
+        controlSocket = socket
+      }
       reader = socket.openReadChannel()
       writer = socket.openWriteChannel(autoFlush = true)
 
@@ -119,21 +128,24 @@ internal class RealFtpClient(
       throw KetchError.Network(Exception("Not connected"))
     }
 
-    log.d { "Upgrading to TLS for $host:$port" }
+    // Implicit FTPS secured the control connection as it opened.
+    if (!implicitTls) {
+      log.d { "Upgrading to TLS for $host:$port" }
 
-    // Send AUTH TLS
-    val authReply = sendCommand("AUTH TLS")
-    if (!authReply.isPositiveCompletion) {
-      log.e { "AUTH TLS rejected: $authReply" }
-      throw FtpError.fromReply(authReply)
+      // Send AUTH TLS
+      val authReply = sendCommand("AUTH TLS")
+      if (!authReply.isPositiveCompletion) {
+        log.e { "AUTH TLS rejected: $authReply" }
+        throw FtpError.fromReply(authReply)
+      }
+
+      // The handshake continues on the channels connect() opened.
+      val upgraded = secure(Connection(socket, input, output), "control")
+
+      controlSocket = upgraded
+      reader = upgraded.openReadChannel()
+      writer = upgraded.openWriteChannel(autoFlush = true)
     }
-
-    // The handshake continues on the channels connect() opened.
-    val upgraded = secure(Connection(socket, input, output), "control")
-
-    controlSocket = upgraded
-    reader = upgraded.openReadChannel()
-    writer = upgraded.openWriteChannel(autoFlush = true)
 
     // Set protection buffer size and protection level
     val pbszReply = sendCommand("PBSZ 0")
@@ -286,9 +298,13 @@ internal class RealFtpClient(
       }
     }
 
-    // Read the transfer complete reply (226)
+    // Read the transfer complete reply (226). An error says why the data ended, as a data
+    // connection the server refused after its handshake: report that, not a short transfer.
     val completeReply = readReply()
-    if (!completeReply.isPositiveCompletion) {
+    if (completeReply.isError) {
+      log.w { "Transfer failed: $completeReply" }
+      throw FtpError.fromReply(completeReply)
+    } else if (!completeReply.isPositiveCompletion) {
       log.w { "Transfer complete reply: $completeReply" }
     } else {
       log.d { "Transfer complete for $path" }

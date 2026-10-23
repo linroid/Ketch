@@ -24,7 +24,8 @@ internal interface FtpClient {
   suspend fun connect()
 
   /**
-   * Upgrades the control connection to TLS (AUTH TLS / PBSZ / PROT P).
+   * Upgrades the control connection to TLS (AUTH TLS / PBSZ / PROT P), or, on an implicit
+   * FTPS connection, which [connect] already secured, asks for protected data (PBSZ / PROT P).
    * Later data connections are then wrapped in TLS as well.
    *
    * @throws com.linroid.ketch.api.KetchError.Unsupported if TLS

@@ -1,9 +1,11 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.api.KetchError
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class RealFtpClientPassiveTest {
   private val content = ByteArray(64 * 1024) { (it * 31 % 251).toByte() }
@@ -42,6 +44,23 @@ class RealFtpClientPassiveTest {
     // TEST-NET-1 is never routed: a client dialing it would time out instead of downloading.
     ScriptedFtpServer(content, epsvUnreachable = true, pasvAddress = "192,0,2,1").use { server ->
       server.downloadTwice().forEach { assertContentEquals(content, it) }
+    }
+  }
+
+  @Test
+  fun retrieve_transferEndingWithRefusal_throwsTheReplysError() = runTest {
+    val refusal = "425 Cannot secure data connection - TLS session resumption required."
+    ScriptedFtpServer(content, refusedTransferReply = refusal).use { server ->
+      val client = RealFtpClient(host = "localhost", port = server.port)
+      try {
+        client.connect()
+        client.login("anonymous", "guest")
+        client.setBinaryMode()
+
+        assertFailsWith<KetchError.Unsupported> { client.download() }
+      } finally {
+        client.disconnect()
+      }
     }
   }
 }

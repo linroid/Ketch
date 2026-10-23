@@ -21,6 +21,9 @@ import kotlin.concurrent.thread
  * connections it records what the client sent in [clientDataBytes].
  *
  * @param sslContext the server's TLS, for sessions that negotiate it
+ * @param implicitTls starts the control connection with TLS, before the greeting
+ * @param refusedTransferReply closes each data connection without data and ends the transfer
+ *   with this reply, as a server refusing the connection after its handshake does
  * @param epsvUnreachable answers EPSV with a port nothing listens on, as a server behind a NAT
  *   or proxy that drops those connections appears
  * @param pasvAddress the address PASV replies name, comma-separated; the data port listens on
@@ -33,6 +36,8 @@ internal class ScriptedFtpServer(
   private val sendsPlainData: Boolean = false,
   private val epsvUnreachable: Boolean = false,
   private val pasvAddress: String = "127,0,0,1",
+  private val implicitTls: Boolean = false,
+  private val refusedTransferReply: String? = null,
 ) : AutoCloseable {
   private val loopback = InetAddress.getLoopbackAddress()
   private val control = ServerSocket(0, 1, loopback).apply { soTimeout = TIMEOUT_MS }
@@ -71,6 +76,7 @@ internal class ScriptedFtpServer(
 
   private fun serve() {
     var socket: Socket = control.accept().apply { soTimeout = TIMEOUT_MS }
+    if (implicitTls) socket = acceptTls(socket)
     var input = socket.getInputStream()
     var output = socket.getOutputStream()
     var protectData = false
@@ -108,6 +114,11 @@ internal class ScriptedFtpServer(
           "RETR" -> {
             output.reply("150 Opening BINARY mode data connection")
             val data = checkNotNull(passive).accept().apply { soTimeout = TIMEOUT_MS }
+            if (refusedTransferReply != null) {
+              data.close()
+              output.reply(refusedTransferReply)
+              continue
+            }
             when {
               !protectData -> sendPlain(data)
               sendsPlainData -> sendPlain(data, awaitClient = true)
