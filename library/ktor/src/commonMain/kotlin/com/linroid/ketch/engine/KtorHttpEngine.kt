@@ -37,6 +37,7 @@ import io.ktor.http.hostWithPortIfSpecified
 import io.ktor.http.isSecure
 import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
+import io.ktor.utils.io.cancel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
@@ -222,26 +223,33 @@ class KtorHttpEngine private constructor(
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         var receivedBytes = 0L
 
-        while (!channel.isClosedForRead) {
-          val bytesRead = channel.readAvailable(buffer)
-          if (bytesRead > 0) {
-            if (expectedBytes != null && bytesRead > expectedBytes - receivedBytes) {
-              throw KetchError.Unsupported(
-                cause = IllegalStateException("Response exceeds requested length"),
-              )
-            }
-            receivedBytes += bytesRead
-            val data = if (bytesRead == buffer.size) buffer else buffer.copyOf(bytesRead)
-            try {
-              onData(data)
-            } catch (e: CancellationException) {
-              throw e
-            } catch (e: KetchError) {
-              throw e
-            } catch (e: Exception) {
-              throw CallbackFailure(e)
+        try {
+          while (!channel.isClosedForRead) {
+            val bytesRead = channel.readAvailable(buffer)
+            if (bytesRead > 0) {
+              if (expectedBytes != null && bytesRead > expectedBytes - receivedBytes) {
+                throw KetchError.Unsupported(
+                  cause = IllegalStateException("Response exceeds requested length"),
+                )
+              }
+              receivedBytes += bytesRead
+              val data = if (bytesRead == buffer.size) buffer else buffer.copyOf(bytesRead)
+              try {
+                onData(data)
+              } catch (e: CancellationException) {
+                throw e
+              } catch (e: KetchError) {
+                throw e
+              } catch (e: Exception) {
+                throw CallbackFailure(e)
+              }
             }
           }
+        } catch (e: Throwable) {
+          // Ktor's cleanup cancels the raw response, not the channel the body is copied into: the
+          // copy would wait for room in it, with its buffered megabytes, as long as the client.
+          channel.cancel(e)
+          throw e
         }
         channel.closedCause?.let { throw it }
         if (expectedBytes != null && receivedBytes != expectedBytes) {
@@ -301,15 +309,20 @@ class KtorHttpEngine private constructor(
     var out = ByteArray(minOf(limit, DEFAULT_BUFFER_SIZE))
     var size = 0
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    while (!channel.isClosedForRead) {
-      val read = channel.readAvailable(buffer)
-      if (read <= 0) continue
-      if (read > limit - size) throw tooLong()
-      if (size + read > out.size) {
-        out = out.copyOf(minOf(limit, maxOf(size + read, out.size * 2)))
+    try {
+      while (!channel.isClosedForRead) {
+        val read = channel.readAvailable(buffer)
+        if (read <= 0) continue
+        if (read > limit - size) throw tooLong()
+        if (size + read > out.size) {
+          out = out.copyOf(minOf(limit, maxOf(size + read, out.size * 2)))
+        }
+        buffer.copyInto(out, size, 0, read)
+        size += read
       }
-      buffer.copyInto(out, size, 0, read)
-      size += read
+    } catch (e: Throwable) {
+      channel.cancel(e)
+      throw e
     }
     channel.closedCause?.let { throw it }
     return out.copyOf(size)
