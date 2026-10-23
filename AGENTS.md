@@ -380,6 +380,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
   connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
+- Ranged HTTP requests send `If-Range` with the file's strong ETag, else its Last-Modified, as
+  the download started (kept across cross-origin redirects, as it holds no credentials): a file
+  replaced while it downloads comes back whole, `200`, rather than as parts of two files, and the
+  run restarts over one connection, saving the new file; one whose size changed too fails with
+  `KetchError.FileChanged`
 - HTTP probes use HEAD; when it is refused with 400, 403, 404, 405, 500 or 501 (URLs presigned
   for GET only, handlers that fail on HEAD), `RangeSupportDetector` asks `HttpEngine.probe`, a
   `GET` with `Range: bytes=0-0` whose body is never read. Engines without it (the default throws `UnsupportedOperationException`)

@@ -7,6 +7,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpDownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpSourceState
+import com.linroid.ketch.core.engine.RangeIgnoredException
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.file.FileAccessor
@@ -132,6 +133,46 @@ class HttpDownloadSourceTest {
       .resolve("https://example.com/download?id=5", emptyMap(), DownloadConfig.Default)
 
     assertEquals("App 1.2.3.dmg", resolved.suggestedFileName)
+  }
+
+  @Test
+  fun download_ranges_askIfRangeWithTheFilesValidator() = runTest {
+    val engine = FakeHttpEngine()
+    HttpDownloadSource(engine).download(context(), null)
+    assertEquals("\"test-etag\"", engine.lastDownloadHeaders["If-Range"])
+
+    // A weak ETag cannot validate a range; the modification time does.
+    val weak = FakeHttpEngine(serverInfo = FakeHttpEngine().serverInfo.copy(etag = "W/\"x\""))
+    HttpDownloadSource(weak).download(context(), null)
+    assertEquals("Wed, 01 Jan 2025 00:00:00 GMT", weak.lastDownloadHeaders["If-Range"])
+  }
+
+  @Test
+  fun download_fileReplacedWhileDownloading_savesTheNewFileWhole() = runTest {
+    val before = ByteArray(1000) { 1 }
+    val after = ByteArray(1000) { 2 }
+    val engine = ReplacedFileEngine(before, after, replaceAfter = 2)
+    val file = MemoryFile()
+
+    HttpDownloadSource(engine).download(
+      context(config = DownloadConfig(maxConnectionsPerDownload = 4), fileAccessor = file),
+      null,
+    )
+
+    // Never parts of both: the new file, restarted over one connection.
+    assertContentEquals(after, file.bytes)
+  }
+
+  @Test
+  fun download_fileReplacedBySizeWhileDownloading_failsAsChanged() = runTest {
+    val engine = ReplacedFileEngine(ByteArray(1000) { 1 }, ByteArray(700) { 2 }, replaceAfter = 2)
+
+    assertFailsWith<KetchError.FileChanged> {
+      HttpDownloadSource(engine).download(
+        context(config = DownloadConfig(maxConnectionsPerDownload = 4)),
+        null,
+      )
+    }
   }
 
   @Test
@@ -334,4 +375,43 @@ class HttpDownloadSourceTest {
       lastModified = null,
     )
   }
+
+  /**
+   * Serves [before] (ETag `"a"`) until [replaceAfter] transfers started, then [after] (`"b"`),
+   * honoring `If-Range` as servers do: a range whose validator no longer matches gets the whole
+   * file, which the engine reports for a part as [RangeIgnoredException].
+   */
+  private class ReplacedFileEngine(
+    private val before: ByteArray,
+    private val after: ByteArray,
+    private val replaceAfter: Int,
+  ) : HttpEngine {
+    private var transfers = 0
+
+    override suspend fun head(url: String, headers: Map<String, String>) =
+      ServerInfo(before.size.toLong(), acceptRanges = true, etag = "\"a\"", lastModified = null)
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) {
+      val replaced = ++transfers > replaceAfter
+      val content = if (replaced) after else before
+      val current = if (replaced) "\"b\"" else "\"a\""
+      val asked = checkNotNull(range)
+      if (headers["If-Range"] == current) return onData(content.sliceArray(asked.toIntRange()))
+      // Changed: the whole file, which only a range of all of it, and of its size, takes.
+      if (asked.first != 0L || asked.last != content.size - 1L) {
+        throw KetchError.Unsupported(RangeIgnoredException())
+      }
+      onData(content)
+    }
+
+    override fun close() {}
+
+    private fun LongRange.toIntRange() = first.toInt()..last.toInt()
+  }
 }
+

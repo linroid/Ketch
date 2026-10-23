@@ -146,6 +146,7 @@ internal class HttpDownloadSource(
     downloadRanges(
       context, segments, totalBytes, resolved.supportsResume, requested,
       quotaLimited = remaining != null,
+      validator = resolved.metadata.let { rangeValidator(it[META_ETAG], it[META_LAST_MODIFIED]) },
     )
   }
 
@@ -227,6 +228,7 @@ internal class HttpDownloadSource(
     downloadRanges(
       context, validatedSegments, totalBytes, serverInfo.supportsResume, requested,
       quotaLimited = serverInfo.rateLimitRemaining != null,
+      validator = rangeValidator(state.etag, state.lastModified),
     )
   }
 
@@ -274,6 +276,11 @@ internal class HttpDownloadSource(
   /**
    * [downloadSegments], restarting over one connection from byte zero once the server answers a
    * range with the whole resource ([RangeIgnoredException]), whatever its `Accept-Ranges` said.
+   *
+   * Ranges ask `If-Range` with [validator], the file's ETag or modification time as the download
+   * started, so a file replaced while it downloads comes back whole instead of as parts of two
+   * files: the restart then saves the new file, unless its size changed too, which fails the
+   * download with [KetchError.FileChanged].
    */
   private suspend fun downloadRanges(
     context: DownloadContext,
@@ -282,10 +289,17 @@ internal class HttpDownloadSource(
     supportsRanges: Boolean,
     requestedConnections: Int,
     quotaLimited: Boolean,
+    validator: String?,
   ) {
+    val headers = if (supportsRanges && validator != null) {
+      context.headers + (IF_RANGE to validator)
+    } else {
+      context.headers
+    }
     try {
       downloadSegments(
         context, segments, totalBytes, supportsRanges, requestedConnections, quotaLimited,
+        headers,
       )
     } catch (e: KetchError.Unsupported) {
       if (!supportsRanges || e.cause !is RangeIgnoredException) throw e
@@ -295,11 +309,22 @@ internal class HttpDownloadSource(
       }
       val whole = SegmentCalculator.singleSegment(totalBytes)
       context.segments.value = whole
-      downloadSegments(
-        context, whole, totalBytes, supportsRanges = false, requestedConnections, quotaLimited,
-      )
+      try {
+        downloadSegments(
+          context, whole, totalBytes, supportsRanges = false, requestedConnections, quotaLimited,
+          headers,
+        )
+      } catch (again: KetchError.Unsupported) {
+        // The whole file, of another size than when the download started.
+        if (headers === context.headers || again.cause !is RangeIgnoredException) throw again
+        throw KetchError.FileChanged("The file changed on the server while it downloaded", again)
+      }
     }
   }
+
+  /** The `If-Range` validator of a file: its ETag unless weak, else its modification time. */
+  private fun rangeValidator(etag: String?, lastModified: String?): String? =
+    etag?.takeUnless { it.startsWith("W/") } ?: lastModified
 
   /**
    * Downloads segments via HTTP Range requests with dynamic
@@ -317,6 +342,7 @@ internal class HttpDownloadSource(
     supportsRanges: Boolean,
     requestedConnections: Int,
     quotaLimited: Boolean,
+    headers: Map<String, String>,
   ) {
     val segmentHelper = if (quotaLimited) {
       SegmentedDownloadHelper(
@@ -348,7 +374,7 @@ internal class HttpDownloadSource(
       val handle = if (lane.isComplete) ConnectionHandle.None else context.connections.open(spec)
       try {
         observeExchanges(handle, spec) {
-          downloader.download(context.url, lane, context.headers, handle)
+          downloader.download(context.url, lane, headers, handle)
         }
       } finally {
         handle.close()
@@ -483,6 +509,7 @@ internal class HttpDownloadSource(
     internal const val META_CONTENT_DISPOSITION = "contentDisposition"
     internal const val META_RATE_LIMIT_REMAINING = "rateLimitRemaining"
     internal const val META_RATE_LIMIT_RESET = "rateLimitReset"
+    private const val IF_RANGE = "If-Range"
   }
 }
 

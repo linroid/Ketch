@@ -569,7 +569,8 @@ class KtorHttpEngine private constructor(
 
     /** Lowercase names of the request headers a redirect to another origin keeps. */
     private val CROSS_ORIGIN_HEADERS = setOf(
-      "user-agent", "accept", "accept-encoding", "accept-language",
+      // If-Range carries the final target's validator, which its HEAD read through the same hops.
+      "user-agent", "accept", "accept-encoding", "accept-language", "if-range",
     )
     private val SENSITIVE_HEADERS = setOf("set-cookie", "cookie", "authorization")
     /** `HTTP/1.1` as it is, `HTTP/2.0` as `HTTP/2` and `HTTP/3.0` as `HTTP/3`. */
