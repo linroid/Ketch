@@ -340,11 +340,20 @@ class KtorHttpEngine private constructor(
   }
 
   /** [headers] as they are sent: checked, without the engine's own, with the user agent. */
+  /**
+   * [headers] as they may be sent, with this engine's `User-Agent` and `Accept-Encoding:
+   * identity` unless they name their own. Without the latter, OkHttp asks for gzip on requests
+   * without a range, a `HEAD` included: servers that compress on the fly then report the
+   * compressed length, which ranged requests, never compressed, cannot match.
+   */
   private fun requestHeaders(headers: Map<String, String>): Map<String, String> {
     val sendable = RequestHeaders.sendable(headers)
-    val agent = userAgent ?: return sendable
-    if (sendable.keys.any { it.equals(HttpHeaders.UserAgent, ignoreCase = true) }) return sendable
-    return sendable + (HttpHeaders.UserAgent to agent)
+    fun named(name: String) = sendable.keys.any { it.equals(name, ignoreCase = true) }
+    return buildMap {
+      putAll(sendable)
+      if (userAgent != null && !named(HttpHeaders.UserAgent)) put(HttpHeaders.UserAgent, userAgent)
+      if (!named(HttpHeaders.AcceptEncoding)) put(HttpHeaders.AcceptEncoding, "identity")
+    }
   }
 
   /**

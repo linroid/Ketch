@@ -389,7 +389,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   messages never quote values); engines drop `Host`, `Range`, `Content-Length` and hop-by-hop
   headers (`RequestHeaders.sendable`)
 - `KtorHttpEngine` sends `User-Agent: Ketch/<version>` unless the headers name one (`userAgent`,
-  `null` for none) and follows redirects itself (`followRedirects` off on its client copy): at
+  `null` for none), and `Accept-Encoding: identity` unless they name one: OkHttp would ask for
+  gzip on requests without a range, a `HEAD` included, and servers compressing on the fly then
+  report a compressed length that ranged requests cannot match. It follows redirects itself (`followRedirects` off on its client copy): at
   most 20, never HTTPS to HTTP or to other schemes. A hop to another scheme, host or port keeps
   only `User-Agent`, `Accept`, `Accept-Encoding`, `Accept-Language` and `Referer` cut to its
   origin, and drops URL user info. `RedirectCache` remembers each request's final target and
