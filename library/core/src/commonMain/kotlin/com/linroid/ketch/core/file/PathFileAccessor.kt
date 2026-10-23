@@ -4,6 +4,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import okio.FileHandle
+import okio.Path
 import okio.Path.Companion.toPath
 
 /**
@@ -30,7 +31,7 @@ internal class PathFileAccessor(
       val parent = realPath.parent
       if (parent != null && !platformFileSystem.exists(parent)) {
         log.d { "Creating directories: $parent" }
-        platformFileSystem.createDirectories(parent)
+        createDirectoriesAsGiven(parent)
       }
       log.d { "Opening file: $realPath" }
       platformFileSystem.openReadWrite(realPath).also { handle = it }
@@ -98,5 +99,25 @@ internal class PathFileAccessor(
         size < current -> handle.resize(size)
       }
     }
+  }
+}
+
+/**
+ * Creates [directory] and the folders on its way as `mkdir -p` does, the path as it is given:
+ * each missing folder in turn, with `.` and `..` left to the file system, which
+ * [okio.FileSystem.createDirectories] cannot create a path through (`sub/../up`).
+ */
+private fun createDirectoriesAsGiven(directory: Path) {
+  if (directory.segments.none { it == "." || it == ".." }) {
+    platformFileSystem.createDirectories(directory)
+    return
+  }
+  var current = directory.root
+  for (segment in directory.segments) {
+    val next = current?.div(segment) ?: segment.toPath()
+    if (segment != "." && segment != ".." && !platformFileSystem.exists(next)) {
+      platformFileSystem.createDirectory(next)
+    }
+    current = next
   }
 }
