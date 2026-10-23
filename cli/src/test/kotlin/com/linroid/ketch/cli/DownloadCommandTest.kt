@@ -60,6 +60,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class DownloadCommandTest {
@@ -445,6 +446,40 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun progressPrinter_queuedWithoutPosition_saysItIsStarting() {
+    val line = ProgressLine(outStream, interactive = false)
+    ProgressPrinter(line, SpeedLimit.Unlimited, magnet = true).print(DownloadState.Queued, null)
+    ProgressPrinter(line, SpeedLimit.Unlimited).print(DownloadState.Queued, null)
+    ProgressPrinter(line, SpeedLimit.Unlimited).print(DownloadState.Queued, null, queuePosition = 2)
+
+    assertEquals(
+      listOf(
+        "[Starting] Finding peers that have the torrent's metadata...",
+        "[Starting] Getting ready...",
+        "[Queued] Waiting for download slot (#2)...",
+      ),
+      out.toString(Charsets.UTF_8).lines().filter { it.isNotBlank() },
+    )
+  }
+
+  @Test
+  fun listFiles_slowResolve_saysWhatItWaitsFor() {
+    val engine = object : HttpEngine by ServingEngine(ByteArray(4)) {
+      override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
+        delay(500)
+        return ServerInfo(contentLength = 4, acceptRanges = true, etag = null, lastModified = null)
+      }
+    }
+    val status = listFiles("https://example.com/a.iso", engine, noticeAfter = 10.milliseconds)
+
+    assertEquals(DownloadExit.FAILED, status)
+    assertTrue(
+      "Still looking up the files" in err.toString(Charsets.UTF_8),
+      err.toString(Charsets.UTF_8),
+    )
+  }
+
+  @Test
   fun listFiles_linkNoSourceHandles_saysSo() {
     val status = listFiles("gopher://example.com/a.iso", ServingEngine(ByteArray(0)))
 
@@ -469,12 +504,16 @@ class DownloadCommandTest {
     )
   }
 
-  private fun listFiles(url: String, engine: HttpEngine): Int {
+  private fun listFiles(
+    url: String,
+    engine: HttpEngine,
+    noticeAfter: Duration = 3.seconds,
+  ): Int {
     val args = assertIs<DownloadArgs.Download>(parseDownloadArgs(listOf("--list-files", url)))
     return runBlocking {
       val ketch = Ketch(httpEngine = engine)
       try {
-        listFiles(ketch, args, outStream, errStream)
+        listFiles(ketch, args, outStream, errStream, noticeAfter)
       } finally {
         ketch.close()
         // Ketch installs its logger for the whole process.

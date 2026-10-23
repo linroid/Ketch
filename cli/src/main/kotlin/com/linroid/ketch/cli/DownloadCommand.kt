@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentStallReason
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.PrintStream
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /** Exit statuses of `ketch <url>` and `ketch --list-files <url>`, for scripts that run them. */
@@ -100,19 +102,33 @@ internal fun stallReason(stall: TorrentStall): String = when (stall.reason) {
  * torrent stalls it says only for how long, in place of the speed and [speedLimit], and why goes
  * on a line of its own above it each time the reason changes.
  */
-internal class ProgressPrinter(private val line: ProgressLine, speedLimit: SpeedLimit) {
+internal class ProgressPrinter(
+  private val line: ProgressLine,
+  speedLimit: SpeedLimit,
+  private val magnet: Boolean = false,
+) {
   private val limitLabel =
     if (speedLimit.isUnlimited) "" else " [limit: ${formatBytes(speedLimit.bytesPerSecond)}/s]"
 
   // The stall reason printed above the progress line, until the download progresses again.
   private var shownReason: String? = null
 
-  /** Prints [state]; [stall] is why a downloading torrent makes no progress, `null` if it does. */
-  fun print(state: DownloadState, stall: TorrentStall?) {
+  /**
+   * Prints [state]; [stall] is why a downloading torrent makes no progress, `null` if it does,
+   * and [queuePosition] where a queued download waits, `null` when it is not waiting for a slot
+   * but getting ready, as a magnet link looking for its metadata does.
+   */
+  fun print(state: DownloadState, stall: TorrentStall?, queuePosition: Int? = null) {
     if (state !is DownloadState.Downloading) shownReason = null
     when (state) {
       is DownloadState.Scheduled -> line.printBelow("[Scheduled] Waiting for scheduled time...")
-      is DownloadState.Queued -> line.printBelow("[Queued] Waiting for download slot...")
+      is DownloadState.Queued -> line.printBelow(
+        when {
+          queuePosition != null -> "[Queued] Waiting for download slot (#$queuePosition)..."
+          magnet -> "[Starting] Finding peers that have the torrent's metadata..."
+          else -> "[Starting] Getting ready..."
+        },
+      )
       is DownloadState.Downloading -> printProgress(state.progress, stall)
       is DownloadState.Paused -> line.printBelow("[Paused] Download paused.")
       is DownloadState.Completed -> {
@@ -172,13 +188,16 @@ internal suspend fun downloadUntilDone(
     return@coroutineScope DownloadExit.FAILED
   }
 
-  val printer = ProgressPrinter(progress, request.speedLimit)
+  val printer = ProgressPrinter(progress, request.speedLimit, request.url.isMagnet())
   val latestStall = MutableStateFlow<TorrentStall?>(null)
   val stallWatch = launch { stalls(task.taskId).collect { latestStall.value = it } }
   val monitor = launch {
-    combine(task.state, latestStall) { state, stall ->
-      state to stall?.takeIf { state is DownloadState.Downloading }
-    }.distinctUntilChanged().collect { (state, stall) -> printer.print(state, stall) }
+    combine(task.state, latestStall, task.queuePosition) { state, stall, position ->
+      Triple(state, stall?.takeIf { state is DownloadState.Downloading },
+        position.takeIf { state is DownloadState.Queued })
+    }.distinctUntilChanged().collect { (state, stall, position) ->
+      printer.print(state, stall, position)
+    }
   }
 
   val result = task.await()
@@ -212,15 +231,31 @@ internal suspend fun listFiles(
   args: DownloadArgs.Download,
   out: PrintStream = System.out,
   err: PrintStream = System.err,
+  noticeAfter: Duration = RESOLVE_NOTICE_DELAY,
 ): Int {
-  val source = try {
-    ketch.resolve(args.url, args.headers)
-  } catch (e: CancellationException) {
-    throw e
-  } catch (e: Exception) {
-    err.println("Couldn't list the files: ${failureReason(e)}")
-    return DownloadExit.FAILED
-  }
+  // Resolving is quick but for a magnet link, which waits for a peer to send its metadata.
+  val source = coroutineScope {
+    val notice = launch {
+      delay(noticeAfter)
+      err.println(
+        if (args.url.isMagnet()) {
+          "Finding peers that have the torrent's metadata (Ctrl+C to stop)..."
+        } else {
+          "Still looking up the files (Ctrl+C to stop)..."
+        },
+      )
+    }
+    try {
+      ketch.resolve(args.url, args.headers)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      err.println("Couldn't list the files: ${failureReason(e)}")
+      null
+    } finally {
+      notice.cancel()
+    }
+  } ?: return DownloadExit.FAILED
   val rows = fileListRows(source, args.fileOrder, args.reverse)
   if (rows.isEmpty()) {
     err.println("This download has no files to choose.")
@@ -232,3 +267,9 @@ internal suspend fun listFiles(
   }
   return DownloadExit.OK
 }
+
+/** How long `--list-files` resolves before it says what it waits for. */
+private val RESOLVE_NOTICE_DELAY = 3.seconds
+
+private fun String.isMagnet(): Boolean = startsWith("magnet:", ignoreCase = true)
+
