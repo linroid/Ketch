@@ -122,11 +122,13 @@ internal data class TorrentMetadata(
       val stored = files.filterNot { it.padding }
       require(stored.size in 1..MAX_FILES) { "Invalid file count" }
       // Checked on the names files are stored under, which cleaning may have made equal.
+      // Each stored path's file as the metainfo names it, which cleaned names may not tell apart.
       val paths = HashMap<String, String>()
       for (file in stored) {
-        val earlier = paths.put(canonicalTorrentName(file.path).lowercase(), file.path)
+        val listed = file.rawPath.joinToString("/")
+        val earlier = paths.put(canonicalTorrentName(file.path).lowercase(), listed)
         require(earlier == null) {
-          "Colliding torrent paths: ${quotedName(earlier!!)} and ${quotedName(file.path)}"
+          "Colliding torrent paths: ${quotedName(earlier!!)} and ${quotedName(listed)}"
         }
       }
       for ((path, file) in paths) {

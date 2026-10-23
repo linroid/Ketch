@@ -54,9 +54,9 @@ internal fun diskComponent(value: String): String {
 
 
 /**
- * [value], a name a torrent lists, quoted for an error message: control and bidirectional
- * formatting characters escaped as `\uXXXX`, so a name cannot rewrite what a terminal shows,
- * and at most 80 characters.
+ * [value], a name a torrent lists, quoted for an error message: control characters (C0 and C1)
+ * and Unicode `Bidi_Control` characters escaped as `\uXXXX`, so a name cannot rewrite what a
+ * terminal shows, and at most 80 characters.
  */
 internal fun quotedName(value: String): String {
   val shown = buildString {
@@ -65,9 +65,7 @@ internal fun quotedName(value: String): String {
         append('…')
         break
       }
-      if (char < ' ' || char == '\u007f' || char in '\u200e'..'\u200f' ||
-        char in '\u202a'..'\u202e' || char in '\u2066'..'\u2069'
-      ) {
+      if (char.isISOControl() || char in BIDI_CONTROLS) {
         append("\\u").append(char.code.toString(16).padStart(4, '0'))
       } else {
         append(char)
@@ -76,3 +74,7 @@ internal fun quotedName(value: String): String {
   }
   return "\"$shown\""
 }
+
+/** Unicode `Bidi_Control` characters, the set core's `sanitizeFileName` removes. */
+private const val BIDI_CONTROLS =
+  "\u061C\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069"
