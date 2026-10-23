@@ -12,6 +12,7 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.through
+import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.engine.httpConnectionSpec
 import com.linroid.ketch.core.engine.observeExchanges
 import com.linroid.ketch.core.file.sanitizeFileName
@@ -58,8 +59,7 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     variants: List<MediaVariant> = emptyList(),
     chosen: String? = null,
   ): ResolvedSource {
-    val name = url.substringBefore('?').substringBefore('#').substringAfterLast('/')
-      .substringBeforeLast('.').ifBlank { "media" }
+    val name = mediaName(url)
     val choices = variants.takeIf { it.size > 1 }.orEmpty()
     return ResolvedSource(
       url = url,
@@ -327,3 +327,33 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     }
   }
 }
+
+/**
+ * What the stream at [url] is called, without an extension: its playlist's name, unless that
+ * only says it is a playlist (`master.m3u8`, `index.m3u8`, `dash.mpd`) or there is none
+ * (`…/tears-of-steel.ism/.m3u8`). Then the nearest folder of the two above it that names
+ * something, as `img_bipbop_adv_example_fmp4` in `…/img_bipbop_adv_example_fmp4/master.m3u8`,
+ * without a Smooth Streaming `.ism`; never a signed path's token. Else the playlist's name, or
+ * `media`.
+ */
+internal fun mediaName(url: String): String {
+  val path = url.substringBefore('?').substringBefore('#').substringAfter("://", url)
+    .substringAfter('/', "")
+  val segments = path.split('/').map(DefaultFileNameResolver::percentDecode)
+  val file = segments.lastOrNull().orEmpty().substringBeforeLast('.')
+  if (file.isNotBlank() && file.lowercase() !in GENERIC_MEDIA_NAMES) return file
+  val folder = segments.dropLast(1).takeLast(2).asReversed()
+    .map { it.removeSuffix(".isml").removeSuffix(".ism") }
+    .firstOrNull { folder ->
+      folder.isNotBlank() && folder.lowercase() !in GENERIC_MEDIA_NAMES && folder.length <= 64 &&
+        folder.any(Char::isLetter) && folder.none { it in "=~," }
+    }
+  return folder ?: file.ifBlank { "media" }
+}
+
+/** Playlist and folder names that say only that they hold a stream. */
+private val GENERIC_MEDIA_NAMES = setOf(
+  "master", "index", "playlist", "manifest", "main", "media", "stream", "streams", "prog_index",
+  "chunklist", "dash", "hls", "video", "videos", "audio", "output", "out", "default",
+)
+

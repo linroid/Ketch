@@ -225,4 +225,23 @@ class MediaDownloadHelperTest {
     override suspend fun flush() {}
     override fun close() {}
   }
+
+  @Test
+  fun mediaName_genericPlaylists_takeTheirFoldersName() {
+    val names = mapOf(
+      "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/" +
+        "master.m3u8" to "img_bipbop_adv_example_fmp4",
+      "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/" +
+        "tears-of-steel.ism/.m3u8" to "tears-of-steel",
+      "https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd" to "angel-one",
+      "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" to "x36xhzz",
+      "https://example.com/my%20show/playlist.m3u8?sig=1" to "my show",
+      "https://example.com/index.m3u8" to "index",
+      // Folders that name nothing, or a signed path's token, are never a name.
+      "https://example.com/movies/123/hls/master.m3u8?token=x" to "master",
+      "https://cdn.example.com/exp=1~acl=*~hmac=abc/master.m3u8" to "master",
+      "https://example.com/.m3u8" to "media",
+    )
+    for ((url, name) in names) assertEquals(name, mediaName(url), url)
+  }
 }
