@@ -131,11 +131,9 @@ internal class ProgressPrinter(
       )
       is DownloadState.Downloading -> printProgress(state.progress, stall)
       is DownloadState.Paused -> line.printBelow("[Paused] Download paused.")
-      is DownloadState.Completed -> {
-        line.printBelow("[Completed] Saved to ${state.outputPath}")
-        state.checksum?.let { line.printBelow("[Verified] ${it.algorithm.label} matches") }
-      }
-      is DownloadState.Failed -> line.printBelow("[Failed] ${state.error.message}")
+      // The command reports how the download ended (downloadUntilDone), whether or not the
+      // monitor sees its last state before it stops.
+      is DownloadState.Completed, is DownloadState.Failed -> Unit
       is DownloadState.Canceled -> line.printBelow("[Canceled] Download canceled.")
     }
   }
@@ -203,12 +201,16 @@ internal suspend fun downloadUntilDone(
   val result = task.await()
   monitor.cancel()
   stallWatch.cancel()
+  val final = task.state.value
   // The task lives only as long as this process: what a source kept beside its files to resume
   // it, such as a torrent's sidecar or creation log, would only clutter the folder.
   task.remove(deleteFiles = false)
 
   result.fold(
     onSuccess = { path ->
+      (final as? DownloadState.Completed)?.checksum?.let {
+        progress.printBelow("[Verified] ${it.algorithm.label} matches")
+      }
       progress.printBelow("Download completed: $path")
       DownloadExit.OK
     },

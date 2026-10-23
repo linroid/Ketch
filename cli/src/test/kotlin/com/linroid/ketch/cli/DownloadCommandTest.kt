@@ -1,6 +1,7 @@
 package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
@@ -480,6 +481,25 @@ class DownloadCommandTest {
   }
 
   @Test
+  fun download_matchingChecksum_saysItWasVerified() {
+    // SHA-256 of bytes 1, 2, 3.
+    val checksum = Checksum.parse(
+      "sha256:039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+    )
+    val status = download(
+      "https://example.com/a.bin", ServingEngine(byteArrayOf(1, 2, 3)), interactive = false,
+      checksum = checksum,
+    )
+
+    assertEquals(DownloadExit.OK, status)
+    val lines = out.toString(Charsets.UTF_8).lines()
+    assertEquals(
+      listOf("[Verified] SHA-256 matches", "Download completed: ${File(folder, "a.bin").path}"),
+      lines.filter { it.startsWith("[Verified]") || it.startsWith("Download completed") },
+    )
+  }
+
+  @Test
   fun listFiles_linkNoSourceHandles_saysSo() {
     val status = listFiles("gopher://example.com/a.iso", ServingEngine(ByteArray(0)))
 
@@ -530,6 +550,7 @@ class DownloadCommandTest {
     sources: List<DownloadSource<*>> = emptyList(),
     config: DownloadConfig = DownloadConfig(retryCount = 0),
     interactive: Boolean = true,
+    checksum: Checksum? = null,
   ): Int = runBlocking {
     // As `ketch <url>` sets them up.
     val progress = ProgressLine(outStream, interactive)
@@ -540,7 +561,11 @@ class DownloadCommandTest {
       logger = logger.above(progress),
     )
     try {
-      val request = DownloadRequest(url = url, destination = Destination(folder.path + "/"))
+      val request = DownloadRequest(
+        url = url,
+        destination = Destination(folder.path + "/"),
+        checksum = checksum,
+      )
       withTimeout(10.seconds) {
         if (stalls == null) {
           downloadUntilDone(ketch, request, progress, errStream)
