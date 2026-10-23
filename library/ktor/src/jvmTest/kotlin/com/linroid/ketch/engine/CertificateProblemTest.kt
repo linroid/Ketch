@@ -3,6 +3,12 @@ package com.linroid.ketch.engine
 import com.linroid.ketch.api.KetchError
 import com.sun.net.httpserver.HttpsConfigurator
 import com.sun.net.httpserver.HttpsServer
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -21,6 +27,7 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -98,6 +105,42 @@ class CertificateProblemTest {
         engine.close()
         server.stop(0)
       }
+    }
+  }
+
+  @Test
+  fun cachedRedirectTargetRefusingItsCertificate_followsTheRedirectsAgain() = runTest {
+    val content = ByteArray(64) { it.toByte() }
+    var target = "https://a.example/file"
+    var refused = false
+    val requests = mutableListOf<String>()
+    val client = HttpClient(MockEngine { request ->
+      requests += request.url.host
+      when {
+        request.url.host == "origin.example" ->
+          respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, target))
+        request.url.host == "a.example" && refused ->
+          throw SSLHandshakeException("certificate_expired").apply {
+            initCause(CertificateExpiredException())
+          }
+        else -> respond(content, HttpStatusCode.OK)
+      }
+    })
+    val engine = KtorHttpEngine(client)
+    try {
+      engine.download("https://origin.example/file", null, emptyMap()) {}
+      // The mirror the origin sent requests to lets its certificate expire, and is replaced.
+      refused = true
+      target = "https://b.example/file"
+      val received = mutableListOf<Byte>()
+
+      engine.download("https://origin.example/file", null, emptyMap()) { received += it.toList() }
+
+      assertContentEquals(content, received.toByteArray())
+      assertEquals(listOf("origin.example", "a.example", "a.example", "origin.example",
+        "b.example"), requests)
+    } finally {
+      engine.close()
     }
   }
 

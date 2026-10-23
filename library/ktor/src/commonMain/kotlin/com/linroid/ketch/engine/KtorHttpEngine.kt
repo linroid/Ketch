@@ -408,9 +408,11 @@ class KtorHttpEngine private constructor(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        // The next attempt follows the redirects again.
+        // The next attempt follows the redirects again. A refused certificate allows none, so
+        // they are followed again now: the origin may send the request elsewhere since.
         redirects.remove(key)
-        throw e
+        if (certificateProblemOf(e) == null) throw e
+        null
       }
       if (result != null) return result.value
       redirects.remove(key)
