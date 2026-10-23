@@ -949,6 +949,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   before its piece layers); the metainfo a task saved is read without those checks when it
   resumes and when its file table is built (`newInput = false`), and admission refuses its pieces
   when it starts
+- A metainfo file, fetched or local, longer than `TorrentConfig.maxMetadataBytes` (4 MiB) fails
+  with a `KetchError.SourceError` naming the limit, never retried: `TorrentHttp.fetch` throws
+  `ResponseTooLargeException` past its limit, also through engines that report what their
+  callback throws as a `Network` error
 - Metadata that matches a magnet's hash but does not parse ends the lookup with
   `UnusableTorrentMetadataException`, a `MetadataLookupFailure` like
   `PrivateTorrentMagnetException`, which `resolve` reports as `KetchError.SourceError`; v2

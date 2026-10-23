@@ -51,6 +51,7 @@ import com.linroid.ketch.torrent.magnet.MagnetUri
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.V2InfoHash
+import com.linroid.ketch.torrent.net.ResponseTooLargeException
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.storage.TorrentCheckpoint
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
@@ -1249,6 +1250,8 @@ class TorrentDownloadSource(
       val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
         try {
           http.fetch(url, config.maxMetadataBytes, headers = headers)
+        } catch (e: ResponseTooLargeException) {
+          throw metainfoTooLarge(config.maxMetadataBytes, e)
         } catch (e: IOException) {
           // Caller-supplied engines may surface raw socket failures; the metainfo host is remote.
           throw KetchError.Network(e)
@@ -1268,7 +1271,7 @@ class TorrentDownloadSource(
           torrentSystemFileSystem.read(path.toPath()) {
             val result = readByteArray(minOf(config.maxMetadataBytes.toLong(),
               torrentSystemFileSystem.metadata(path.toPath()).size ?: 0L))
-            require(exhausted()) { "Metainfo exceeds limit" }
+            if (!exhausted()) throw metainfoTooLarge(config.maxMetadataBytes)
             result
           }
         }
@@ -2196,6 +2199,14 @@ internal fun torrentFailure(error: Throwable): KetchError = when (error) {
   is TorrentStorageException -> KetchError.Disk(error.cause)
   is IOException -> KetchError.Disk(error)
   else -> torrentSourceError(error)
+}
+
+/** The error for a metainfo file longer than [maxBytes], which reading it again never changes. */
+private fun metainfoTooLarge(maxBytes: Int, cause: Throwable? = null): KetchError.SourceError {
+  val mib = 1024 * 1024
+  val limit = if (maxBytes % mib == 0) "${maxBytes / mib} MiB" else "$maxBytes bytes"
+  return KetchError.SourceError(TorrentDownloadSource.TYPE, cause,
+    detail = "The torrent file is larger than $limit, the most Ketch reads")
 }
 
 /** A [KetchError.SourceError] for [error], with its message, without URLs, as the `detail`. */

@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent.net
 
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.torrent.monotonicClock
@@ -13,6 +14,10 @@ import okio.IOException
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+
+/** What [TorrentHttp.fetch] throws for a response longer than the [maxBytes] it accepts. */
+internal class ResponseTooLargeException(val maxBytes: Int) :
+  IllegalArgumentException("HTTP response exceeds torrent limit")
 
 /** Size- and time-bounded HTTP adapter; injected engines remain owned by their caller. */
 internal class TorrentHttp(
@@ -30,11 +35,15 @@ internal class TorrentHttp(
     require(maxBytes > 0)
     require(url.startsWith("https://", true) || url.startsWith("http://", true))
     val output = Buffer()
-    engine.download(url, null, headers) { bytes ->
-      require(bytes.size.toLong() <= maxBytes - output.size) {
-        "HTTP response exceeds torrent limit"
+    try {
+      engine.download(url, null, headers) { bytes ->
+        if (bytes.size.toLong() > maxBytes - output.size) throw ResponseTooLargeException(maxBytes)
+        output.write(bytes)
       }
-      output.write(bytes)
+    } catch (e: KetchError.Network) {
+      // Engines report what this callback throws as a network failure, which callers retry; a
+      // response too long is as long the next time.
+      throw e.cause as? ResponseTooLargeException ?: e
     }
     output.readByteArray()
   }

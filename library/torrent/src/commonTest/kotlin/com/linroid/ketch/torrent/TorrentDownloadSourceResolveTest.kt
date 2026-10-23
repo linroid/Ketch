@@ -6,6 +6,8 @@ import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
 import com.linroid.ketch.api.log.Logger
+import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
@@ -351,6 +353,38 @@ class TorrentDownloadSourceResolveTest {
   }
 
   // -- resolve via .torrent URL --
+
+  @Test
+  fun resolveUrl_metainfoLargerThanTheLimit_failsWithoutRetrying() = runTest {
+    // As KtorHttpEngine does, the engine reports what its callback throws as a network failure.
+    val http = object : HttpEngine {
+      override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+        error("unused")
+
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) {
+        try {
+          onData(ByteArray(1024 * 1024 + 1))
+        } catch (e: IllegalArgumentException) {
+          throw KetchError.Network(e)
+        }
+      }
+
+      override fun close() = Unit
+    }
+    val limited = TorrentDownloadSource(TorrentConfig(maxMetadataBytes = 1024 * 1024), http)
+
+    val error = assertFailsWith<KetchError.SourceError> {
+      limited.resolve("https://example.com/big.torrent")
+    }
+
+    assertEquals("The torrent file is larger than 1 MiB, the most Ketch reads", error.detail)
+    assertFalse(error.isRetryable)
+  }
 
   // -- Engine lifecycle --
 
