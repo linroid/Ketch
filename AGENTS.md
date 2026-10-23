@@ -381,9 +381,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
 - HTTP probes use HEAD; when it is refused with 400, 403, 404, 405, 500 or 501 (URLs presigned
-  for GET only, handlers that fail on HEAD), `RangeSupportDetector` asks `HttpEngine.probe`, a
-  `GET` with `Range: bytes=0-0` whose body is never read. Engines without it (the default throws `UnsupportedOperationException`)
-  keep the HEAD error
+  for GET only, handlers that fail on HEAD), or fails on the network (servers and middleboxes
+  that drop it without a reply, as Hetzner's do), `RangeSupportDetector` asks
+  `HttpEngine.probe`, a `GET` with `Range: bytes=0-0` whose body is never read. Engines without
+  it (the default throws `UnsupportedOperationException`) keep the HEAD error
 - Request headers (`DownloadRequest.headers`, `resolve` properties): `Ketch.download` rejects
   non-token names and values with control characters (`RequestHeaders.requireValid`, whose
   messages never quote values); engines drop `Host`, `Range`, `Content-Length` and hop-by-hop
