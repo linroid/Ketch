@@ -114,6 +114,8 @@ internal class MirrorPool(
   private fun isPermanent(error: Throwable): Boolean = when (error) {
     is KetchError.Http -> !error.isRetryable && error.code != 408
     is KetchError.Unsupported, is KetchError.FileChanged, is KetchError.AuthenticationFailed -> true
+    // The HTTP engine's own: a server certificate it refuses, as it does every time.
+    is KetchError.SourceError -> true
     else -> false
   }
 

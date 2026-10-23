@@ -162,7 +162,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:ktor`, `library:kermit`, `library:sqlite`
 - `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM),
-  `RedirectCache`; internal proxy transports: `ProxyRoute`, `HttpTransports`, `JvmTransports`
+  `RedirectCache`, internal `CertificateProblem` (expect/actual `certificateProblemOf`); internal
+  proxy transports: `ProxyRoute`, `HttpTransports`, `JvmTransports`
   (with `EnvironmentProxies`), `AndroidTransports`, `DarwinTransports`, `Socks5Socket`
 - `com.linroid.ketch.log` -- `KermitLogger`
 - `com.linroid.ketch.sqlite` -- `SqliteTaskStore`, `DriverFactory` (expect/actual),
@@ -416,10 +417,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   those warnings say where; not the errors it raises itself on a response it refuses (another
   range, a body of the wrong length or too long, a redirect it will not follow) or after 20
   redirects, nor with `logRequests = false`, nor for what an `onData` callback throws, which
-  stays the `KetchError.Network`'s cause. A body it stops reading early (a pause, a lane taken
+  stays the `KetchError.Network`'s cause. A server certificate the platform refuses (expired, not
+  yet valid, revoked, for another host or not trusted: `certificateProblemOf`, from JSSE, Conscrypt
+  and OkHttp exceptions or `NSURLErrorServerCertificate` codes) fails a request with a
+  `KetchError.SourceError` saying which (`CertificateProblem.description`), not a `Network` error,
+  as retrying gets the same certificate. A GET that went to a remembered redirect target whose
+  certificate is refused follows the redirects again at once, as the origin may send it elsewhere
+  since, and fails only when that fails too. A body it stops reading early (a pause, a lane taken
   over, a failure) is cancelled where it reads it: `bodyAsChannel()` copies the response into a
-  channel in a coroutine of the client's job, which Ktor's cleanup never cancels, so one waiting
-  for room would otherwise keep its buffered megabytes as long as the client lives
+  channel in a coroutine of the client's job, which Ktor's cleanup never cancels, so one waiting for
+  room would otherwise keep its buffered megabytes as long as the client lives
 - An HTTP download without `Content-Disposition` is named after the URL that answered
   (`ServerInfo.url`, after redirects) when that name has an extension, as browsers do (a
   `/download?id=5` link redirecting to `app.dmg`), else after the requested URL when its name
@@ -780,7 +787,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   connection on a fast mirror takes over a slow mirror's tail), each `SegmentLane` fetched from
   the least busy usable mirror (`MirrorPool`, ties by priority). A failed segment continues from the byte
   it reached on another mirror; a mirror is dropped at once for 4xx (not 408/429), `Unsupported`
-  (wrong range), `FileChanged` or `AuthenticationFailed`, else backs off 1 s doubling to 60 s (or
+  (wrong range), `FileChanged`, `AuthenticationFailed` or a `SourceError` (a certificate the
+  engine refuses), else backs off 1 s doubling to 60 s (or
   `Retry-After`) and is dropped after 5 failures in a row; the last mirror left never backs off
   and rethrows, so Ketch's `RetryPolicy` applies as for HTTP. With `PieceHashes` it reads the
   finished file back piece by piece (skipped when `readAt` is unsupported), drops the mirrors
@@ -878,6 +886,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   restarts it. SIZE answering 550 is a path with no file, missing or a folder, unless MDTM dates
   it: `RealFtpClient.size` then fails with a `SourceError` naming the path and the reply
   (`FtpError.noFile`), as curl does. Other 5xx replies carry the server's reply as the detail
+- A control connection that fails is logged at debug, as callers warn as they retry, and its
+  `KetchError.Network` names the server in a cause (`FtpConnectException`: `Cannot connect to
+  host:port`), which an unresolved host's own exception leaves out
 - Resume support with MDTM-based server file change validation
 - FTPS on JVM/Android via ktor-network-tls; iOS deferred (no ktor TLS support)
 - FTPS (`AUTH TLS`, `PBSZ 0`, `PROT P`) wraps every data connection in TLS too, after the `RETR`
@@ -2453,7 +2464,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Never log credentials: pass URLs through `redactUrl()`, tracker URLs through
   `trackerLabel()`, and describe tracker errors with `describeWithoutUrls()`
 - Warnings without a stack trace name the cause with `error.describeCauses()`, not
-  `error.message`, which for `KetchError` is only a generic summary
+  `error.message`, which for `KetchError` is only a generic summary. It says each thing once:
+  text a wrapper copied from its cause (`cause.toString()`, or a message of 16 characters or more
+  after a space or colon, as the JDK's TLS errors repeat theirs) is cut, and a copy coroutines
+  recover of an exception (same class and message as its cause) is left out
 - Do not swallow failures silently: log best-effort work that fails (at debug when it is
   expected to fail often), as `attempt("label") { ... }` does in the torrent engine
 - Use lazy lambdas: `log.d { "expensive $computation" }`

@@ -27,6 +27,43 @@ class LogFormatTest {
   }
 
   @Test
+  fun describeCauses_wrappersEndingWithTheirCause_sayOnlyTheirOwnPart() {
+    // As the JDK words an expired certificate: each wrapper repeats what the next one says.
+    val expired = IllegalStateException("NotAfter: Mon Apr 13 07:59:59 UTC 2015")
+    val check = IllegalArgumentException("validity check failed", expired)
+    val validation = IllegalStateException("PKIX path validation failed: $check", check)
+    val handshake = RuntimeException("(certificate_expired) ${validation.message}", validation)
+
+    assertEquals(
+      "RuntimeException: (certificate_expired) <- IllegalStateException: PKIX path validation " +
+        "failed <- IllegalArgumentException: validity check failed <- IllegalStateException: " +
+        "NotAfter: Mon Apr 13 07:59:59 UTC 2015",
+      handshake.describeCauses(),
+    )
+  }
+
+  @Test
+  fun describeCauses_recoveredCopy_isListedOnce() {
+    val original = IllegalStateException("TLS handshake failed")
+    val copy = IllegalStateException("TLS handshake failed", original)
+
+    assertEquals(
+      "Network: Network error occurred <- IllegalStateException: TLS handshake failed",
+      KetchError.Network(copy).describeCauses(),
+    )
+  }
+
+  @Test
+  fun describeCauses_messageEndingWithAShortCauseMessage_isKept() {
+    val error = IllegalStateException("Stream closed", IllegalStateException("closed"))
+
+    assertEquals(
+      "IllegalStateException: Stream closed <- IllegalStateException: closed",
+      error.describeCauses(),
+    )
+  }
+
+  @Test
   fun describeCauses_multilineMessage_staysOnOneLine() {
     val description = IllegalStateException("first\nsecond").describeCauses()
     assertFalse('\n' in description)
