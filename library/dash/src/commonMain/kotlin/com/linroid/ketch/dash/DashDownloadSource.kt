@@ -71,9 +71,11 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
   }
 
   private fun variants(stream: DashStream): List<MediaVariant> {
-    val names = mediaVariantNames(stream.variants.map { it.height }, stream.variants.map {
-      it.bandwidth
-    })
+    val names = mediaVariantNames(
+      stream.variants.map { it.height },
+      stream.variants.map { it.bandwidth },
+      stream.variants.map { it.metadata["codecs"] },
+    )
     val ids = mediaVariantIds(stream.variants.map { it.key })
     return stream.variants.mapIndexed { index, variant ->
       MediaVariant(ids[index], names[index], variant.bandwidth, variant.metadata)

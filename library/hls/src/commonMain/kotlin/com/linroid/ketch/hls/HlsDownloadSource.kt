@@ -123,7 +123,9 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     val heights = ranked.map { variant ->
       variant.attributes["RESOLUTION"]?.substringAfter('x', "")?.toIntOrNull()
     }
-    val names = mediaVariantNames(heights, ranked.map { it.bandwidth })
+    val names = mediaVariantNames(
+      heights, ranked.map { it.bandwidth }, ranked.map { it.attributes["CODECS"] },
+    )
     val ids = mediaVariantIds(ranked.map { variant ->
       listOf(variant.url.substringBefore('?'), variant.bandwidth.toString(),
         variant.attributes["RESOLUTION"], variant.attributes["CODECS"], variant.audioGroup)

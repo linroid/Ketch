@@ -142,6 +142,30 @@ class Mp4TracksTest {
     )
   }
 
+  @Test
+  fun mediaVariantNames_tellRepeatsApartByTheCodecsThatDiffer() {
+    // Apple's bipbop example offers each picture with AAC, AC-3 and E-AC-3 audio.
+    assertEquals(
+      listOf(
+        "540p · 2.2 Mbps · AAC",
+        "540p · 2.2 Mbps · E-AC-3",
+        "540p · 2.4 Mbps",
+        "1080p · HEVC",
+        "1080p · H.264",
+        "720p (1)",
+        "720p (2)",
+      ),
+      mediaVariantNames(
+        listOf(540, 540, 540, 1080, 1080, 720, 720),
+        listOf(2_177_116, 2_207_619, 2_399_619, 0, 0, 0, 0),
+        listOf(
+          "avc1.640020,mp4a.40.2", "avc1.640020,ec-3", "avc1.640020,ac-3",
+          "hvc1.2.4.L123.B0,mp4a.40.2", "avc1.640028,mp4a.40.2", "avc1.64001f", "avc1.64001f",
+        ),
+      ),
+    )
+  }
+
   private fun u32(bytes: ByteArray, at: Int): Long =
     ((bytes[at].toLong() and 0xff) shl 24) or ((bytes[at + 1].toLong() and 0xff) shl 16) or
       ((bytes[at + 2].toLong() and 0xff) shl 8) or (bytes[at + 3].toLong() and 0xff)

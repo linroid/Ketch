@@ -114,11 +114,17 @@ fun mediaVariantIds(keys: List<String>): List<String> {
 
 /**
  * Names variants as users pick them, such as `1080p · 5.1 Mbps`, from each one's picture
- * [heights] and [bandwidths]; names that would repeat get a number.
+ * [heights] and [bandwidths]. Variants whose names would repeat are told apart by the codecs
+ * that differ among them ([codecs], as manifests list them: `540p · 2.2 Mbps · E-AC-3`), else
+ * get a number.
  */
-fun mediaVariantNames(heights: List<Int?>, bandwidths: List<Long>): List<String> {
-  require(heights.size == bandwidths.size)
-  val names = heights.indices.map { index ->
+fun mediaVariantNames(
+  heights: List<Int?>,
+  bandwidths: List<Long>,
+  codecs: List<String?> = List(heights.size) { null },
+): List<String> {
+  require(heights.size == bandwidths.size && heights.size == codecs.size)
+  val plain = heights.indices.map { index ->
     val height = heights[index]?.takeIf { it > 0 }?.let { "${it}p" }
     val bandwidth = bandwidths[index]
     val rate = when {
@@ -129,6 +135,14 @@ fun mediaVariantNames(heights: List<Int?>, bandwidths: List<Long>): List<String>
     }
     listOfNotNull(height, rate).joinToString(" · ").ifEmpty { "Variant ${index + 1}" }
   }
+  val formats = codecs.map(::codecNames)
+  val names = plain.mapIndexed { index, name ->
+    val alike = plain.indices.filter { plain[it] == name }
+    if (alike.size == 1) return@mapIndexed name
+    val shared = alike.map { formats[it].toSet() }.reduce { all, next -> all intersect next }
+    val distinct = formats[index].filterNot { it in shared }
+    if (distinct.isEmpty()) name else "$name · ${distinct.joinToString(" + ")}"
+  }
   val seen = mutableMapOf<String, Int>()
   return names.map { name ->
     val count = names.count { it == name }
@@ -138,3 +152,28 @@ fun mediaVariantNames(heights: List<Int?>, bandwidths: List<Long>): List<String>
     "$name ($number)"
   }
 }
+
+/** The formats a `CODECS` value lists, as users know them: `avc1.64001f,ec-3` is H.264, E-AC-3. */
+private fun codecNames(codecs: String?): List<String> =
+  codecs.orEmpty().split(',').mapNotNull { codec ->
+    val entry = codec.trim().lowercase()
+    val tag = entry.substringBefore('.')
+    when {
+      tag.isEmpty() -> null
+      tag == "avc1" || tag == "avc3" -> "H.264"
+      tag == "hvc1" || tag == "hev1" -> "HEVC"
+      tag == "dvh1" || tag == "dvhe" -> "Dolby Vision"
+      tag == "av01" -> "AV1"
+      tag == "vp09" || tag == "vp9" -> "VP9"
+      tag == "vp8" -> "VP8"
+      entry == "mp4a.69" || entry == "mp4a.6b" || entry == "mp4a.40.34" -> "MP3"
+      tag == "mp4a" -> "AAC"
+      tag == "ac-3" -> "AC-3"
+      tag == "ec-3" -> "E-AC-3"
+      tag == "ac-4" -> "AC-4"
+      tag == "opus" -> "Opus"
+      tag == "flac" || tag == "fla" -> "FLAC"
+      tag == "alac" -> "ALAC"
+      else -> tag.uppercase()
+    }
+  }.distinct()
