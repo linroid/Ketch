@@ -856,9 +856,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the control session refuse transfers. `RealFtpClientTlsTest` (jvmTest) runs a scripted JSSE
   server
 - Passive mode only: EPSV, else PASV when EPSV is refused or its port cannot be reached (the
-  connection then skips EPSV). Data connections always go to the control host: the address
-  a PASV reply names (a NAT's private address, `0.0.0.0`, another host) is ignored, as curl
-  does. FTP URL parsing with credentials
+  connection then skips EPSV). Data connections always go to the address the control
+  connection reached, not a fresh lookup of the host (round-robin DNS): the address a PASV
+  reply names (a NAT's private address, `0.0.0.0`, another host) is ignored, as curl does. FTP
+  URL parsing with credentials
 - Platforms: Android, JVM, iOS (no WasmJs — requires raw TCP sockets)
 
 ### WebDAV Support (`library:webdav`)

@@ -5,7 +5,9 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import io.ktor.network.selector.SelectorManager
 import io.ktor.network.sockets.Connection
+import io.ktor.network.sockets.InetSocketAddress
 import io.ktor.network.sockets.Socket
+import io.ktor.network.sockets.SocketAddress
 import io.ktor.network.sockets.aSocket
 import io.ktor.network.sockets.connection
 import io.ktor.network.sockets.openReadChannel
@@ -73,6 +75,12 @@ internal class RealFtpClient(
   /** False once EPSV failed on this connection: data connections then use PASV. */
   private var epsvUsable = true
 
+  /**
+   * The address the control connection reached, where data connections go: [host] may resolve
+   * to other servers (round-robin DNS), which would not be listening on the passive port.
+   */
+  private var serverAddress = host
+
   /** True once the server accepted `PROT P`: data connections use TLS. */
   private var protectData = false
 
@@ -83,6 +91,7 @@ internal class RealFtpClient(
     try {
       val socket = connectWithin(host, port)
       controlSocket = socket
+      socket.remoteAddress.numericHost()?.let { serverAddress = it }
       reader = socket.openReadChannel()
       writer = socket.openWriteChannel(autoFlush = true)
 
@@ -341,9 +350,9 @@ internal class RealFtpClient(
    * refuses EPSV, or the port it names cannot be reached, as behind some NATs and proxies. The
    * connection then skips EPSV.
    *
-   * Both connect to the control connection's host. The address a PASV reply names is ignored,
-   * as curl does: servers behind NAT name a private address or `0.0.0.0`, and a server must not
-   * send the client to another host.
+   * Both connect to the address the control connection reached ([serverAddress]). The address a
+   * PASV reply names is ignored, as curl does: servers behind NAT name a private address or
+   * `0.0.0.0`, and a server must not send the client to another host.
    */
   private suspend fun openPassiveDataConnection(): Socket {
     if (epsvUsable) {
@@ -359,7 +368,7 @@ internal class RealFtpClient(
       if (dataPort != null) {
         log.d { "EPSV data connection on port $dataPort" }
         try {
-          return connectDataSocket(host, dataPort)
+          return connectDataSocket(serverAddress, dataPort)
         } catch (e: KetchError.Network) {
           log.d { "EPSV data connection failed, falling back to PASV: ${e.describeCauses()}" }
         }
@@ -379,9 +388,9 @@ internal class RealFtpClient(
       )
     log.d {
       "PASV data connection on port $dataPort" +
-        if (dataHost != host) ", using the control host for the address the reply named" else ""
+        if (dataHost != serverAddress) ", ignoring the address the reply named" else ""
     }
-    return connectDataSocket(host, dataPort)
+    return connectDataSocket(serverAddress, dataPort)
   }
 
   private suspend fun connectDataSocket(
@@ -511,6 +520,19 @@ internal class RealFtpClient(
     withContext(Dispatchers.IO) { withTimeoutOrNull(timeout) { block() } }
 
   companion object {
+    /** This address as a numeric IPv4 or IPv6 host, `null` when it was not resolved. */
+    internal fun SocketAddress.numericHost(): String? {
+      val bytes = (this as? InetSocketAddress)?.resolveAddress() ?: return null
+      return when (bytes.size) {
+        4 -> bytes.joinToString(".") { (it.toInt() and 0xff).toString() }
+        16 -> (0 until 8).joinToString(":") { group ->
+          val high = bytes[2 * group].toInt() and 0xff
+          (high shl 8 or (bytes[2 * group + 1].toInt() and 0xff)).toString(16)
+        }
+        else -> null
+      }
+    }
+
     /**
      * The selector every client shares by default, created on first use and never closed: it
      * waits for every client's sockets on one thread, where a selector per client took one each.

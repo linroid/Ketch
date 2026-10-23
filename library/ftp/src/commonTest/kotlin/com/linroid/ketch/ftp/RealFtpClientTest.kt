@@ -1,5 +1,7 @@
 package com.linroid.ketch.ftp
 
+import com.linroid.ketch.ftp.RealFtpClient.Companion.numericHost
+import io.ktor.network.sockets.InetSocketAddress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -113,5 +115,17 @@ class RealFtpClientTest {
         "Entering Passive Mode (192,168,1)"
       )
     )
+  }
+
+  // --- Data connection address ---
+
+  @Test
+  fun numericHost_ipv4() {
+    assertEquals("192.0.2.7", InetSocketAddress("192.0.2.7", 21).numericHost())
+  }
+
+  @Test
+  fun numericHost_ipv6() {
+    assertEquals("2001:db8:0:0:0:0:0:1", InetSocketAddress("2001:db8::1", 21).numericHost())
   }
 }
