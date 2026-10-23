@@ -104,8 +104,9 @@ internal class DefaultFileNameResolver : FileNameResolver {
       }
     }
 
+    /** Whether this name ends with letters and digits after a dot, as `.dmg` or `.safetensors`. */
     private fun String.hasExtension(): Boolean =
-      substringAfterLast('.', "").let { it.length in 1..10 && it.all(Char::isLetterOrDigit) } &&
+      substringAfterLast('.', "").let { it.isNotEmpty() && it.all(Char::isLetterOrDigit) } &&
         indexOf('.') > 0
 
     internal fun percentDecode(encoded: String): String {

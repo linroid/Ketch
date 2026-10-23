@@ -318,6 +318,9 @@ class DefaultFileNameResolverTest {
     assertEquals("report.pdf", DefaultFileNameResolver.fromUrls(
       "https://example.com/file.php?id=3", "https://files.example.com/report.pdf?sig=x",
     ))
+    assertEquals("profile.mobileconfig", DefaultFileNameResolver.fromUrls(
+      "https://example.com/download", "https://example.com/files/profile.mobileconfig",
+    ))
   }
 
   @Test
