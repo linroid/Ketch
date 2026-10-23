@@ -339,7 +339,6 @@ class KtorHttpEngine private constructor(
     if (ownsTransports) transports.close()
   }
 
-  /** [headers] as they are sent: checked, without the engine's own, with the user agent. */
   /**
    * [headers] as they may be sent, with this engine's `User-Agent` and `Accept-Encoding:
    * identity` unless they name their own. Without the latter, OkHttp asks for gzip on requests
@@ -357,9 +356,11 @@ class KtorHttpEngine private constructor(
   }
 
   /**
-   * Runs [block], reporting transport failures as [KetchError.Network]. They are logged at debug
-   * level only: callers retry them, warning as they do, and report the failure they give up on,
-   * which names where it failed ([FailedRequest]).
+   * Runs [block], reporting transport failures as [KetchError.Network], which callers retry,
+   * except a refused server certificate ([CertificateProblem]): it fails the same way every time,
+   * so it is a [KetchError.SourceError] saying why. Both are logged at debug level only: callers
+   * warn as they retry and report the failure they give up on, which names where it failed
+   * ([FailedRequest]).
    */
   private inline fun <T> transport(block: () -> T): T {
     try {
@@ -374,6 +375,10 @@ class KtorHttpEngine private constructor(
       throw KetchError.Network(e.cause)
     } catch (e: Exception) {
       if (logRequests) log.d { "Network error: ${e.describeCauses()}" }
+      val certificate = certificateProblemOf(e)
+      if (certificate != null) {
+        throw KetchError.SourceError(SOURCE_TYPE, e, certificate.description)
+      }
       throw KetchError.Network(e)
     }
   }
@@ -562,6 +567,9 @@ class KtorHttpEngine private constructor(
     val DEFAULT_USER_AGENT: String = "Ketch/${KetchApi.VERSION}"
 
     private const val DEFAULT_BUFFER_SIZE = 8192
+
+    /** The source type of the errors the engine reports itself, as the HTTP source's. */
+    private const val SOURCE_TYPE = "http"
     private const val MAX_REDIRECTS = 20
     private val PROBE_RANGE = 0L..0L
     private val REDIRECT_STATUSES = setOf(301, 302, 303, 307, 308)

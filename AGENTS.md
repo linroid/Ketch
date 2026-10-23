@@ -162,7 +162,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:ktor`, `library:kermit`, `library:sqlite`
 - `com.linroid.ketch.engine` -- `KtorHttpEngine` (`withNetworkInterfaces()` on Android/JVM),
-  `RedirectCache`; internal proxy transports: `ProxyRoute`, `HttpTransports`, `JvmTransports`
+  `RedirectCache`, internal `CertificateProblem` (expect/actual `certificateProblemOf`); internal
+  proxy transports: `ProxyRoute`, `HttpTransports`, `JvmTransports`
   (with `EnvironmentProxies`), `AndroidTransports`, `DarwinTransports`, `Socks5Socket`
 - `com.linroid.ketch.log` -- `KermitLogger`
 - `com.linroid.ketch.sqlite` -- `SqliteTaskStore`, `DriverFactory` (expect/actual),
@@ -411,7 +412,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   those warnings say where; not the errors it raises itself on a response it refuses (another
   range, a body of the wrong length or too long, a redirect it will not follow) or after 20
   redirects, nor with `logRequests = false`, nor for what an `onData` callback throws, which
-  stays the `KetchError.Network`'s cause
+  stays the `KetchError.Network`'s cause. A server certificate the platform refuses (expired, not
+  yet valid, revoked, for another host or not trusted: `certificateProblemOf`, from JSSE,
+  Conscrypt and OkHttp exceptions or `NSURLErrorServerCertificate` codes) fails a request with a
+  `KetchError.SourceError` saying which (`CertificateProblem.description`), not a `Network`
+  error, as retrying gets the same certificate
 - An HTTP download without `Content-Disposition` is named after the URL that answered
   (`ServerInfo.url`, after redirects) when that name has an extension, as browsers do (a
   `/download?id=5` link redirecting to `app.dmg`), else after the requested URL when its name
@@ -772,7 +777,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   connection on a fast mirror takes over a slow mirror's tail), each `SegmentLane` fetched from
   the least busy usable mirror (`MirrorPool`, ties by priority). A failed segment continues from the byte
   it reached on another mirror; a mirror is dropped at once for 4xx (not 408/429), `Unsupported`
-  (wrong range), `FileChanged` or `AuthenticationFailed`, else backs off 1 s doubling to 60 s (or
+  (wrong range), `FileChanged`, `AuthenticationFailed` or a `SourceError` (a certificate the
+  engine refuses), else backs off 1 s doubling to 60 s (or
   `Retry-After`) and is dropped after 5 failures in a row; the last mirror left never backs off
   and rethrows, so Ketch's `RetryPolicy` applies as for HTTP. With `PieceHashes` it reads the
   finished file back piece by piece (skipped when `readAt` is unsupported), drops the mirrors
