@@ -63,6 +63,13 @@ class SegmentLane internal constructor(
   @Volatile
   internal var released: Boolean = false
 
+  /**
+   * Whether no connection started this lane yet, as the batch has more lanes than connections:
+   * the first connection free takes it whole.
+   */
+  @Volatile
+  internal var waiting: Boolean = false
+
   /** When this lane's current transfer began, for its rate. */
   internal var startedAt: TimeMark = startedAt
 
@@ -123,7 +130,12 @@ internal class Steal(val lane: SegmentLane, val victim: SegmentLane, val victimI
  * nothing in its last measured lane, and the failed one [rejoin]s once it waited, taking its own
  * lane back if nobody did, else a split like a finished connection.
  *
+ * Only [connections] lanes start ([initialLanes]); the others, as when resegmenting to fewer
+ * connections leaves more gaps than connections, wait until a connection is free and go to it
+ * whole, before any split.
+ *
  * @param minSplitBytes the smallest range a split hands over; [Long.MAX_VALUE] never splits
+ * @param connections how many lanes transfer at once
  * @param rateWindow how long a lane runs before its rate counts
  * @param setupTime what starting another request costs, weighed against continuing the victim
  * @param onCommitted runs after every [commit], outside the lock
@@ -135,9 +147,11 @@ internal class SegmentLedger(
   private val rateWindow: Duration = 1.seconds,
   private val setupTime: Duration = 0.5.seconds,
   private val onCommitted: suspend () -> Unit = {},
+  connections: Int = Int.MAX_VALUE,
 ) {
   init {
     require(minSplitBytes > 0) { "minSplitBytes must be positive" }
+    require(connections > 0) { "connections must be positive" }
   }
 
   private val mutex = Mutex()
@@ -145,8 +159,11 @@ internal class SegmentLedger(
     SegmentLane(this, segment.start, segment.currentOffset, segment.end + 1, timeSource.markNow())
   }.toMutableList()
 
-  /** The lanes of the incomplete segments the ledger started with. */
-  val initialLanes: List<SegmentLane> = lanes.filter { !it.isComplete }
+  /** The lanes of the incomplete segments the ledger starts transferring, [connections] at most. */
+  val initialLanes: List<SegmentLane> = lanes.filter { !it.isComplete }.let { incomplete ->
+    incomplete.drop(connections).forEach { it.waiting = true }
+    incomplete.take(connections)
+  }
 
   /** Connections transferring, or about to: every lane's but those waiting to retry. */
   private var active = initialLanes.size
@@ -236,6 +253,13 @@ internal class SegmentLedger(
   }
 
   private fun takeOver(thief: SegmentLane, thiefRate: Double?): Steal? {
+    // A lane nobody started goes to the first connection free, whatever it received last, as no
+    // other connection would start it.
+    lanes.firstOrNull { it.waiting }?.let { lane ->
+      lane.waiting = false
+      restart(lane)
+      return Steal(lane, lane, victimIdle = false)
+    }
     // A connection that received nothing in its last lane takes nothing, not even a failed
     // connection's bytes, which then wait for their own connection to retry.
     if (thiefRate != null && thiefRate <= 0.0) return null

@@ -373,6 +373,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   connection runs out of `retryCount`, the error is not retryable, it is a 429 (so
   `HttpDownloadSource` lowers the connections), or no other connection is transferring (an
   outage, not one connection)
+- A batch never runs more connections than its effective count: resegmenting to fewer
+  connections cannot join the gaps finished ranges leave, so the segments past the count wait
+  (`SegmentLane.waiting`) and the first connection free takes each whole, before any split.
+  Otherwise a server that answered 429 would get a connection per gap however low the count went,
+  answer 429 again and leave ever smaller segments
 - Servers without Range support use a single connection; resuming them restarts from zero. So
   does a run whose ranged request a server answers with the whole file (`200`) although it
   advertised ranges: engines throw a `KetchError.Unsupported` caused by a

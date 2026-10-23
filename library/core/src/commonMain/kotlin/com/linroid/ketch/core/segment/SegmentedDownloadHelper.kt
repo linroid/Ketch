@@ -135,8 +135,10 @@ class SegmentedDownloadHelper(
   }
 
   /**
-   * Downloads one batch of incomplete segments concurrently, one connection per segment. A
-   * connection that finishes its segment takes over the tail of the slowest one still running
+   * Downloads one batch of incomplete segments concurrently, one connection per segment, but no
+   * more connections than [requestedAtStart] allows: the other segments, gaps that resegmenting
+   * to fewer connections could not join, wait for a connection to finish. A connection that
+   * finishes its segment takes over a waiting one, else the tail of the slowest one still running
    * ([SegmentLedger.steal]) instead of closing, so the batch no longer waits on its slowest
    * connection; it closes once no segment has [minSplitBytes] left to hand over.
    *
@@ -178,9 +180,11 @@ class SegmentedDownloadHelper(
       minSplitBytes = if (supportsRanges) minSplitBytes else Long.MAX_VALUE,
       timeSource = timeSource,
       onCommitted = { updateProgress() },
+      // A server that refused more connections (429) must not get one per gap.
+      connections = context.effectiveConnections(requestedAtStart).coerceAtLeast(1),
     )
     // Connections the batch really runs: fewer than effectiveConnections() when a source capped
-    // them (HttpDownloadSource.applyRateLimit) or segments already finished.
+    // them (HttpDownloadSource.applyRateLimit) or segments already finished, never more.
     val lanes = ledger.initialLanes
     val runningConnections = lanes.size
 

@@ -286,6 +286,41 @@ class SegmentedDownloadHelperTest {
   }
 
   @Test
+  fun downloadAll_moreGapsThanConnections_runsOnlyTheConnections() = runTest {
+    // Gaps between finished ranges cannot be joined: a server that allowed one connection (429)
+    // must still get one, which takes each gap whole in turn.
+    val segments = listOf(
+      Segment(index = 0, start = 0, end = 29),
+      Segment(index = 1, start = 30, end = 39, downloadedBytes = 10),
+      Segment(index = 2, start = 40, end = 69),
+      Segment(index = 3, start = 70, end = 79, downloadedBytes = 10),
+      Segment(index = 4, start = 80, end = 99),
+    )
+    val context = context(connections = MutableStateFlow(1), segments = segments)
+    val written = IntArray(100)
+    val requests = mutableListOf<LongRange>()
+    var running = 0
+    var most = 0
+    SegmentedDownloadHelper(minSplitBytes = 1, timeSource = testScheduler.timeSource)
+      .downloadAll(context, segments, 100) { lane ->
+        requests.add(lane.offset..lane.end)
+        most = maxOf(most, ++running)
+        try {
+          while (!lane.isComplete) {
+            delay(10)
+            lane.write(written, 5)
+          }
+        } finally {
+          running--
+        }
+      }
+    assertEquals(1, most)
+    assertEquals(listOf(0L..29L, 40L..69L, 80L..99L), requests)
+    assertTrue(written.withIndex().all { (i, n) -> n == if (i in 30..39 || i in 70..79) 0 else 1 })
+    assertTrue(context.segments.value.all { it.isComplete })
+  }
+
+  @Test
   fun downloadAll_withoutRangeSupport_neverSplits() = runTest {
     val segments = listOf(Segment(index = 0, start = 0, end = 99))
     val context = context(connections = MutableStateFlow(1), segments = segments)
