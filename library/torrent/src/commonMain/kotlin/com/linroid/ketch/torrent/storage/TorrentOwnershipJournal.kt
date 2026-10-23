@@ -8,11 +8,18 @@ import okio.FileSystem
 import okio.Path
 import okio.use
 
-/** Append-only ownership records survive a process exit before TaskStore publishes a checkpoint. */
+/**
+ * Append-only ownership records survive a process exit before TaskStore publishes a checkpoint.
+ *
+ * @param binding what the journal belongs to, which it starts with
+ * @param legacyBindings other bindings a journal written by an earlier version may start with; a
+ *   compaction rewrites it with [binding]
+ */
 internal class TorrentOwnershipJournal(
   private val path: Path,
   private val binding: ByteArray,
   private val fileSystem: FileSystem,
+  private val legacyBindings: List<ByteArray> = emptyList(),
 ) {
   private var position = 0L
   private var compactedAt = 0L
@@ -36,7 +43,9 @@ internal class TorrentOwnershipJournal(
       if (input.size < length) break // Discard a torn final append; never infer ownership from it.
       val value = input.readByteArray(length.toLong())
       if (first) {
-        require(value.contentEquals(binding)) { "Ownership journal belongs to another task" }
+        require(value.contentEquals(binding) || legacyBindings.any(value::contentEquals)) {
+          "Ownership journal belongs to another task"
+        }
         first = false
       } else {
         val node = Bencode.parse(value, 16_384)

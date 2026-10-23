@@ -84,6 +84,8 @@ internal class TorrentPieceStore(
   @Volatile var seedOnly: Boolean = seedOnly
   private val log = KetchLogger("TorrentSession")
   private val mutex = Mutex()
+  // The output as given: journals were bound to it before they named the resolved [output].
+  private val givenOutput = output
   private val output = absolute(output)
   // BEP 47 padding: zeros that pieces hash, never selected, written or read from disk.
   private val padding = BooleanArray(metadata.files.size) { metadata.files[it].padding }
@@ -134,9 +136,14 @@ internal class TorrentPieceStore(
   private val pendingOwnership = mutableListOf<Pair<Boolean, TorrentOwnedPath>>()
   private val journalPath: Path get() = sidecar / "ownership"
   private val journal by lazy {
-    TorrentOwnershipJournal(journalPath, Bencode.encode(mapOf(
-      "hash" to metadata.infoHash.toBytes(), "task" to taskId, "output" to output.toString()
-    )), fileSystem)
+    fun binding(path: Path) = Bencode.encode(mapOf(
+      "hash" to metadata.infoHash.toBytes(), "task" to taskId, "output" to path.toString()
+    ))
+    // Bound to the resolved output (`this.output`: a bare `output` here is the constructor
+    // parameter), so a store opened through another spelling of it, such as a relative path,
+    // reads the journal of the store that wrote it.
+    TorrentOwnershipJournal(journalPath, binding(this.output), fileSystem,
+      legacyBindings = listOf(binding(givenOutput)))
   }
   val outputPath: String get() = output.toString()
   val selectedIndices: Set<Int> get() = selected

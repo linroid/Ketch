@@ -192,6 +192,29 @@ class TorrentCheckpointTest {
   }
 
   @Test
+  fun forget_storeReopenedThroughAnotherSpellingOfItsOutput_removesTheSidecar() = runTest {
+    // As the CLI, given a relative destination, reopens the store to forget a finished task.
+    val root = root()
+    try {
+      val initial = store(root)
+      initial.initialize()
+      initial.commit(0, bytes.copyOfRange(0, 4))
+      initial.persistCheckpoint()
+      val sidecar = root / ".ketch-${metadata.infoHash.hex}-test"
+      assertTrue(torrentFileSystem.exists(sidecar / "ownership"))
+
+      val reopened = TorrentPieceStore(metadata, root / "pack" / ".." / "pack", setOf(0, 2), "test")
+      reopened.recoverOwnership()
+      reopened.forget()
+
+      assertFalse(torrentFileSystem.exists(sidecar))
+      assertTrue(torrentFileSystem.exists(root / "pack/first"))
+    } finally {
+      torrentFileSystem.deleteRecursively(root, mustExist = false)
+    }
+  }
+
+  @Test
   fun offlineCleanup_preservesReplacedAndPreexistingFiles() = runTest {
     val root = root()
     torrentFileSystem.createDirectories(root / "pack")
