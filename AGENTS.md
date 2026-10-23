@@ -25,7 +25,11 @@ The library is **substantially complete** with all core features implemented and
 Android, JVM/Desktop, iOS, and WebAssembly platforms.
 
 **Note:** The library is published on Maven Central (`com.linroid.ketch`), but it is still pre-1.0,
-so public API breaking changes are allowed.
+so public API breaking changes are allowed. A release tag publishes the libraries only when they
+changed since the last version on Maven Central (`.github/scripts/library-changes.py`: the
+published modules but their tests, and the root build files), as Maven Central limits publishing
+per month, so library versions skip releases that change only the apps. Running the `Release`
+workflow on a tag with `force-maven-central` publishes that tag's libraries and nothing else.
 
 ## Module Structure
 

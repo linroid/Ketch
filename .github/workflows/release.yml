@@ -3,6 +3,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Run on a release tag, this only publishes that tag's libraries to Maven Central: the apps, the
+  # Docker image and the GitHub release are built for tag pushes alone.
+  workflow_dispatch:
+    inputs:
+      force-maven-central:
+        description: Publish the libraries even if unchanged since their last published version
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -118,6 +126,7 @@ jobs:
 
   build-android:
     name: Android
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -174,6 +183,7 @@ jobs:
 
   build-desktop:
     name: Desktop (${{ matrix.name }})
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -314,6 +324,7 @@ jobs:
   # the user's own Apple ID when they install it. The App Store build is made in Xcode.
   build-ios:
     name: iOS IPA
+    if: github.event_name == 'push'
     # Xcode 26 ships the iOS 26 SDK, which Compose Multiplatform needs (see tests.yml).
     runs-on: macos-26
     steps:
@@ -362,6 +373,7 @@ jobs:
 
   build-web:
     name: Web (WasmJs)
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -477,25 +489,44 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           push: true
 
+  # Maven Central limits how much an organization publishes each month, so a release that changes
+  # only the apps leaves the libraries at their last published version, and their versions skip
+  # those of the apps. The job still succeeds then, so the release goes on.
   publish-maven-central:
     name: Publish to Maven Central
     needs: [build-cli, build-android, build-desktop, build-web]
+    # A manual run skips the builds; a tag push still needs them to succeed.
+    if: ${{ !cancelled() && !failure() }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check for library changes
+        id: changes
+        run: |
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::Run the release on a v* tag, not $GITHUB_REF_NAME."
+            exit 1
+          fi
+          python3 .github/scripts/library-changes.py --tag "$KETCH_VERSION" \
+            ${{ inputs.force-maven-central && '--force' || '' }}
+
       - uses: actions/setup-java@v5
+        if: steps.changes.outputs.publish == 'true'
         with:
           distribution: temurin
           java-version: 21
 
       - uses: gradle/actions/setup-gradle@v5
+        if: steps.changes.outputs.publish == 'true'
 
       - name: Publish to Maven Central
-        run: >
-          ./gradlew publishAndReleaseToMavenCentral
-          -PVERSION_NAME=${KETCH_VERSION#v}
-          --no-configuration-cache
+        if: steps.changes.outputs.publish == 'true'
+        run: |
+          ./gradlew publishAndReleaseToMavenCentral \
+            -PVERSION_NAME="${KETCH_VERSION#v}" \
+            --no-configuration-cache
+          echo "Published ${KETCH_VERSION#v}." >> "$GITHUB_STEP_SUMMARY"
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

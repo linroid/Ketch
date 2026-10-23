@@ -7,8 +7,10 @@ quick start and the REST API, start with the [developer guide](developers.md).
 
 ## Installation
 
-Ketch is published on Maven Central under `com.linroid.ketch`. Add the modules you need to your
-version catalog:
+Ketch is published on Maven Central under `com.linroid.ketch`. The libraries share version numbers
+with the apps, but a release that changes only the apps publishes no libraries, so take the latest
+version on [Maven Central](https://central.sonatype.com/namespace/com.linroid.ketch) rather than
+the latest app release. Add the modules you need to your version catalog:
 
 ```toml
 # gradle/libs.versions.toml
