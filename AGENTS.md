@@ -401,6 +401,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   range, a body of the wrong length or too long, a redirect it will not follow) or after 20
   redirects, nor with `logRequests = false`, nor for what an `onData` callback throws, which
   stays the `KetchError.Network`'s cause
+- An HTTP download without `Content-Disposition` is named after the URL that answered
+  (`ServerInfo.url`, after redirects) when that name has an extension, as browsers do (a
+  `/download?id=5` link redirecting to `app.dmg`), else after the requested URL when its name
+  has one (`asset.zip` served from an opaque storage key): `DefaultFileNameResolver.fromUrls`
 - Names from a server (`Content-Disposition`), a URL or an FTP path pass through
   `sanitizeFileName()` (last `/` or `\` segment, no control, bidi or Windows-reserved characters
   or device names, at most 255 UTF-8 bytes, `null` when nothing is left), in the sources and again

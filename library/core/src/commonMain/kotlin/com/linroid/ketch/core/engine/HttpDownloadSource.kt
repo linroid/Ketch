@@ -53,7 +53,7 @@ internal class HttpDownloadSource(
     val serverInfo = detector.detect(url, headers)
     val fileName = serverInfo.contentDisposition?.let {
       DefaultFileNameResolver.fromContentDisposition(it)
-    } ?: DefaultFileNameResolver.fromUrl(url)
+    } ?: DefaultFileNameResolver.fromUrls(url, serverInfo.url)
     return ResolvedSource(
       url = url,
       sourceType = TYPE,

@@ -307,4 +307,29 @@ class DefaultFileNameResolverTest {
       DefaultFileNameResolver.percentDecode("test%")
     )
   }
+
+  @Test
+  fun fromUrls_namesAfterTheAnsweringUrlWhenItHasAnExtension() {
+    // Mozilla's download link redirects to the installer, with no Content-Disposition.
+    assertEquals("Firefox 158.0.1.dmg", DefaultFileNameResolver.fromUrls(
+      "https://download.mozilla.org/?product=firefox-latest-ssl&os=osx",
+      "https://cdn.example.net/pub/firefox/158.0.1/Firefox%20158.0.1.dmg",
+    ))
+    assertEquals("report.pdf", DefaultFileNameResolver.fromUrls(
+      "https://example.com/file.php?id=3", "https://files.example.com/report.pdf?sig=x",
+    ))
+  }
+
+  @Test
+  fun fromUrls_keepsTheRequestedNameOverAnOpaqueTarget() {
+    assertEquals("asset.zip", DefaultFileNameResolver.fromUrls(
+      "https://example.com/releases/asset.zip",
+      "https://storage.example.net/objects/4f1d2c3b-9a8e?X-Amz-Signature=1",
+    ))
+    assertEquals("download", DefaultFileNameResolver.fromUrls(
+      "https://example.com/download", "https://example.com/files/7d3a",
+    ))
+    assertEquals("latest", DefaultFileNameResolver.fromUrls("https://example.com/latest", null))
+  }
 }
+

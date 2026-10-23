@@ -22,6 +22,8 @@ import com.linroid.ketch.api.ChecksumAlgorithm
  * @property checksum the digest the server publishes for the whole file, read with
  *   [publishedChecksum]; downloads without a [com.linroid.ketch.api.DownloadRequest.checksum]
  *   are verified against it
+ * @property url the URL that answered, after the redirects the engine followed, which names the
+ *   file when the requested one does not; `null` when the engine does not say
  */
 data class ServerInfo(
   val contentLength: Long?,
@@ -33,6 +35,7 @@ data class ServerInfo(
   val rateLimitReset: Long? = null,
   val contentType: String? = null,
   val checksum: Checksum? = null,
+  val url: String? = null,
 ) {
   /** `true` when the server supports byte-range requests and reports a content length. */
   val supportsResume: Boolean

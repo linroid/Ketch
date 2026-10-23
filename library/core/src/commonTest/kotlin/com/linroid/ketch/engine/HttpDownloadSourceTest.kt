@@ -121,6 +121,20 @@ class HttpDownloadSourceTest {
   }
 
   @Test
+  fun resolve_redirectedLink_isNamedAfterTheAnsweringUrl() = runTest {
+    val engine = FakeHttpEngine(
+      serverInfo = FakeHttpEngine().serverInfo.copy(
+        url = "https://cdn.example.com/pub/App%201.2.3.dmg",
+      ),
+    )
+
+    val resolved = HttpDownloadSource(engine)
+      .resolve("https://example.com/download?id=5", emptyMap(), DownloadConfig.Default)
+
+    assertEquals("App 1.2.3.dmg", resolved.suggestedFileName)
+  }
+
+  @Test
   fun download_unknownSizeRetry_restartsInEmptiedFile() = runTest {
     val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE, failAfterBytes = 300)
     val file = MemoryFile()

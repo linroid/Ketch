@@ -88,6 +88,26 @@ internal class DefaultFileNameResolver : FileNameResolver {
       return sanitizeFileName(percentDecode(segment))
     }
 
+    /**
+     * The name of the file a [requested] URL downloads, which redirected to [answered]: the
+     * answering URL's name when it has an extension, as browsers name a download (a link such
+     * as `/download?id=5` that redirects to `app-1.2.3.dmg`), else the requested URL's when it
+     * has one (`asset.zip` served from an opaque storage key), else either.
+     */
+    internal fun fromUrls(requested: String, answered: String?): String? {
+      val asked = fromUrl(requested)
+      val final = answered?.let(::fromUrl)
+      return when {
+        final != null && final.hasExtension() -> final
+        asked != null && asked.hasExtension() -> asked
+        else -> asked ?: final
+      }
+    }
+
+    private fun String.hasExtension(): Boolean =
+      substringAfterLast('.', "").let { it.length in 1..10 && it.all(Char::isLetterOrDigit) } &&
+        indexOf('.') > 0
+
     internal fun percentDecode(encoded: String): String {
       val input = encoded.encodeToByteArray()
       val output = ByteArray(input.size)

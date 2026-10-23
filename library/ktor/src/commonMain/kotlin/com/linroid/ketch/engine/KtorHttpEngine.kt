@@ -624,6 +624,7 @@ class KtorHttpEngine private constructor(
         digest = response.headers[DIGEST].takeIf { whole },
         contentEncoding = response.headers[HttpHeaders.ContentEncoding],
       ),
+      url = response.call.request.url.toString(),
     )
 
     private fun redirectOf(response: HttpResponse): Hop.Redirect? {

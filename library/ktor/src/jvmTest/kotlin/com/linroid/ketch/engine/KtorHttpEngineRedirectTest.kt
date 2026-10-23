@@ -52,7 +52,9 @@ class KtorHttpEngineRedirectTest {
       val url = "http://127.0.0.1:${origin.address.port}/file"
       val headers = mapOf("Cookie" to "sid=1", "Authorization" to "Bearer t", "Accept" to "*/*")
 
-      assertEquals(content.size.toLong(), engine.head(url, headers).contentLength)
+      val info = engine.head(url, headers)
+      assertEquals(content.size.toLong(), info.contentLength)
+      assertEquals("http://127.0.0.1:${target.address.port}/file", info.url)
       val downloaded = ByteArray(content.size)
       engine.download(url, 0L..31L, headers) { it.copyInto(downloaded) }
 
