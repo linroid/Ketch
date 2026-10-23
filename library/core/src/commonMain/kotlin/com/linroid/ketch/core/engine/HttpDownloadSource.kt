@@ -143,7 +143,7 @@ internal class HttpDownloadSource(
       }
     }
 
-    downloadSegments(
+    downloadRanges(
       context, segments, totalBytes, resolved.supportsResume, requested,
       quotaLimited = remaining != null,
     )
@@ -224,7 +224,7 @@ internal class HttpDownloadSource(
       context.segments.value = validatedSegments
     }
 
-    downloadSegments(
+    downloadRanges(
       context, validatedSegments, totalBytes, serverInfo.supportsResume, requested,
       quotaLimited = serverInfo.rateLimitRemaining != null,
     )
@@ -269,6 +269,36 @@ internal class HttpDownloadSource(
         "claimedProgress=$claimedProgress"
     }
     return segments
+  }
+
+  /**
+   * [downloadSegments], restarting over one connection from byte zero once the server answers a
+   * range with the whole resource ([RangeIgnoredException]), whatever its `Accept-Ranges` said.
+   */
+  private suspend fun downloadRanges(
+    context: DownloadContext,
+    segments: List<Segment>,
+    totalBytes: Long,
+    supportsRanges: Boolean,
+    requestedConnections: Int,
+    quotaLimited: Boolean,
+  ) {
+    try {
+      downloadSegments(
+        context, segments, totalBytes, supportsRanges, requestedConnections, quotaLimited,
+      )
+    } catch (e: KetchError.Unsupported) {
+      if (!supportsRanges || e.cause !is RangeIgnoredException) throw e
+      log.w {
+        "Server ignored ranges for taskId=${context.taskId}, restarting from zero " +
+          "over one connection"
+      }
+      val whole = SegmentCalculator.singleSegment(totalBytes)
+      context.segments.value = whole
+      downloadSegments(
+        context, whole, totalBytes, supportsRanges = false, requestedConnections, quotaLimited,
+      )
+    }
   }
 
   /**

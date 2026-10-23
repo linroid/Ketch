@@ -456,7 +456,7 @@ closes them once its coroutines have finished.
 interface HttpEngine {
   suspend fun head(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
 
-  // GET with `Range: bytes=0-0`, used when HEAD is refused (400, 403, 404, 405 or 501).
+  // GET with `Range: bytes=0-0`, used when HEAD is refused (400, 403, 404, 405, 500 or 501).
   // The default throws UnsupportedOperationException, keeping the HEAD error.
   suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ServerInfo
 

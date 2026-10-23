@@ -12,6 +12,7 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpExchange
 import com.linroid.ketch.core.engine.HttpExchangeObserver
 import com.linroid.ketch.core.engine.HttpReply
+import com.linroid.ketch.core.engine.RangeIgnoredException
 import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.ServerInfo
 import io.ktor.client.HttpClient
@@ -208,7 +209,13 @@ class KtorHttpEngine private constructor(
             else -> false
           }
           if (!validRange) {
-            throw KetchError.Unsupported(IllegalStateException("Server returned a different range"))
+            throw KetchError.Unsupported(
+              if (status == HttpStatusCode.OK) {
+                RangeIgnoredException()
+              } else {
+                IllegalStateException("Server returned a different range")
+              },
+            )
           }
         }
         val channel = response.bodyAsChannel()

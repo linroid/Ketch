@@ -370,13 +370,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   connection runs out of `retryCount`, the error is not retryable, it is a 429 (so
   `HttpDownloadSource` lowers the connections), or no other connection is transferring (an
   outage, not one connection)
-- Servers without Range support use a single connection; resuming them restarts from zero
+- Servers without Range support use a single connection; resuming them restarts from zero. So
+  does a run whose ranged request a server answers with the whole file (`200`) although it
+  advertised ranges: engines throw a `KetchError.Unsupported` caused by a
+  `RangeIgnoredException`, and `HttpDownloadSource` restarts over one connection from byte zero
 - Content of unknown size (no `Content-Length`, e.g. generated archives) streams over one
   connection; a retry or resume restarts it, and the completed task records the file's size
 - Pause / Resume with server identity validation (ETag, Last-Modified)
-- HTTP probes use HEAD; when it is refused with 400, 403, 404, 405 or 501 (URLs presigned for GET
-  only), `RangeSupportDetector` asks `HttpEngine.probe`, a `GET` with `Range: bytes=0-0` whose
-  body is never read. Engines without it (the default throws `UnsupportedOperationException`)
+- HTTP probes use HEAD; when it is refused with 400, 403, 404, 405, 500 or 501 (URLs presigned
+  for GET only, handlers that fail on HEAD), `RangeSupportDetector` asks `HttpEngine.probe`, a
+  `GET` with `Range: bytes=0-0` whose body is never read. Engines without it (the default throws `UnsupportedOperationException`)
   keep the HEAD error
 - Request headers (`DownloadRequest.headers`, `resolve` properties): `Ketch.download` rejects
   non-token names and values with control characters (`RequestHeaders.requireValid`, whose

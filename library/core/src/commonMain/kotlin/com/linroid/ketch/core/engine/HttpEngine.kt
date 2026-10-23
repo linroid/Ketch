@@ -48,6 +48,8 @@ interface HttpEngine {
    * @param onData callback invoked for each chunk of received bytes
    * @throws com.linroid.ketch.api.KetchError.Network on connection failure
    * @throws com.linroid.ketch.api.KetchError.Http on non-success status
+   * @throws com.linroid.ketch.api.KetchError.Unsupported caused by a [RangeIgnoredException]
+   *   when the server answers [range] with the whole resource
    */
   suspend fun download(
     url: String,
@@ -163,3 +165,10 @@ class HttpReply(
     const val DEFAULT_MAX_BODY_BYTES: Int = 1 shl 20
   }
 }
+
+/**
+ * Why an [HttpEngine.download] of a range failed with [KetchError.Unsupported]: the server sent
+ * the whole resource (`200`) instead, as servers and caches that ignore `Range` do, whatever
+ * their `Accept-Ranges` said. Ketch then downloads the file over one connection from byte zero.
+ */
+class RangeIgnoredException : IllegalStateException("Server ignored the range")

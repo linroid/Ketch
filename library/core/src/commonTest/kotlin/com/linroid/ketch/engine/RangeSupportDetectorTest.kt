@@ -71,7 +71,7 @@ class RangeSupportDetectorTest {
 
   @Test
   fun detect_headRefused_probesWithGet() = runTest {
-    for (code in listOf(400, 403, 404, 405, 501)) {
+    for (code in listOf(400, 403, 404, 405, 500, 501)) {
       val engine = FakeHttpEngine(headErrorCode = code)
       val headers = mapOf("Cookie" to "sid=1")
 

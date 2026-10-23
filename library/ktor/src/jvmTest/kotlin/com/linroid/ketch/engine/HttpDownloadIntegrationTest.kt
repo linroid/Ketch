@@ -101,10 +101,12 @@ class HttpDownloadIntegrationTest {
   }
 
   @Test
-  fun download_ignoredRange_failsInsteadOfCorruptingFile() = runTest(timeout = 20.seconds) {
+  fun download_ignoredRange_restartsOverOneConnection() = runTest(timeout = 20.seconds) {
     withFixture(65539, Mode.IGNORE_RANGES) { fixture ->
-      val state = assertIs<DownloadState.Failed>(fixture.download(connections = 4))
-      assertIs<KetchError.Unsupported>(state.error)
+      val state = fixture.download(connections = 4)
+      val file = File(assertIs<DownloadState.Completed>(state).outputPath)
+      assertContentEquals(fixture.content, file.readBytes())
+      assertEquals("bytes=0-65538", fixture.requests.last())
     }
   }
 

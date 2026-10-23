@@ -105,6 +105,22 @@ class HttpDownloadSourceTest {
   }
 
   @Test
+  fun download_serverIgnoringAdvertisedRanges_restartsOverOneConnection() = runTest {
+    val engine = FakeHttpEngine(ignoresRanges = true)
+    val file = MemoryFile()
+    val context = context(
+      config = DownloadConfig(maxConnectionsPerDownload = 4),
+      fileAccessor = file,
+    )
+
+    HttpDownloadSource(engine).download(context, null)
+
+    assertContentEquals(engine.content, file.bytes)
+    assertEquals(0L..999L, engine.lastDownloadRange)
+    assertEquals(1000L, context.segments.value.single().downloadedBytes)
+  }
+
+  @Test
   fun download_unknownSizeRetry_restartsInEmptiedFile() = runTest {
     val engine = FakeHttpEngine(serverInfo = UNKNOWN_SIZE, failAfterBytes = 300)
     val file = MemoryFile()

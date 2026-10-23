@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpExchange
 import com.linroid.ketch.core.engine.HttpExchangeObserver
+import com.linroid.ketch.core.engine.RangeIgnoredException
 import com.linroid.ketch.core.engine.ServerInfo
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
@@ -36,6 +37,8 @@ class FakeHttpEngine(
   var retryAfterSeconds: Long? = null,
   var rateLimitRemaining: Long? = null,
   var exchange: HttpExchange? = null,
+  /** Answers every range but the whole resource with all of it, whatever [serverInfo] says. */
+  var ignoresRanges: Boolean = false,
 ) : HttpEngine {
 
   var headCallCount = 0
@@ -106,7 +109,10 @@ class FakeHttpEngine(
     // Like KtorHttpEngine: a server without range support answers with the whole body,
     // which only matches a range starting at zero.
     if (range != null && range.first > 0 && !serverInfo.acceptRanges) {
-      throw KetchError.Unsupported(IllegalStateException("Server ignored the range"))
+      throw KetchError.Unsupported(RangeIgnoredException())
+    }
+    if (ignoresRanges && range != null && range != 0L until content.size.toLong()) {
+      throw KetchError.Unsupported(RangeIgnoredException())
     }
 
     val start = range?.first?.toInt() ?: 0

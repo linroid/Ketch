@@ -39,8 +39,9 @@ internal class RangeSupportDetector(
   private companion object {
     /**
      * `HEAD` statuses after which a `GET` may still succeed: signatures valid for `GET` only
-     * (403), servers or routes without `HEAD` (404, 405, 501) and servers that reject it (400).
+     * (403), servers or routes without `HEAD` (404, 405, 501), servers that reject it (400) and
+     * handlers that fail on it (500).
      */
-    val HEAD_REFUSED = setOf(400, 403, 404, 405, 501)
+    val HEAD_REFUSED = setOf(400, 403, 404, 405, 500, 501)
   }
 }
