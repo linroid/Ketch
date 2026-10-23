@@ -54,7 +54,15 @@ class TorrentMetadataTest {
     val error = assertFailsWith<IllegalArgumentException> {
       parse(files(listOf(listOf("a?b"), listOf("A_b"))))
     }
-    assertEquals("Colliding torrent paths", error.message)
+    assertEquals("Colliding torrent paths: \"root/a_b\" and \"root/A_b\"", error.message)
+  }
+
+  @Test
+  fun fromBencode_unsafeComponent_namesItEscaped() {
+    val error = assertFailsWith<IllegalArgumentException> {
+      parse(files(listOf(listOf("tab\there\u202e.bin"))))
+    }
+    assertEquals("Unsafe torrent path component: \"tab\\u0009here\\u202e.bin\"", error.message)
   }
 
   @Test
