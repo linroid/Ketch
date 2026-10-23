@@ -53,8 +53,9 @@ internal interface FtpClient {
   /**
    * Queries the file size using the SIZE command.
    *
-   * @return file size in bytes, or null if the server does not
-   *   support SIZE or the file does not exist
+   * @return file size in bytes, or null if the server cannot tell, as a server without SIZE
+   * @throws com.linroid.ketch.api.KetchError.SourceError when the server has no file at [path]:
+   *   it is missing or a folder (implementations may return null instead)
    */
   suspend fun size(path: String): Long?
 

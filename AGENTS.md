@@ -865,6 +865,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### FTP/FTPS Support (`library:ftp`)
 - FTP and FTPS (FTP over TLS) as a pluggable `DownloadSource`
 - Segmented parallel downloads via multiple FTP connections with REST offsets
+- A file whose size the server does not report (no SIZE) streams over one connection from byte
+  zero to the end of the transfer, as HTTP content of unknown size does; a retry or resume
+  restarts it. SIZE answering 550 is a path with no file, missing or a folder, unless MDTM dates
+  it: `RealFtpClient.size` then fails with a `SourceError` naming the path and the reply
+  (`FtpError.noFile`), as curl does. Other 5xx replies carry the server's reply as the detail
 - Resume support with MDTM-based server file change validation
 - FTPS on JVM/Android via ktor-network-tls; iOS deferred (no ktor TLS support)
 - FTPS (`AUTH TLS`, `PBSZ 0`, `PROT P`) wraps every data connection in TLS too, after the `RETR`

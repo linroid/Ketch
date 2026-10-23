@@ -63,11 +63,15 @@ internal object FtpError {
         Exception("FTP ${reply.code}: ${reply.message}")
       )
 
-      // All 5xx: FTP protocol errors (file not found, etc.)
-      in 500..599 -> KetchError.SourceError(
-        sourceType = FtpDownloadSource.TYPE,
-        cause = Exception("FTP ${reply.code}: ${reply.message}"),
-      )
+      // All 5xx: FTP protocol errors (file not found, etc.), as the server words them.
+      in 500..599 -> {
+        val said = "FTP ${reply.code}: ${reply.message}"
+        KetchError.SourceError(
+          sourceType = FtpDownloadSource.TYPE,
+          cause = Exception(said),
+          detail = said.replace('\n', ' ').take(MAX_DETAIL),
+        )
+      }
 
       else -> KetchError.Unknown(
         errorMessage = "Unexpected FTP reply: " +
@@ -75,6 +79,20 @@ internal object FtpError {
       )
     }
   }
+
+  /** The longest server reply an error's detail repeats. */
+  private const val MAX_DETAIL = 200
+
+  /**
+   * The error for a [path] the server has no file at, missing or a folder, as its [reply] to
+   * SIZE (550) says; the detail names both, as servers word it vaguely ("Could not get file
+   * size").
+   */
+  fun noFile(path: String, reply: FtpReply): KetchError.SourceError = KetchError.SourceError(
+    sourceType = FtpDownloadSource.TYPE,
+    cause = Exception("FTP ${reply.code}: ${reply.message}"),
+    detail = "The server has no file at $path (FTP ${reply.code}: ${reply.message})",
+  )
 
   /**
    * How servers that require TLS session resumption refuse a data connection that did not

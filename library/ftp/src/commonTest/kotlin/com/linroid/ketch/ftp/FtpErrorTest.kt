@@ -93,6 +93,7 @@ class FtpErrorTest {
     )
     assertIs<KetchError.SourceError>(error)
     assertEquals("ftp", error.sourceType)
+    assertEquals("FTP 550: File not found", error.detail)
   }
 
   // --- Server errors ---

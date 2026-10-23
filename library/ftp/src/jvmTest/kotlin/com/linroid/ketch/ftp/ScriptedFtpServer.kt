@@ -28,6 +28,8 @@ import kotlin.concurrent.thread
  *   or proxy that drops those connections appears
  * @param pasvAddress the address PASV replies name, comma-separated; the data port listens on
  *   loopback whatever it says
+ * @param sizeReply the reply to SIZE, else 502 as to any command it does not know
+ * @param mdtmReply the reply to MDTM, else 502
  */
 internal class ScriptedFtpServer(
   private val content: ByteArray,
@@ -38,6 +40,8 @@ internal class ScriptedFtpServer(
   private val pasvAddress: String = "127,0,0,1",
   private val implicitTls: Boolean = false,
   private val refusedTransferReply: String? = null,
+  private val sizeReply: String? = null,
+  private val mdtmReply: String? = null,
 ) : AutoCloseable {
   private val loopback = InetAddress.getLoopbackAddress()
   private val control = ServerSocket(0, 1, loopback).apply { soTimeout = TIMEOUT_MS }
@@ -99,6 +103,8 @@ internal class ScriptedFtpServer(
           }
           "USER" -> output.reply("230 Logged in")
           "TYPE" -> output.reply("200 Type set to I")
+          "SIZE" -> output.reply(sizeReply ?: "502 Command not implemented")
+          "MDTM" -> output.reply(mdtmReply ?: "502 Command not implemented")
           "EPSV" -> {
             val port = if (epsvUnreachable) {
               ServerSocket(0, 1, loopback).use { it.localPort }

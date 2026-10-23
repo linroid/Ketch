@@ -4,6 +4,7 @@ import com.linroid.ketch.api.ConnectionRoute
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.DownloadContext
@@ -171,6 +172,38 @@ class FtpDownloadSourceTest {
   }
 
   @Test
+  fun download_serverWithoutSize_streamsTheFileOverOneConnection() = runTest {
+    val server = FakeFtpServer(content(1000), reportsSize = false)
+    val file = MemoryFileAccessor()
+    val source = source(server)
+    val resolved = source.resolve(URL, emptyMap())
+    val progress = mutableListOf<Pair<Long, Long>>()
+    val context = context(file, connections = 4, resolved = resolved) { done, total ->
+      progress += done to total
+    }
+
+    source.download(context, null)
+
+    assertEquals(-1, resolved.totalBytes)
+    assertEquals(listOf(0L), server.retrieveOffsets)
+    assertContentEquals(server.content, file.bytes)
+    assertTrue(context.segments.value.isEmpty())
+    assertEquals(1000L to 1000L, progress.last())
+  }
+
+  @Test
+  fun resume_fileOfUnknownSize_streamsItAgainFromZero() = runTest {
+    val server = FakeFtpServer(content(1000), reportsSize = false)
+    val file = MemoryFileAccessor()
+    file.writeAt(0, ByteArray(300) { 7 })
+
+    source(server).download(context(file), FtpSourceState(-1, null))
+
+    assertEquals(listOf(0L), server.retrieveOffsets)
+    assertContentEquals(server.content, file.bytes)
+  }
+
+  @Test
   fun download_noRestSupport_usesSingleConnection() = runTest {
     val server = FakeFtpServer(content(1000), supportsRest = false)
     val file = MemoryFileAccessor()
@@ -299,15 +332,18 @@ class FtpDownloadSourceTest {
     throttle: suspend (Int) -> Unit = {},
     reporter: ConnectionReporter = ConnectionReporter.None,
     url: String = URL,
+    resolved: ResolvedSource? = null,
+    onProgress: suspend (Long, Long) -> Unit = { _, _ -> },
   ) = DownloadContext(
     taskId = "ftp",
     url = url,
     request = DownloadRequest(url, connections = connections),
     fileAccessor = file,
     segments = MutableStateFlow(emptyList()),
-    onProgress = { _, _ -> },
+    onProgress = onProgress,
     throttle = throttle,
     headers = emptyMap(),
+    preResolved = resolved,
     maxConnections = maxConnections,
     config = config,
     connections = reporter,

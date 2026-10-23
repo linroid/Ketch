@@ -202,8 +202,14 @@ internal class RealFtpClient(
     val reply = sendCommand("SIZE $path")
     if (!reply.isPositiveCompletion) {
       if (reply.code == 550) {
-        log.d { "SIZE: file not found — $path" }
-        return null
+        // Missing paths and folders get a 550, and on a few servers so does a file they cannot
+        // size, which MDTM still dates.
+        if (mdtm(path) != null) {
+          log.d { "SIZE: unknown for $path, which exists" }
+          return null
+        }
+        log.d { "SIZE: no file at $path" }
+        throw FtpError.noFile(path, reply)
       }
       if (reply.code == 502) {
         log.d { "SIZE: command not supported by server" }

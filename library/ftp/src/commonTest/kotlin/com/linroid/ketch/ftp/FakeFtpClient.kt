@@ -10,11 +10,13 @@ import kotlinx.coroutines.awaitCancellation
  *
  * @param supportsRest whether the server accepts REST offsets
  * @param chunkSize bytes delivered per data callback
+ * @param reportsSize whether SIZE tells the size, unlike a server without it
  */
 internal class FakeFtpServer(
   val content: ByteArray,
   var supportsRest: Boolean = true,
   private val chunkSize: Int = 100,
+  val reportsSize: Boolean = true,
 ) {
   /** Offset of every RETR, in call order. */
   val retrieveOffsets = mutableListOf<Long>()
@@ -68,7 +70,8 @@ internal class FakeFtpClient(private val server: FakeFtpServer) : FtpClient {
 
   override suspend fun setBinaryMode() {}
 
-  override suspend fun size(path: String): Long = server.content.size.toLong()
+  override suspend fun size(path: String): Long? =
+    if (server.reportsSize) server.content.size.toLong() else null
 
   override suspend fun mdtm(path: String): String = "20250101000000"
 

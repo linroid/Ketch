@@ -7,7 +7,6 @@ import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.engine.ConnectionHandle
 import com.linroid.ketch.core.engine.ConnectionSpec
 import com.linroid.ketch.core.engine.DownloadContext
@@ -21,6 +20,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.KSerializer
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * FTP/FTPS download source using the [FtpClient] protocol layer.
@@ -116,14 +117,8 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
       ?: resolve(context.url, context.headers, context.config)
     val totalBytes = resolved.totalBytes
     if (totalBytes < 0) {
-      log.e { "Unknown file size for ${redactUrl(context.url)} — file may not exist" }
-      throw KetchError.SourceError(
-        sourceType = TYPE,
-        cause = Exception(
-          "Unknown file size — file may not exist: " +
-            context.url,
-        ),
-      )
+      streamUnknownSize(context)
+      return
     }
 
     val supportsRest = resolved.supportsResume
@@ -170,6 +165,11 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
 
   /** Continues from [context]'s segments once the file's modification time still matches. */
   private suspend fun continueFrom(context: DownloadContext, state: FtpSourceState) {
+    if (state.totalBytes < 0) {
+      // A file of unknown size was streamed, which can only start over.
+      streamUnknownSize(context)
+      return
+    }
     log.i { "Resuming download for taskId=${context.taskId}" }
 
     val ftpUrl = FtpUrl.parse(context.url)
@@ -386,6 +386,62 @@ class FtpDownloadSource : DownloadSource<FtpSourceState> {
     }
 
     log.d { "Completed range at offset=$fileOffset: downloaded ${writeOffset - fileOffset} bytes" }
+  }
+
+  /**
+   * Streams a file whose size the server does not report (no SIZE) over one connection, from
+   * byte zero until the server ends the transfer, as HTTP streams content of unknown size. It can
+   * neither be split nor continued, so every attempt empties the file first and
+   * [DownloadContext.segments] stays empty.
+   */
+  private suspend fun streamUnknownSize(context: DownloadContext) {
+    log.i { "Unknown size, streaming taskId=${context.taskId} over one connection" }
+    context.segments.value = emptyList()
+    writeOrDiskError { context.fileAccessor.preallocate(0) }
+    val ftpUrl = FtpUrl.parse(context.url)
+    val client = clientFactory(ftpUrl, context.config.bufferSize)
+    val progressInterval = context.config.progressIntervalMs.milliseconds
+    var lastProgress = TimeSource.Monotonic.markNow()
+    var downloaded = 0L
+    var handle = ConnectionHandle.None
+    context.onProgress(0, 0)
+    try {
+      context.watchdog.watch { monitor ->
+        client.connect()
+        handle = context.connections.open(connectionSpec(ftpUrl))
+        if (ftpUrl.isTls) client.upgradeToTls()
+        client.login(ftpUrl.username, ftpUrl.password)
+        client.setBinaryMode()
+        client.retrieve(ftpUrl.path) { data ->
+          currentCoroutineContext().ensureActive()
+          monitor.received(data.size)
+          monitor.throttled { context.throttle(data.size) }
+          writeOrDiskError { context.fileAccessor.writeAt(downloaded, data) }
+          downloaded += data.size
+          handle.received(data.size)
+          if (lastProgress.elapsedNow() >= progressInterval) {
+            context.onProgress(downloaded, 0)
+            lastProgress = TimeSource.Monotonic.markNow()
+          }
+        }
+      }
+    } finally {
+      handle.close()
+      client.disconnect()
+    }
+    log.i { "Streamed $downloaded bytes for taskId=${context.taskId}" }
+    context.onProgress(downloaded, downloaded)
+  }
+
+  /** Runs [write], reporting its failures as [KetchError.Disk]. */
+  private suspend inline fun writeOrDiskError(write: () -> Unit) {
+    try {
+      write()
+    } catch (e: Exception) {
+      if (e is CancellationException) throw e
+      if (e is KetchError) throw e
+      throw KetchError.Disk(e)
+    }
   }
 
   /**
