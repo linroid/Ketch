@@ -114,9 +114,10 @@ internal class RealFtpClient(
       if (e is CancellationException) throw e
       if (e is KetchError) throw e
       // A server that refuses or cannot be reached fails the download as a network error, which
-      // is retried: one line says why, without a stack trace.
-      log.e { "Failed to connect to $host:$port: ${e.describeCauses()}" }
-      throw FtpError.fromException(e)
+      // callers retry, warning as they do; it names the server, which an unresolved host's
+      // exception leaves out.
+      log.d { "Failed to connect to $host:$port: ${e.describeCauses()}" }
+      throw FtpError.fromException(FtpConnectException(host, port, e))
     }
   }
 
@@ -593,3 +594,7 @@ internal class RealFtpClient(
     }
   }
 }
+
+/** Where a control connection failed, for whoever reports it: the server it was to reach. */
+internal class FtpConnectException(host: String, port: Int, cause: Throwable) :
+  Exception("Cannot connect to $host:$port", cause)

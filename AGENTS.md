@@ -870,6 +870,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   restarts it. SIZE answering 550 is a path with no file, missing or a folder, unless MDTM dates
   it: `RealFtpClient.size` then fails with a `SourceError` naming the path and the reply
   (`FtpError.noFile`), as curl does. Other 5xx replies carry the server's reply as the detail
+- A control connection that fails is logged at debug, as callers warn as they retry, and its
+  `KetchError.Network` names the server in a cause (`FtpConnectException`: `Cannot connect to
+  host:port`), which an unresolved host's own exception leaves out
 - Resume support with MDTM-based server file change validation
 - FTPS on JVM/Android via ktor-network-tls; iOS deferred (no ktor TLS support)
 - FTPS (`AUTH TLS`, `PBSZ 0`, `PROT P`) wraps every data connection in TLS too, after the `RETR`
