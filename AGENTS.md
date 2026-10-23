@@ -2430,7 +2430,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Never log credentials: pass URLs through `redactUrl()`, tracker URLs through
   `trackerLabel()`, and describe tracker errors with `describeWithoutUrls()`
 - Warnings without a stack trace name the cause with `error.describeCauses()`, not
-  `error.message`, which for `KetchError` is only a generic summary
+  `error.message`, which for `KetchError` is only a generic summary. It says each thing once:
+  text a wrapper copied from its cause (`cause.toString()`, or a message of 16 characters or more
+  after a space or colon, as the JDK's TLS errors repeat theirs) is cut, and a copy coroutines
+  recover of an exception (same class and message as its cause) is left out
 - Do not swallow failures silently: log best-effort work that fails (at debug when it is
   expected to fail often), as `attempt("label") { ... }` does in the torrent engine
 - Use lazy lambdas: `log.d { "expensive $computation" }`

@@ -20,14 +20,39 @@ fun Throwable.describeCauses(): String {
     seen += current
     current = current.cause
   }
-  return seen.joinToString(" <- ") { error ->
+  // Coroutines recover an exception as a copy of it whose cause is the original.
+  val shown = seen.filterNot { it.isCopyOfItsCause() }.ifEmpty { seen }
+  return shown.joinToString(" <- ") { error ->
     val name = error::class.simpleName ?: "Throwable"
-    // Exception(cause) copies cause.toString() into its message; the next entry repeats it.
-    val message = error.message?.takeIf { it.isNotBlank() && it != error.cause?.toString() }
+    val message = error.message?.let { ownMessage(it, error.cause) }
+      ?.takeIf { it.isNotBlank() }
       ?.replace('\n', ' ')
       ?.let(::redactUrlsIn)
     if (message == null) name else "$name: $message"
   }
+}
+
+private fun Throwable.isCopyOfItsCause(): Boolean {
+  val cause = cause ?: return false
+  return cause::class == this::class && cause.message == message
+}
+
+/**
+ * What [message] says beyond its [cause], which the next entry shows: `Exception(cause)` copies
+ * `cause.toString()` into its message, and wrappers such as the JDK's TLS errors end theirs with
+ * it (`PKIX path validation failed: java.security.cert.CertPathValidatorException: ...`) or with
+ * the cause's message. A message ends with a cause's message only by copying it when that is
+ * long enough and follows a space or colon, so `Stream closed` keeps its words before `closed`.
+ */
+private fun ownMessage(message: String, cause: Throwable?): String {
+  if (cause == null) return message
+  val described = cause.toString()
+  if (message.endsWith(described)) return message.dropLast(described.length).trimEnd(' ', ':')
+  val copied = cause.message?.takeIf { it.length >= MIN_COPIED_MESSAGE } ?: return message
+  if (!message.endsWith(copied)) return message
+  val own = message.dropLast(copied.length)
+  val atBoundary = own.isEmpty() || own.last() == ' ' || own.last() == ':'
+  return if (atBoundary) own.trimEnd(' ', ':') else message
 }
 
 /**
@@ -124,6 +149,9 @@ private fun Int.pad(length: Int): String = toString().padStart(length, '0')
 
 /** How many causes of a (possibly cyclic) error chain are followed. */
 internal const val MAX_LOGGED_CAUSES = 8
+
+/** How long a cause's message must be for [ownMessage] to take one ending with it for a copy. */
+private const val MIN_COPIED_MESSAGE = 16
 
 private val EMBEDDED_URL = Regex("""(?:[A-Za-z][A-Za-z0-9+.-]*://|magnet:\?)[^\s,;"'()\[\]]+""")
 
