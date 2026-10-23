@@ -7,11 +7,14 @@ import com.linroid.ketch.api.KetchError
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
@@ -56,8 +59,10 @@ class TransferWatchdog(
 
   /**
    * Runs [block], one transfer, under the watchdog. [block] reports every chunk it receives with
-   * [TransferMonitor.received] and runs its speed limit waits in [TransferMonitor.throttled].
-   * A stall cancels [block] and throws [KetchError.Network], whose cause names the stall.
+   * [TransferMonitor.received] and runs its speed limit waits in [TransferMonitor.throttled];
+   * engines report the bodies they read themselves through [TransferProgress], which [block]
+   * runs with. A stall cancels [block] and throws [KetchError.Network], whose cause names the
+   * stall.
    */
   suspend fun <T> watch(block: suspend (TransferMonitor) -> T): T {
     if (!isEnabled) return block(TransferMonitor.None)
@@ -66,7 +71,7 @@ class TransferWatchdog(
       coroutineScope {
         val checker = launch { check(monitor) }
         try {
-          block(monitor)
+          withContext(TransferProgress(monitor)) { block(monitor) }
         } finally {
           checker.cancel()
         }
@@ -151,6 +156,18 @@ interface TransferMonitor {
     override fun received(bytes: Int) = Unit
     override suspend fun <T> throttled(wait: suspend () -> T): T = wait()
   }
+}
+
+/**
+ * The [TransferMonitor] of the transfer a coroutine runs, which [TransferWatchdog.watch]
+ * installs. Engines that read a body themselves rather than hand it to a callback, as
+ * [HttpEngine.request] does, report its bytes to it, so an answer still arriving is not taken for
+ * a stall; bytes delivered through a callback are the caller's to report. The context passes
+ * through engines that wrap another unchanged.
+ */
+class TransferProgress(val monitor: TransferMonitor) : AbstractCoroutineContextElement(Key) {
+  /** The key of [TransferProgress] in a coroutine context. */
+  companion object Key : CoroutineContext.Key<TransferProgress>
 }
 
 /** The cause of the [KetchError.Network] a stalled transfer fails with. */

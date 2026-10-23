@@ -135,8 +135,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
   `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`, `HttpExchange`,
-  `HttpExchangeObserver`, `TransferWatchdog`, `TransferMonitor`, `TransferStalledException`,
-  `RetryPolicy`
+  `HttpExchangeObserver`, `TransferWatchdog`, `TransferMonitor`, `TransferProgress`,
+  `TransferStalledException`, `RetryPolicy`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
   `SegmentedDownloadHelper`, `SegmentLane` and its internal `SegmentLedger`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
@@ -551,7 +551,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `PROPFIND` and probe, as engines wait for an answer as long as it takes and a server that takes
   the connection and never answers would hold the download forever. Tests that resolve against a
   real server run off the test scheduler, whose virtual time would fire the watchdog while a
-  request is on the wire. Sources report bytes with `TransferMonitor.received` and run `throttle` in
+  request is on the wire. Sources report bytes with `TransferMonitor.received`, and engines the
+  bodies they read themselves (`HttpEngine.request`'s) to the `TransferProgress` `watch` runs its
+  block with, so a long answer still arriving is no stall; sources run `throttle` in
   `TransferMonitor.throttled`, so speed limit waits count as neither idle nor slow; a stall
   cancels the transfer and fails it with a retryable `KetchError.Network` whose cause is a
   `TransferStalledException`. It checks every tenth of the idle timeout (10 ms to 1 s) with

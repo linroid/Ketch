@@ -15,6 +15,7 @@ import com.linroid.ketch.core.engine.HttpReply
 import com.linroid.ketch.core.engine.RangeIgnoredException
 import com.linroid.ketch.core.engine.RequestHeaders
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.TransferProgress
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareRequest
@@ -298,12 +299,14 @@ class KtorHttpEngine private constructor(
     val tooLong = { KetchError.Unsupported(IllegalStateException("Response is too long")) }
     response.contentLength()?.let { if (it > limit) throw tooLong() }
     val channel = response.bodyAsChannel()
+    val progress = currentCoroutineContext()[TransferProgress]?.monitor
     var out = ByteArray(minOf(limit, DEFAULT_BUFFER_SIZE))
     var size = 0
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
     while (!channel.isClosedForRead) {
       val read = channel.readAvailable(buffer)
       if (read <= 0) continue
+      progress?.received(read)
       if (read > limit - size) throw tooLong()
       if (size + read > out.size) {
         out = out.copyOf(minOf(limit, maxOf(size + read, out.size * 2)))
