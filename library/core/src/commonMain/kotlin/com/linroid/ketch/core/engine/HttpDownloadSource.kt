@@ -49,7 +49,8 @@ internal class HttpDownloadSource(
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val (url, headers) = input as ResolveInput.Url
-    val detector = RangeSupportDetector(httpEngine.through(config.proxy))
+    val engine = httpEngine.through(config.proxy)
+    val detector = RangeSupportDetector(engine, TransferWatchdog.of(config))
     val serverInfo = detector.detect(url, headers)
     val fileName = serverInfo.contentDisposition?.let {
       DefaultFileNameResolver.fromContentDisposition(it)
@@ -159,7 +160,7 @@ internal class HttpDownloadSource(
       return
     }
 
-    val detector = RangeSupportDetector(httpEngine.through(context.config.proxy))
+    val detector = RangeSupportDetector(httpEngine.through(context.config.proxy), context.watchdog)
     val serverInfo = detector.detect(context.url, context.headers)
     context.publishedChecksum = serverInfo.checksum
 

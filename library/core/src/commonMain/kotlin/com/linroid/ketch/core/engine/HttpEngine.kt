@@ -77,6 +77,8 @@ interface HttpEngine {
    * the other requests do, and returns the final response. Unlike [head] and [download], a status
    * that is not a success is returned rather than thrown, so callers can read its headers, such
    * as an authentication challenge; only a success's body is read, and never a `HEAD`'s.
+   * Engines report the body's bytes as they read them to the [TransferProgress] of the calling
+   * coroutine, so a watchdog does not take a long answer for a stall.
    *
    * The default implementation throws [UnsupportedOperationException]. Engines that wrap another
    * must override it to pass it on.

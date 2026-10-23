@@ -1,5 +1,6 @@
 package com.linroid.ketch.hls
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
@@ -12,17 +13,21 @@ import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
 import com.linroid.ketch.core.engine.SourceState
+import com.linroid.ketch.core.engine.TransferStalledException
 import com.linroid.ketch.core.engine.canHandle
 import com.linroid.ketch.core.engine.resolve
 import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.core.media.MediaDownloadHelper
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class HlsDownloadSourceTest {
@@ -42,6 +47,30 @@ class HlsDownloadSourceTest {
     val resolved = source.resolve(engine.url)
     assertEquals("hls", resolved.sourceType)
     assertEquals("index.ts", resolved.suggestedFileName)
+  }
+
+  @Test
+  fun resolve_serverNeverSendingThePlaylist_failsAsAStall() = runTest {
+    val engine = object : HttpEngine {
+      override suspend fun head(url: String, headers: Map<String, String>): ServerInfo =
+        error("Media does not require HEAD")
+      override suspend fun download(
+        url: String,
+        range: LongRange?,
+        headers: Map<String, String>,
+        onData: suspend (ByteArray) -> Unit,
+      ) = awaitCancellation()
+      override fun close() {}
+    }
+
+    val error = assertFailsWith<KetchError.Network> {
+      HlsDownloadSource(engine).resolve(
+        "https://example.com/index.m3u8", emptyMap(), DownloadConfig(idleTimeoutMs = 30_000),
+      )
+    }
+
+    assertIs<TransferStalledException>(error.cause)
+    assertEquals(30_000, currentTime)
   }
 
   @Test

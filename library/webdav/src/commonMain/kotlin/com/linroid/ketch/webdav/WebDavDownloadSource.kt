@@ -10,6 +10,7 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.TransferWatchdog
 import com.linroid.ketch.core.engine.httpConnectionSpec
 import com.linroid.ketch.core.engine.observeExchanges
 import com.linroid.ketch.core.file.sanitizeFileName
@@ -62,7 +63,8 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val (link, headers) = input as ResolveInput.Url
     val url = parse(link)
-    return inspect(WebDavClient(engineFor(config.proxy), url, headers), link, url, config).resolved
+    val client = WebDavClient(engineFor(config.proxy), url, headers, TransferWatchdog.of(config))
+    return inspect(client, link, url, config).resolved
   }
 
   /**
@@ -75,7 +77,8 @@ class WebDavDownloadSource(private val httpEngine: HttpEngine) :
 
   override suspend fun download(context: DownloadContext, state: WebDavSourceState?) {
     val url = parse(context.url)
-    val client = WebDavClient(engineFor(context.config.proxy), url, context.headers)
+    val engine = engineFor(context.config.proxy)
+    val client = WebDavClient(engine, url, context.headers, context.watchdog)
     // Asked on every run: it answers the server's challenge and tells whether the file changed.
     val inspection = inspect(client, context.url, url, context.config)
     val resolved = inspection.resolved

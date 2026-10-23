@@ -135,8 +135,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
   `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`, `HttpExchange`,
-  `HttpExchangeObserver`, `TransferWatchdog`, `TransferMonitor`, `TransferStalledException`,
-  `RetryPolicy`
+  `HttpExchangeObserver`, `TransferWatchdog`, `TransferMonitor`, `TransferProgress`,
+  `TransferStalledException`, `RetryPolicy`
 - `com.linroid.ketch.core.segment` -- `SegmentCalculator`, `SegmentDownloader`,
   `SegmentedDownloadHelper`, `SegmentLane` and its internal `SegmentLedger`
 - `com.linroid.ketch.core.file` -- `FileAccessor`, `createFileAccessor()` (expect/actual),
@@ -559,7 +559,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `DownloadConfig.idleTimeoutMs`, 60 s by default, and `minSpeed` bytes per second averaged over
   `MIN_SPEED_WINDOW_MS`, 30 s, off by default; `0` turns either off) wraps each HTTP segment
   request, the unknown-size stream, each HLS/DASH part and each FTP segment connection (connect,
-  login and `RETR`). Sources report bytes with `TransferMonitor.received` and run `throttle` in
+  login and `RETR`), and the requests made before a transfer, in `resolve` too
+  (`TransferWatchdog.of(config)`): HTTP's `HEAD` and probe (`RangeSupportDetector`), HLS and DASH
+  manifests and segment indexes (`MediaDownloadHelper.fetchManifest`, `fetchRange`), the
+  Metalink document and its mirrors' `HEAD`s (a silent mirror is passed over), and WebDAV's
+  `PROPFIND` and probe, as engines wait for an answer as long as it takes and a server that takes
+  the connection and never answers would hold the download forever. Tests that resolve against a
+  real server run off the test scheduler, whose virtual time would fire the watchdog while a
+  request is on the wire. Sources report bytes with `TransferMonitor.received`, and engines the
+  bodies they read themselves (`HttpEngine.request`'s) to the `TransferProgress` `watch` runs its
+  block with, so a long answer still arriving is no stall; sources run `throttle` in
   `TransferMonitor.throttled`, so speed limit waits count as neither idle nor slow; a stall
   cancels the transfer and fails it with a retryable `KetchError.Network` whose cause is a
   `TransferStalledException`. It checks every tenth of the idle timeout (10 ms to 1 s) with
