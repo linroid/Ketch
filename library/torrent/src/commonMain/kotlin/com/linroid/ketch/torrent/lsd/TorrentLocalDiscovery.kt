@@ -171,9 +171,10 @@ internal fun lsdPeerDialable(address: ByteArray): Boolean =
  * the engine never registers private (BEP 27) or tracker-only ones.
  *
  * Each torrent is announced when it starts and every 5 minutes, never more than once a minute,
- * several to a datagram, to the IPv4 and the IPv6 group alike. A peer heard for one of them for
- * the first time in a minute is answered with that announce as soon as that limit allows, so a
- * device that joins the LAN finds the others at once rather than at their next round. The groups are joined only while
+ * several to a datagram, to the IPv4 and the IPv6 group alike. A new peer, one not heard for one
+ * of them in [NEW_PEER_MS], is answered with that announce as soon as that limit allows, so a
+ * device that joins the LAN finds the others at once rather than at their next round, while peers
+ * that hear each other every round never answer each other. The groups are joined only while
  * a torrent participates and [enabled]. Announces are accepted only from private or link-local
  * IPv4 and unique local IPv6 senders ([lsdSenderAllowed], [lsdPeerDialable]), at most
  * [ACCEPT_BURST] at once and [ACCEPT_PER_SECOND] a second after that, and each peer once a minute
@@ -369,12 +370,14 @@ internal class TorrentLocalDiscovery(
       val key = hash to peer
       val last = delivered[key]
       if (last != null && now - last < MIN_INTERVAL_MS) continue
+      // Peers heard every round are no newcomers: answering them would echo every minute.
+      val newcomer = last == null || now - last >= NEW_PEER_MS
       delivered.remove(key)
       delivered[key] = now
       if (delivered.size > MAX_REMEMBERED) delivered.remove(delivered.keys.first())
       log.v { "LAN peer $peer for ${logHash(hash.hex())}" }
       for (topic in topics) topic.deliver(peer)
-      if (answerSoon(hash, now)) answer = true
+      if (newcomer && answerSoon(hash, now)) answer = true
     }
     if (answer) wake.trySend(Unit)
   }
@@ -410,6 +413,12 @@ internal class TorrentLocalDiscovery(
 
     /** BEP 14's limit of one announce per torrent a minute; a peer is redelivered after it too. */
     const val MIN_INTERVAL_MS = 60_000L
+
+    /**
+     * How long a peer goes unheard for a torrent before an announce of it is answered: two
+     * rounds, so peers that announce every round never are.
+     */
+    const val NEW_PEER_MS = 2 * ANNOUNCE_INTERVAL_MS
 
     /** How often a joined group checks whether the device's interfaces changed. */
     const val NETWORK_CHECK_MS = 60_000L
