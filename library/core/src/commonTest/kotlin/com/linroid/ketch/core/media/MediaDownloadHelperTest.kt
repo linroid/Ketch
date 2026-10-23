@@ -234,6 +234,8 @@ class MediaDownloadHelperTest {
       "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/" +
         "tears-of-steel.ism/.m3u8" to "tears-of-steel",
       "https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd" to "angel-one",
+      "https://example.com/title.ISM/.m3u8" to "title",
+      "https://example.com/live.Isml/manifest.mpd" to "live",
       "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" to "x36xhzz",
       "https://example.com/my%20show/playlist.m3u8?sig=1" to "my show",
       "https://example.com/index.m3u8" to "index",

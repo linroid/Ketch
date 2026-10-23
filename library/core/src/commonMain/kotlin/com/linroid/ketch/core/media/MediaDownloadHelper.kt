@@ -343,13 +343,16 @@ internal fun mediaName(url: String): String {
   val file = segments.lastOrNull().orEmpty().substringBeforeLast('.')
   if (file.isNotBlank() && file.lowercase() !in GENERIC_MEDIA_NAMES) return file
   val folder = segments.dropLast(1).takeLast(2).asReversed()
-    .map { it.removeSuffix(".isml").removeSuffix(".ism") }
+    .map { it.replace(SMOOTH_STREAMING_SUFFIX, "") }
     .firstOrNull { folder ->
       folder.isNotBlank() && folder.lowercase() !in GENERIC_MEDIA_NAMES && folder.length <= 64 &&
         folder.any(Char::isLetter) && folder.none { it in "=~," }
     }
   return folder ?: file.ifBlank { "media" }
 }
+
+/** A Smooth Streaming server manifest's folder suffix, `.ism` or `.isml`, in any case. */
+private val SMOOTH_STREAMING_SUFFIX = Regex("\\.isml?$", RegexOption.IGNORE_CASE)
 
 /** Playlist and folder names that say only that they hold a stream. */
 private val GENERIC_MEDIA_NAMES = setOf(
