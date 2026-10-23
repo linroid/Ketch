@@ -1279,7 +1279,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   torrent's discovery runs (`participate`, from the same block as DHT, so private and tracker-only
   torrents never take part), announcing `BT-SEARCH` datagrams (`LsdAnnounce`: our TCP listen port,
   never the mapped one, a random cookie, up to 20 `Infohash` headers) when each starts and every 5
-  minutes, at most once a minute per hash, to both groups (`LsdTransport.send` writes each group's
+  minutes, at most once a minute per hash, and as soon as that allows once a peer it has not heard
+  from this minute announces one of them (a seeder never dials it), to both groups (`LsdTransport.send` writes each group's
   `Host`), and hands the peers others announce to the torrent (v1: its discovery channel, counted as
   `lsd` in the swarm summary; v2: `PeerOrigin.LSD` offers, the truncated v2 hash in v2 mode and a
   hybrid's v1 hash in v1 mode). A public magnet's metadata lookup (`discoverMagnet`, not

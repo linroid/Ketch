@@ -171,7 +171,9 @@ internal fun lsdPeerDialable(address: ByteArray): Boolean =
  * the engine never registers private (BEP 27) or tracker-only ones.
  *
  * Each torrent is announced when it starts and every 5 minutes, never more than once a minute,
- * several to a datagram, to the IPv4 and the IPv6 group alike. The groups are joined only while
+ * several to a datagram, to the IPv4 and the IPv6 group alike. A peer heard for one of them for
+ * the first time in a minute is answered with that announce as soon as that limit allows, so a
+ * device that joins the LAN finds the others at once rather than at their next round. The groups are joined only while
  * a torrent participates and [enabled]. Announces are accepted only from private or link-local
  * IPv4 and unique local IPv6 senders ([lsdSenderAllowed], [lsdPeerDialable]), at most
  * [ACCEPT_BURST] at once and [ACCEPT_PER_SECOND] a second after that, and each peer once a minute
@@ -362,6 +364,7 @@ internal class TorrentLocalDiscovery(
       }
     }
     // Every participant of a hash hears the peer, as a task and a magnet lookup may share it.
+    var answer = false
     for ((hash, topics) in targets.groupBy { it.hash }) {
       val key = hash to peer
       val last = delivered[key]
@@ -371,7 +374,22 @@ internal class TorrentLocalDiscovery(
       if (delivered.size > MAX_REMEMBERED) delivered.remove(delivered.keys.first())
       log.v { "LAN peer $peer for ${logHash(hash.hex())}" }
       for (topic in topics) topic.deliver(peer)
+      if (answerSoon(hash, now)) answer = true
     }
+    if (answer) wake.trySend(Unit)
+  }
+
+  /**
+   * Brings the next announce of [hash], which a new peer just announced, forward to the first
+   * moment BEP 14 allows: a seeder never dials it, so it learns of us only from that announce.
+   * False when [hash] no longer participates or is due no later anyway.
+   */
+  private suspend fun answerSoon(hash: ByteString, now: Long): Boolean = mutex.withLock {
+    val next = due[hash] ?: return@withLock false
+    val soonest = announced[hash]?.let { maxOf(now, it + MIN_INTERVAL_MS) } ?: now
+    if (soonest >= next) return@withLock false
+    due[hash] = soonest
+    true
   }
 
   private fun takeToken(): Boolean {
