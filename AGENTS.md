@@ -2070,6 +2070,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ketch watch` prints task JSON lines (`snapshot`, `added`, `state`, `progress`, `removed`),
   progress every second or every `--interval` (`500ms`, `2s`, or seconds); with IDs it exits
   once they finish, and it exits 1 when the connection is lost
+- `ketch <url>` and `ketch add` take a link without a scheme as curl and wget do
+  (`withAssumedScheme`): a host holding a dot, or `localhost`, followed by a path gets `ftp://`
+  when it starts with `ftp.`, else `http://`; links with a scheme, local files and bare names
+  stay as they are
 - `ketch <url>` downloads through `[download.proxy]` of the config file, `ketch add` through the
   instance's setting; `--proxy <url>`, `--proxy-bypass <hosts>` and `--no-proxy` (`ProxyOptions`)
   set `DownloadRequest.proxy` instead, which `ketch add` refuses for an instance without

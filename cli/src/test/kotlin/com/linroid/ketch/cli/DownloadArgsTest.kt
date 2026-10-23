@@ -360,6 +360,30 @@ class DownloadArgsTest {
       SourceFile("2", "Pack/Episode 10.mkv", 1_048_576, mapOf("path" to "Pack/Episode 10.mkv")),
     ),
   )
+
+  @Test
+  fun withAssumedScheme_hostAndPath_getsTheSchemeCurlAssumes() {
+    val none = { _: String -> false }
+    assertEquals("http://example.com/file.zip", withAssumedScheme("example.com/file.zip", none))
+    assertEquals("http://example.com:8080/a", withAssumedScheme("example.com:8080/a", none))
+    assertEquals("http://localhost:8765/a.bin", withAssumedScheme("localhost:8765/a.bin", none))
+    assertEquals("ftp://ftp.gnu.org/gnu/hello.tar.gz",
+      withAssumedScheme("ftp.gnu.org/gnu/hello.tar.gz", none))
+  }
+
+  @Test
+  fun withAssumedScheme_linksWithASchemeFilesAndNames_stayAsTheyAre() {
+    val none = { _: String -> false }
+    for (link in listOf(
+      "https://example.com/a", "magnet:?xt=urn:btih:00", "metalink:abc", "file:///tmp/a",
+      "ubuntu.torrent", "downloads/ubuntu.torrent", "example.com", ".hidden/a", "C:\\a.zip",
+    )) {
+      assertEquals(link, withAssumedScheme(link, none))
+    }
+    assertEquals("my.dir/a.torrent", withAssumedScheme("my.dir/a.torrent") { true })
+    val parsed = parseDownloadArgs(listOf("example.com/a.iso")) as DownloadArgs.Download
+    assertEquals("http://example.com/a.iso", parsed.url)
+  }
 }
 
 private const val MAGNET = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"

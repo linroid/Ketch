@@ -162,7 +162,8 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
   val target = Target(server, token)
   val parsed = when (command) {
     "add" -> {
-      val url = positional.getOrNull(0) ?: return InstanceArgs.Invalid("missing <url>")
+      val url = positional.getOrNull(0)?.let(::withAssumedScheme)
+        ?: return InstanceArgs.Invalid("missing <url>")
       if (positional.size > 2) {
         return InstanceArgs.Invalid("unexpected argument '${positional[2]}'")
       }

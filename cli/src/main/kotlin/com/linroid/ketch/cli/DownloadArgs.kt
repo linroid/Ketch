@@ -186,6 +186,36 @@ private fun parseFileIds(value: String): Set<String>? {
   return ids.toCollection(LinkedHashSet())
 }
 
+/**
+ * [link] with the scheme curl and wget would assume when it names none, such as
+ * `example.com/file.zip`: `ftp://` for a host starting with `ftp.`, else `http://`, which a
+ * server may redirect to HTTPS. Only a host holding a dot, or `localhost`, followed by a path
+ * counts, and never a local file that [exists], such as a `.torrent`: other links stay as they
+ * are, so a mistyped file name is refused as no link rather than looked up as a host.
+ */
+internal fun withAssumedScheme(
+  link: String,
+  exists: (String) -> Boolean = { File(it).exists() },
+): String {
+  val scheme = Regex("^[A-Za-z][A-Za-z0-9+.-]+:").find(link)?.value?.dropLast(1)
+  if (scheme != null) {
+    val rest = link.substring(scheme.length + 1)
+    // `host:port/path` names no scheme: it holds a dot, or a port follows, and no `//`.
+    if (rest.startsWith("//") || ('.' !in scheme && rest.firstOrNull()?.isDigit() != true)) {
+      return link
+    }
+  }
+  if (exists(link)) return link
+  val host = link.substringBefore('/', missingDelimiterValue = "")
+  val name = host.substringBefore(':').lowercase()
+  val port = host.substringAfter(':', missingDelimiterValue = "")
+  val isHost = (name == "localhost" || ('.' in name && !name.startsWith('.') &&
+    !name.endsWith('.') && name.all { it.isLetterOrDigit() || it == '.' || it == '-' })) &&
+    port.all(Char::isDigit)
+  if (!isHost) return link
+  return (if (name.startsWith("ftp.")) "ftp://" else "http://") + link
+}
+
 /** Parses [args], which no longer contain the global flags. */
 internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var url: String? = null
@@ -241,7 +271,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
         i++
       }
       arg.length > 1 && arg.startsWith("-") -> return DownloadArgs.Invalid("unknown option '$arg'")
-      url == null -> url = arg
+      url == null -> url = withAssumedScheme(arg)
       destination == null -> destination = arg
       else -> return DownloadArgs.Invalid("unexpected argument '$arg'")
     }
