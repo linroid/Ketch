@@ -157,4 +157,126 @@ class DashManifestTest {
     assertEquals(listOf(128_000L, 64_000L), stream.variants.map { it.bandwidth })
     assertEquals(1, stream.plan().tracks)
   }
+
+  @Test
+  fun dash_segmentBase_alone_downloadsTheWholeFile() {
+    val stream = parseDashStream("""
+      <MPD type="static" mediaPresentationDuration="PT10S"><Period>
+        <AdaptationSet contentType="video" mimeType="video/mp4">
+          <Representation id="v" bandwidth="100" height="360"><BaseURL>video.mp4</BaseURL>
+            <SegmentBase indexRange="900-1099"><Initialization range="0-899"/></SegmentBase>
+          </Representation>
+        </AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/media/index.mpd")
+
+    assertEquals(emptyList(), stream.indexesNeeded())
+    val plan = stream.plan()
+    assertEquals(1, plan.tracks)
+    assertEquals(listOf("https://example.com/media/video.mp4"), plan.parts.map { it.url })
+    assertEquals(listOf(null), plan.parts.map { it.range })
+  }
+
+  @Test
+  fun dash_segmentBase_withSeparateAudio_interleavesTheIndexedFragments() {
+    val stream = parseDashStream("""
+      <MPD type="static" mediaPresentationDuration="PT4S"><Period>
+        <AdaptationSet contentType="video" mimeType="video/mp4">
+          <Representation id="v" bandwidth="100"><BaseURL>v.mp4</BaseURL>
+            <SegmentBase indexRange="100-155"><Initialization range="0-99"/></SegmentBase>
+          </Representation>
+        </AdaptationSet>
+        <AdaptationSet contentType="audio" mimeType="audio/mp4">
+          <Representation id="a" bandwidth="10"><BaseURL>a.mp4</BaseURL>
+            <SegmentBase indexRange="50-93" timescale="1000" presentationTimeOffset="0"/>
+          </Representation>
+        </AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/media/index.mpd")
+
+    val needed = stream.indexesNeeded()
+    assertEquals(listOf("https://example.com/media/v.mp4", "https://example.com/media/a.mp4"),
+      needed.map { it.url })
+    // Without the indexes, each file follows its initialization whole.
+    assertEquals(listOf(0L..99L, 0L..49L, null, null), stream.plan().parts.map { it.range })
+
+    val video = sidx(timescale = 10, references = listOf(10L to 20L, 10L to 20L))
+    val audio = sidx(timescale = 10, references = listOf(4L to 40L))
+    val plan = stream.plan(0, mapOf(needed[0] to video, needed[1] to audio))
+    assertEquals(2, plan.tracks)
+    assertEquals(
+      listOf(0 to 0L..99L, 1 to 0L..49L, 0 to 156L..165L, 1 to 94L..97L, 0 to 166L..175L),
+      plan.parts.map { it.track to it.range },
+    )
+  }
+
+  @Test
+  fun dash_segmentBase_withoutBaseUrlOrRanges_isRefusedWhereItCannotWork() {
+    assertFailsWith<KetchError.SourceError> {
+      parseDash("""
+        <MPD type="static"><Period><AdaptationSet mimeType="video/mp4">
+          <Representation id="v"><SegmentBase indexRange="0-9"/></Representation>
+        </AdaptationSet></Period></MPD>
+      """.trimIndent(), base)
+    }
+    val stream = parseDashStream("""
+      <MPD type="static"><Period>
+        <AdaptationSet contentType="video" mimeType="video/mp4">
+          <Representation id="v"><BaseURL>v.mp4</BaseURL></Representation>
+        </AdaptationSet>
+        <AdaptationSet contentType="audio" mimeType="audio/mp4">
+          <Representation id="a"><BaseURL>a.mp4</BaseURL></Representation>
+        </AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/media/index.mpd")
+    // Merging needs each file's initialization apart from its fragments.
+    assertFailsWith<KetchError.SourceError> { stream.plan() }
+  }
+
+  @Test
+  fun dash_otherContainers_areLeftOutBesideMp4() {
+    val stream = parseDashStream("""
+      <MPD type="static"><Period>
+        <AdaptationSet contentType="audio" mimeType="audio/webm">
+          <Representation id="opus" bandwidth="64000"><BaseURL>a.webm</BaseURL></Representation>
+        </AdaptationSet>
+        <AdaptationSet contentType="video">
+          <Representation id="h264" bandwidth="500" mimeType="video/mp4">
+            <BaseURL>v.mp4</BaseURL>
+            <SegmentBase indexRange="10-19"><Initialization range="0-9"/></SegmentBase>
+          </Representation>
+        </AdaptationSet>
+        <AdaptationSet contentType="video" mimeType="video/webm">
+          <Representation id="vp9" bandwidth="900"><BaseURL>v.webm</BaseURL></Representation>
+        </AdaptationSet>
+        <AdaptationSet contentType="audio" mimeType="audio/mp4">
+          <Representation id="aac" bandwidth="128000"><BaseURL>a.mp4</BaseURL>
+            <SegmentBase indexRange="10-19"><Initialization range="0-9"/></SegmentBase>
+          </Representation>
+        </AdaptationSet>
+      </Period></MPD>
+    """.trimIndent(), "https://example.com/media/index.mpd")
+
+    assertEquals(listOf("null|h264|500|null|null"), stream.variants.map { it.key })
+    assertEquals(listOf("https://example.com/media/v.mp4", "https://example.com/media/a.mp4"),
+      stream.indexesNeeded().map { it.url })
+    assertFailsWith<KetchError.SourceError> {
+      parseDash("""
+        <MPD type="static"><Period><AdaptationSet mimeType="video/webm">
+          <Representation id="vp9"><BaseURL>v.webm</BaseURL></Representation>
+        </AdaptationSet></Period></MPD>
+      """.trimIndent(), base)
+    }
+  }
+
+  /** A version 0 `sidx` box whose fragments start right after it, from time 0. */
+  private fun sidx(timescale: Long, references: List<Pair<Long, Long>>): ByteArray {
+    val body = mutableListOf<Byte>()
+    fun u32(value: Long) = (3 downTo 0).forEach { body += (value ushr (it * 8)).toByte() }
+    listOf(0L, 1L, timescale, 0L, 0L, references.size.toLong()).forEach(::u32)
+    for ((size, duration) in references) listOf(size, duration, 0x90000000).forEach(::u32)
+    val total = body.size + 8
+    return byteArrayOf((total ushr 24).toByte(), (total ushr 16).toByte(),
+      (total ushr 8).toByte(), total.toByte()) + "sidx".encodeToByteArray() + body.toByteArray()
+  }
 }

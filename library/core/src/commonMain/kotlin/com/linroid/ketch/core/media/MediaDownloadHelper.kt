@@ -280,6 +280,30 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     return MediaManifest(buffer.readUtf8(), base, mediaHeaders(checked, base, headers))
   }
 
+  /**
+   * Fetches [range] of [url], at most [maxBytes], through [proxy] with what [headers] of the
+   * stream at [streamUrl] [url]'s origin may receive: a part a plan needs before it is complete,
+   * such as a DASH representation's segment index.
+   */
+  suspend fun fetchRange(
+    streamUrl: String,
+    url: String,
+    range: LongRange,
+    headers: Map<String, String>,
+    proxy: Proxy = Proxy.System,
+    maxBytes: Long = 1024 * 1024,
+  ): ByteArray {
+    val size = range.last - range.first + 1
+    mediaRequire(size in 1..maxBytes, "Media index is too large")
+    val buffer = Buffer()
+    http.through(proxy).download(url, range, mediaHeaders(streamUrl, url, headers)) { data ->
+      mediaRequire(buffer.size + data.size <= size, "Media server returned a different byte range")
+      buffer.write(data)
+    }
+    mediaRequire(buffer.size == size, "Media index is incomplete")
+    return buffer.readByteArray()
+  }
+
   /** Runs a media transformation, reporting what it cannot read as this source's error. */
   private inline fun <T> media(action: () -> T): T = try {
     action()

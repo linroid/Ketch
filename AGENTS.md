@@ -177,10 +177,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.hls` -- `HlsDownloadSource` (`.m3u8`); internal `parseHls`, `HlsPlaylist`
   (`audioFor`), `HlsVariant`, `HlsRendition`
 - `com.linroid.ketch.dash` -- `DashDownloadSource` (`.mpd`); internal `parseDashStream`,
-  `DashStream`, `DashRepresentation`, `manifestXml`
+  `DashStream` (`indexesNeeded`), `DashRepresentation`, `DashTrack` (`Listed`, or `SingleFile`:
+  `SegmentBase`, fetched whole alone, else per fragment of its `sidx`, `parseSegmentIndex`),
+  `manifestXml`; representations in other containers than MP4 (WebM) are left out
 - Both depend on core's `com.linroid.ketch.core.media` helpers: `MediaDownloadHelper` (bounded
-  manifest fetching, variant resolution and `planSelection`, `downloadFollowingSelection`,
-  sequential transfer), `MediaPart`/`MediaPlan`/`MediaKey`/`MediaVariant`, `mergeTracks`,
+  manifest fetching, `fetchRange` for a DASH segment index, variant resolution and
+  `planSelection`, `downloadFollowingSelection`, sequential transfer),
+  `MediaPart`/`MediaPlan`/`MediaKey`/`MediaVariant`, `mergeTracks`,
   `mediaVariantNames`, `Aes128CbcDecryptor` (pure Kotlin AES-128-CBC) and `Mp4Tracks.kt`
   (internal `mergeInitSegments`, `FragmentRewriter`, `mp4Boxes`); each module owns its parser
   and tests

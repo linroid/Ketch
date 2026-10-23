@@ -68,7 +68,7 @@ declared bandwidth among the variants with video; audio-only variants come last.
 | HLS media playlists | Finished playlists (`EXT-X-ENDLIST`) of MPEG-TS, packed AAC or MP3, or fragmented MP4 with one `EXT-X-MAP`. Byte ranges are supported, including implicit offsets. |
 | HLS master playlists | The chosen variant (the best by default), up to four nested playlists deep, with a separate fragmented MP4 audio rendition merged in. |
 | HLS encryption | `METHOD=AES-128` with the `identity` key format, with an explicit `IV` or the media sequence number. An encrypted `EXT-X-MAP` needs an `IV`. Keys may change between segments. |
-| DASH | Static MP4 manifests with one period: the chosen video representation (the best by default) and the main audio adaptation set, or one audio adaptation set alone. `SegmentList`, and `SegmentTemplate` with a finite duration or bounded `SegmentTimeline`, including initialization segments and byte ranges. Text and image adaptation sets are ignored. |
+| DASH | Static MP4 manifests with one period: the chosen video representation (the best by default) and the main audio adaptation set, or one audio adaptation set alone. `SegmentList`, `SegmentTemplate` with a finite duration or bounded `SegmentTimeline`, including initialization segments and byte ranges, and `SegmentBase` (on-demand profiles: one file per representation), fetched whole when it is the only track, or fragment by fragment from its segment index (`sidx`) when merged with separate audio. Representations in other containers, such as WebM beside MP4, and text and image adaptation sets are ignored. |
 
 Not supported:
 
@@ -79,7 +79,7 @@ Not supported:
 - choosing the audio language or a second audio track: the default rendition or main adaptation
   set is used, and subtitles are not downloaded;
 - HLS discontinuities and changing initialization segments;
-- DASH `SegmentBase` and multiple periods;
+- DASH multiple periods, and `SegmentBase` indexes that refer to further indexes;
 - other containers.
 
 A stream Ketch cannot handle fails before any segment is written, and the playlist itself is never

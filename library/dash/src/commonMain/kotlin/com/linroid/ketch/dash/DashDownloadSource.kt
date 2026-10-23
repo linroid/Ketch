@@ -42,6 +42,7 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     val (url, headers) = input as ResolveInput.Url
     val stream = stream(url, headers, config.proxy)
     val variants = variants(stream)
+    // The plan's container and tracks are all a resolution needs: no segment index is fetched.
     return helper.resolve(url, stream.plan(), variants, variants.firstOrNull()?.id)
   }
 
@@ -57,7 +58,13 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
       val stream = stream(context.url, context.headers, context.config.proxy)
       val variants = variants(stream)
       val chosen = helper.chosenVariant(context, selected, variants)
-      stream.plan(chosen?.let(variants::indexOf) ?: 0)
+      val index = chosen?.let(variants::indexOf) ?: 0
+      val indexes = stream.indexesNeeded(index).associateWith { file ->
+        helper.fetchRange(
+          context.url, file.url, file.indexRange!!, context.headers, context.config.proxy,
+        )
+      }
+      stream.plan(index, indexes)
     }
   }
 

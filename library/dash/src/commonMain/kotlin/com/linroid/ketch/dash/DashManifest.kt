@@ -8,7 +8,7 @@ import com.linroid.ketch.core.media.mergeTracks
 import kotlin.math.ceil
 
 /**
- * A representation to choose: its declared [bandwidth], picture [height] and [plan], and the
+ * A representation to choose: its declared [bandwidth], picture [height] and [track], and the
  * [key] that identifies it in the manifest (its adaptation set's and its own `id`).
  */
 internal class DashRepresentation(
@@ -16,18 +16,75 @@ internal class DashRepresentation(
   val bandwidth: Long,
   val height: Int?,
   val metadata: Map<String, String>,
-  val plan: MediaPlan,
+  val track: DashTrack,
 )
+
+/** How a representation's media is stored. */
+internal sealed interface DashTrack {
+  /** Segments the manifest lists (`SegmentList`, `SegmentTemplate`), as [plan]. */
+  class Listed(val plan: MediaPlan) : DashTrack
+
+  /**
+   * One fragmented MP4 file at [url] (`SegmentBase`, or a `BaseURL` alone): its initialization
+   * (`ftyp` and `moov`) at [initRange] and its segment index (a `sidx` box listing its
+   * fragments) at [indexRange], when the manifest names them, and the presentation time offset
+   * its fragment times start from, in seconds.
+   */
+  class SingleFile(
+    val url: String,
+    val initRange: LongRange?,
+    val indexRange: LongRange?,
+    val timeOffsetSeconds: Double,
+  ) : DashTrack {
+    /**
+     * Written as it is, the file is the track, fetched with one request. Merged with another
+     * track, it is its initialization and then each fragment its segment index ([index], the
+     * bytes at [indexRange]) lists, timed so the tracks interleave; without an index the whole
+     * file follows, whose `moof` and `mdat` boxes the merge keeps.
+     */
+    fun plan(merged: Boolean, index: ByteArray?): MediaPlan {
+      if (!merged) return MediaPlan(listOf(MediaPart(url)), "mp4")
+      val init = initRange ?: indexRange?.takeIf { it.first > 0 }?.let { 0 until it.first }
+      mediaRequire(init != null, "DASH separate audio needs each file's initialization range")
+      val initPart = MediaPart(url, init, init = true)
+      if (index == null) return MediaPlan(listOf(initPart, MediaPart(url)), "mp4")
+      val fragments = parseSegmentIndex(index, indexRange!!.first).map { fragment ->
+        MediaPart(url, fragment.range, startSeconds = fragment.startSeconds - timeOffsetSeconds)
+      }
+      return MediaPlan(listOf(initPart) + fragments, "mp4")
+    }
+  }
+}
 
 /**
  * A static DASH presentation: the [variants] to choose from, best first, and the [audio] each
  * plays with when the audio is a track of its own.
  */
-internal class DashStream(val variants: List<DashRepresentation>, val audio: MediaPlan?) {
-  /** The plan of variant [index], with [audio] merged in. */
-  fun plan(index: Int = 0): MediaPlan {
-    val video = variants[index].plan
-    return if (audio == null) video else mergeTracks(video, audio)
+internal class DashStream(val variants: List<DashRepresentation>, val audio: DashTrack?) {
+  /**
+   * The single files whose segment index [plan] of variant [index] needs, fetched by their
+   * [DashTrack.SingleFile.indexRange]: those merged with another track.
+   */
+  fun indexesNeeded(index: Int = 0): List<DashTrack.SingleFile> =
+    if (audio == null) emptyList() else listOf(variants[index].track, audio)
+      .filterIsInstance<DashTrack.SingleFile>().filter { it.indexRange != null }
+
+  /**
+   * The plan of variant [index], with [audio] merged in, from the segment [indexes] of
+   * [indexesNeeded].
+   */
+  fun plan(
+    index: Int = 0,
+    indexes: Map<DashTrack.SingleFile, ByteArray> = emptyMap(),
+  ): MediaPlan {
+    fun DashTrack.plan(merged: Boolean): MediaPlan = when (this) {
+      is DashTrack.Listed -> plan
+      is DashTrack.SingleFile -> plan(merged, indexes[this])
+    }
+    val video = variants[index].track
+    return if (audio == null) video.plan(merged = false) else {
+      mergeTracks(video.plan(merged = true), audio.plan(merged = true))
+    }
   }
 }
 
@@ -47,7 +104,11 @@ internal fun parseDashStream(text: String, url: String): DashStream {
   val periods = root.children.filter { it.name == "Period" }
   mediaRequire(periods.size == 1, "DASH requires exactly one period")
   val period = periods.single()
-  val adaptations = period.children.filter { it.name == "AdaptationSet" }
+  val listed = period.children.filter { it.name == "AdaptationSet" }
+  // Representations in other containers, such as WebM beside MP4, are left out.
+  val adaptations = listed.filter { mp4Representations(it).isNotEmpty() }
+  mediaRequire(adaptations.isNotEmpty() || listed.isEmpty(),
+    "Only MP4 DASH representations are supported")
   val kinds = adaptations.groupBy(::contentKind)
   val videos = kinds["video"].orEmpty()
   val audios = kinds["audio"].orEmpty()
@@ -59,7 +120,7 @@ internal fun parseDashStream(text: String, url: String): DashStream {
   }
   mediaRequire(main.isNotEmpty(), "DASH contains no supported tracks")
   val variants = main.flatMap { adaptation ->
-    adaptation.children.filter { it.name == "Representation" }.map { representation ->
+    mp4Representations(adaptation).map { representation ->
       val height = (representation.attributes["height"] ?: adaptation.attributes["height"])
         ?.toIntOrNull()
       val width = representation.attributes["width"] ?: adaptation.attributes["width"]
@@ -75,7 +136,7 @@ internal fun parseDashStream(text: String, url: String): DashStream {
           (representation.attributes["frameRate"] ?: adaptation.attributes["frameRate"])
             ?.let { put("frameRate", it) }
         },
-        plan = representationPlan(root, period, adaptation, representation, url),
+        track = representationTrack(root, period, adaptation, representation, url),
       )
     }
   }.sortedByDescending { it.bandwidth }
@@ -83,13 +144,21 @@ internal fun parseDashStream(text: String, url: String): DashStream {
   mediaRequire(variants.size <= 100, "Too many DASH representations")
   val audio = if (videos.isEmpty() || audios.isEmpty()) null else {
     val adaptation = mainAudio(audios)
-    val representation = adaptation.children.filter { it.name == "Representation" }
+    val representation = mp4Representations(adaptation)
       .maxByOrNull { it.attributes["bandwidth"]?.toLongOrNull() ?: 0 }
     mediaRequire(representation != null, "DASH audio contains no representation")
-    representationPlan(root, period, adaptation, representation!!, url)
+    representationTrack(root, period, adaptation, representation!!, url)
   }
   return DashStream(variants, audio)
 }
+
+/** [adaptation]'s representations in an MP4 container, the only one Ketch joins. */
+private fun mp4Representations(adaptation: XmlElement): List<XmlElement> =
+  adaptation.children.filter { it.name == "Representation" }.filter { representation ->
+    (representation.attributes["mimeType"] ?: adaptation.attributes["mimeType"]) in MP4_TYPES
+  }
+
+private val MP4_TYPES = setOf("video/mp4", "audio/mp4", "application/mp4")
 
 /** `video`, `audio`, `text` or `image` from what an adaptation set declares, else `null`. */
 private fun contentKind(adaptation: XmlElement): String? {
@@ -104,23 +173,24 @@ private fun mainAudio(audios: List<XmlElement>): XmlElement = audios.firstOrNull
   adaptation.children.any { it.name == "Role" && it.attributes["value"] == "main" }
 } ?: audios.first()
 
-private fun representationPlan(
+private fun representationTrack(
   root: XmlElement,
   period: XmlElement,
   adaptation: XmlElement,
   representation: XmlElement,
   url: String,
-): MediaPlan {
+): DashTrack {
   val levels = listOf(root, period, adaptation, representation)
   var base = url
+  var hasBase = false
   for (level in levels) {
     val bases = level.children.filter { it.name == "BaseURL" }
     mediaRequire(bases.size <= 1, "Multiple DASH base URLs are not supported")
-    bases.singleOrNull()?.let { base = mediaUrl("dash", base, it.text.toString().trim()) }
+    bases.singleOrNull()?.let {
+      base = mediaUrl("dash", base, it.text.toString().trim())
+      hasBase = true
+    }
   }
-  val mime = representation.attributes["mimeType"] ?: adaptation.attributes["mimeType"]
-  mediaRequire(mime in setOf("video/mp4", "audio/mp4", "application/mp4"),
-    "Only MP4 DASH representations are supported")
   val lists = levels.mapNotNull { it.child("SegmentList") }
   if (lists.isNotEmpty()) {
     val list = lists.last()
@@ -143,10 +213,25 @@ private fun representationPlan(
       mediaRequire(parts.size <= 10_000, "Too many media segments")
     }
     mediaRequire(parts.size > 1, "DASH contains no segments")
-    return MediaPlan(parts, "mp4")
+    return DashTrack.Listed(MediaPlan(parts, "mp4"))
   }
   val templates = levels.mapNotNull { it.child("SegmentTemplate") }
-  mediaRequire(templates.isNotEmpty(), "DASH requires SegmentList or SegmentTemplate")
+  if (templates.isEmpty()) {
+    // On-demand profiles store each representation as one file, at its base URL.
+    mediaRequire(hasBase && !base.substringBefore('?').endsWith('/'),
+      "DASH requires SegmentList, SegmentTemplate or SegmentBase")
+    val segmentBase = levels.mapNotNull { it.child("SegmentBase") }.lastOrNull()
+    val scale = segmentBase?.attributes?.get("timescale")?.toLongOrNull() ?: 1
+    mediaRequire(scale > 0, "Invalid DASH timescale")
+    val offset = segmentBase?.attributes?.get("presentationTimeOffset")?.toLongOrNull() ?: 0
+    mediaRequire(offset >= 0, "Invalid DASH presentation offset")
+    return DashTrack.SingleFile(
+      url = base,
+      initRange = dashRange(segmentBase?.child("Initialization")?.attributes?.get("range")),
+      indexRange = dashRange(segmentBase?.attributes?.get("indexRange")),
+      timeOffsetSeconds = offset.toDouble() / scale,
+    )
+  }
   val attrs = templates.fold(emptyMap<String, String>()) { values, element ->
     values + element.attributes
   }
@@ -227,7 +312,7 @@ private fun representationPlan(
     repeat(count.toInt()) { index -> add(offset + index * duration, index * duration) }
   }
   mediaRequire(parts.size > 1, "DASH contains no segments")
-  return MediaPlan(parts, "mp4")
+  return DashTrack.Listed(MediaPlan(parts, "mp4"))
 }
 
 private fun dashRange(value: String?): LongRange? {
