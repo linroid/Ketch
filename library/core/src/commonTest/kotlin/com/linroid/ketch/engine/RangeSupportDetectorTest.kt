@@ -4,12 +4,18 @@ import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.RangeSupportDetector
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.TransferStalledException
+import com.linroid.ketch.core.engine.TransferWatchdog
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class RangeSupportDetectorTest {
 
@@ -30,6 +36,54 @@ class RangeSupportDetectorTest {
     assertTrue(info.acceptRanges)
     assertEquals("\"etag-value\"", info.etag)
     assertEquals("Mon, 01 Jan 2024 00:00:00 GMT", info.lastModified)
+  }
+
+  @Test
+  fun detect_serverNeverAnswering_failsRetryablyOnceBothRequestsWaitedTheTimeout() = runTest {
+    val engine = SilentEngine(probeAnswers = false)
+
+    val error = assertFailsWith<KetchError.Network> {
+      RangeSupportDetector(engine, TransferWatchdog(30.seconds, 0)).detect("https://example.com/file")
+    }
+
+    assertIs<TransferStalledException>(error.cause)
+    assertEquals(60_000, currentTime)
+    assertEquals(listOf("HEAD", "GET"), engine.requests)
+  }
+
+  @Test
+  fun detect_headNeverAnswered_probesWithAGet() = runTest {
+    val engine = SilentEngine(probeAnswers = true)
+
+    val info = RangeSupportDetector(engine, TransferWatchdog(30.seconds, 0)).detect("https://example.com/file")
+
+    assertEquals(1000, info.contentLength)
+    assertEquals(listOf("HEAD", "GET"), engine.requests)
+  }
+
+  /** Never answers `HEAD`, and a probe only with [probeAnswers]. */
+  private class SilentEngine(private val probeAnswers: Boolean) : HttpEngine {
+    val requests = mutableListOf<String>()
+
+    override suspend fun head(url: String, headers: Map<String, String>): ServerInfo {
+      requests += "HEAD"
+      awaitCancellation()
+    }
+
+    override suspend fun probe(url: String, headers: Map<String, String>): ServerInfo {
+      requests += "GET"
+      if (!probeAnswers) awaitCancellation()
+      return ServerInfo(contentLength = 1000, acceptRanges = true, etag = null, lastModified = null)
+    }
+
+    override suspend fun download(
+      url: String,
+      range: LongRange?,
+      headers: Map<String, String>,
+      onData: suspend (ByteArray) -> Unit,
+    ) = error("unused")
+
+    override fun close() = Unit
   }
 
   @Test

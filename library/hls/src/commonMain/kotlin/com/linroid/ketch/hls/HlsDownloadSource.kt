@@ -11,6 +11,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.TransferWatchdog
 import com.linroid.ketch.core.media.MediaDownloadHelper
 import com.linroid.ketch.core.media.MediaManifest
 import com.linroid.ketch.core.media.MediaPlan
@@ -47,7 +48,9 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val (url, headers) = input as ResolveInput.Url
-    val choice = plan(url, headers, config.proxy) { variants -> variants.firstOrNull() }
+    val choice = plan(url, headers, config.proxy, TransferWatchdog.of(config)) { variants ->
+      variants.firstOrNull()
+    }
     return helper.resolve(url, choice.plan, choice.variants, choice.chosen?.id)
   }
 
@@ -60,7 +63,7 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
    */
   override suspend fun download(context: DownloadContext, state: Unit?) {
     helper.downloadFollowingSelection(context) { selected ->
-      plan(context.url, context.headers, context.config.proxy) { variants ->
+      plan(context.url, context.headers, context.config.proxy, context.watchdog) { variants ->
         helper.chosenVariant(context, selected, variants)
       }.plan
     }
@@ -72,14 +75,18 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     val chosen: MediaVariant?,
   )
 
-  /** Plans the variant [choose] picks of a master playlist's variants, best first. */
+  /**
+   * Plans the variant [choose] picks of a master playlist's variants, best first, fetching each
+   * playlist under [watchdog].
+   */
   private suspend fun plan(
     original: String,
     headers: Map<String, String>,
     proxy: Proxy,
+    watchdog: TransferWatchdog,
     choose: (List<MediaVariant>) -> MediaVariant?,
   ): Choice {
-    val top = helper.fetchManifest(mediaUrl("hls", original, original), headers, proxy)
+    val top = helper.fetchManifest(mediaUrl("hls", original, original), headers, proxy, watchdog)
     val playlist = parseHls(top.text, top.url)
     playlist.plan?.let { return Choice(it, emptyList(), choose(emptyList())) }
     // Audio-only variants rank after those with video, whatever their bandwidth.
@@ -89,9 +96,9 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     val variants = variants(ranked, playlist)
     val chosen = choose(variants) ?: variants.first()
     val variant = ranked[variants.indexOf(chosen)]
-    val video = mediaPlan(top, variant.url, depth = 1, proxy)
+    val video = mediaPlan(top, variant.url, depth = 1, proxy, watchdog)
     val audio = playlist.audioFor(variant)?.url?.takeIf { it != variant.url }
-      ?.let { mediaPlan(top, it, depth = MAX_DEPTH - 1, proxy) }
+      ?.let { mediaPlan(top, it, depth = MAX_DEPTH - 1, proxy, watchdog) }
       ?: return Choice(video, variants, chosen)
     mediaRequire(video.parts.first().init && audio.parts.first().init,
       "Separate HLS audio is supported for fragmented MP4 streams only")
@@ -104,13 +111,14 @@ class HlsDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
     url: String,
     depth: Int,
     proxy: Proxy,
+    watchdog: TransferWatchdog,
   ): MediaPlan {
     var next = url
     var requestHeaders = mediaHeaders(from.url, url, from.headers)
     val visited = mutableSetOf(from.url)
     for (level in depth until MAX_DEPTH) {
       mediaRequire(visited.add(next), "HLS playlist cycle")
-      val manifest = helper.fetchManifest(next, requestHeaders, proxy)
+      val manifest = helper.fetchManifest(next, requestHeaders, proxy, watchdog)
       val playlist = parseHls(manifest.text, manifest.url)
       playlist.plan?.let { return it }
       next = playlist.variants.maxBy { it.bandwidth }.url

@@ -11,8 +11,10 @@ import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
@@ -27,19 +29,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Runs against a real server, so off the test scheduler: its virtual time would let the stall
+ * watchdog that `resolve` fetches manifests under fire while a request is on the wire.
+ */
 class MediaDownloadIntegrationTest {
   @Test
   fun download_separateSources_produceCompleteMediaFiles() = runTest(timeout = 30.seconds) {
-    downloadManifests(legacy = false)
+    withContext(Dispatchers.IO) { downloadManifests(legacy = false) }
   }
 
   @Test
   fun download_legacyResolvedMediaType_routesToInstalledProtocol() = runTest(timeout = 30.seconds) {
-    downloadManifests(legacy = true)
+    withContext(Dispatchers.IO) { downloadManifests(legacy = true) }
   }
 
   @Test
   fun download_separateTracks_mergeIntoOneMovie() = runTest(timeout = 30.seconds) {
+    withContext(Dispatchers.IO) { downloadTracks() }
+  }
+
+  private suspend fun downloadTracks() {
     val directory = Files.createTempDirectory("ketch-media-").toFile()
     val server = serve()
     try {

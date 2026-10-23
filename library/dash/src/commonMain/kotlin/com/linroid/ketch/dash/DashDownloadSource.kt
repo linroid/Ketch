@@ -10,6 +10,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.TransferWatchdog
 import com.linroid.ketch.core.media.MediaDownloadHelper
 import com.linroid.ketch.core.media.MediaVariant
 import com.linroid.ketch.core.media.mediaVariantIds
@@ -40,7 +41,7 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
 
   override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
     val (url, headers) = input as ResolveInput.Url
-    val stream = stream(url, headers, config.proxy)
+    val stream = stream(url, headers, config.proxy, TransferWatchdog.of(config))
     val variants = variants(stream)
     // The plan's container and tracks are all a resolution needs: no segment index is fetched.
     return helper.resolve(url, stream.plan(), variants, variants.firstOrNull()?.id)
@@ -55,25 +56,32 @@ class DashDownloadSource(httpEngine: HttpEngine) : DownloadSource<Unit> {
    */
   override suspend fun download(context: DownloadContext, state: Unit?) {
     helper.downloadFollowingSelection(context) { selected ->
-      val stream = stream(context.url, context.headers, context.config.proxy)
+      val stream = stream(context.url, context.headers, context.config.proxy, context.watchdog)
       val variants = variants(stream)
       val chosen = helper.chosenVariant(context, selected, variants)
       val index = chosen?.let(variants::indexOf) ?: 0
       val indexes = stream.indexesNeeded(index).associateWith { file ->
         helper.fetchRange(
-          context.url, file.url, file.indexRange!!, context.headers, context.config.proxy,
+          streamUrl = context.url,
+          url = file.url,
+          range = file.indexRange!!,
+          headers = context.headers,
+          proxy = context.config.proxy,
+          watchdog = context.watchdog,
         )
       }
       stream.plan(index, indexes)
     }
   }
 
+  /** The presentation at [original], its manifest fetched under [watchdog]. */
   private suspend fun stream(
     original: String,
     headers: Map<String, String>,
     proxy: Proxy,
+    watchdog: TransferWatchdog,
   ): DashStream {
-    val manifest = helper.fetchManifest(original, headers, proxy)
+    val manifest = helper.fetchManifest(original, headers, proxy, watchdog)
     return parseDashStream(manifest.text, manifest.url)
   }
 

@@ -11,6 +11,7 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.TransferWatchdog
 import com.linroid.ketch.core.engine.through
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.engine.httpConnectionSpec
@@ -262,28 +263,32 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
   }
 
   /**
-   * Fetches at most 1 MiB through [proxy] and retains the final URL and headers safe for that
-   * origin.
+   * Fetches at most 1 MiB through [proxy] under [watchdog], as transfers run, and retains the
+   * final URL and headers safe for that origin.
    */
   suspend fun fetchManifest(
     url: String,
     headers: Map<String, String>,
     proxy: Proxy = Proxy.System,
+    watchdog: TransferWatchdog = TransferWatchdog.Off,
   ): MediaManifest {
     val checked = mediaUrl(type, url, url)
     val buffer = Buffer()
-    val effective = http.through(proxy).downloadResource(checked, headers) { bytes ->
-      mediaRequire(buffer.size + bytes.size <= 1024 * 1024, "Media manifest exceeds 1 MiB")
-      buffer.write(bytes)
+    val effective = watchdog.watch { monitor ->
+      http.through(proxy).downloadResource(checked, headers) { bytes ->
+        monitor.received(bytes.size)
+        mediaRequire(buffer.size + bytes.size <= 1024 * 1024, "Media manifest exceeds 1 MiB")
+        buffer.write(bytes)
+      }
     }
     val base = mediaUrl(type, checked, effective)
     return MediaManifest(buffer.readUtf8(), base, mediaHeaders(checked, base, headers))
   }
 
   /**
-   * Fetches [range] of [url], at most [maxBytes], through [proxy] with what [headers] of the
-   * stream at [streamUrl] [url]'s origin may receive: a part a plan needs before it is complete,
-   * such as a DASH representation's segment index.
+   * Fetches [range] of [url], at most [maxBytes], through [proxy] under [watchdog] with what
+   * [headers] of the stream at [streamUrl] [url]'s origin may receive: a part a plan needs before
+   * it is complete, such as a DASH representation's segment index.
    */
   suspend fun fetchRange(
     streamUrl: String,
@@ -292,13 +297,19 @@ class MediaDownloadHelper(private val http: HttpEngine, private val type: String
     headers: Map<String, String>,
     proxy: Proxy = Proxy.System,
     maxBytes: Long = 1024 * 1024,
+    watchdog: TransferWatchdog = TransferWatchdog.Off,
   ): ByteArray {
     val size = range.last - range.first + 1
     mediaRequire(size in 1..maxBytes, "Media index is too large")
     val buffer = Buffer()
-    http.through(proxy).download(url, range, mediaHeaders(streamUrl, url, headers)) { data ->
-      mediaRequire(buffer.size + data.size <= size, "Media server returned a different byte range")
-      buffer.write(data)
+    watchdog.watch { monitor ->
+      http.through(proxy).download(url, range, mediaHeaders(streamUrl, url, headers)) { data ->
+        monitor.received(data.size)
+        mediaRequire(
+          buffer.size + data.size <= size, "Media server returned a different byte range",
+        )
+        buffer.write(data)
+      }
     }
     mediaRequire(buffer.size == size, "Media index is incomplete")
     return buffer.readByteArray()

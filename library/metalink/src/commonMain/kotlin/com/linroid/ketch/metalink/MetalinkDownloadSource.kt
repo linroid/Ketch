@@ -16,6 +16,7 @@ import com.linroid.ketch.core.engine.DownloadSource
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionPlan
 import com.linroid.ketch.core.engine.SelectionRequest
+import com.linroid.ketch.core.engine.TransferWatchdog
 import com.linroid.ketch.core.mirror.MirrorDownloadHelper
 import com.linroid.ketch.core.mirror.mirrorHeaders
 import kotlinx.coroutines.CancellationException
@@ -81,7 +82,8 @@ class MetalinkDownloadSource internal constructor(
         if (input.url.startsWith(SCHEME, ignoreCase = true)) {
           throw KetchError.SourceError(TYPE, detail = "Open the Metalink file again to download it")
         }
-        val (text, secure) = fetch(input.url, input.headers, config.proxy)
+        val watchdog = TransferWatchdog.of(config)
+        val (text, secure) = fetch(input.url, input.headers, config.proxy, watchdog)
         resolved(input.url, parse(text, secure), input.headers, config)
       }
       is ResolveInput.Content -> {
@@ -127,7 +129,7 @@ class MetalinkDownloadSource internal constructor(
     val file = fileOf(metalink, id)
       ?: throw KetchError.SourceError(TYPE, detail = "The Metalink has no such file")
     val size = file.size
-      ?: probeSize(file, context.url, context.headers, context.config.proxy)
+      ?: probeSize(file, context.url, context.headers, context.config.proxy, context.watchdog)
       ?: throw KetchError.SourceError(TYPE, detail = "No mirror reports the size of the file")
     if (state != null && state.fileId != id) {
       log.w { "taskId=${context.taskId} saved another file of its Metalink; starting over" }
@@ -148,7 +150,7 @@ class MetalinkDownloadSource internal constructor(
     headers: Map<String, String>,
     config: DownloadConfig,
   ): ResolvedSource {
-    val metalink = withProbedSizes(parsed, url, headers, config.proxy)
+    val metalink = withProbedSizes(parsed, url, headers, config.proxy, TransferWatchdog.of(config))
     val default = metalink.files.first()
     if (default.size == null) {
       throw KetchError.SourceError(
@@ -195,19 +197,21 @@ class MetalinkDownloadSource internal constructor(
 
   /**
    * [metalink] with the sizes it lacks, of its first [PROBED_FILES] files, asked of their mirrors
-   * with the request's [headers] and [proxy], so a file chosen later is sized as it is fetched.
+   * with the request's [headers] and [proxy] under [watchdog], so a file chosen later is sized as
+   * it is fetched.
    */
   private suspend fun withProbedSizes(
     metalink: Metalink,
     from: String,
     headers: Map<String, String>,
     proxy: Proxy,
+    watchdog: TransferWatchdog,
   ): Metalink {
     val missing = metalink.files.withIndex().filter { it.value.size == null }.take(PROBED_FILES)
     if (missing.isEmpty()) return metalink
     val sizes = coroutineScope {
       missing.map { (index, file) ->
-        async { index to probeSize(file, from, headers, proxy) }
+        async { index to probeSize(file, from, headers, proxy, watchdog) }
       }.awaitAll()
     }.toMap()
     return metalink.copy(
@@ -217,20 +221,27 @@ class MetalinkDownloadSource internal constructor(
     )
   }
 
-  /** Fetches the document at [url], at most [MAX_DOCUMENT_BYTES], and whether it came over TLS. */
+  /**
+   * Fetches the document at [url], at most [MAX_DOCUMENT_BYTES], under [watchdog], and whether it
+   * came over TLS.
+   */
   private suspend fun fetch(
     url: String,
     headers: Map<String, String>,
     proxy: Proxy,
+    watchdog: TransferWatchdog,
   ): Pair<String, Boolean> {
     val chunks = mutableListOf<ByteArray>()
     var size = 0
-    val final = engine(proxy).downloadResource(url, headers) { bytes ->
-      if (bytes.size > MAX_DOCUMENT_BYTES - size) {
-        throw KetchError.SourceError(TYPE, detail = "The Metalink is larger than 8 MiB")
+    val final = watchdog.watch { monitor ->
+      engine(proxy).downloadResource(url, headers) { bytes ->
+        monitor.received(bytes.size)
+        if (bytes.size > MAX_DOCUMENT_BYTES - size) {
+          throw KetchError.SourceError(TYPE, detail = "The Metalink is larger than 8 MiB")
+        }
+        size += bytes.size
+        chunks += bytes
       }
-      size += bytes.size
-      chunks += bytes
     }
     val bytes = ByteArray(size)
     var offset = 0
@@ -241,17 +252,23 @@ class MetalinkDownloadSource internal constructor(
     return bytes.decodeToString() to final.startsWith("https://", ignoreCase = true)
   }
 
-  /** The size the first mirrors of [file] that answer `HEAD` report, or `null`. */
+  /**
+   * The size the first mirrors of [file] that answer `HEAD` report, or `null`; a mirror that does
+   * not answer within [watchdog]'s limits is passed over.
+   */
   private suspend fun probeSize(
     file: MetalinkFile,
     from: String,
     headers: Map<String, String>,
     proxy: Proxy,
+    watchdog: TransferWatchdog,
   ): Long? {
     val engine = engine(proxy)
     for ((index, mirror) in file.urls.take(PROBED_MIRRORS).withIndex()) {
       try {
-        val info = engine.head(mirror.url, mirrorHeaders(from, mirror.url, headers))
+        val info = watchdog.watch {
+          engine.head(mirror.url, mirrorHeaders(from, mirror.url, headers))
+        }
         info.contentLength?.takeIf { it > 0 }?.let { return it }
       } catch (e: CancellationException) {
         throw e

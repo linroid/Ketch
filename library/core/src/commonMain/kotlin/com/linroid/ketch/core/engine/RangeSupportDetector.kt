@@ -5,8 +5,14 @@ import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 
+/**
+ * @param watchdog what `HEAD` and the probe each run under, as transfers do: engines wait for an
+ *   answer as long as it takes, so a server that takes the connection and never answers would
+ *   otherwise hold the download forever
+ */
 internal class RangeSupportDetector(
   private val httpEngine: HttpEngine,
+  private val watchdog: TransferWatchdog = TransferWatchdog.Off,
 ) {
   private val log = KetchLogger("RangeDetector")
 
@@ -18,7 +24,7 @@ internal class RangeSupportDetector(
   suspend fun detect(url: String, headers: Map<String, String> = emptyMap()): ServerInfo {
     log.d { "Sending HEAD request to ${redactUrl(url)}" }
     val serverInfo = try {
-      httpEngine.head(url, headers)
+      watchdog.watch { httpEngine.head(url, headers) }
     } catch (e: KetchError.Http) {
       if (e.code !in HEAD_REFUSED) throw e
       log.d { "HEAD refused with ${e.code}, probing ${redactUrl(url)} with a ranged GET" }
@@ -47,7 +53,7 @@ internal class RangeSupportDetector(
     headers: Map<String, String>,
     headError: KetchError,
   ): ServerInfo = try {
-    httpEngine.probe(url, headers)
+    watchdog.watch { httpEngine.probe(url, headers) }
   } catch (_: UnsupportedOperationException) {
     throw headError
   }

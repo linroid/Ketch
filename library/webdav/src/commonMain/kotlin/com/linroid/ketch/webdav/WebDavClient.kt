@@ -9,6 +9,7 @@ import com.linroid.ketch.core.engine.HttpBody
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.HttpReply
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.TransferWatchdog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
@@ -35,6 +36,8 @@ internal class WebDavClient(
   private val engine: HttpEngine,
   private val url: WebDavUrl,
   headers: Map<String, String>,
+  /** What `PROPFIND` and [probe] run under, as transfers do, so a silent server fails them. */
+  private val watchdog: TransferWatchdog = TransferWatchdog.Off,
 ) {
   private val log = KetchLogger("WebDavSource")
   private val basicHeader: Credentials? = headers.entries
@@ -74,7 +77,7 @@ internal class WebDavClient(
   suspend fun propfind(): DavProperties? {
     val body = HttpBody(DavProperties.REQUEST.encodeToByteArray(), XML)
     val reply = try {
-      send(PROPFIND, mapOf(DEPTH to "0"), body)
+      watchdog.watch { send(PROPFIND, mapOf(DEPTH to "0"), body) }
     } catch (e: KetchError.Unsupported) {
       // A server that takes PROPFIND for GET sends the file itself, too long for an answer.
       log.d { "PROPFIND answer too long (${e.describeCauses()}); reading the file as plain HTTP" }
@@ -103,12 +106,14 @@ internal class WebDavClient(
    * What a ranged `GET` of the first byte says about the resource ([HttpEngine.probe]), else a
    * `HEAD` for engines that cannot probe.
    */
-  suspend fun probe(): ServerInfo = authorized {
-    val to = target
-    try {
-      engine.probe(to.httpUrl, headers("GET", to))
-    } catch (_: UnsupportedOperationException) {
-      engine.head(to.httpUrl, headers(HEAD, to))
+  suspend fun probe(): ServerInfo = watchdog.watch {
+    authorized {
+      val to = target
+      try {
+        engine.probe(to.httpUrl, headers("GET", to))
+      } catch (_: UnsupportedOperationException) {
+        engine.head(to.httpUrl, headers(HEAD, to))
+      }
     }
   }
 
