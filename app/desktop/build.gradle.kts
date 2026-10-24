@@ -95,6 +95,17 @@ tasks.test {
     systemProperty("user.country$category", "US")
     systemProperty("user.script$category", "")
   }
+  // `-Psnapshots` renders the tray menu's snapshots to build/snapshots; without it they skip.
+  val snapshots = providers.gradleProperty("snapshots").map { it != "false" }.getOrElse(false)
+  inputs.property("snapshots", snapshots)
+  if (snapshots) {
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    systemProperty("ketch.snapshots", "true")
+    systemProperty("ketch.snapshots.dir", layout.buildDirectory.dir("snapshots").get().asFile.path)
+    // No window and no Dock icon.
+    systemProperty("java.awt.headless", "true")
+  }
 }
 
 // Some runtime jars bundle native libraries for systems other than the one they are named for. A

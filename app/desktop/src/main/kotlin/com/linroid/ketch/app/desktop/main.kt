@@ -582,15 +582,19 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   LaunchedEffect(notifier, behavior, files) {
     notifier.clicks.collect { openNotification(it, controller, behavior, files) }
   }
-  KetchTray(
-    controller = controller,
-    status = status,
-    actions = actions,
-    speedMode = speedMode,
-    state = trayState,
-    onMessageClick = notifier::trayMessageClicked,
-    updates = updater,
-  )
+  val exceptionHandlers = remember { windowExceptionHandlers(controller) }
+  // The tray's menu on Windows is a window too.
+  CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
+    KetchTray(
+      controller = controller,
+      status = status,
+      actions = actions,
+      speedMode = speedMode,
+      state = trayState,
+      onMessageClick = notifier::trayMessageClicked,
+      updates = updater,
+    )
+  }
   TaskbarFeedback(status, hooks.dockBadge, mainWindow)
   // Text resolves as it composes, so the menus compose again in a new language.
   val language = controller.appSettings.language
@@ -608,7 +612,6 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
   MacDockPresence(shown = behavior.windowVisible || settingsWindow.isOpen)
 
   val icon = painterResource(Res.drawable.icon)
-  val exceptionHandlers = remember { windowExceptionHandlers(controller) }
   CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides exceptionHandlers) {
     if (behavior.windowVisible) {
       Window(

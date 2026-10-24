@@ -242,6 +242,10 @@ private fun DevicePresence.toPulse(): DevicePulse = DevicePulse(
  * what it is doing and its own actions, the last finished downloads, Settings and Quit. Clicking
  * the icon on Windows and Linux shows the window.
  *
+ * On Windows Ketch draws the menu itself, in the app's font, colors and zoom ([TrayMenuWindow]),
+ * as Java's menus there only take Java's own fonts. macOS shows its own menu, and Linux Java's,
+ * whose sans-serif fontconfig maps to the system's.
+ *
  * The icon, its tooltip and the status sentence sum up every device the app keeps connected:
  * the sail, filled from its foot as far as the downloads have come, with a dot for failures not
  * seen yet, dimmed while everything is paused. On macOS it is a template image, which the menu
@@ -288,8 +292,8 @@ fun ApplicationScope.KetchTray(
   val now = LocalClock.current.now()
   val update = updates?.state?.collectAsState()?.value as? AppUpdateState.Ready
   val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices, update))
-  // Text resolves as it composes, so the menu composes again in a new language, and Windows
-  // measures items once, so a new zoom creates them again in its font.
+  // Text resolves as it composes, so the menu composes again in a new language, and Java's menus
+  // measure items once, so a new zoom creates them again in its font.
   val language = controller.appSettings.language
   val zoom = controller.appSettings.zoomScale
   val showSpeed = controller.appSettings.config.desktop.menuBarSpeed
@@ -297,15 +301,36 @@ fun ApplicationScope.KetchTray(
     look = trayIconLook(fleet, status.unseenFailures),
     speed = if (showSpeed) trayIconSpeed(fleet) else null,
   )
+  val tooltip = trayTooltip(fleet, now).resolve()
+  val platform = KeyboardPlatform.current
+  var menuRequest by remember { mutableStateOf<TrayMenuRequest?>(null) }
+  val menu = if (DesktopOs.current == DesktopOs.WINDOWS) {
+    remember { TrayIconMenu.Drawn { menuRequest = trayMenuRequest(it, systemScreens()) } }
+  } else {
+    TrayIconMenu.Java(remember(zoom) { trayMenuFont(zoom) }) {
+      key(language, zoom) { MenuEntries(entries, platform, commands::perform) }
+    }
+  }
   SystemTrayIcon(
     image = icon,
     state = state,
-    tooltip = trayTooltip(fleet, now).resolve(),
+    tooltip = tooltip,
     onAction = actions.showWindow,
     onMessageClick = onMessageClick,
-    menuFont = remember(zoom) { trayMenuFont(zoom) },
-  ) {
-    key(language, zoom) { MenuEntries(entries, KeyboardPlatform.current, commands::perform) }
+    menu = menu,
+  )
+  menuRequest?.let { request ->
+    // A new request opens a new menu; the one it replaces may still lose the focus afterwards.
+    key(request) {
+      TrayMenuWindow(
+        request = request,
+        appSettings = controller.appSettings,
+        title = tooltip,
+        onDismiss = { if (menuRequest === request) menuRequest = null },
+      ) {
+        menuEntries(entries, platform, commands::perform)
+      }
+    }
   }
 }
 

@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class TrayMenuFontTest {
   @Test
-  fun trayMenuFont_zoom_growsFromTheSizeOfWindowsMenusToTheNearestPixel() {
+  fun trayMenuFont_zoom_growsFromTwelvePixelsToTheNearestPixel() {
     assertEquals(12, trayMenuFont(1f).size)
     assertEquals(13, trayMenuFont(1.1f).size)
     assertEquals(18, trayMenuFont(1.5f).size)
