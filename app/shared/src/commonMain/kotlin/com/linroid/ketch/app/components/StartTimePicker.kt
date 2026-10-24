@@ -21,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedScheduler
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.clockTime
 import com.linroid.ketch.app.i18n.etaText
@@ -30,9 +32,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.weekdayShortText
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.LocalClock
-import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.config.SpeedRule
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_back
 import ketch.app.shared.generated.resources.action_cancel

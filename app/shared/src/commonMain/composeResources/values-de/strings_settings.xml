@@ -465,6 +465,7 @@
   <string name="settings_speed_mode_slow_lane">Drosselung</string>
   <string name="settings_speed_mode_auto">Automatisch</string>
   <string name="settings_speed_remote">Die Einstellungen gelten auf %1$s bis zum nächsten Neustart. Drosselung und Automatikmodus werden dort noch nicht unterstützt.</string>
+  <string name="settings_speed_remote_modes">%1$s führt Drosselung, Automatikmodus und Regeln selbst aus, auch wenn diese App geschlossen ist. Verbindungen pro Download gelten bis zum nächsten Neustart.</string>
   <string name="settings_speed_limit_group">Limit</string>
   <string name="settings_speed_limit">Tempolimit</string>
   <string name="settings_speed_limit_hint">Alle Downloads teilen es sich; das eigene Limit eines Downloads kann niedriger sein.</string>

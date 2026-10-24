@@ -1,0 +1,59 @@
+package com.linroid.ketch.cli
+
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.config.FileConfigStore
+import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.core.speed.ObservedPeak
+import kotlinx.coroutines.test.runTest
+import java.io.File
+import java.nio.file.Files
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class ServerSpeedModesTest {
+  private val dir: File = Files.createTempDirectory("ketch-speed-modes").toFile()
+  private val store = FileConfigStore(File(dir, "config.toml").path)
+
+  @AfterTest
+  fun cleanUp() {
+    dir.deleteRecursively()
+  }
+
+  @Test
+  fun saveSettings_capFromAFlag_keepsTheFilesSpeedLimit() = runTest {
+    store.save(KetchConfig(download = DownloadConfig(speedLimit = SpeedLimit.mbps(5))))
+    val options = serverSpeedModes(store, store.load(), startCap = SpeedLimit.mbps(10))
+
+    options.saveSettings(
+      SpeedSettings(mode = SpeedLimitMode.SlowLane, standard = SpeedLimit.mbps(10)),
+    )
+
+    val saved = store.load()
+    assertEquals(SpeedLimitMode.SlowLane, saved.speed.mode)
+    assertEquals(SpeedLimit.mbps(5), saved.download.speedLimit)
+  }
+
+  @Test
+  fun saveSettings_newCap_savedAsTheDownloadLimit() = runTest {
+    val options = serverSpeedModes(store, KetchConfig(), startCap = SpeedLimit.Unlimited)
+
+    options.saveSettings(SpeedSettings(standard = SpeedLimit.mbps(20)))
+
+    assertEquals(SpeedLimit.mbps(20), store.load().download.speedLimit)
+  }
+
+  @Test
+  fun savePeak_peak_savedUnderUi() = runTest {
+    val options = serverSpeedModes(store, KetchConfig(), startCap = SpeedLimit.Unlimited)
+
+    options.savePeak(ObservedPeak(bytesPerSecond = 8_000_000, atEpochMillis = 1_000))
+
+    val ui = store.load().ui
+    assertEquals(8_000_000, ui.observedPeak)
+    assertEquals(1_000, ui.observedPeakAt)
+  }
+}

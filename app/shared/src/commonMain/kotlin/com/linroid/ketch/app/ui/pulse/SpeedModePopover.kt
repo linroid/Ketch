@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
@@ -39,7 +40,6 @@ import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_any_in_sentence
 import ketch.app.shared.generated.resources.pulse_caption_capped
@@ -69,7 +69,7 @@ import kotlin.time.Instant
  * sheet on touch: Full speed, Slow lane or Auto, the speed limit, "Use as Slow lane speed" and
  * a link to the Speed settings of the active device.
  *
- * A device without a speed mode, such as a remote one, offers only its speed limit.
+ * A device without a speed mode, such as one running an older Ketch, offers only its speed limit.
  */
 @Composable
 fun SpeedModePopover(

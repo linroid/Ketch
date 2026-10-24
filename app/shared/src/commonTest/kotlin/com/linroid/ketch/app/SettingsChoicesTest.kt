@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.SpeedMode
@@ -29,7 +30,6 @@ import com.linroid.ketch.app.state.slowLanePresets
 import com.linroid.ketch.app.state.speedChoices
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toggleRuleDay
-import com.linroid.ketch.config.Weekday
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test

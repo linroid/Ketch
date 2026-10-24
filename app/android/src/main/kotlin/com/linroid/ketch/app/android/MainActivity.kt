@@ -368,7 +368,6 @@ internal class MainModel(application: Application) : AndroidViewModel(applicatio
         instanceManager = connected.instanceManager,
         aiProviderFactory = connected.aiProviderFactory,
         incoming = app.incoming,
-        speedMode = connected.speedMode,
         unreadableFiles = app.unreadableFiles,
         discoverHistory = app.discoverHistory,
       ).also(connected::follow)

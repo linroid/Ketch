@@ -5,6 +5,7 @@ import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.ServerState
 import com.linroid.ketch.app.platform.DetectedBrowser
@@ -20,7 +21,6 @@ import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.SearchSettings
 import com.linroid.ketch.config.ServerConfig
-import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.ThemeMode
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

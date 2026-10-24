@@ -1,7 +1,5 @@
-package com.linroid.ketch.app.state
+package com.linroid.ketch.api
 
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.Weekday
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant

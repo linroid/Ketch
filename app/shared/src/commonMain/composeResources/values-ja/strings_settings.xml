@@ -454,6 +454,7 @@
   <string name="settings_speed_mode_slow_lane">低速モード</string>
   <string name="settings_speed_mode_auto">自動</string>
   <string name="settings_speed_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。このデバイスでは低速モードと自動モードはまだ使えません。</string>
+  <string name="settings_speed_remote_modes">%1$sは速度モードとルールを自身で実行するため、このアプリを閉じていても適用されます。ダウンロードごとの接続数は再起動するとリセットされます。</string>
   <string name="settings_speed_limit_group">制限</string>
   <string name="settings_speed_limit">速度制限</string>
   <string name="settings_speed_limit_hint">すべてのダウンロードで共有します。各ダウンロードの制限でさらに低くできます。</string>

@@ -465,6 +465,7 @@
   <string name="settings_speed_mode_slow_lane">Modo lento</string>
   <string name="settings_speed_mode_auto">Automático</string>
   <string name="settings_speed_remote">Estas configurações valem em %1$s até a próxima reinicialização. O modo lento e o modo Automático ainda não estão disponíveis nesse dispositivo.</string>
+  <string name="settings_speed_remote_modes">%1$s aplica sozinho o modo de velocidade e as regras, mesmo com este app fechado. As conexões por download valem até a próxima reinicialização.</string>
   <string name="settings_speed_limit_group">Limite</string>
   <string name="settings_speed_limit">Limite de velocidade</string>
   <string name="settings_speed_limit_hint">Todos os downloads dividem esse limite; o limite próprio de um download pode ser menor.</string>

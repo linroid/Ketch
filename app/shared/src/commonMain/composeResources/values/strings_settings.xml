@@ -617,6 +617,7 @@
   <string name="settings_speed_mode_auto">Auto</string>
   <!-- On the page of a device that is not this one, %1$s. -->
   <string name="settings_speed_remote">Saved on %1$s until it restarts. No Slow lane or Auto for it yet.</string>
+  <string name="settings_speed_remote_modes">%1$s runs its speed mode and rules itself, even while this app is closed. Connections per download last until it restarts.</string>
   <!-- The group and row of a device without speed modes, which has one limit. -->
   <string name="settings_speed_limit_group">Limit</string>
   <string name="settings_speed_limit">Speed limit</string>

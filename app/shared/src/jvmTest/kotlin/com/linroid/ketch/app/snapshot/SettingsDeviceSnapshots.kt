@@ -8,17 +8,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
-import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
@@ -28,19 +29,11 @@ import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
-import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.days
@@ -179,6 +172,16 @@ class SettingsDeviceSnapshots {
   }
 
   @Test
+  fun remote_speedPage_offersTheSpeedModesTheDeviceRuns() {
+    pageSnapshots(
+      name = "settings-remote-speed-modes",
+      category = SettingsCategory.Speed,
+      sizes = listOf(Pane, PhonePage),
+      setup = DeviceSetup(remote = true, remoteSpeedModes = true),
+    )
+  }
+
+  @Test
   fun app_deviceSettingsPages_openThroughIntents() {
     val sizes = listOf(SnapshotSize.Medium, SnapshotSize.Phone)
     appPageSnapshots("app-settings-speed", sizes) { openSettings(SettingsTarget.Page.Speed) }
@@ -279,6 +282,8 @@ private fun PageFrame(
  * @property folder the download folder chosen for it; `null` uses its Downloads folder.
  * @property pendingPort a port saved after sharing started, which asks for a restart.
  * @property remote whether the pages show the NAS, a remote device, instead of this one.
+ * @property remoteSpeedModes whether the NAS runs [speed] itself; without, it runs an older
+ *   Ketch with a plain speed limit.
  * @property networksFail whether asking the device for its networks fails.
  * @property proxy how the device's downloads reach servers.
  * @property upload what the device shares with the peers of its torrents.
@@ -309,6 +314,7 @@ private data class DeviceSetup(
   val folder: String? = null,
   val pendingPort: Int? = null,
   val remote: Boolean = false,
+  val remoteSpeedModes: Boolean = false,
   val networksFail: Boolean = false,
   val proxy: Proxy = Proxy.System,
   val upload: TorrentUploadMode = TorrentUploadMode.Seed,
@@ -346,9 +352,11 @@ private class DeviceEnvironment(
       },
     )
   }
-  private val api = NetworkedApi(SampleKetchApi(data), fail = setup.networksFail)
+  private val api = NetworkedApi(
+    SampleKetchApi(data, speed = setup.speed, observedPeak = PEAK),
+    fail = setup.networksFail,
+  )
   private val store = RecordingConfigStore(config(theme, density, setup))
-  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
@@ -382,7 +390,13 @@ private class DeviceEnvironment(
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
         RemoteInstance(
-          instance = NetworkedApi(SampleKetchApi(data)),
+          instance = NetworkedApi(
+            SampleKetchApi(
+              data,
+              speed = setup.speed.takeIf { setup.remoteSpeedModes },
+              observedPeak = PEAK,
+            ),
+          ),
           remoteConfig = config,
           connectionState = MutableStateFlow(ConnectionState.Connected),
         )
@@ -392,26 +406,12 @@ private class DeviceEnvironment(
     configStore = store,
     context = SnapshotHarness.ui,
   )
-  private val speedMode = SpeedModeController(
-    config = { api.status().config },
-    apply = { api.updateConfig(it) },
-    scope = speedScope,
-    settings = setup.speed,
-    observedPeak = ObservedPeak(
-      bytesPerSecond = PEAK,
-      atEpochMillis = (SampleData.NOW - 1.days).toEpochMilliseconds(),
-    ),
-    scheduler = SpeedScheduler { TimeZone.UTC },
-    clock = SampleData.CLOCK,
-  )
-
   /** The controller the pages and the app root show. */
   override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
-    speedMode = speedMode,
     clock = SampleData.CLOCK,
   )
 
@@ -425,7 +425,6 @@ private class DeviceEnvironment(
 
   override fun close() {
     controller.close()
-    speedScope.cancel()
     instanceManager.close()
   }
 

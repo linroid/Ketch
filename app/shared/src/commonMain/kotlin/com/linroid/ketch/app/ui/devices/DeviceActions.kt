@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.ui.devices
 
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -19,7 +20,6 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.ui.pulse.speedModeFor
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_reconnect_failed
 import kotlinx.coroutines.Job
@@ -39,7 +39,7 @@ internal fun AppState.runNextAction(entry: InstanceEntry, action: NextAction): J
   is NextAction.StartNow -> startNow(action.task)
 }
 
-/** Speed mode of [device], or `null` when it has none: only the embedded device can. */
+/** Speed mode of [device], or `null` when it runs none (see [speedModeFor]). */
 internal fun AppState.speedModeOf(device: DevicePresence): SpeedModeController? =
   speedModeFor(device.entry)
 

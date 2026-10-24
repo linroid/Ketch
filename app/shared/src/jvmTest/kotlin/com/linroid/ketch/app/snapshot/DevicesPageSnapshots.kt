@@ -14,6 +14,7 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -21,7 +22,6 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.ListTestTask
-import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.config.DensityMode
@@ -222,7 +222,10 @@ private class DevicesPageEnvironment(
     .filter { it.state.value is DownloadState.Downloading }
     .associateWith { it.state.value as DownloadState.Downloading }
   private val denPc = MutableStateFlow<ConnectionState>(ConnectionState.Connected)
-  private val local = NetworkedApi(SampleKetchApi(data), en0 = listOf("192.168.1.20"))
+  private val local = NetworkedApi(
+    SampleKetchApi(data, speed = SpeedSettings()),
+    en0 = listOf("192.168.1.20"),
+  )
   private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -240,19 +243,11 @@ private class DevicesPageEnvironment(
     clock = clock,
     context = SnapshotHarness.ui,
   )
-  private val speedMode = SpeedModeController(
-    config = { local.status().config },
-    apply = { local.updateConfig(it) },
-    scope = speedScope,
-    clock = SampleData.CLOCK,
-  )
-
   override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
-    speedMode = speedMode,
     clock = SampleData.CLOCK,
   )
 

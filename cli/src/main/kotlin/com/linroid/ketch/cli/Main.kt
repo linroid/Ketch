@@ -3,27 +3,28 @@ package com.linroid.ketch.cli
 import ch.qos.logback.classic.Level
 import com.linroid.ketch.ai.AiConfig
 import com.linroid.ketch.ai.AiModule
-import com.linroid.ketch.ai.resolveAiSettingsFromEnv
-import com.linroid.ketch.api.DownloadPriority
-import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.Proxy
-import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.log.KetchLogger
-import com.linroid.ketch.api.log.LogLevel
-import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.ai.DiscoverDevice
 import com.linroid.ketch.ai.DiscoverQuery
 import com.linroid.ketch.ai.DiscoveryException
 import com.linroid.ketch.ai.PageAccessApprover
 import com.linroid.ketch.ai.agent.DiscoveryStepListener
+import com.linroid.ketch.ai.resolveAiSettingsFromEnv
+import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.LogLevel
+import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.config.CONFIG_DIR_ENV
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.SearchProvider
-import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentEncryptionMode
+import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.config.defaultConfigPath
@@ -31,23 +32,23 @@ import com.linroid.ketch.config.defaultDbPath
 import com.linroid.ketch.config.generateConfig
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.geo.DbIpCountryDatabase
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
-import com.linroid.ketch.torrent.TorrentConfig
-import com.linroid.ketch.torrent.TorrentDownloadSource
-import com.linroid.ketch.torrent.TorrentEncryption
-import com.linroid.ketch.dash.DashDownloadSource
-import com.linroid.ketch.webdav.WebDavDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
-import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.hls.HlsDownloadSource
+import com.linroid.ketch.hooks.HookRunner
 import com.linroid.ketch.mcp.KetchMcpServer
 import com.linroid.ketch.metalink.MetalinkDownloadSource
 import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
+import com.linroid.ketch.torrent.TorrentConfig
+import com.linroid.ketch.torrent.TorrentDownloadSource
+import com.linroid.ketch.torrent.TorrentEncryption
 import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -514,6 +515,12 @@ private fun runServer(args: Array<String>): Int {
       MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
     countries = DbIpCountryDatabase(File(defaultConfigDir(), COUNTRY_DATABASE_FILE)),
+    // Clients switch them; the server follows them while none is connected.
+    speedModes = serverSpeedModes(
+      store = FileConfigStore(configPath ?: defaultConfigPath()),
+      saved = fileConfig,
+      startCap = downloadConfig.speedLimit,
+    ),
   )
   val server = KetchServer(
     ketch,
@@ -588,6 +595,9 @@ private fun runServer(args: Array<String>): Int {
       "  Speed limit:   " +
         "${downloadConfig.speedLimit.bytesPerSecond / 1024} KB/s"
     )
+  }
+  if (fileConfig.speed.mode != SpeedLimitMode.Full) {
+    println("  Speed mode:    " + describeSpeedMode(fileConfig.speed))
   }
   println()
   if (token.value == null && !serverConfig.isLoopbackOnly) {

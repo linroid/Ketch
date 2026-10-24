@@ -88,10 +88,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   which, as the server, MCP and `ketch --list-files` word it),
   `ActiveConnections`, `ActiveConnection`, `ConnectionDirection`, `ConnectionRoute`, `PeerDetails`,
   `CountryDatabase` (its `Key` is a `ControlKey`) and `CountryDatabaseStatus`,
+  `SpeedModes` (its `Key` is a `ControlKey`: an instance's Full speed, Slow lane and Auto rules),
+  `SpeedModeState`, `SpeedModeChange`, `SpeedSettings` (`[speed]`), `SpeedRule`,
+  `SpeedLimitMode`, `Weekday`, `SpeedScheduler` and `SpeedWindow` (the rules read in a time zone),
   `ControlKey` (`KetchApi.controller(key)` looks up optional typed controllers that other modules
   define; `null` by default), `Interest` (what `KetchApi.subscribe(interest, interval)`, abstract,
-  follows: `Interest.Segments(taskIds)`, `Interest.Stats` (`KetchStats`) and
-  `Interest.Connections(limit)`; other modules define their own, all serializable, each naming the
+  follows: `Interest.Segments(taskIds)`, `Interest.Stats` (`KetchStats`),
+  `Interest.Connections(limit)` and `Interest.SpeedMode` (`SpeedModeState`); other modules define
+  their own, all serializable, each naming the
   `valueSerializer` servers encode what it reports with; a flow ends when what it follows is gone,
   and an instance fails those it does not know with `UnsupportedOperationException` when
   collected), `Checksum`, `ChecksumAlgorithm`, and
@@ -151,6 +155,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.core.geo` -- `CountryLookup` (a `CountryDatabase` `Ketch(countries = ...)`
   names `ActiveConnection.country` with), internal `CountryTable`, and `DbIpCountryDatabase`
   (jvmAndAndroidMain)
+- `com.linroid.ketch.core.speed` -- `SpeedModeOptions` (what `Ketch(speedModes = ...)` starts
+  from and saves through) and `ObservedPeak`; internal `SpeedModeKeeper` (the `SpeedModes`
+  `Ketch` runs)
 - `com.linroid.ketch.core.mirror` -- `MirrorDownloadHelper` (one file of known size from several
   HTTP(S) mirrors at once, with piece checks and repair), `Mirror`, `PieceHashes`,
   `mirrorHeaders()`; internal `MirrorPool` (least busy mirror, backoff, dropping)
@@ -300,7 +307,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `AiSettings`, `LlmSettings`, `LlmProvider`, `LlmApi`, `LlmProviderGroup`, `SearchSettings`,
   `SearchProvider`,
   `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
-  `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
+  `AccentColor`, `ThemeMode`, `UiPreferences`, `DesktopSettings`,
   `NotificationSettings`, `IntegrationSettings`, `PowerSettings`, `HookConfig`, `HookEvent`
 
 ### `app:shared` (`com.linroid.ketch.app`)
@@ -308,7 +315,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ConnectionGridModel`, `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`,
   `KeepAwake`, `SleepInhibitor`, `FileSelectionModel`, `FileOrder`, `AiDiscoverController`,
   `DiscoverSession`, `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
-  (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
+  (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`, and
+  `embeddedSpeedModes()` in nonWebMain), `theme` (`KetchTheme`
   tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
   `CommandScope`, `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`,
   `UnreadableFiles`) and `util`
@@ -726,6 +734,23 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   run, such as a lent torrent seeder, pay `DownloadContext.globalThrottle`, the global limit
   alone, which holds nothing of the run. Seeders `TorrentControls` restores have no context and
   pay no Ketch limit
+- Speed modes (`Ketch(speedModes = SpeedModeOptions(...))`, `controller(SpeedModes)`, listed as
+  `KetchFeatures.SPEED_MODES`, `speed.modes`): the engine switches its own global limit between
+  the standing cap (`SpeedSettings.standard`), Full speed, and the slow lane, by hand
+  (`SpeedLimitMode.SlowLane`) or while a weekly `SpeedRule` holds in `Auto`, so the schedule runs
+  on the device doing the downloads, also while no client is connected. `SpeedModeKeeper`
+  evaluates the rules (`SpeedScheduler`, wall-clock times in the system time zone) whenever one
+  starts or ends and at least every minute, and records the highest download speed it sees in a
+  week outside the slow lane (`SpeedModeState.observedPeak`), whose `SLOW_LANE_PERCENT` (30 %)
+  is the slow lane's suggested speed when none is set (at least 256 KB/s, 1 MB/s without a
+  peak). The slow lane never runs faster than the cap. `DownloadConfig.speedLimit` stays the
+  limit in effect; the cap is always current: at full speed every limit set is the cap, and
+  outside it `updateConfig` takes a `speedLimit` other than the one in effect as the new cap,
+  while one that writes back the limit in effect changes nothing. The engine starts from
+  `config.speedLimit` as the cap; `SpeedModeOptions.saveSettings` saves each change before it
+  returns (hosts write `[speed]` and the cap as `[download] speedLimit`), `savePeak` the peak once
+  it held 10 s (`[ui] observedPeak`). `Interest.SpeedMode` follows the state. Tests:
+  `SpeedModeKeeperTest` (virtual time), `KetchSpeedModesTest`, `RemoteSpeedModesTest` (server)
 - Token-bucket algorithm (`TokenBucket`) with delegating wrapper. Waiters queue by owner
   (`SpeedLimiter.acquire(bytes, owner)`; the global limiter's owner is the task ID) and are served
   in turns of at most 16 KiB by start-time fair queuing, so tasks share the global limit equally
@@ -1636,8 +1661,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
   `TorrentPeerEncryption.policy`, a uTP endpoint that refuses new connections while off, a port
   mapper started or stopped, and the LAN discovery group joined or left)
-- `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
-  `SpeedRule`s), applied by the apps' `SpeedModeController`; `UiPreferences` (`[ui]`): view
+- `[speed]` (`SpeedSettings`, from `library:api`): the speed mode (Full speed, Slow lane, Auto
+  with weekly `SpeedRule`s) of the engine that runs this directory's downloads, which reads and
+  saves it (the apps' embedded engine, or `ketch server`); `UiPreferences` (`[ui]`): view
   state such as table columns, sort, sidebar, inspector, density, per-device add sheet defaults,
   Discover's docked history (`discoverHistory`) and onboarding; `DesktopSettings`: close action,
   open at login, Dock badge, the speed in the macOS menu bar (`menuBarSpeed`), daily update
@@ -1811,6 +1837,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   task only meant to seed, are in the inspector only). Auto connections and queue positions only
   show for devices whose `KetchStatus.features` list them (`AppState.featuresOf`; the embedded
   engine has all, `EmbeddedFeatures`)
+- Speed modes on every device: the engine of the device doing the downloads runs them
+  (`SpeedModes`), so a phone can switch a NAS to the Slow lane or Auto and the NAS follows its
+  rules while the phone is away. `SpeedModeController` (`state/`) is the app's view of one
+  device's speed modes, following `Interest.SpeedMode`; `InstanceManager` makes one for the
+  embedded engine (`embeddedSpeedMode`, the hosts pass `embeddedSpeedModes(config, save)` to its
+  `Ketch`) and one for each connected remote client, and `speedModes` lists those that reported
+  one (a remote device running an older Ketch never does). `AppState.speedModeFor(entry)` is the
+  device's: the Speed page shows Mode, Limits and Rules for any device that has one (a remote one
+  listing `speed.modes` loads until it reports, an older one keeps the plain speed limit and its
+  note), and the Pulse pill and popover, device rows and menus, the palette and the desktop menu
+  bar switch the shown device's; `DevicePresence.speedMode` is each device's own
 - Remote devices send what is shown: every task's state at once and progress every second; the
   segments of the rows on screen every second on desktop and the web (`WatchShownTasks`; phones
   leave them out) and of the inspected tasks every 500 ms (`AppState.followSegments`); while the
@@ -1978,6 +2015,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `selection` and `seeding` commands guarded by a revision and an idempotency key, and an SSE
   `events` stream of snapshots (deprecated: the event stream carries them). Command failures
   answer with the `TorrentCommandError` wire name
+- Speed modes (`SpeedRoutes`, with `controller(SpeedModes)`, else not installed: `404`):
+  `GET /api/speed` answers the `SpeedModeState`, `PUT /api/speed` applies a `SpeedModeChange`
+  (fields left out unchanged; `slowLane` `unlimited` follows the suggestion) and answers the
+  state; the event stream's `speedMode` interest follows them. `RemoteKetch.controller(SpeedModes)`
+  fails closed with `UnsupportedOperationException` against servers without `speed.modes`
 - Live connections (`ConnectionRoutes`): `GET /api/connections?limit=1..1024` answers the first
   `ActiveConnections` snapshot and `/api/connections/events` (deprecated: the event stream
   carries them) streams `snapshot` events (id: a per-stream count), repeating the last one every
@@ -2097,6 +2139,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it) over `config.toml`, such as `--torrent-port`/`KETCH_TORRENT_PORT` and
   `--torrent-upload`/`KETCH_TORRENT_UPLOAD` (`[torrent] upload`). It exits 1 when it cannot start
   and 2 for invalid options
+- `ketch server` runs the speed modes of `[speed]` (`serverSpeedModes`), which clients switch and
+  it follows on its own, and saves them back to its config file (`--config`, else the default
+  one) as they change, with the cap as `[download] speedLimit` only once it differs from the one
+  it started with, which a flag or `KETCH_SPEED_LIMIT` may have set; its banner names a mode other
+  than full speed
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
@@ -2459,7 +2506,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "FtpClient", "WebDavSource", "TorrentSource", "TorrentEngine", "TorrentSession",
   "TorrentSwarm", "TorrentTracker", "TorrentWebSeed", "TorrentLsd", "TrackerList",
   "TorrentController", "TorrentControls", "Connections", "RemoteKetch", "RemoteTask",
-  "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore",
+  "RemotePairing", "RemoteTorrents", "TokenBucket", "SpeedModes", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
   "GitHubReleases", "Hooks", "Mirrors", "MetalinkSource";

@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.NotificationCopy
@@ -31,7 +32,6 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.config.DockBadgeMode
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest

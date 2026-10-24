@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.desktop
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadCondition
 import com.linroid.ketch.api.DownloadConfig
@@ -16,20 +17,41 @@ import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedModeChange
+import com.linroid.ketch.api.SpeedModeState
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.SystemInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlin.time.Duration
 import kotlin.time.Instant
 
-/** A device that records the downloads and the settings it is given. */
-internal class FakeDevice : KetchApi {
+/**
+ * A device that records the downloads and the settings it is given, and switches between speed
+ * modes when it [runsSpeedModes].
+ */
+internal class FakeDevice(runsSpeedModes: Boolean = false) : KetchApi {
   private val list = MutableStateFlow<List<DownloadTask>>(emptyList())
 
-  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
+  /** Its speed modes: switching between them only, with the slow lane at 1 MB/s. */
+  private val speedModes = if (runsSpeedModes) FakeSpeedModes() else null
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    if (interest == Interest.SpeedMode && speedModes != null) {
+      speedModes.states as Flow<T>
+    } else {
+      emptyFlow()
+    }
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    speedModes.takeIf { key === SpeedModes.Key } as T?
 
   /** Requests passed to [download], in order. */
   val requests = mutableListOf<DownloadRequest>()
@@ -76,6 +98,18 @@ internal class FakeDevice : KetchApi {
   }
 
   override fun close() {}
+}
+
+/** Speed modes that only switch their mode. */
+private class FakeSpeedModes : SpeedModes {
+  val states = MutableStateFlow(SpeedModeState())
+
+  override suspend fun state(): SpeedModeState = states.value
+
+  override suspend fun update(change: SpeedModeChange): SpeedModeState = states.updateAndGet {
+    val mode = change.mode ?: it.settings.mode
+    it.copy(settings = it.settings.copy(mode = mode), inSlowLane = mode == SpeedLimitMode.SlowLane)
+  }
 }
 
 /** A task that changes state as it is told to. */

@@ -52,10 +52,13 @@ object KetchFeatures {
   /** [KetchApi.controller] offers a [CountryDatabase], for [ActiveConnection.country]. */
   const val COUNTRIES: String = "net.countries"
 
+  /** [KetchApi.controller] offers [SpeedModes], which [Interest.SpeedMode] follows. */
+  const val SPEED_MODES: String = "speed.modes"
+
   /** Every feature named here; other modules name their controllers' own. */
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
     CATEGORY_FOLDERS, TRANSFER_TIMEOUTS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS,
-    CHECKSUM, COUNTRIES, METALINK,
+    CHECKSUM, COUNTRIES, METALINK, SPEED_MODES,
   )
 }

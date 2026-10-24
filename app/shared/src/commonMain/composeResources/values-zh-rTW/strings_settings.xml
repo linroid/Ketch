@@ -454,6 +454,7 @@
   <string name="settings_speed_mode_slow_lane">低速模式</string>
   <string name="settings_speed_mode_auto">自動</string>
   <string name="settings_speed_remote">設定將在 %1$s 上生效，重新啟動該裝置後會重設。該裝置尚不支援低速模式和自動模式。</string>
+  <string name="settings_speed_remote_modes">%1$s 會自行執行速度模式和規則，即使關閉本應用程式也會生效。每個下載的連線數在該裝置重新啟動後會重設。</string>
   <string name="settings_speed_limit_group">限制</string>
   <string name="settings_speed_limit">速度限制</string>
   <string name="settings_speed_limit_hint">所有下載的總速度受此限制；個別下載可設定更低的速度上限。</string>

@@ -11,8 +11,6 @@ import android.os.Binder
 import android.os.IBinder
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.ServiceCompat
-import com.linroid.ketch.api.DownloadState
-import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.LogLevel
@@ -22,18 +20,19 @@ import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
 import com.linroid.ketch.app.feedback.ActivityRouting
 import com.linroid.ketch.app.feedback.ActivitySource
-import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.AndroidFeedbackPlayer
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
-import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.PairingNotices
+import com.linroid.ketch.app.feedback.SuccessFeedback
+import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.pairingNotificationCopy
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.instance.embeddedSpeedModes
 import com.linroid.ketch.app.instance.isUnmeteredNow
 import com.linroid.ketch.app.instance.unmeteredNetworkChanges
 import com.linroid.ketch.app.instance.uploadsPaused
@@ -44,7 +43,6 @@ import com.linroid.ketch.app.state.ForegroundPolicy
 import com.linroid.ketch.app.state.ForegroundStatus
 import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.pauseActiveTasks
@@ -54,9 +52,9 @@ import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.geo.DbIpCountryDatabase
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
-import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.metalink.MetalinkDownloadSource
@@ -72,7 +70,6 @@ import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
@@ -85,7 +82,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
@@ -112,8 +108,8 @@ class KetchService : Service() {
     private set
 
   /**
-   * Speed mode of the embedded device. The service owns it, so speed rules keep applying while
-   * the app is closed and the ongoing notification's Slow lane button can switch it.
+   * Speed mode of the embedded device, which its engine runs, so speed rules keep applying while
+   * the app is closed; the ongoing notification's Slow lane button switches it.
    */
   lateinit var speedMode: SpeedModeController
     private set
@@ -125,7 +121,6 @@ class KetchService : Service() {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private val binder = LocalBinder()
   private val toasts = Channel<ActivityEvent>(EVENT_BUFFER, BufferOverflow.DROP_OLDEST)
-  private val speed = MutableStateFlow(0L)
   private val discovering = MutableStateFlow(0)
 
   // `[power] keepAwake`, as the app's settings last said, and whether the service runs in the
@@ -235,6 +230,9 @@ class KetchService : Service() {
             ),
             // Left out of backups, as it downloads again on request.
             countries = DbIpCountryDatabase(File(noBackupFilesDir, COUNTRY_DATABASE_FILE)),
+            speedModes = embeddedSpeedModes(config) { transform ->
+              withContext(Dispatchers.Main) { saveConfig(transform) }
+            },
           )
         },
         localServerFactory = { ketchApi, pairingRequests ->
@@ -298,16 +296,7 @@ class KetchService : Service() {
       configStore = configStore,
     )
     val embedded = checkNotNull(instanceManager.embedded) { "No embedded instance" }
-    speedMode = SpeedModeController(
-      config = { embedded.status().config },
-      apply = { embedded.updateConfig(it) },
-      scope = scope,
-      settings = config.speed,
-      observedPeak = ObservedPeak(config.ui.observedPeak, config.ui.observedPeakAt),
-      speed = speed,
-    )
-
-    saveSpeedMode()
+    speedMode = checkNotNull(instanceManager.embeddedSpeedMode) { "No speed modes" }
     startForegroundMonitor(embedded)
     startActivityMonitor(embedded)
     startPairingNotices()
@@ -462,7 +451,6 @@ class KetchService : Service() {
           // The service can leave the foreground meanwhile, such as at its time limit; posting
           // then would leave a notification behind that nothing removes.
           if (!isForeground) break
-          speed.value = totalSpeed(embedded.tasks.value)
           notifier.refreshOngoing(ongoing(status))
         }
       }
@@ -550,27 +538,6 @@ class KetchService : Service() {
     }
   }
 
-  /** Saves the speed mode and the observed peak to `config.toml` as they change. */
-  @OptIn(FlowPreview::class)
-  private fun saveSpeedMode() {
-    scope.launch {
-      speedMode.settings.drop(1).collect { speed -> saveConfig { it.copy(speed = speed) } }
-    }
-    scope.launch {
-      // The peak climbs in steps while a download speeds up.
-      speedMode.observedPeak.drop(1).debounce(PEAK_SAVE_DELAY).collect { peak ->
-        saveConfig {
-          it.copy(
-            ui = it.ui.copy(
-              observedPeak = peak.bytesPerSecond,
-              observedPeakAt = peak.atEpochMillis,
-            ),
-          )
-        }
-      }
-    }
-  }
-
   // Reads and writes run on the main thread, like the app's settings, so they cannot interleave.
   private fun loadConfig(): KetchConfig = try {
     instanceManager.configStore?.load() ?: KetchConfig()
@@ -595,9 +562,6 @@ class KetchService : Service() {
       slowLane = speedMode.mode.value.isSlowLane,
       discovering = status.discovering > 0,
     )
-
-  private fun totalSpeed(tasks: List<DownloadTask>): Long =
-    tasks.sumOf { (it.state.value as? DownloadState.Downloading)?.progress?.bytesPerSecond ?: 0L }
 
   private fun enterForeground(notification: Notification) {
     try {
@@ -642,7 +606,6 @@ class KetchService : Service() {
 
   private companion object {
     const val EVENT_BUFFER = 64
-    val PEAK_SAVE_DELAY = 10.seconds
     val RECOVERY_HOLD = 30.seconds
   }
 }

@@ -64,8 +64,8 @@ import kotlin.time.Instant
  *   app first reached it; they count as seen once it shows with the app in front.
  * @property cap its global speed limit as of [status]; unlimited until it has been read.
  * @property disk space where it saves downloads; `null` until it has been read.
- * @property speedMode its speed mode; [SpeedMode.Full] for remote devices, whose mode the app
- *   cannot read yet.
+ * @property speedMode its speed mode, as it last reported it; [SpeedMode.Full] for a device that
+ *   runs none, such as one running an older Ketch.
  * @property history its total speed once a second, oldest first, at most
  *   [PulseModel.HISTORY_SIZE] samples.
  */
@@ -115,7 +115,7 @@ data class DevicePresence(
  * @param connected ids of the remote devices whose client is connected or connecting.
  * @param serverState state of the embedded device's server, for its health.
  * @param shown devices the app shows; their failures count as seen while [inForeground].
- * @param localMode speed mode of the embedded device.
+ * @param speedModes speed mode of each device that runs them, by device id.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class DevicePresenceModel(
@@ -124,7 +124,7 @@ internal class DevicePresenceModel(
   private val serverState: Flow<ServerState>,
   shown: Flow<DeviceScope>,
   inForeground: Flow<Boolean>,
-  localMode: Flow<SpeedMode>,
+  speedModes: Flow<Map<String, SpeedMode>>,
   scope: CoroutineScope,
   private val clock: Clock,
 ) {
@@ -145,11 +145,11 @@ internal class DevicePresenceModel(
     pulse.devices,
     combine(statuses, unseen, lastSeen, ::Readings),
     connected,
-    localMode,
-  ) { entries, pulses, readings, connectedIds, mode ->
+    speedModes,
+  ) { entries, pulses, readings, connectedIds, modes ->
     val pulseOf = pulses.associateBy { it.deviceId }
     entries.mapNotNull { entry ->
-      pulseOf[entry.deviceId]?.let { presenceOf(entry, it, readings, connectedIds, mode) }
+      pulseOf[entry.deviceId]?.let { presenceOf(entry, it, readings, connectedIds, modes) }
     }
   }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
@@ -212,7 +212,7 @@ internal class DevicePresenceModel(
     pulse: DevicePulse,
     readings: Readings,
     connectedIds: Set<String>,
-    localMode: SpeedMode,
+    speedModes: Map<String, SpeedMode>,
   ): DevicePresence {
     val reading = readings.statuses[pulse.deviceId]
     return DevicePresence(
@@ -231,7 +231,7 @@ internal class DevicePresenceModel(
       unseenFailures = readings.unseen[pulse.deviceId] ?: 0,
       cap = pulse.cap,
       disk = pulse.disk,
-      speedMode = if (entry is EmbeddedInstance) localMode else SpeedMode.Full,
+      speedMode = speedModes[pulse.deviceId] ?: SpeedMode.Full,
       history = pulse.history,
     )
   }
