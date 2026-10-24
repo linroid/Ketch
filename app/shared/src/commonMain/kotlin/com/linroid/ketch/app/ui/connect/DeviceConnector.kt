@@ -30,8 +30,13 @@ import kotlin.time.Duration.Companion.seconds
  *   [ConnectionState.Unauthorized] when it asked for an access code, and
  *   [ConnectionState.Disconnected] when it did not answer in time.
  * @property name the name it announces, read once it let Ketch in; `null` when unknown.
+ * @property instanceId the identity it reports, read with [name]; `null` when unknown.
  */
-internal data class ProbeResult(val state: ConnectionState, val name: String? = null)
+internal data class ProbeResult(
+  val state: ConnectionState,
+  val name: String? = null,
+  val instanceId: String? = null,
+)
 
 /** Tries a device before it is added, so a typo or a missing code is caught in the form. */
 internal fun interface ConnectionProbe {
@@ -52,15 +57,15 @@ internal object RemoteProbe : ConnectionProbe {
         client.connectionState.first { it != ConnectionState.Connecting }
       } ?: ConnectionState.Disconnected(NO_ANSWER)
       if (state != ConnectionState.Connected) return ProbeResult(state)
-      val name = try {
-        client.status().name
+      val status = try {
+        client.status()
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        log.d { "Couldn't read the name of ${config.host}:${config.port}: ${e.describeCauses()}" }
+        log.d { "Couldn't read the status of ${config.host}:${config.port}: ${e.describeCauses()}" }
         null
       }
-      return ProbeResult(state, name)
+      return ProbeResult(state, status?.name, status?.instanceId)
     } finally {
       client.close()
     }
@@ -93,6 +98,9 @@ internal sealed interface ConnectOutcome {
 
   /** Nothing answered at the address. */
   data object Unreachable : ConnectOutcome
+
+  /** The device at the address is this one, which the app shows already. */
+  data object ThisDevice : ConnectOutcome
 }
 
 /**
@@ -134,7 +142,9 @@ internal class DeviceConnector(
   /**
    * Connects to [link]. A device added before is tried with the code it has unless [link]
    * brings one. With [check] off the device is added without trying it first, such as one that
-   * is switched off now, and by default not shown, since there is nothing to show yet.
+   * is switched off now, and by default not shown, since there is nothing to show yet. A device
+   * that reports this device's identity is this device, such as its own shared server reached
+   * at another address, and is never added.
    *
    * @param show whether to show the device once it is added.
    */
@@ -144,26 +154,35 @@ internal class DeviceConnector(
     show: Boolean = check,
   ): ConnectOutcome {
     var name = deviceNameOrNull(link.name)
+    var instanceId: String? = null
     if (check) {
       val saved = remoteAt(link)?.remoteConfig?.apiToken
       val result = probe.check(link.copy(token = link.token ?: saved).toRemoteConfig())
       log.d { "${link.address} answered ${result.state}" }
       when (result.state) {
-        ConnectionState.Connected -> name = name ?: deviceNameOrNull(result.name)
+        ConnectionState.Connected -> {
+          name = name ?: deviceNameOrNull(result.name)
+          instanceId = result.instanceId
+        }
         ConnectionState.Unauthorized -> return ConnectOutcome.NeedsCode(link.token != null)
         else -> return ConnectOutcome.Unreachable
       }
+      if (instanceId != null && instanceId == manager.instanceId) {
+        log.i { "Not adding ${link.address}, which is this device" }
+        return ConnectOutcome.ThisDevice
+      }
     }
-    val device = save(link.copy(name = name))
+    val device = save(link.copy(name = name), instanceId)
     if (show) switchTo(device)
     return ConnectOutcome.Connected(device)
   }
 
-  // A device already added keeps its connection unless the code or the scheme changed.
-  private suspend fun save(link: PairingLink): RemoteInstance {
+  // A device already added keeps its connection unless the code or the scheme changed, and
+  // learns its identity once connected.
+  private suspend fun save(link: PairingLink, instanceId: String?): RemoteInstance {
     val existing = remoteAt(link) ?: run {
       log.i { "Adding ${link.address}" }
-      return manager.addRemote(link.toRemoteConfig())
+      return manager.addRemote(link.toRemoteConfig().copy(instanceId = instanceId))
     }
     val token = link.token?.takeIf { it != existing.remoteConfig.apiToken }
     if (token != null || link.secure != existing.remoteConfig.secure) {

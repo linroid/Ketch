@@ -147,6 +147,7 @@
   <string name="connect_port">Порт</string>
   <string name="connect_use_https">Использовать HTTPS</string>
   <string name="connect_unreachable">Не удалось связаться с %1$s. Убедитесь, что в Ketch на том устройстве открыт общий доступ и оба устройства подключены к одной сети.</string>
+  <string name="connect_this_device">%1$s — адрес этого устройства. Его загрузки уже показаны здесь.</string>
   <string name="connect_add_anyway">Всё равно добавить</string>
   <string name="connect_add_failed">Не удалось добавить устройство: %1$s</string>
   <string name="connect_connected">Подключено к %1$s</string>

@@ -77,7 +77,7 @@ deleting the file makes a new one on the next start.
 
 | Path | Holds |
 |---|---|
-| `/config` | `config.toml` (optional; settings changed from the apps are saved there), the task database `ketch.db`, the access code `api-token`, and `torrent-state` (DHT nodes and tracker lists) |
+| `/config` | `config.toml` (optional; settings changed from the apps are saved there), the task database `ketch.db`, the access code `api-token`, the device identity `device.json`, and `torrent-state` (DHT nodes and tracker lists) |
 | `/downloads` | Downloads, unless a download names another folder |
 
 Mount both: without a mount, Docker keeps them in an anonymous volume that is easy to lose when

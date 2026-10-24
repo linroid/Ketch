@@ -107,6 +107,9 @@ class InstanceManager(
    */
   val embedded: KetchApi? get() = embeddedInstance?.instance
 
+  /** This device's identity ([InstanceFactory.instanceId]); `null` where it has none. */
+  val instanceId: String? get() = factory.instanceId
+
   private val _instances =
     MutableStateFlow(listOfNotNull<InstanceEntry>(embeddedInstance))
 
@@ -593,7 +596,8 @@ class InstanceManager(
   }
 
   // Once connected, names a device after the name it announces, unless it has one already, and
-  // keeps the system it runs, so it shows as the kind of device it is while offline.
+  // keeps the system it runs, so it shows as the kind of device it is while offline, and its
+  // identity, which tells it apart from another device at its address.
   private suspend fun learnStatus(entry: RemoteInstance) {
     entry.connectionState.first { it == ConnectionState.Connected }
     val status = try {
@@ -606,17 +610,26 @@ class InstanceManager(
     }
     val name = deviceNameOrNull(status.name)
     val os = status.system.os.trim().ifEmpty { null }
+    val instanceId = status.instanceId?.trim()?.ifEmpty { null }
     connectionLock.withLock {
       val current = entryOf(entry.deviceId) as? RemoteInstance
       if (current?.instance !== entry.instance) return
       val saved = current.remoteConfig
       val naming = saved.name == null && name != null
-      if (!naming && (os == null || os == saved.os)) return
+      val learned = (os != null && os != saved.os) ||
+        (instanceId != null && instanceId != saved.instanceId)
+      if (!naming && !learned) return
       if (naming) log.i { "Naming ${entry.deviceId} after the name it announces" }
       // A rename on another thread may land meanwhile; it wins.
       updateRemote(entry.deviceId) { remote ->
         val config = remote.remoteConfig
-        remote.copy(remoteConfig = config.copy(name = config.name ?: name, os = os ?: config.os))
+        remote.copy(
+          remoteConfig = config.copy(
+            name = config.name ?: name,
+            os = os ?: config.os,
+            instanceId = instanceId ?: config.instanceId,
+          ),
+        )
       }
       persistRemotes()
     }

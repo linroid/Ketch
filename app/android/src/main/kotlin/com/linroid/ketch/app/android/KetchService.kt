@@ -49,6 +49,8 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.pauseActiveTasks
 import com.linroid.ketch.app.state.toKetchAccent
+import com.linroid.ketch.config.DEVICE_FILE_NAME
+import com.linroid.ketch.config.DeviceStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
@@ -188,6 +190,8 @@ class KetchService : Service() {
     }
     val taskStore = createSqliteTaskStore(driverFactory)
     val instanceName = config.name ?: deviceName()
+    // Left out of backups and transfers to a new phone, which gets an identity of its own.
+    val instanceId = DeviceStore(File(filesDir, DEVICE_FILE_NAME).path).instanceId()
     val torrentSource = TorrentDownloadSource(
       TorrentConfig(
         stateDirectory = filesDir.resolve("torrent-state").absolutePath,
@@ -215,6 +219,7 @@ class KetchService : Service() {
     instanceManager = InstanceManager(
       factory = InstanceFactory(
         deviceName = instanceName,
+        instanceId = instanceId,
         embeddedFactory = {
           val httpEngine = KtorHttpEngine.withNetworkInterfaces(
             getSystemService(ConnectivityManager::class.java)
@@ -235,6 +240,7 @@ class KetchService : Service() {
             ),
             // Left out of backups, as it downloads again on request.
             countries = DbIpCountryDatabase(File(noBackupFilesDir, COUNTRY_DATABASE_FILE)),
+            instanceId = instanceId,
           )
         },
         localServerFactory = { context ->

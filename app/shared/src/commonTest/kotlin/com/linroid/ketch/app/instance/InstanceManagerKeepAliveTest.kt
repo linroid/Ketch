@@ -293,6 +293,32 @@ class InstanceManagerKeepAliveTest {
   }
 
   @Test
+  fun connect_deviceReportingItsIdentity_savesIt() = runTest {
+    val id = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10"
+    val fakes = FakeInstanceFactory().apply {
+      announcedName = "NAS"
+      announcedInstanceId = id
+    }
+    val store = RecordingConfigStore()
+    // Named and with its system known already, so only the identity is new.
+    val manager = manager(fakes, listOf(nas.copy(name = "NAS", os = "Linux")), store)
+
+    assertEquals(id, store.config.remotes.single().instanceId)
+    assertEquals(id, manager.remote("nas.local").remoteConfig.instanceId)
+    manager.close()
+  }
+
+  @Test
+  fun connect_deviceReportingNoIdentity_keepsTheOneSaved() = runTest {
+    val fakes = FakeInstanceFactory().apply { announcedName = "NAS" }
+    val saved = nas.copy(name = "NAS", instanceId = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10")
+    val manager = manager(fakes, listOf(saved))
+
+    assertEquals(saved.instanceId, manager.remote("nas.local").remoteConfig.instanceId)
+    manager.close()
+  }
+
+  @Test
   fun connect_deviceAnnouncingGenericName_keepsItsAddress() = runTest {
     val fakes = FakeInstanceFactory().apply { announcedName = "Ketch" }
     val manager = manager(fakes, listOf(nas))

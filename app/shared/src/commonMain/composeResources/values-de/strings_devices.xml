@@ -135,6 +135,7 @@
   <string name="connect_port">Port</string>
   <string name="connect_use_https">HTTPS verwenden</string>
   <string name="connect_unreachable">%1$s ist nicht erreichbar. Prüfe, ob Ketch dort freigegeben ist und beide Geräte im selben Netzwerk sind.</string>
+  <string name="connect_this_device">%1$s ist dieses Gerät. Seine Downloads siehst du bereits hier.</string>
   <string name="connect_add_anyway">Trotzdem hinzufügen</string>
   <string name="connect_add_failed">Das Gerät konnte nicht hinzugefügt werden: %1$s</string>
   <string name="connect_connected">Mit %1$s verbunden</string>

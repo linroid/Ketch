@@ -71,7 +71,8 @@ internal fun testStatus(
   uptime: Long = 0,
   system: SystemInfo = testSystem(),
   features: Set<String> = emptySet(),
-): KetchStatus = KetchStatus(name, version, revision, uptime, config, system, features)
+  instanceId: String? = null,
+): KetchStatus = KetchStatus(name, version, revision, uptime, config, system, features, instanceId)
 
 /** The system a test device runs on, `test` placeholders and no memory unless given. */
 internal fun testSystem(

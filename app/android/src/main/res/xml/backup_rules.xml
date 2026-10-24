@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Backups up to Android 11: everything but the Discover history and the app logs, which hold
-  searches and links.
+  searches and links, and the device identity, so a phone restored from a backup gets its own.
 -->
 <full-backup-content>
   <exclude domain="file" path="discover-history.json" />
   <exclude domain="file" path="discover-history.json.tmp" />
   <exclude domain="file" path="discover-history.json.bak" />
   <exclude domain="file" path="logs/" />
+  <exclude domain="file" path="device.json" />
+  <exclude domain="file" path="device.json.tmp" />
 </full-backup-content>

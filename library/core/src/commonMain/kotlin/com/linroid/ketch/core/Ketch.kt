@@ -127,6 +127,10 @@ import kotlin.uuid.Uuid
  *   controllers and lifecycle hooks through [DownloadSource.attach].
  * @param countries names the countries of [com.linroid.ketch.api.ActiveConnection]s, offered through [controller] as
  *   the [CountryDatabase]; `null` for none
+ * @param instanceId the device's identity, which [status] reports as
+ *   [KetchStatus.instanceId]: a random UUID the host keeps beside [taskStore]'s database (the
+ *   config module's `DeviceStore`), so every process running that database reports the same
+ *   one; `null` for none
  * @param logger logging backend
  * @param dispatchers dispatchers for task management, network operations and file I/O; by
  *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
@@ -145,6 +149,7 @@ class Ketch(
   logger: Logger = Logger.None,
   internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
   private val countries: CountryLookup? = null,
+  private val instanceId: String? = null,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
@@ -365,6 +370,7 @@ class Ketch(
       config = config,
       system = currentSystemInfo(config.defaultDirectory),
       features = features,
+      instanceId = instanceId,
     )
   }
 

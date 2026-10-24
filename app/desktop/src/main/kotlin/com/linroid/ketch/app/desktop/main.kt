@@ -93,6 +93,8 @@ import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.shell.LocalHostShortcuts
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.config.ConfigStore
+import com.linroid.ketch.config.DEVICE_FILE_NAME
+import com.linroid.ketch.config.DeviceStore
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
@@ -693,11 +695,14 @@ private fun createInstanceManager(
   val configDir = launch.configDir
   val config = configStore.load()
   val instanceName = config.name?.ifEmpty { null } ?: launch.hostName
+  // Shared with ketch server and ketch mcp --standalone, which create it under the downloads
+  // lock as the app does: one identity for this computer, whichever runs its downloads.
+  val instanceId = DeviceStore(File(configDir, DEVICE_FILE_NAME).path).instanceId()
   if (launch.downloads is DownloadsClaim.Taken) {
     // Another process runs this computer's downloads: no engine, so ketch.db stays closed, and
     // that process's device in the engine's place, when the app can reach it.
     return InstanceManager(
-      factory = InstanceFactory(deviceName = instanceName),
+      factory = InstanceFactory(deviceName = instanceName, instanceId = instanceId),
       initialRemotes = config.remotes,
       configStore = configStore,
       standIn = launch.standIn,
@@ -723,6 +728,7 @@ private fun createInstanceManager(
   return InstanceManager(
     factory = InstanceFactory(
       deviceName = instanceName,
+      instanceId = instanceId,
       embeddedFactory = {
         val httpEngine = KtorHttpEngine.withNetworkInterfaces()
         Ketch(
@@ -737,6 +743,7 @@ private fun createInstanceManager(
             MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
           ),
           countries = DbIpCountryDatabase(File(configDir, COUNTRY_DATABASE_FILE)),
+          instanceId = instanceId,
         ).also { ketch ->
           // The app runs this computer's downloads, so it runs the hooks of config.toml; for the
           // life of the process, as the engine.

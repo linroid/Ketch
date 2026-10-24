@@ -9,6 +9,10 @@ import kotlinx.serialization.Serializable
  * @property uptime seconds since the instance started
  * @property features the optional behaviors it supports ([KetchFeatures]); empty from older
  *   versions
+ * @property instanceId the device's identity, a random UUID kept beside its task database, which
+ *   stays the same across restarts and address changes and which every process running that
+ *   database reports, such as the desktop app and the `ketch server` beside it. `null` from
+ *   older versions and from instances given none
  */
 @Serializable
 data class KetchStatus(
@@ -19,6 +23,7 @@ data class KetchStatus(
   val config: DownloadConfig,
   val system: SystemInfo,
   val features: Set<String> = emptySet(),
+  val instanceId: String? = null,
 )
 
 /**

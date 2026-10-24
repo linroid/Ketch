@@ -40,6 +40,9 @@ internal sealed interface ConnectProblem {
   /** Nothing answered at [address]. */
   data class Unreachable(val address: String) : ConnectProblem
 
+  /** The device at [address] is this one, which the app shows already. */
+  data class ThisDevice(val address: String) : ConnectProblem
+
   /** The device could not be added, for the reason in [message]. */
   data class Failed(val message: UiText) : ConnectProblem
 
@@ -285,6 +288,7 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
               is ConnectOutcome.Connected -> onConnected(outcome.device)
               is ConnectOutcome.NeedsCode -> askForCode(address, rejected = true)
               ConnectOutcome.Unreachable -> problem = ConnectProblem.Unreachable(address)
+              ConnectOutcome.ThisDevice -> problem = ConnectProblem.ThisDevice(address)
             }
           }
           PairingResult.Unsupported -> askForCode(address, rejected = false)
@@ -358,6 +362,7 @@ internal class ConnectForm(link: String = "", askForCode: Boolean = false) {
             problem = ConnectProblem.NeedsCode(target.address, outcome.rejected)
           }
           ConnectOutcome.Unreachable -> problem = ConnectProblem.Unreachable(target.address)
+          ConnectOutcome.ThisDevice -> problem = ConnectProblem.ThisDevice(target.address)
         }
       } catch (e: CancellationException) {
         throw e

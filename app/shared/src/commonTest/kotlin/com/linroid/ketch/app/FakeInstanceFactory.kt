@@ -30,9 +30,11 @@ import kotlin.time.Duration
  * ```
  *
  * @param embeddedFactory creates the embedded device; `null` for remote-only mode.
+ * @param instanceId this device's identity.
  */
 class FakeInstanceFactory(
   embeddedFactory: (() -> KetchApi)? = { FakeKetchApi("Core") },
+  instanceId: String? = null,
 ) {
   /** Every remote client created, oldest first. */
   val remotes: MutableList<FakeRemote> = mutableListOf()
@@ -46,9 +48,13 @@ class FakeInstanceFactory(
   /** Operating system new remote clients report in their status. */
   var announcedOs: String = "Linux"
 
+  /** Identity new remote clients report in their status. */
+  var announcedInstanceId: String? = null
+
   /** The factory to build the manager with. */
   val factory: InstanceFactory = InstanceFactory(
     deviceName = "MacBook Pro",
+    instanceId = instanceId,
     embeddedFactory = embeddedFactory,
     remoteFactory = ::createRemote,
   )
@@ -57,7 +63,7 @@ class FakeInstanceFactory(
   fun clientsOf(deviceId: String): List<FakeRemote> = remotes.filter { it.deviceId == deviceId }
 
   private fun createRemote(config: RemoteConfig): RemoteInstance {
-    val client = FakeRemote(config, stateOnStart, announcedName, announcedOs)
+    val client = FakeRemote(config, stateOnStart, announcedName, announcedOs, announcedInstanceId)
     remotes += client
     return RemoteInstance(client, config, client.connection)
   }
@@ -74,6 +80,7 @@ class FakeRemote(
   private val stateOnStart: ConnectionState,
   private val announcedName: String,
   private val announcedOs: String,
+  private val announcedInstanceId: String? = null,
 ) : KetchApi {
   override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
 
@@ -117,6 +124,7 @@ class FakeRemote(
       freeSpace = 1_800_000_000_000,
       usableSpace = 1_800_000_000_000,
     ),
+    instanceId = announcedInstanceId,
   )
 
   override suspend fun download(request: DownloadRequest): DownloadTask =

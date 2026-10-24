@@ -78,7 +78,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `DownloadRequest`, `DownloadState`, `DownloadProgress`, `DownloadConfig`, `DownloadCategory`,
   `Destination`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
-  `DownloadCondition`, `KetchStatus`, `NetworkInterfaces`, `NetworkInterfaceConfig`, `NetworkKind`,
+  `DownloadCondition`, `KetchStatus` (`instanceId`: the device's identity, see
+  [Device identity](#device-identity)), `NetworkInterfaces`, `NetworkInterfaceConfig`,
+  `NetworkKind`,
   `Proxy`, `ProxyAddress`, `ResolvedSource`, `SourceFile`, `FileSelectionMode`,
   `ResolveInput` (what `KetchApi.resolve`, its one probing function, takes: `Url(url, headers)`,
   which the instance fetches, or `Content(bytes, fileName)` the caller holds; the `resolve(url)`
@@ -301,7 +303,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SearchProvider`,
   `PageAccessSettings`, `PageAccessMode`, `SiteNames`, `TorrentSettings`, `AppearanceConfig`,
   `AccentColor`, `ThemeMode`, `SpeedSettings`, `SpeedRule`, `UiPreferences`, `DesktopSettings`,
-  `NotificationSettings`, `IntegrationSettings`, `PowerSettings`, `HookConfig`, `HookEvent`
+  `NotificationSettings`, `IntegrationSettings`, `PowerSettings`, `HookConfig`, `HookEvent`,
+  `DeviceStore` (`device.json`; internal `writeOwnerOnly`, expect/actual)
 
 ### `app:shared` (`com.linroid.ketch.app`)
 - `App` (root composable), `state` (`AppController`, `AppState`, `TaskListModel`, `PulseModel`,
@@ -554,6 +557,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   torrent source's `torrent.control` (`TorrentFeatures.CONTROL`, outside `KetchFeatures.ALL`).
   `DownloadSource.previousTypes` lets stored tasks with the old `media` type route to the
   matching protocol by URL
+- `KetchStatus.instanceId` is what `Ketch(instanceId = ...)` was given, `null` by default; see
+  [Device identity](#device-identity)
 - Retries of transient errors (`KetchError.isRetryable`) follow `RetryPolicy`: `retryCount` in a
   row (or forever with `DownloadConfig.unlimitedRetries`), counted again from zero once an attempt
   gets further than every attempt before it (`DownloadExecution.progressReached`, from reported
@@ -1617,6 +1622,32 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   registers Koog's HTTP client factory under `META-INF/services` (Koog's Android AAR omits it)
 - See [AI discovery configuration](docs/ai-discovery.md)
 
+### Device identity
+- `instanceId`: a random UUID (v4) generated on a device's first start and kept in
+  `device.json` (`DEVICE_FILE_NAME`, `{"instanceId": ...}`, unknown fields ignored and kept)
+  beside its task database by `DeviceStore`, which `Ketch(instanceId = ...)` reports as
+  `KetchStatus.instanceId` (`null` from older versions and engines given none) and the apps as
+  `InstanceFactory.instanceId` / `InstanceManager.instanceId`, also while another process runs
+  the downloads (`DownloadsClaim.Taken`). Never in `config.toml` or mDNS
+- `DeviceStore.instanceId()` reads the file and, when it is missing or holds no valid UUID
+  (unreadable JSON, no or another id), generates one and replaces it with a warning; an id it
+  cannot save is still returned for the process. `writeOwnerOnly` writes `device.json.tmp`
+  created owner-only (`rw-------`; Windows relies on the private profile folder) and moves it
+  over the file atomically, as `SingleInstance` does; iOS also sets `NSURLIsExcludedFromBackupKey`
+- Where: the config directory on the JVM (`defaultDevicePath()`), which the desktop app,
+  `ketch server` and `ketch mcp --standalone` share, so they report one id; each creates it under
+  the downloads lock (`instance.lock`), so two processes never create it at once. Android keeps
+  it in `filesDir`, left out of backups and device transfers (`backup_rules.xml`,
+  `data_extraction_rules.xml`), iOS in Application Support, so a restored phone gets an id of its
+  own. A JVM config folder copied to another machine keeps its id
+- The apps save `RemoteConfig.instanceId` learned on connect, and `DeviceConnector` refuses to add
+  a device whose probed status reports this device's id (`ConnectOutcome.ThisDevice`, the form's
+  `ConnectProblem.ThisDevice`, "<address> is this device"), such as its own shared server typed by
+  its LAN address. Devices added without a check (Add anyway, the web app's own server) and apps
+  without an id (the web) skip it. The design is
+  [§7.1 of the helper devices proposal](docs/design/multi-instance-downloads.md#71-identity)
+  (task transfer's F7); pairings, the mDNS `boot` value and hues by id are not built yet
+
 ### Configuration (`config/`)
 - TOML-based configuration via ktoml library
 - `KetchConfig` root with server, download, remotes, AI, appearance, torrent, speed, UI,
@@ -1691,7 +1722,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `autoStart` (apps start the server on launch; Settings › Sharing turns it on with sharing
   and off with Stop sharing, and shows its switch outside Advanced)
 - `RemoteConfig`: pre-configured remote server connections, with the system each device last
-  reported, which picks its `DeviceType` glyph in the apps' pennants
+  reported, which picks its `DeviceType` glyph in the apps' pennants, and its `instanceId`, both
+  learned on each connection (`InstanceManager.learnStatus`) and saved
+- `DeviceStore(path).instanceId()`: the device identity in `device.json`, never in `config.toml`;
+  see [Device identity](#device-identity). `defaultDevicePath()` (JVM) is
+  `<configDir>/device.json`, beside `defaultDbPath()`
 - `defaultConfigDir()` (JVM: desktop app and CLI) is `KETCH_CONFIG_DIR` when set (`/config` in
   the Docker image), else the platform's directory
 - `FileConfigStore`: platform-specific file persistence via okio; on the JVM a leading `~` in
@@ -2105,7 +2140,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `instance.json` describes while its pid runs, else the desktop app (`otherEngine`), and while
   the app runs at all, as one from before the lock runs them without it. Once their tasks are
   restored, they describe themselves in the owner-only `instance.json` (command, pid, loopback
-  URL, token) for the attaching commands and the app
+  URL, token) for the attaching commands and the app. Both read the device identity under the
+  lock (`deviceInstanceId`, `defaultDevicePath()`) and pass it to `Ketch(instanceId = ...)`, so
+  `/api/status` reports the id the desktop app reports too; one-shot `ketch <url>` and
+  `--list-files` engines have none
 - The desktop app takes the lock before it opens `ketch.db` and keeps it until its process exits,
   removing an `instance.json` a stopped command left (`DownloadsLock`). Opened while a command
   holds it, it waits up to 3 s for the command to say where it listens, taking the lock if it
@@ -2501,7 +2539,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
-  "GitHubReleases", "Hooks", "Mirrors", "MetalinkSource", "ServerConfig";
+  "GitHubReleases", "Hooks", "Mirrors", "MetalinkSource", "ServerConfig", "DeviceStore";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable

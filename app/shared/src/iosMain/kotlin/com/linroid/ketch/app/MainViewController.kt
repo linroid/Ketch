@@ -28,6 +28,8 @@ import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.rememberAppController
+import com.linroid.ketch.config.DEVICE_FILE_NAME
+import com.linroid.ketch.config.DeviceStore
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.TorrentEncryptionMode
@@ -208,6 +210,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
   val taskStore = createSqliteTaskStore(DriverFactory())
   val instanceName = config.name
     ?: UIDevice.currentDevice.name
+  // Left out of backups, so a restored iPhone gets an identity of its own.
+  val instanceId = DeviceStore("$supportDir/$DEVICE_FILE_NAME").instanceId()
   val torrentSource = TorrentDownloadSource(
     TorrentConfig(
       stateDirectory = "$supportDir/torrent-state",
@@ -226,6 +230,7 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
   return InstanceManager(
     factory = InstanceFactory(
       deviceName = instanceName,
+      instanceId = instanceId,
       embeddedFactory = {
         val httpEngine = KtorHttpEngine()
         Ketch(
@@ -239,6 +244,7 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
             HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
             MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
           ),
+          instanceId = instanceId,
         )
       },
       applyTorrentSettings = {

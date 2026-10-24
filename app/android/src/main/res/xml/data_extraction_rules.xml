@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Android 12+: cloud backups and transfers to a new device leave out the Discover history and
-  the app logs, which hold searches and links.
+  the app logs, which hold searches and links, and the device identity, so the new phone gets
+  its own.
 -->
 <data-extraction-rules>
   <cloud-backup>
@@ -9,11 +10,15 @@
     <exclude domain="file" path="discover-history.json.tmp" />
     <exclude domain="file" path="discover-history.json.bak" />
     <exclude domain="file" path="logs/" />
+    <exclude domain="file" path="device.json" />
+    <exclude domain="file" path="device.json.tmp" />
   </cloud-backup>
   <device-transfer>
     <exclude domain="file" path="discover-history.json" />
     <exclude domain="file" path="discover-history.json.tmp" />
     <exclude domain="file" path="discover-history.json.bak" />
     <exclude domain="file" path="logs/" />
+    <exclude domain="file" path="device.json" />
+    <exclude domain="file" path="device.json.tmp" />
   </device-transfer>
 </data-extraction-rules>

@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.Flow
  *
  * @param deviceName label for the embedded instance (e.g. device
  *   model on Android, hostname on desktop).
+ * @param instanceId this device's identity, which its engine reports as
+ *   [com.linroid.ketch.api.KetchStatus.instanceId], also while another process runs its
+ *   downloads; a device that reports it is this one, which the apps never add. `null` where
+ *   the device has none, as on the web.
  * @param embeddedFactory factory for creating the embedded [KetchApi]
  *   instance. When `null`, no embedded instance is available and
  *   [InstanceManager] starts in remote-only mode (e.g. wasmJs/web).
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.Flow
  */
 class InstanceFactory(
   val deviceName: String = "Embedded",
+  val instanceId: String? = null,
   private val embeddedFactory: (() -> KetchApi)? = null,
   private val localServerFactory: ((LocalServerContext) -> LocalServerHandle)? = null,
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,

@@ -893,12 +893,14 @@ final class com.linroid.ketch.api/KetchStats { // com.linroid.ketch.api/KetchSta
 }
 
 final class com.linroid.ketch.api/KetchStatus { // com.linroid.ketch.api/KetchStatus|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/Long, com.linroid.ketch.api/DownloadConfig, com.linroid.ketch.api/SystemInfo, kotlin.collections/Set<kotlin/String> = ...) // com.linroid.ketch.api/KetchStatus.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.Long;com.linroid.ketch.api.DownloadConfig;com.linroid.ketch.api.SystemInfo;kotlin.collections.Set<kotlin.String>){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/Long, com.linroid.ketch.api/DownloadConfig, com.linroid.ketch.api/SystemInfo, kotlin.collections/Set<kotlin/String> = ..., kotlin/String? = ...) // com.linroid.ketch.api/KetchStatus.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.Long;com.linroid.ketch.api.DownloadConfig;com.linroid.ketch.api.SystemInfo;kotlin.collections.Set<kotlin.String>;kotlin.String?){}[0]
 
     final val config // com.linroid.ketch.api/KetchStatus.config|{}config[0]
         final fun <get-config>(): com.linroid.ketch.api/DownloadConfig // com.linroid.ketch.api/KetchStatus.config.<get-config>|<get-config>(){}[0]
     final val features // com.linroid.ketch.api/KetchStatus.features|{}features[0]
         final fun <get-features>(): kotlin.collections/Set<kotlin/String> // com.linroid.ketch.api/KetchStatus.features.<get-features>|<get-features>(){}[0]
+    final val instanceId // com.linroid.ketch.api/KetchStatus.instanceId|{}instanceId[0]
+        final fun <get-instanceId>(): kotlin/String? // com.linroid.ketch.api/KetchStatus.instanceId.<get-instanceId>|<get-instanceId>(){}[0]
     final val name // com.linroid.ketch.api/KetchStatus.name|{}name[0]
         final fun <get-name>(): kotlin/String // com.linroid.ketch.api/KetchStatus.name.<get-name>|<get-name>(){}[0]
     final val revision // com.linroid.ketch.api/KetchStatus.revision|{}revision[0]
@@ -917,7 +919,8 @@ final class com.linroid.ketch.api/KetchStatus { // com.linroid.ketch.api/KetchSt
     final fun component5(): com.linroid.ketch.api/DownloadConfig // com.linroid.ketch.api/KetchStatus.component5|component5(){}[0]
     final fun component6(): com.linroid.ketch.api/SystemInfo // com.linroid.ketch.api/KetchStatus.component6|component6(){}[0]
     final fun component7(): kotlin.collections/Set<kotlin/String> // com.linroid.ketch.api/KetchStatus.component7|component7(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long = ..., com.linroid.ketch.api/DownloadConfig = ..., com.linroid.ketch.api/SystemInfo = ..., kotlin.collections/Set<kotlin/String> = ...): com.linroid.ketch.api/KetchStatus // com.linroid.ketch.api/KetchStatus.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.Long;com.linroid.ketch.api.DownloadConfig;com.linroid.ketch.api.SystemInfo;kotlin.collections.Set<kotlin.String>){}[0]
+    final fun component8(): kotlin/String? // com.linroid.ketch.api/KetchStatus.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long = ..., com.linroid.ketch.api/DownloadConfig = ..., com.linroid.ketch.api/SystemInfo = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin/String? = ...): com.linroid.ketch.api/KetchStatus // com.linroid.ketch.api/KetchStatus.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.Long;com.linroid.ketch.api.DownloadConfig;com.linroid.ketch.api.SystemInfo;kotlin.collections.Set<kotlin.String>;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/KetchStatus.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/KetchStatus.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/KetchStatus.toString|toString(){}[0]

@@ -68,6 +68,7 @@ import ketch.app.shared.generated.resources.connect_host
 import ketch.app.shared.generated.resources.connect_link_label
 import ketch.app.shared.generated.resources.connect_link_placeholder
 import ketch.app.shared.generated.resources.connect_port
+import ketch.app.shared.generated.resources.connect_this_device
 import ketch.app.shared.generated.resources.connect_unreachable
 import ketch.app.shared.generated.resources.connect_use_https
 import kotlinx.coroutines.CancellationException
@@ -260,9 +261,9 @@ internal fun ManualDetails(
 
 /**
  * Why the last attempt of a form failed, other than a missing code, which [AccessCodeField]
- * explains: nothing answered, with [onAddAnyway] when the device may be added all the same, it
- * could not be added, or its owner did not let this device in, with [onAskAgain] to ask once
- * more.
+ * explains: nothing answered, with [onAddAnyway] when the device may be added all the same, the
+ * address is this device's, it could not be added, or its owner did not let this device in,
+ * with [onAskAgain] to ask once more.
  */
 @Composable
 internal fun ConnectProblemNotice(
@@ -286,6 +287,11 @@ internal fun ConnectProblemNotice(
           )
         }
       },
+    )
+    is ConnectProblem.ThisDevice -> SettingsNotice(
+      text = stringResource(Res.string.connect_this_device, problem.address),
+      tone = NoticeTone.Warning,
+      modifier = modifier,
     )
     is ConnectProblem.Failed -> SettingsNotice(
       text = Res.string.connect_add_failed.text(problem.message).resolve(),

@@ -201,6 +201,19 @@ class ServerRoutesTest {
   }
 
   @Test
+  fun status_reportsTheEnginesInstanceId() = testApplication {
+    val id = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10"
+    val ketch = Ketch(httpEngine = NoOpHttpEngine(), instanceId = id)
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val response = client.get("/api/status")
+    val status = json.decodeFromString<KetchStatus>(response.bodyAsText())
+    assertEquals(id, status.instanceId)
+  }
+
+  @Test
   fun `status includes uptime`() = testApplication {
     application {
       val server = createTestServer()

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class RemoteConfigTest {
 
   @Test
-  fun decode_remoteSavedBeforeNamesWatchingAndSystems_isUnnamedWatchedAndUnknown() {
+  fun decode_remoteSavedBeforeNamesWatchingSystemsAndIds_isUnnamedWatchedAndUnknown() {
     val decoded = ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(),
       """
@@ -25,15 +25,21 @@ class RemoteConfigTest {
     assertNull(remote.name)
     assertTrue(remote.watch)
     assertNull(remote.os)
+    assertNull(remote.instanceId)
     assertEquals("token", remote.apiToken)
   }
 
   @Test
-  fun encode_namedUnwatchedRemote_readsBackTheSame() {
+  fun encode_remotesWithNamesSystemsAndIds_readBackTheSame() {
     val config = KetchConfig(
       remotes = listOf(
         RemoteConfig(host = "nas.local", name = "NAS \"Basement\"", watch = false),
-        RemoteConfig(host = "den-pc", port = 9000),
+        RemoteConfig(
+          host = "den-pc",
+          port = 9000,
+          os = "Windows 11",
+          instanceId = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10",
+        ),
       ),
     )
 

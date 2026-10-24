@@ -135,6 +135,7 @@
   <string name="connect_port">Puerto</string>
   <string name="connect_use_https">Usar HTTPS</string>
   <string name="connect_unreachable">No se pudo conectar con %1$s. Comprueba que Ketch está compartiendo allí y que ambos dispositivos están en la misma red.</string>
+  <string name="connect_this_device">%1$s es este dispositivo. Sus descargas ya se muestran aquí.</string>
   <string name="connect_add_anyway">Añadir de todos modos</string>
   <string name="connect_add_failed">No se pudo añadir el dispositivo: %1$s</string>
   <string name="connect_connected">Conectado a %1$s</string>

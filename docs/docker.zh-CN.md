@@ -75,7 +75,7 @@ Ketch 在网络上提供服务时需要访问码，也就是它的 API 令牌。
 
 | 路径 | 存放 |
 |---|---|
-| `/config` | `config.toml`（可选；在 App 里修改的设置会保存到这里）、任务数据库 `ketch.db`、访问码 `api-token`，以及 `torrent-state`（DHT 节点和 Tracker 列表） |
+| `/config` | `config.toml`（可选；在 App 里修改的设置会保存到这里）、任务数据库 `ketch.db`、访问码 `api-token`、设备标识 `device.json`，以及 `torrent-state`（DHT 节点和 Tracker 列表） |
 | `/downloads` | 下载的文件，除非某个下载指定了别的文件夹 |
 
 两个都要挂载：不挂载的话，Docker 会把它们放在匿名卷里，重建容器时很容易丢失。客户端只能保存到

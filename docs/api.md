@@ -412,6 +412,17 @@ Modules beside `library:api` name their own: the torrent source lists `TorrentFe
 (`torrent.control`). On servers without `QUEUE_POSITION` tasks report no position, and without
 `AUTO_CONNECTIONS` `setConnections(0)` throws `UnsupportedOperationException`.
 
+### Device identity
+
+`status().instanceId` is the device's identity: a random UUID generated on its first start and
+kept in `device.json` beside its task database, so it stays the same across restarts and address
+changes. Every process running that database reports the same one: the desktop app, `ketch server`
+and `ketch mcp --standalone` share the config directory, and so one id. Use it to tell two devices
+at one address apart, or one device at two addresses alike; the apps refuse to add their own
+shared server as a device by it. It is `null` from older versions and from engines built without
+one. `device.json` is readable by its owner only and never goes in `config.toml`; the Android and
+iOS apps leave it out of backups, so a restored phone gets an identity of its own.
+
 ## The Ketch engine (`library:core`)
 
 `Ketch` implements `KetchApi` in-process. Everything except the `HttpEngine` has a default:
@@ -426,8 +437,13 @@ val ketch = Ketch(
   additionalSources = emptyList(),
   logger = Logger.None,
   dispatchers = KetchDispatchers.Default,
+  instanceId = null,                           // reported by status(); see Device identity
 )
 ```
+
+Hosts that keep a task database pass `instanceId = DeviceStore(path).instanceId()` (`config`
+module), with `path` the `device.json` beside the database, created after taking the lock that keeps
+one process at a time on that database.
 
 ### Download sources
 

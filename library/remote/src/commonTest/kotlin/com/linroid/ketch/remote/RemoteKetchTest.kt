@@ -17,10 +17,14 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class RemoteKetchTest {
   private fun status(features: Set<String>) = KetchStatus(
@@ -57,6 +61,24 @@ class RemoteKetchTest {
       }
       // The features were asked once for this connection, and nothing was added.
       assertEquals(listOf("/api/status"), paths)
+    } finally {
+      remote.close()
+    }
+  }
+
+  @Test
+  fun status_serverOlderThanIdentities_reportsNoInstanceId() = runTest {
+    val current = Json.encodeToJsonElement(status(features = emptySet())).jsonObject
+    val old = JsonObject(current - "instanceId")
+    val remote = RemoteKetch("remote.example", 8642, null, false, MockEngine {
+      respond(
+        old.toString(),
+        HttpStatusCode.OK,
+        headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    })
+    try {
+      assertNull(remote.status().instanceId)
     } finally {
       remote.close()
     }
