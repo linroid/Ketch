@@ -79,10 +79,10 @@ kotlin {
     commonMain {
       kotlin.srcDir(generateVersion)
       dependencies {
-        // The public API exposes their types (Flow, StateFlow, KSerializer).
+        // The public API exposes their types (Flow, StateFlow, KSerializer, TimeZone).
         api(libs.kotlinx.coroutines.core)
         api(libs.kotlinx.serialization.json)
-        implementation(libs.kotlinx.datetime)
+        api(libs.kotlinx.datetime)
       }
     }
     commonTest.dependencies {

@@ -17,6 +17,7 @@ import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.components.SpeedLimitPickerPresets
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
@@ -51,7 +52,6 @@ import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.ui.pulse.speedModeName
 import com.linroid.ketch.app.util.displayName
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.app_title_status
 import ketch.app.desktop.generated.resources.tray_active
@@ -601,9 +601,9 @@ internal fun trayTooltip(pulse: PulseState, now: Instant): UiText {
 @Composable
 private fun traySpeed(speedMode: SpeedModeController): TraySpeed {
   val settings by speedMode.settings.collectAsState()
-  val peak by speedMode.observedPeak.collectAsState()
+  val reported by speedMode.state.collectAsState()
   // Without a speed of its own, the slow lane follows the observed peak.
-  val slowLane = remember(settings, peak) { speedMode.slowLaneSpeed }
+  val slowLane = remember(settings, reported) { speedMode.slowLaneSpeed }
   return TraySpeed(settings.mode, slowLane, settings.rules.isNotEmpty())
 }
 

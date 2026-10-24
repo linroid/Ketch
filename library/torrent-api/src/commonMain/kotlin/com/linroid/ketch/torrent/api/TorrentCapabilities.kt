@@ -24,6 +24,8 @@ enum class TorrentCapability(val wireName: String) {
   ENCRYPTION("mse-pe"),
   PROXY("proxy"),
   REACHABILITY("reachability"),
+  SETTINGS("settings"),
+  LOCAL_DISCOVERY("local-discovery"),
 }
 
 /**

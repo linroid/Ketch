@@ -458,6 +458,8 @@
   <string name="settings_speed_mode_auto">자동</string>
   <string name="settings_speed_remote">설정은 %1$s 기기에 적용되며, 해당 기기를 다시 시작하면 초기화됩니다. 이 기기는 아직 저속 모드와 자동 모드를 지원하지 않습니다.</string>
   <string name="settings_speed_remote_saved">설정은 %1$s 기기에 저장됩니다. 이 기기는 아직 저속 모드와 자동 모드를 지원하지 않습니다.</string>
+  <string name="settings_speed_remote_modes">%1$s 기기가 속도 모드와 규칙을 직접 실행하므로 이 앱을 닫아도 적용됩니다. 다운로드당 연결 수는 해당 기기를 다시 시작하면 초기화됩니다.</string>
+  <string name="settings_speed_remote_modes_saved">설정은 %1$s 기기에 저장되며, 해당 기기가 속도 모드와 규칙을 직접 실행하므로 이 앱을 닫아도 적용됩니다.</string>
   <string name="settings_speed_limit_group">제한</string>
   <string name="settings_speed_limit">속도 제한</string>
   <string name="settings_speed_limit_hint">모든 다운로드가 나눠 씁니다. 다운로드별 제한은 이보다 낮게 설정할 수 있습니다.</string>
@@ -570,7 +572,7 @@
   <string name="settings_torrent_connections_footer">암호화는 트래픽의 종류를 숨길 뿐, 누구와 연결하는지는 숨기지 않습니다.</string>
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>
-  <string name="settings_torrent_remote">BitTorrent 설정은 %1$s 기기에서 직접 또는 해당 기기의 config.toml에서 변경하세요.</string>
+  <string name="settings_torrent_remote">여기에서 이 설정을 변경하려면 %1$s의 Ketch를 업데이트하세요.</string>
   <string name="settings_torrent_reach_reachable">피어가 포트 %2$d로 %1$s에 연결할 수 있습니다.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="other">포트 %2$d가 라우터 %3$d대를 거쳐 %1$s로 전달되므로 피어가 연결할 수 있습니다.</item>

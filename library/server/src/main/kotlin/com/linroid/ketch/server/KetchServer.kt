@@ -3,6 +3,7 @@ package com.linroid.ketch.server
 import com.linroid.ketch.api.CountryDatabase
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.file.PathRejectedException
 import com.linroid.ketch.endpoints.model.ErrorResponse
@@ -16,6 +17,7 @@ import com.linroid.ketch.server.api.eventRoutes
 import com.linroid.ketch.server.api.healthRoutes
 import com.linroid.ketch.server.api.pairingRoutes
 import com.linroid.ketch.server.api.serverRoutes
+import com.linroid.ketch.server.api.speedRoutes
 import com.linroid.ketch.server.api.streamRoutes
 import com.linroid.ketch.server.api.toErrorResponse
 import com.linroid.ketch.server.api.torrentErrorStatus
@@ -110,6 +112,14 @@ import kotlin.coroutines.cancellation.CancellationException
  * - `PUT    /api/tasks/{id}/files`       — choose the files of a task with several: `400`
  *   `invalid_selection`, `409` `selection_unavailable` (no file list yet, or canceled), `501`
  *   `unsupported` (not a task with files)
+ *
+ * ### Speed modes
+ *
+ * Served from `KetchApi.controller(SpeedModes)`, and only when the instance has them: servers
+ * listing `speed.modes` do, and others answer `404` without an error code. The event stream's
+ * `speedMode` interest follows them.
+ * - `GET /api/speed` — Full speed, the Slow lane or Auto, the rules and what they apply now
+ * - `PUT /api/speed` — apply a `SpeedModeChange`; fields left out stay as they are
  *
  * ### Torrents
  *
@@ -583,6 +593,7 @@ private fun Route.apiRoutes(
   downloadRoutes(ketch, destinations)
   ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it) }
   ketch.controller(CountryDatabase)?.let { countryRoutes(it) }
+  ketch.controller(SpeedModes)?.let { speedRoutes(it) }
   connectionRoutes(ketch, connectionStreams)
   streamRoutes(events)
   eventRoutes(ketch)

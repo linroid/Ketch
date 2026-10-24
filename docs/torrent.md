@@ -254,9 +254,26 @@ uploading is Off. The desktop app, the CLI and `ketch server` ignore it and uplo
 
 ## Settings
 
-The apps edit these settings under Settings → BitTorrent for the device they run on and apply them
-immediately. A remote device's BitTorrent settings can only be changed on that device or in its
-`config.toml`.
+The apps edit these settings under Settings → BitTorrent and apply them immediately, for the
+device they run on and for a remote device: a `ketch server`, or another app sharing its downloads.
+A remote device saves what you change to its own `config.toml`, so the change outlives its
+restart; "Only on Wi-Fi" and the listen port stay that device's to decide, and "Local peer
+discovery" shows only for devices that can run it (not iOS). A device whose Ketch is too old for
+this shows "Update Ketch on *device* to change these settings here" instead.
+
+Other programs change them through the REST API: `GET /api/torrents/settings` answers what every
+torrent runs with, and `PUT /api/torrents/settings` changes the fields its body sets, keeping the
+others, and answers the result:
+
+```json
+{"upload": "seed", "uploadLimit": "1m", "utp": false}
+```
+
+Servers list the `settings` capability in `GET /api/torrents/capabilities` (`local-discovery` too
+where they can run it); `RemoteKetch` refuses both calls for servers without it, sending nothing.
+`ketch server` writes each change over its `config.toml` field by field, so a value that
+`--torrent-upload` or `KETCH_TORRENT_UPLOAD` gave stays as the file has it until a client changes
+it, and the option still wins at the next start.
 
 ### `config.toml`
 
@@ -619,8 +636,12 @@ val page = controller.files(taskId, order = TorrentFileOrder.NAME)
 It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp` and `mse-pe`,
 which describe the backend, not its current settings, and `seeding` while the configured policy is
 `SEED_AFTER_COMPLETION`, also while uploads are paused), `snapshot(taskId)`, sorted file
-pages (`files`), and `select` and `setSeeding` commands guarded by a revision and an idempotency
-key. A snapshot's `counters` add up every session of the task: `receivedPayloadBytes`,
+pages (`files`), `select` and `setSeeding` commands guarded by a revision and an idempotency
+key, and `settings()` and `updateSettings(change)` (`TorrentEngineSettings`,
+`TorrentSettingsChange`; the `settings` capability). In process, `updateSettings` runs
+`TorrentDownloadSource.applySettings`, and `TorrentDownloadSource.settings` reports the result, so a
+host that keeps settings in a file follows it to save what clients change. A snapshot's
+`counters` add up every session of the task: `receivedPayloadBytes`,
 `uploadedPayloadBytes` and `discardedPayloadBytes`, the part of the received payload thrown away
 rather than verified. While no session runs they are the totals the task saved last. Follow a
 task's snapshots with `ketch.subscribe(TorrentInterest(taskId))`. `RemoteKetch`

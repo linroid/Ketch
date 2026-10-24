@@ -1,10 +1,9 @@
 package com.linroid.ketch.app.ui.pulse
 
-import com.linroid.ketch.api.DownloadConfig
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
-import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.RecordingConfigStore
+import com.linroid.ketch.app.SpeedModeEngine
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.instance.InstanceFactory
@@ -27,41 +26,24 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpeedModeActionsTest {
 
-  /** The embedded engine: it keeps the config it is given, or rejects it while [rejects]. */
-  private class Engine : KetchApi by FakeKetchApi() {
-    var config = DownloadConfig()
-    var rejects = false
-
-    override suspend fun updateConfig(config: DownloadConfig) {
-      if (rejects) throw IllegalStateException("Engine stopped")
-      this.config = config
-    }
+  private class Fixture(val state: AppState, val engine: SpeedModeEngine) {
+    val speed: SpeedModeController? get() = state.speedMode
   }
 
-  private class Fixture(val state: AppState, val engine: Engine, val speed: SpeedModeController?)
-
   private fun TestScope.fixture(withSpeedMode: Boolean = true): Fixture {
-    val engine = Engine()
+    val engine = SpeedModeEngine(settings = SpeedSettings().takeIf { withSpeedMode })
     val store = RecordingConfigStore(KetchConfig())
-    val speed = if (withSpeedMode) {
-      SpeedModeController(
-        config = { engine.config },
-        apply = { engine.updateConfig(it) },
-        scope = backgroundScope,
-      )
-    } else {
-      null
-    }
     val state = AppState(
       instanceManager = InstanceManager(
         factory = InstanceFactory(deviceName = "This Mac", embeddedFactory = { engine }),
         configStore = store,
+        context = backgroundScope.coroutineContext,
       ),
       scope = backgroundScope,
       appSettings = AppSettingsController(store),
-      speedMode = speed,
     )
-    return Fixture(state, engine, speed)
+    runCurrent()
+    return Fixture(state, engine)
   }
 
   @Test

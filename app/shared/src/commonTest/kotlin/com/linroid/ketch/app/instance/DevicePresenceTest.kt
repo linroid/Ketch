@@ -6,13 +6,18 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.FakeInstanceFactory
 import com.linroid.ketch.app.FakeKetchApi
 import com.linroid.ketch.app.FakeRemote
+import com.linroid.ketch.app.FakeSpeedModes
+import com.linroid.ketch.app.SpeedModeEngine
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.state.DeviceHealth
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.PulseModel
@@ -240,16 +245,24 @@ class DevicePresenceTest {
     }
 
   @Test
-  fun presence_hostSpeedMode_appliesToEmbeddedDeviceOnly() = managerTest { _, manager ->
-    val mode = MutableStateFlow<SpeedMode>(SpeedMode.Full)
-    manager.setLocalSpeedMode(mode)
+  fun presence_speedModes_showEachDevicesOwnMode(): TestResult {
+    val fakes = FakeInstanceFactory(
+      embeddedFactory = { SpeedModeEngine(SpeedSettings(mode = SpeedLimitMode.SlowLane)) },
+    )
+    fakes.speedModes = FakeSpeedModes(SpeedSettings(mode = SpeedLimitMode.Auto))
+    return fixtureTest({ manager(fakes) }, InstanceManager::close) { manager ->
+      settle()
 
-    mode.value = SpeedMode.SlowLane
-    runCurrent()
+      assertEquals(SpeedMode.SlowLane, manager.presenceOf(LOCAL_DEVICE_ID).speedMode)
+      assertEquals(SpeedMode.Auto(), manager.presenceOf("nas.local:8642").speedMode)
+    }
+  }
 
-    val (embedded, remote) = manager.presence.value
-    assertEquals(SpeedMode.SlowLane, embedded.speedMode)
-    assertEquals(SpeedMode.Full, remote.speedMode)
+  @Test
+  fun presence_remoteWithoutSpeedModes_showsFullSpeed() = managerTest { _, manager ->
+    settle()
+
+    assertEquals(SpeedMode.Full, manager.presenceOf("nas.local:8642").speedMode)
   }
 
   @Test

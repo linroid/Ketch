@@ -2,6 +2,7 @@ package com.linroid.ketch.app.ui.pulse
 
 import androidx.compose.runtime.Composable
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.joinText
 import com.linroid.ketch.app.i18n.resolve
@@ -20,7 +21,6 @@ import com.linroid.ketch.app.state.clockLabel
 import com.linroid.ketch.app.state.formatSpace
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_free_space
 import ketch.app.shared.generated.resources.pulse_count_downloading

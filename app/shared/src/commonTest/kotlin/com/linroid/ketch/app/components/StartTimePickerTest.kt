@@ -1,9 +1,9 @@
 package com.linroid.ketch.app.components
 
 import com.linroid.ketch.api.DownloadSchedule
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedScheduler
 import com.linroid.ketch.app.i18n.load
-import com.linroid.ketch.app.state.SpeedScheduler
-import com.linroid.ketch.config.SpeedRule
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime

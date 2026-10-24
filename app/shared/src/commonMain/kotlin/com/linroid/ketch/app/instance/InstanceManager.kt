@@ -5,15 +5,18 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedModeState
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.SpeedMode
+import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.RemoteConfig
@@ -21,6 +24,7 @@ import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.remote.RemoteKetch
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_server_start_failed
 import kotlinx.coroutines.CancellationException
@@ -33,15 +37,21 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -168,7 +178,43 @@ class InstanceManager(
 
   private val inForeground = MutableStateFlow(true)
   private val backgroundExpired = MutableStateFlow(false)
-  private val localSpeedMode = MutableStateFlow<Flow<SpeedMode>>(flowOf(SpeedMode.Full))
+
+  /**
+   * Speed mode of the embedded device, which its engine runs; `null` without one, or when the
+   * host gave it no speed modes.
+   */
+  val embeddedSpeedMode: SpeedModeController? = embeddedInstance?.instance?.let { api ->
+    api.controller(SpeedModes)?.let { modes ->
+      SpeedModeController(modes, api.subscribe(Interest.SpeedMode), scope, LOCAL_DEVICE_ID)
+    }
+  }
+
+  // A controller per started remote client, by device id, with the job that follows it; they
+  // change only under connectionLock.
+  private val remoteSpeedModes = MutableStateFlow<Map<String, SpeedModeController>>(emptyMap())
+  private val speedModeJobs = mutableMapOf<String, Job>()
+
+  /**
+   * Speed modes of the devices that run them, by device id: the embedded device's, and those of
+   * the connected remote devices whose server has reported them. A remote device's stays while
+   * it is offline, as it last reported it, until the app stops keeping it connected.
+   */
+  val speedModes: StateFlow<Map<String, SpeedModeController>> = remoteSpeedModes
+    .flatMapLatest { remotes ->
+      if (remotes.isEmpty()) {
+        flowOf(emptyMap())
+      } else {
+        combine(remotes.values.map { c -> c.state.map { state -> c.takeIf { state != null } } }) {
+          it.filterNotNull().associateBy { controller -> controller.deviceId }
+        }
+      }
+    }
+    .map { remotes -> embeddedSpeedMode?.let { remotes + (LOCAL_DEVICE_ID to it) } ?: remotes }
+    .stateIn(
+      scope,
+      SharingStarted.Eagerly,
+      embeddedSpeedMode?.let { mapOf(LOCAL_DEVICE_ID to it) } ?: emptyMap(),
+    )
 
   // Clients started since they were created, by device id, with the jobs that learn their
   // names and systems. Both change only under connectionLock.
@@ -191,7 +237,13 @@ class InstanceManager(
       serverState = serverState,
       shown = deviceScope,
       inForeground = inForeground,
-      localMode = localSpeedMode.flatMapLatest { it },
+      speedModes = speedModes.flatMapLatest { controllers ->
+        if (controllers.isEmpty()) {
+          flowOf(emptyMap())
+        } else {
+          combine(controllers.map { (id, c) -> c.mode.map { id to it } }) { it.toMap() }
+        }
+      },
       scope = scope,
       clock = clock,
     ).presence
@@ -283,9 +335,22 @@ class InstanceManager(
     this.inForeground.value = inForeground
   }
 
-  /** Feeds the embedded device's speed mode, owned by the host, to [presence]. */
-  fun setLocalSpeedMode(mode: Flow<SpeedMode>) {
-    localSpeedMode.value = mode
+  /** Speed mode of [entry], once it has reported one; see [speedModes]. */
+  fun speedModeOf(entry: InstanceEntry): SpeedModeController? = speedModes.value[entry.deviceId]
+
+  /**
+   * Speed mode of [device] read once over its API rather than followed, for a page that edits a
+   * device the app does not keep connected, which [speedModes] leaves out; each change it makes
+   * shows what the device returns. Its state stays `null` when the device runs none.
+   *
+   * @param scope reads it; the page's.
+   */
+  fun readSpeedMode(device: RemoteInstance, scope: CoroutineScope): SpeedModeController? {
+    val modes = device.instance.controller(SpeedModes) ?: return null
+    val state = flow { emit(modes.state()) }.catch { e ->
+      log.d { "Couldn't read the speed mode of ${device.deviceId}: ${e.describeCauses()}" }
+    }
+    return SpeedModeController(modes, state, scope, device.deviceId)
   }
 
   /**
@@ -362,6 +427,13 @@ class InstanceManager(
 
   /** Downloads the embedded instance's subscribed tracker lists again now. */
   fun refreshTrackerList() = factory.refreshTrackerList()
+
+  /**
+   * The torrent settings the embedded instance runs, which other devices may change through its
+   * server; `null` without torrents.
+   */
+  val torrentEngineSettings: StateFlow<TorrentEngineSettings>?
+    get() = factory.torrentEngineSettings
 
   /**
    * Replaces [old] with a new remote instance that reaches it over HTTPS when [secure] or HTTP
@@ -593,6 +665,31 @@ class InstanceManager(
       log.w { "Couldn't connect to $deviceId: ${e.describeCauses()}" }
     }
     learning[deviceId] = scope.launch { learnStatus(entry) }
+    entry.instance.controller(SpeedModes)?.let { modes ->
+      val job = SupervisorJob(scope.coroutineContext[Job])
+      speedModeJobs[deviceId] = job
+      val follower = CoroutineScope(scope.coroutineContext + job)
+      val controller = SpeedModeController(modes, speedStatesOf(entry), follower, deviceId)
+      remoteSpeedModes.update { it + (deviceId to controller) }
+    }
+  }
+
+  // What a remote device reports about its speed modes, each time it connects, when its server
+  // runs them; it may run another version once it connects again.
+  private fun speedStatesOf(entry: RemoteInstance): Flow<SpeedModeState> = flow {
+    while (true) {
+      entry.connectionState.first { it == ConnectionState.Connected }
+      try {
+        if (KetchFeatures.SPEED_MODES in entry.instance.status().features) {
+          emitAll(entry.instance.subscribe(Interest.SpeedMode))
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.d { "Couldn't follow the speed mode of ${entry.deviceId}: ${e.describeCauses()}" }
+      }
+      entry.connectionState.first { it != ConnectionState.Connected }
+    }
   }
 
   // Once connected, names a device after the name it announces, unless it has one already, and
@@ -638,6 +735,8 @@ class InstanceManager(
   private fun forget(deviceId: String) {
     started.remove(deviceId)
     learning.remove(deviceId)?.cancel()
+    speedModeJobs.remove(deviceId)?.cancel()
+    remoteSpeedModes.update { it - deviceId }
     connected.value = started.keys.toSet()
   }
 

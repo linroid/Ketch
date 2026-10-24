@@ -13,6 +13,7 @@ import androidx.compose.ui.window.MenuScope
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
@@ -57,7 +58,6 @@ import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.links
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.menu_add_device
 import ketch.app.desktop.generated.resources.menu_check_updates
@@ -776,8 +776,9 @@ internal class DesktopCommands(
     state.showDownloads(state.statusFilter)
   }
 
-  // This computer is the one device with a speed mode, which the tray switches also while
-  // another device shows, naming it then. Either way the change offers Undo when [undoable].
+  // The shown device's speed mode when it runs one; else this computer's, which the tray switches
+  // also while another device shows, naming it then. Either way the change offers Undo when
+  // [undoable].
   private fun switchSpeedMode(mode: SpeedLimitMode, undoable: Boolean = true) {
     if (state.activeSpeedMode != null) {
       state.switchSpeedMode(mode, undoable)

@@ -26,12 +26,14 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentCounters
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
@@ -122,6 +124,59 @@ internal class KetchTorrentController(
     }
     return source.torrentReachability()
   }
+
+  override suspend fun settings(): TorrentEngineSettings {
+    requireSettings()
+    return source.torrentSettings()
+  }
+
+  override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+    requireSettings()
+    change.trackers?.let { checkUrls(it, MAX_TRACKERS, "extra trackers") }
+    change.trackerListUrls?.let { checkUrls(it, MAX_TRACKER_LISTS, "tracker lists") }
+    if (change.isEmpty) return source.torrentSettings()
+    return source.updateTorrentSettings(change).also {
+      log.i { "Torrent settings changed: ${change.names()}" }
+    }
+  }
+
+  private fun requireSettings() {
+    if (TorrentCapability.SETTINGS.wireName !in source.torrentCapabilities) {
+      throw TorrentCommandException(
+        TorrentCommandError.UNSUPPORTED,
+        "Torrent settings are unavailable",
+      )
+    }
+  }
+
+  /** Refuses more than [max] [urls], or one that is empty, too long or holds spaces. */
+  private fun checkUrls(urls: List<String>, max: Int, what: String) {
+    if (urls.size > max) {
+      throw TorrentCommandException(
+        TorrentCommandError.INVALID_INPUT,
+        "At most $max $what are allowed",
+      )
+    }
+    if (urls.any { url -> url.isEmpty() || url.length > MAX_URL_LENGTH || url.any { it <= ' ' } }) {
+      throw TorrentCommandException(
+        TorrentCommandError.INVALID_INPUT,
+        "The $what must be URLs of at most $MAX_URL_LENGTH characters without spaces",
+      )
+    }
+  }
+
+  /** The names of the settings [this] changes, never their values, which may hold passkeys. */
+  private fun TorrentSettingsChange.names(): String = listOfNotNull(
+    "upload".takeIf { upload != null },
+    "uploadLimit".takeIf { uploadLimit != null },
+    "encryption".takeIf { encryption != null },
+    "utp".takeIf { utp != null },
+    "portMapping".takeIf { portMapping != null },
+    "localDiscovery".takeIf { localDiscovery != null },
+    "trackers".takeIf { trackers != null },
+    "trackerList".takeIf { trackerList != null },
+    "trackerListUrls".takeIf { trackerListUrls != null },
+  ).joinToString()
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {
     val task = torrentTask(taskId) ?: return null
@@ -605,6 +660,12 @@ internal class KetchTorrentController(
   companion object {
     const val MAX_PAGE_SIZE: Int = 1000
     const val MAX_SUBSCRIPTIONS: Int = 16
+    /** Upper bound of [TorrentEngineSettings.trackers] a change sets. */
+    const val MAX_TRACKERS: Int = 1024
+    /** Upper bound of [TorrentEngineSettings.trackerListUrls] a change sets. */
+    const val MAX_TRACKER_LISTS: Int = 64
+    /** Upper bound of each tracker or tracker list URL a change sets. */
+    const val MAX_URL_LENGTH: Int = 8192
     private const val MAX_CACHED_FILE_LISTS = 16
     private val cursorJson = Json { ignoreUnknownKeys = false }
 

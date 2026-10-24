@@ -458,6 +458,8 @@
   <string name="settings_speed_mode_auto">自動</string>
   <string name="settings_speed_remote">設定將在 %1$s 上生效，重新啟動該裝置後會重設。該裝置尚不支援低速模式和自動模式。</string>
   <string name="settings_speed_remote_saved">設定將儲存在 %1$s 上。該裝置尚不支援低速模式和自動模式。</string>
+  <string name="settings_speed_remote_modes">%1$s 會自行執行速度模式和規則，即使關閉本應用程式也會生效。每個下載的連線數在該裝置重新啟動後會重設。</string>
+  <string name="settings_speed_remote_modes_saved">設定儲存在 %1$s 上，它會自行執行速度模式和規則，即使關閉本應用程式也會生效。</string>
   <string name="settings_speed_limit_group">限制</string>
   <string name="settings_speed_limit">速度限制</string>
   <string name="settings_speed_limit_hint">所有下載的總速度受此限制；個別下載可設定更低的速度上限。</string>
@@ -570,7 +572,7 @@
   <string name="settings_torrent_connections_footer">加密隱藏的是流量類型，而不是連線的對象。</string>
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>
-  <string name="settings_torrent_remote">請在 %1$s 上開啟 Ketch，或編輯該裝置的 config.toml，變更 BitTorrent 設定。</string>
+  <string name="settings_torrent_remote">請更新 %1$s 上的 Ketch，以便在這裡變更這些設定。</string>
   <string name="settings_torrent_reach_reachable">對等端可以透過連接埠 %2$d 連線至 %1$s。</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="other">連接埠 %2$d 已經由 %3$d 台路由器轉送至 %1$s，對等端可以連線。</item>

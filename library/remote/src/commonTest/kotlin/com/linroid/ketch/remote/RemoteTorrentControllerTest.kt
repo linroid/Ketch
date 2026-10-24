@@ -7,13 +7,17 @@ import com.linroid.ketch.torrent.api.TorrentCommandContext
 import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
+import com.linroid.ketch.torrent.api.TorrentEncryptionSetting
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentReachabilityStatus
 import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -24,7 +28,9 @@ import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -156,6 +162,81 @@ class RemoteTorrentControllerTest {
     } finally {
       fixture.client.close()
       older.client.close()
+    }
+  }
+
+  @Test
+  fun settings_readAndChangeTheServers_sendingOnlyWhatChanges() = runTest {
+    val settings = TorrentEngineSettings(upload = TorrentUploadSetting.SEED, utp = false)
+    val sent = mutableListOf<TorrentSettingsChange>()
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "settings")))
+        ?: when (request.method) {
+          HttpMethod.Get -> json(json.encodeToString(settings))
+          else -> {
+            val change = json.decodeFromString<TorrentSettingsChange>(
+              (request.body as TextContent).text,
+            )
+            sent += change
+            json(json.encodeToString(change.applyTo(settings)))
+          }
+        }
+    }
+    try {
+      assertEquals(settings, fixture.controller.settings())
+      val change = TorrentSettingsChange(encryption = TorrentEncryptionSetting.OFF)
+      assertEquals(
+        settings.copy(encryption = TorrentEncryptionSetting.OFF),
+        fixture.controller.updateSettings(change),
+      )
+      assertEquals(listOf(change), sent)
+      // Capabilities follow the settings, so they are asked again after a change.
+      fixture.controller.capabilities()
+      assertEquals(
+        listOf(
+          "/api/torrents/capabilities", "/api/torrents/settings", "/api/torrents/settings",
+          "/api/torrents/capabilities",
+        ),
+        fixture.paths,
+      )
+    } finally {
+      fixture.client.close()
+    }
+  }
+
+  @Test
+  fun settings_withoutTheCapability_sendNoRequest() = runTest {
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "reachability")))
+        ?: error("Unexpected request")
+    }
+    try {
+      failure(TorrentCommandError.UNSUPPORTED) { fixture.controller.settings() }
+      failure(TorrentCommandError.UNSUPPORTED) {
+        fixture.controller.updateSettings(TorrentSettingsChange(utp = true))
+      }
+      assertEquals(listOf("/api/torrents/capabilities"), fixture.paths)
+    } finally {
+      fixture.client.close()
+    }
+  }
+
+  @Test
+  fun updateSettings_refused_mapsToInvalidInput() = runTest {
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("settings")))
+        ?: json(
+          json.encodeToString(ErrorResponse("invalid_input", "At most 1024 extra trackers")),
+          HttpStatusCode.BadRequest,
+        )
+    }
+    try {
+      val error = failure(TorrentCommandError.INVALID_INPUT) {
+        fixture.controller.updateSettings(TorrentSettingsChange(trackers = listOf("udp://t:1")))
+      }
+      assertEquals("At most 1024 extra trackers", error.message)
+    } finally {
+      fixture.client.close()
     }
   }
 

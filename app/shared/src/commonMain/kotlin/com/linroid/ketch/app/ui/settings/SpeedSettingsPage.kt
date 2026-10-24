@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -28,7 +29,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.ConnectionRange
@@ -50,14 +56,15 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.icons.KetchIcon
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
+import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.autoModeSummary
 import com.linroid.ketch.app.state.deviceId
+import com.linroid.ketch.app.state.mode
 import com.linroid.ketch.app.state.newSpeedRule
 import com.linroid.ketch.app.state.normalizeRuleTime
 import com.linroid.ketch.app.state.ruleDaysLabel
@@ -67,10 +74,8 @@ import com.linroid.ketch.app.state.speedChoices
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.toggleRuleDay
 import com.linroid.ketch.app.theme.KetchTheme
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.SpeedSettings
-import com.linroid.ketch.config.Weekday
+import com.linroid.ketch.app.ui.pulse.rememberSpeedModeOf
+import com.linroid.ketch.app.ui.pulse.speedModeFor
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_loading_from
 import ketch.app.shared.generated.resources.settings_speed_auto_no_rules
@@ -137,17 +142,29 @@ import org.jetbrains.compose.resources.stringResource
  * Speed settings of [device]: the speed mode with its Slow lane and Auto rules, the full speed
  * cap, and the connections each download opens. Changes apply at once.
  *
- * Only the embedded device has a speed mode, kept by the host's [SpeedModeController]; other
- * devices, and hosts that keep no speed mode, offer a plain speed limit instead.
+ * The device runs its speed mode itself ([SpeedModeController]), remote devices included, so it
+ * holds while this app is away. Devices without one, such as a remote device running an older
+ * Ketch, offer a plain speed limit instead.
  */
 @Composable
 fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
-  val model = remember(state, device) { SpeedSettingsModel(state, device) }
   LaunchedEffect(controller) { controller.loadDownload() }
-  val config = controller.download
   val features by remember(state, device) { state.featuresFlow(device) }
-    .collectAsState(emptySet())
+    .collectAsState(state.featuresOf(device.deviceId))
+  // A remote device lists them before it reports them; the embedded one has its controller.
+  val remoteModes = controller.isRemote && KetchFeatures.SPEED_MODES in features
+  val followed = state.rememberSpeedModeOf(device)
+  val pageScope = rememberCoroutineScope()
+  // The app follows only the devices it keeps connected; others are read for this page.
+  val read = remember(device, followed == null && remoteModes) {
+    (device as? RemoteInstance)?.takeIf { followed == null && remoteModes }
+      ?.let { state.instanceManager.readSpeedMode(it, pageScope) }
+  }
+  val speedMode = followed ?: read
+  val model = remember(state, device, speedMode) { SpeedSettingsModel(state, device, speedMode) }
+  val runsModes = speedMode != null || remoteModes
+  val config = controller.download
   if (controller.isRemote) {
     SettingsNotice(
       text = stringResource(speedRemoteNotice(features), device.label),
@@ -163,8 +180,11 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
     }
     return
   }
-  val speedMode = model.speedMode
-  if (speedMode == null) {
+  val reported = speedMode?.state?.collectAsState()?.value
+  if (reported == null && runsModes) {
+    // The device reports its speed mode once it is connected.
+    SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
+  } else if (reported == null) {
     SettingsGroup(title = stringResource(Res.string.settings_speed_limit_group)) {
       SettingsRow(
         title = stringResource(Res.string.settings_speed_limit),
@@ -178,13 +198,12 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
       }
     }
   } else {
-    val settings by speedMode.settings.collectAsState()
-    val mode by speedMode.mode.collectAsState()
-    val peak by speedMode.observedPeak.collectAsState()
-    val cap = if (settings.mode == SpeedLimitMode.Full) config.speedLimit else settings.standard
-    val suggested = SpeedModeController.suggestSlowLane(peak.bytesPerSecond)
-    ModeGroup(settings, mode, cap, model)
-    LimitsGroup(settings, cap, suggested, hasPeak = peak.bytesPerSecond > 0, model)
+    val settings = reported.settings
+    // The device keeps its standing cap current, whatever sets it.
+    val cap = settings.standard
+    val suggested = reported.suggestedSlowLane
+    ModeGroup(settings, reported.mode, cap, model)
+    LimitsGroup(settings, cap, suggested, hasPeak = reported.observedPeak > 0, model)
     RulesGroup(settings, model)
   }
   PerDownloadGroup(config, model)
@@ -261,7 +280,7 @@ private fun LimitsGroup(
         stringResource(
           Res.string.settings_speed_slow_lane_suggested,
           suggestion,
-          SpeedModeController.SLOW_LANE_PERCENT,
+          SpeedSettings.SLOW_LANE_PERCENT,
         )
       } else {
         stringResource(Res.string.settings_speed_slow_lane_unknown, suggestion)
@@ -506,32 +525,26 @@ private val TimeInvalid = Res.string.settings_speed_rule_time_invalid.text()
 /**
  * What the Speed page changes on [device], kept out of the composable so it can be tested.
  *
- * Mode changes go through the host's [SpeedModeController], which replaces the device's speed
- * limit; the device's settings are then read back, so the Pulse bar's cap follows at once.
- * Outside full speed, the device's limit is the Slow lane's, so the full speed cap is saved as
- * the controller's standing cap instead of in the download settings.
- *
- * At full speed the controller only learns the device's limit when it leaves full speed, and
- * any change it makes before that puts back the standing cap it last knew. So every change
- * first hands it the limit the device uses, which may have been set elsewhere, such as in the
- * Pulse bar or the config file.
+ * Changes go to the device's [speedMode], which the device runs and saves itself, the standing
+ * cap included; the device's settings are then read back, so the Pulse bar's cap follows at
+ * once. A device without a speed mode only takes a speed limit, in its download settings.
  *
  * Changes run in the app scope, so closing Settings right after a click never undoes them, and
  * failures are posted to [AppState.messages].
+ *
+ * @property speedMode speed mode of [device]; `null` when it runs none.
  */
 internal class SpeedSettingsModel(
   private val state: AppState,
   private val device: InstanceEntry,
+  val speedMode: SpeedModeController? = state.speedModeFor(device),
 ) {
   private val log = KetchLogger("SpeedSettings")
   private val settings = state.settingsFor(device)
 
-  /** Speed mode of [device]; only the embedded device has one, and only when the host keeps it. */
-  val speedMode: SpeedModeController? = state.speedMode.takeIf { device is EmbeddedInstance }
-
   /** The Slow lane speed of [settings]: the one set, or the suggested one. */
   fun slowLaneSpeed(settings: SpeedSettings): SpeedLimit =
-    settings.slowLane ?: speedMode?.suggestedSlowLane ?: SpeedModeController.DEFAULT_SLOW_LANE
+    settings.slowLane ?: speedMode?.suggestedSlowLane ?: SpeedSettings.DEFAULT_SLOW_LANE
 
   /** Switches to [mode]. */
   fun setMode(mode: SpeedLimitMode): Job? =
@@ -541,16 +554,14 @@ internal class SpeedSettingsModel(
 
   /** Sets the speed downloads share outside the Slow lane; [SpeedLimit.Unlimited] for none. */
   fun setFullSpeedCap(limit: SpeedLimit): Job? {
-    val modes = speedMode
-    val failed = Res.string.settings_speed_cap_failed.text()
-    if (modes == null || modes.settings.value.mode == SpeedLimitMode.Full) {
-      // At full speed the cap is the device's own limit, saved with its download settings.
+    if (speedMode == null) {
       val config = settings.download ?: return null
       settings.updateDownload(config.copy(speedLimit = limit))
-      if (modes == null) return null
-      return change("setStandard", failed, syncCap = false) { it.setStandard(limit) }
+      return null
     }
-    return change("setStandard", failed) { it.setStandard(limit) }
+    return change("setStandard", Res.string.settings_speed_cap_failed.text()) {
+      it.setStandard(limit)
+    }
   }
 
   /** Sets the Slow lane speed; `null` follows the suggestion. */
@@ -571,21 +582,15 @@ internal class SpeedSettingsModel(
     }
   }
 
-  // action names the change in the log, failed tells the user it failed. syncCap: whether to
-  // hand the controller the device's limit first; see the class KDoc.
+  // action names the change in the log, failed tells the user it failed.
   private fun change(
     action: String,
     failed: UiText,
-    syncCap: Boolean = true,
     block: suspend (SpeedModeController) -> Unit,
   ): Job? {
     val modes = speedMode ?: return null
     return state.launchCommand {
       try {
-        if (syncCap && modes.settings.value.mode == SpeedLimitMode.Full) {
-          val limit = device.instance.status().config.speedLimit
-          if (modes.settings.value.standard != limit) modes.setStandard(limit)
-        }
         block(modes)
       } catch (e: CancellationException) {
         throw e

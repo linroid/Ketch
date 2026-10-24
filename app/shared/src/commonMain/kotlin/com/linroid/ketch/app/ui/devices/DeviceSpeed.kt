@@ -25,7 +25,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * What [device]'s speed mode pill shows: its own mode and limit, whether or not it is the device
- * the app shows. Only the embedded device has a speed mode; others show their speed limit.
+ * the app shows. Devices without a speed mode show their speed limit.
  */
 @Composable
 internal fun rememberDeviceSpeedView(state: AppState, device: DevicePresence): SpeedModeView {

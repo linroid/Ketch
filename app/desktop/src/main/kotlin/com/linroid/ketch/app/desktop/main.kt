@@ -36,13 +36,13 @@ import com.linroid.ketch.app.App
 import com.linroid.ketch.app.feedback.ActivityEvent
 import com.linroid.ketch.app.feedback.ActivityMonitor
 import com.linroid.ketch.app.feedback.ActivityRouting
-import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.feedback.MessageNotifications
-import com.linroid.ketch.app.feedback.PairingNotices
 import com.linroid.ketch.app.feedback.MessagePlacement
 import com.linroid.ketch.app.feedback.NotificationCopy
 import com.linroid.ketch.app.feedback.NotificationLink
+import com.linroid.ketch.app.feedback.PairingNotices
+import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.SystemNotifier
 import com.linroid.ketch.app.feedback.UnreadableFile
 import com.linroid.ketch.app.feedback.UnreadableFiles
@@ -56,12 +56,12 @@ import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
 import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.instance.embeddedSpeedModes
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.AwtFilePicker
 import com.linroid.ketch.app.platform.FileActionException
@@ -80,12 +80,10 @@ import com.linroid.ketch.app.state.IncomingDownloads
 import com.linroid.ketch.app.state.KeepAwake
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LinkSource
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.PulseCounts
-import com.linroid.ketch.app.state.PulseModel
 import com.linroid.ketch.app.state.SettingsTarget
-import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.StatusFilter
+import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isPairingLink
 import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.theme.LocalWindowChrome
@@ -99,14 +97,12 @@ import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.config.TorrentEncryptionMode
-import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.geo.DbIpCountryDatabase
+import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
-import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.hooks.HookRunner
@@ -117,8 +113,7 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
-import com.linroid.ketch.torrent.TorrentEncryption
-import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.torrent.withSettings
 import com.linroid.ketch.updater.GitHubReleases
 import com.linroid.ketch.updater.ReleaseDownloader
 import com.linroid.ketch.updater.ReleasePlatform
@@ -141,16 +136,10 @@ import ketch.app.desktop.generated.resources.notify_on_device
 import ketch.app.desktop.generated.resources.notify_still_running
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -408,7 +397,6 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Settings, unreadable.movedTo))
     }
   }
-  val localSpeed = remember { LocalSpeedMode(configStore) }
   // Quitting once downloads finish goes through the close behavior, which needs the controller.
   val quitWhenDone = remember { AtomicReference<() -> Unit> {} }
   val controller = remember {
@@ -417,16 +405,15 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
       instanceManager = manager,
       aiProviderFactory = EmbeddedAiDiscoveryProviderFactory(),
       incoming = launch.incoming,
-      speedMode = localSpeed.attach(manager),
       unreadableFiles = unreadableFiles,
       discoverHistory = launch.discoverHistory,
       finishActions = DesktopFinishActions(quit = { quitWhenDone.get()() }),
-    ).also { localSpeed.follow(it.pulse) }
+    )
   }
   LaunchedEffect(controller) {
     (launch.downloads as? DownloadsClaim.Taken)?.let { announceDownloadsElsewhere(controller, it) }
   }
-  val resources = remember { AppResources(controller, localSpeed, launch) }
+  val resources = remember { AppResources(controller, launch) }
   DisposableEffect(resources) {
     onDispose { resources.close() }
   }
@@ -515,8 +502,9 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
     )
   }
   val active by controller.state.activeInstance.collectAsState()
-  // Speed modes only switch this computer for now.
-  val speedMode = controller.speedMode.takeIf { active == null || active is EmbeddedInstance }
+  val speedModes by controller.instanceManager.speedModes.collectAsState()
+  // The shown device's, as it runs them; this computer's while none shows.
+  val speedMode = active?.let { speedModes[it.deviceId] } ?: controller.speedMode
   val commands = remember(speedMode, files, clipboard) {
     DesktopCommands(controller, actions, speedMode, files, clipboard) {
       windowState.isMinimized = true
@@ -713,17 +701,8 @@ private fun createInstanceManager(
   }
   val taskStore = createSqliteTaskStore(driverFactory)
   val torrentSource = TorrentDownloadSource(
-    TorrentConfig(
-      stateDirectory = File(configDir, "torrent-state").path,
-      additionalTrackers = config.torrent.trackers,
-      trackerListUrls = config.torrent.subscribedTrackerLists,
-      uploadPolicy = config.torrent.upload.toUploadPolicy(),
-      uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
-      encryption = config.torrent.encryption.toEncryption(),
-      utpEnabled = config.torrent.utp,
-      portMapping = config.torrent.portMapping,
-      localDiscovery = config.torrent.localDiscovery,
-    ),
+    TorrentConfig(stateDirectory = File(configDir, "torrent-state").path)
+      .withSettings(config.torrent.engineSettings),
   )
   return InstanceManager(
     factory = InstanceFactory(
@@ -744,6 +723,10 @@ private fun createInstanceManager(
           ),
           countries = DbIpCountryDatabase(File(configDir, COUNTRY_DATABASE_FILE)),
           instanceId = instanceId,
+          // Saved on the main thread, like the app's settings.
+          speedModes = embeddedSpeedModes(config) { transform ->
+            withContext(Dispatchers.Main) { saveConfig(configStore, transform) }
+          },
         ).also { ketch ->
           // The app runs this computer's downloads, so it runs the hooks of config.toml; for the
           // life of the process, as the engine.
@@ -783,16 +766,8 @@ private fun createInstanceManager(
           }
         }
       },
-      applyTorrentSettings = {
-        torrentSource.setAdditionalTrackers(it.trackers)
-        torrentSource.setTrackerLists(it.subscribedTrackerLists)
-        torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
-        torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
-        torrentSource.setEncryption(it.encryption.toEncryption())
-        torrentSource.setUtpEnabled(it.utp)
-        torrentSource.setPortMapping(it.portMapping)
-        torrentSource.setLocalDiscovery(it.localDiscovery)
-      },
+      applyTorrentSettings = { torrentSource.applySettings(it.engineSettings) },
+      torrentEngineSettings = torrentSource.settings,
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {
           TrackerListStatus(it.url.orEmpty(), it.trackers, it.updatedAt, it.failed, it.updating)
@@ -896,7 +871,6 @@ private fun createUpdater(
 /** What the app closes when it quits: the controller, then the engine; once. */
 private class AppResources(
   private val controller: AppController,
-  private val localSpeed: LocalSpeedMode,
   private val launch: LaunchContext,
 ) {
   private var closed = false
@@ -922,7 +896,6 @@ private class AppResources(
     if (closed) return false
     closed = true
     controller.close()
-    localSpeed.close()
     launch.localApiServer.close()
     return true
   }
@@ -1213,67 +1186,6 @@ internal suspend fun addedCopy(
   return NotificationCopy(title = heading.load(), body = body.load())
 }
 
-/**
- * Speed mode of this computer, which the app, the tray and the menu bar switch. It is made before
- * the controller that shows it, so it runs in a scope of its own on the main thread, and saves
- * the speed settings and the observed peak as they change.
- */
-private class LocalSpeedMode(private val configStore: ConfigStore) {
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-  private val speed = MutableStateFlow(0L)
-
-  /** Creates the speed mode of [manager]'s embedded engine; `null` without one. */
-  fun attach(manager: InstanceManager): SpeedModeController? {
-    val embedded = manager.embedded ?: return null
-    val config = configStore.load()
-    val speedMode = SpeedModeController(
-      config = { embedded.status().config },
-      apply = { embedded.updateConfig(it) },
-      scope = scope,
-      settings = config.speed,
-      observedPeak = ObservedPeak(config.ui.observedPeak, config.ui.observedPeakAt),
-      speed = speed,
-    )
-    save(speedMode)
-    return speedMode
-  }
-
-  /** Records this computer's speed from [pulse], which raises the observed peak. */
-  fun follow(pulse: PulseModel) {
-    scope.launch {
-      pulse.devices.collect { devices ->
-        speed.value = devices.firstOrNull { it.deviceId == LOCAL_DEVICE_ID }?.speed ?: 0
-      }
-    }
-  }
-
-  fun close() {
-    scope.cancel()
-  }
-
-  @OptIn(FlowPreview::class)
-  private fun save(speedMode: SpeedModeController) {
-    scope.launch {
-      speedMode.settings.drop(1).collect { speed ->
-        saveConfig(configStore) { it.copy(speed = speed) }
-      }
-    }
-    scope.launch {
-      // The peak climbs in steps while a download speeds up.
-      speedMode.observedPeak.drop(1).debounce(PEAK_SAVE_DELAY).collect { peak ->
-        saveConfig(configStore) {
-          it.copy(
-            ui = it.ui.copy(
-              observedPeak = peak.bytesPerSecond,
-              observedPeakAt = peak.atEpochMillis,
-            ),
-          )
-        }
-      }
-    }
-  }
-}
-
 // Runs on the main thread, like the app's settings, so loads and saves cannot interleave.
 private fun saveConfig(store: ConfigStore, transform: (KetchConfig) -> KetchConfig) {
   try {
@@ -1303,19 +1215,6 @@ private const val COUNTRY_DATABASE_FILE = "dbip-country-lite.csv.gz"
 private const val MAIN_WINDOW_STATE = "main-window"
 private const val ADDED_NAMES_SHOWN = 3
 private val ADDED_COALESCE_WINDOW = 1.seconds
-private val PEAK_SAVE_DELAY = 10.seconds
 private val QUIT_COMMIT_TIMEOUT = 5.seconds
 private val WINDOW_ERROR_QUIET = 5.seconds
 
-/** The engine's upload policy for this `[torrent] upload` setting. */
-private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
-  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
-  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
-  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
-}
-
-private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this) {
-  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
-  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
-  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
-}

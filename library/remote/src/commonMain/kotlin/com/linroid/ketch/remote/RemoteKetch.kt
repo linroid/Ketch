@@ -20,6 +20,9 @@ import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
+import com.linroid.ketch.api.SpeedModeChange
+import com.linroid.ketch.api.SpeedModeState
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
@@ -288,14 +291,45 @@ class RemoteKetch internal constructor(
   }
 
   /**
+   * The server's speed modes, over `/api/speed`; servers that do not list
+   * [KetchFeatures.SPEED_MODES] fail every call with [UnsupportedOperationException].
+   * [Interest.SpeedMode] follows them on the event stream.
+   */
+  private val speedModes = object : SpeedModes {
+    override suspend fun state(): SpeedModeState {
+      requireSpeedModes()
+      val response = httpClient.get(Api.Speed())
+      checkSuccess(response)
+      return response.body()
+    }
+
+    override suspend fun update(change: SpeedModeChange): SpeedModeState {
+      requireSpeedModes()
+      val response = httpClient.put(Api.Speed()) {
+        contentType(ContentType.Application.Json)
+        setBody(change)
+      }
+      checkSuccess(response)
+      return response.body()
+    }
+
+    private suspend fun requireSpeedModes() {
+      if (KetchFeatures.SPEED_MODES !in features()) {
+        throw UnsupportedOperationException("This device has no speed modes")
+      }
+    }
+  }
+
+  /**
    * The server's controller for [key]: [TorrentController.Key] returns the server's torrent
-   * controls and [CountryDatabase.Key] its country database, which fail closed against servers
-   * without them. Other keys return `null`.
+   * controls, [CountryDatabase.Key] its country database and [SpeedModes.Key] its speed modes,
+   * which fail closed against servers without them. Other keys return `null`.
    */
   @Suppress("UNCHECKED_CAST")
   override fun <T : Any> controller(key: ControlKey<T>): T? = when {
     key === TorrentController.Key -> torrents as T
     key === CountryDatabase.Key -> countries as T
+    key === SpeedModes.Key -> speedModes as T
     else -> null
   }
 

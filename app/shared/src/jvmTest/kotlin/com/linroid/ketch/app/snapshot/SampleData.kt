@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.snapshot
 
 import com.linroid.ketch.api.ActiveConnections
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
@@ -16,13 +17,16 @@ import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.NetworkInterfaceInfo
-import com.linroid.ketch.api.NetworkKind
 import com.linroid.ketch.api.NetworkInterfaces
+import com.linroid.ketch.api.NetworkKind
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedModes
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.api.SystemInfo
+import com.linroid.ketch.app.FakeSpeedModes
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.verbatim
@@ -45,7 +49,6 @@ import com.linroid.ketch.app.state.InMemoryDiscoverHistoryStore
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
 import com.linroid.ketch.app.state.SpeedHistoryStore
-import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.extractFilename
@@ -57,10 +60,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -363,7 +363,8 @@ internal fun lanes(total: Long, done: List<Double>): List<Segment> {
 
 /**
  * A device of the snapshots named [name], on [os] with its downloads in [directory]: its tasks,
- * starting from [initial], its settings, its disk and the live [connections] it reports.
+ * starting from [initial], its settings, its disk and the live [connections] it reports, and the
+ * speed modes it runs from [speed] with [observedPeak], or none, as an older Ketch.
  */
 internal class SampleKetchApi(
   private val name: String,
@@ -373,22 +374,41 @@ internal class SampleKetchApi(
   private val directory: String = SampleData.DOWNLOAD_DIR,
   private val version: String = KetchApi.VERSION,
   private val connections: ActiveConnections = ActiveConnections(SampleData.NOW),
+  speed: SpeedSettings? = null,
+  observedPeak: Long = 0,
 ) : KetchApi {
-  /** The embedded device of [data]. */
-  constructor(data: SampleData) : this(
+  /** The embedded device of [data], running the speed modes of [speed]. */
+  constructor(data: SampleData, speed: SpeedSettings? = null, observedPeak: Long = 0) : this(
     name = data.deviceName,
     initial = data.tasks,
     config = data.downloadConfig,
     connections = data.connections,
+    speed = speed,
+    observedPeak = observedPeak,
   )
+
+  /** The speed modes it runs, with the cap of [speed] as saved beside them; `null` for none. */
+  val speedModes: FakeSpeedModes? = speed?.let {
+    FakeSpeedModes(it, observedPeak, SampleData.CLOCK) { limit ->
+      config = config.copy(speedLimit = limit)
+    }
+  }
+
+  init {
+    speedModes?.let { config = config.copy(speedLimit = it.states.value.limit) }
+  }
 
   @Suppress("UNCHECKED_CAST")
   override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
     if (interest is Interest.Connections) {
       fixedConnections(connections, interest.limit) as Flow<T>
     } else {
-      emptyFlow()
+      speedModes?.follow(interest) ?: emptyFlow()
     }
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    speedModes.takeIf { key === SpeedModes.Key } as T?
 
   private val taskList = MutableStateFlow(initial)
 
@@ -447,12 +467,15 @@ internal class SampleKetchApi(
       usableSpace = 412_316_860_416,
     ),
     // A device on this version, like the embedded one, whose features the app gets without
-    // asking, shared through a server that saves the settings other devices change.
-    features = KetchFeatures.ALL + KetchFeatures.CONFIG_PERSISTED,
+    // asking, shared through a server that saves the settings other devices change; one without
+    // speed modes stands for an older Ketch.
+    features = KetchFeatures.ALL + KetchFeatures.CONFIG_PERSISTED -
+      setOfNotNull(KetchFeatures.SPEED_MODES.takeIf { speedModes == null }),
   )
 
   override suspend fun updateConfig(config: DownloadConfig) {
-    this.config = config
+    val limit = speedModes?.configure(config.speedLimit) ?: config.speedLimit
+    this.config = config.copy(speedLimit = limit)
   }
 
   override suspend fun start() {}
@@ -566,7 +589,6 @@ internal fun sampleSystem(
  * @param remote the client of a remote device; `null` leaves the app's own, which the
  *   unwatched sample remotes never connect.
  * @param config the saved config, from the one [data] gives.
- * @param speedMode the speed mode of the embedded device, running in the given scope.
  * @param discoverHistory the saved Discover sessions.
  * @param seedHistory whether [start] fills the speed history before the rows are listed.
  * @param wave how far below or above its speed each second of the seeded history is.
@@ -576,15 +598,13 @@ internal class SampleEnvironment(
   theme: SnapshotTheme,
   density: DensityMode,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
-  embedded: (SampleData) -> KetchApi = ::SampleKetchApi,
+  embedded: (SampleData) -> KetchApi = { SampleKetchApi(it) },
   remote: ((RemoteConfig) -> RemoteInstance)? = null,
   config: (KetchConfig) -> KetchConfig = { it },
-  speedMode: ((KetchApi, CoroutineScope) -> SpeedModeController)? = null,
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
   private val seedHistory: Boolean = true,
   private val wave: (second: Int, random: Random) -> Double = SampleWave,
 ) : SnapshotEnvironment {
-  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = if (remote == null) {
       InstanceFactory(deviceName = data.deviceName, embeddedFactory = { embedded(data) })
@@ -606,7 +626,6 @@ internal class SampleEnvironment(
     context = SnapshotHarness.ui,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
-    speedMode = speedMode?.invoke(checkNotNull(instanceManager.embedded), speedScope),
     clock = SampleData.CLOCK,
     discoverHistory = discoverHistory,
   )
@@ -640,7 +659,6 @@ internal class SampleEnvironment(
 
   override fun close() {
     controller.close()
-    speedScope.cancel()
     instanceManager.instances.value.filterIsInstance<RemoteInstance>()
       .forEach { it.instance.close() }
     instanceManager.close()

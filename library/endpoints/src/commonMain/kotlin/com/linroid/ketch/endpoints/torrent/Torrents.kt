@@ -10,6 +10,8 @@ import kotlinx.serialization.Serializable
  *
  * - `GET /api/torrents/capabilities`   — what the torrent controller can do
  * - `GET /api/torrents/reachability`   — whether peers can connect to its engine
+ * - `GET /api/torrents/settings`       — the settings every torrent runs with
+ * - `PUT /api/torrents/settings`       — change some of them; takes a `TorrentSettingsChange`
  * - `GET /api/torrents/{id}`           — a torrent task's snapshot
  * - `GET /api/torrents/{id}/files`     — a page of its files (`?limit&cursor&sort&desc`)
  * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
@@ -27,6 +29,11 @@ data class Torrents(val parent: Api = Api()) {
   @Serializable
   @Resource("reachability")
   data class Reachability(val parent: Torrents = Torrents())
+
+  /** The engine's settings; `PUT` takes a `TorrentSettingsChange` and answers the new ones. */
+  @Serializable
+  @Resource("settings")
+  data class Settings(val parent: Torrents = Torrents())
 
   @Serializable
   @Resource("{id}")

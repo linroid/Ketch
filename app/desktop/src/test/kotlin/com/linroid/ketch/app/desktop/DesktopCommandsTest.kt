@@ -3,6 +3,7 @@ package com.linroid.ketch.app.desktop
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.input.KetchCommands
@@ -12,11 +13,9 @@ import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -178,7 +177,7 @@ class DesktopCommandsTest {
 
   /** This computer and a connected NAS, with the app and the menu commands over them. */
   private class Fleet(scope: TestScope, clipboard: String?, speedMode: Boolean) {
-    val mac = FakeDevice()
+    val mac = FakeDevice(runsSpeedModes = speedMode)
     val nas = FakeDevice()
     var nasClients = 0
       private set
@@ -203,15 +202,6 @@ class DesktopCommandsTest {
       instanceManager = manager,
       context = scope.backgroundScope.coroutineContext +
         SupervisorJob(scope.backgroundScope.coroutineContext[Job]),
-      speedMode = if (speedMode) {
-        SpeedModeController(
-          config = { mac.config },
-          apply = mac::updateConfig,
-          scope = scope.backgroundScope,
-        )
-      } else {
-        null
-      },
     )
 
     val commands = DesktopCommands(

@@ -4,6 +4,10 @@ import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.api.Weekday
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
