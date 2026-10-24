@@ -17,6 +17,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
+import com.linroid.ketch.app.input.KeyPress
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -511,6 +512,51 @@ class DesktopTrayModelTest {
   }
 
   @Test
+  fun menuBar_view_listsTheZoomItemsWithTheirChords() = runTest {
+    val view = menuBar(context()).menu("View")
+
+    assertEquals(
+      KeyChord(Key.Equals, primary = true),
+      view.item(KetchCommands.ZoomIn).shortcut,
+    )
+    assertEquals(
+      KeyChord(Key.Minus, primary = true),
+      view.item(KetchCommands.ZoomOut).shortcut,
+    )
+    assertNull(view.item(KetchCommands.ActualSize).shortcut)
+    assertEquals("Actual size", view.item(KetchCommands.ActualSize).label.load())
+  }
+
+  @Test
+  fun menuBar_zoomAtTheLargest_disablesZoomInOnly() = runTest {
+    val largest = ZoomMenuState(canZoomIn = false, canZoomOut = true, zoomed = true)
+    val normal = ZoomMenuState(canZoomIn = true, canZoomOut = true, zoomed = false)
+    val zoomed = menuBar(context(zoom = largest)).menu("View")
+    val actual = menuBar(context(zoom = normal)).menu("View")
+
+    assertFalse(zoomed.item(KetchCommands.ZoomIn).enabled)
+    assertTrue(zoomed.item(KetchCommands.ZoomOut).enabled)
+    assertTrue(zoomed.item(KetchCommands.ActualSize).enabled)
+    assertFalse(actual.item(KetchCommands.ActualSize).enabled)
+  }
+
+  @Test
+  fun menuKeys_menuBars_ownTheShownZoomChordsAndLeaveTheOthers() {
+    val mac = KeyboardPlatform.Mac
+    val main = menuKeys(menuBar(context()), mac)
+    val settings = menuKeys(settingsMenuBar(ZoomMenuState()), mac)
+
+    for (keys in listOf(main, settings)) {
+      assertTrue(KeyPress(Key.Equals, meta = true) in keys)
+      assertTrue(KeyPress(Key.Minus, meta = true) in keys)
+      assertTrue(KeyPress(Key.W, meta = true) in keys)
+      assertFalse(KeyPress(Key.Equals, meta = true, shift = true) in keys)
+      assertFalse(KeyPress(Key.Plus, meta = true) in keys)
+      assertFalse(KeyPress(Key.NumPadAdd, meta = true) in keys)
+    }
+  }
+
+  @Test
   fun taskPhase_preemptedTask_isRunningLikeAQueuedOne() {
     val progress = DownloadProgress(10, 100)
 
@@ -922,6 +968,7 @@ class DesktopTrayModelTest {
     undoTitle: String? = null,
     slowLane: Boolean? = false,
     allDevices: Boolean = false,
+    zoom: ZoomMenuState = ZoomMenuState(),
   ): MenuBarContext = MenuBarContext(
     counts = counts,
     failures = counts.failed,
@@ -933,6 +980,7 @@ class DesktopTrayModelTest {
     slowLane = slowLane,
     allDevices = allDevices,
     platform = KeyboardPlatform.Mac,
+    zoom = zoom,
   )
 
   private fun selected(phase: TaskPhase, local: Boolean = true) = SelectedTask(phase, local)

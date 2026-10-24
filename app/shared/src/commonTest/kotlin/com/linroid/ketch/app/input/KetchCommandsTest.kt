@@ -34,7 +34,9 @@ class KetchCommandsTest {
     for (platform in KeyboardPlatform.entries) {
       for (scope in CommandScope.entries) {
         val owners = KetchCommands.all.filter { it.scope == scope }
-          .flatMap { command -> command.chords(platform).map { it.resolve(platform) to command } }
+          .flatMap { command ->
+            command.boundChords(platform).map { it.resolve(platform) to command }
+          }
           .groupBy({ it.first }, { it.second.id })
         val duplicates = owners.filterValues { it.size > 1 }
         assertTrue(duplicates.isEmpty(), "$platform $scope binds twice: $duplicates")
@@ -71,7 +73,7 @@ class KetchCommandsTest {
   fun label_everyChordOnEveryPlatform_isPrintable() {
     for (platform in KeyboardPlatform.entries) {
       for (command in KetchCommands.all) {
-        command.chords(platform).forEach { chord ->
+        command.boundChords(platform).forEach { chord ->
           val label = chord.label(platform)
           assertTrue(label.isNotBlank() && label.none { it.isWhitespace() }, "${command.id}")
         }
@@ -91,6 +93,19 @@ class KetchCommandsTest {
     assertLabels(KetchCommands.Shortcuts, "⌘/", "Ctrl+/", "?", "?")
     assertLabels(KetchCommands.Settings, "⌘,", "Ctrl+,", "⌘,", "Ctrl+,")
     assertLabels(KetchCommands.Minimize, "⌘M", null, null, null)
+    assertLabels(KetchCommands.ZoomIn, "⌘=", "Ctrl+=", null, null)
+    assertLabels(KetchCommands.ZoomOut, "⌘−", "Ctrl+-", null, null)
+    assertLabels(KetchCommands.ActualSize, null, null, null, null)
+  }
+
+  @Test
+  fun boundChords_zoomIn_addsThePlusKeysAfterTheShownChord() {
+    val pc = KeyboardPlatform.Pc
+    val labels = KetchCommands.ZoomIn.boundChords(pc).map { it.label(pc) }
+
+    assertEquals(listOf("Ctrl+="), KetchCommands.ZoomIn.chords(pc).map { it.label(pc) })
+    assertEquals(listOf("Ctrl+=", "Ctrl+Shift+=", "Ctrl++", "Ctrl++"), labels)
+    assertTrue(KetchCommands.ZoomIn.boundChords(KeyboardPlatform.WebPc).isEmpty())
   }
 
   @Test
@@ -158,7 +173,7 @@ class KetchCommandsTest {
   fun chords_pc_neverHoldCtrlWithPrimary() {
     for (platform in KeyboardPlatform.entries.filterNot { it.isApple }) {
       for (command in KetchCommands.all) {
-        command.chords(platform).forEach { chord ->
+        command.boundChords(platform).forEach { chord ->
           assertTrue(!(chord.primary && chord.ctrl), "${command.id} on $platform")
         }
       }
@@ -184,7 +199,7 @@ class KetchCommandsTest {
 
   private fun presses(scope: CommandScope, platform: KeyboardPlatform): Set<KeyPress> =
     KetchCommands.all.filter { it.scope == scope }
-      .flatMap { command -> command.chords(platform).map { it.resolve(platform) } }
+      .flatMap { command -> command.boundChords(platform).map { it.resolve(platform) } }
       .toSet()
 
   private fun assertLabels(

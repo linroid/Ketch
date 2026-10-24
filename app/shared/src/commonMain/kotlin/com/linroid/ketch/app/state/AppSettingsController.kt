@@ -55,6 +55,12 @@ class AppSettingsController(
   /** [zoom] as a factor of the normal size, as `KetchTheme` takes it. */
   val zoomScale: Float get() = zoom / 100f
 
+  /** Whether [zoomIn] has a larger zoom to go to. */
+  val canZoomIn: Boolean get() = zoomLevelAbove(config.appearance.zoom) != null
+
+  /** Whether [zoomOut] has a smaller zoom to go to. */
+  val canZoomOut: Boolean get() = zoomLevelBelow(config.appearance.zoom) != null
+
   /**
    * The language the UI shows: the tag of one of [AppLanguages], or `null` while it follows the
    * system. Android 13 and later and iOS keep it in their per-app language setting, the other
@@ -116,6 +122,27 @@ class AppSettingsController(
   fun saveZoom(percent: Int) {
     val zoom = percent.coerceIn(AppearanceConfig.MIN_ZOOM, AppearanceConfig.MAX_ZOOM)
     update { it.copy(appearance = it.appearance.copy(zoom = zoom)) }
+  }
+
+  /**
+   * Persists the next larger of the zooms Settings offers, also from a zoom between two of them;
+   * at the largest, or above it, the zoom stays.
+   */
+  fun zoomIn() {
+    zoomLevelAbove(config.appearance.zoom)?.let(::saveZoom)
+  }
+
+  /**
+   * Persists the next smaller of the zooms Settings offers, also from a zoom between two of them;
+   * at the smallest, or below it, the zoom stays.
+   */
+  fun zoomOut() {
+    zoomLevelBelow(config.appearance.zoom)?.let(::saveZoom)
+  }
+
+  /** Persists the normal size, a zoom of 100 %. */
+  fun resetZoom() {
+    saveZoom(AppearanceConfig.DEFAULT_ZOOM)
   }
 
   /**

@@ -24,6 +24,9 @@
   <string name="command_window_close">關閉視窗</string>
   <string name="command_window_minimize">最小化</string>
   <string name="command_quit">結束 Ketch</string>
+  <string name="command_zoom_in">放大</string>
+  <string name="command_zoom_out">縮小</string>
+  <string name="command_zoom_actual_size">實際大小</string>
   <string name="command_list_up">向上移動</string>
   <string name="command_list_down">向下移動</string>
   <string name="command_list_extend_up">向上擴大選取範圍</string>

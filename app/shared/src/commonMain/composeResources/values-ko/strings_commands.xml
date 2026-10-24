@@ -24,6 +24,9 @@
   <string name="command_window_close">창 닫기</string>
   <string name="command_window_minimize">최소화</string>
   <string name="command_quit">Ketch 종료</string>
+  <string name="command_zoom_in">확대</string>
+  <string name="command_zoom_out">축소</string>
+  <string name="command_zoom_actual_size">실제 크기</string>
   <string name="command_list_up">위로 이동</string>
   <string name="command_list_down">아래로 이동</string>
   <string name="command_list_extend_up">위로 선택 확장</string>

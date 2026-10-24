@@ -27,6 +27,7 @@ import com.linroid.ketch.app.input.CommandScope
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
 import com.linroid.ketch.app.input.KeyChord
+import com.linroid.ketch.app.input.KeyPress
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DeviceScope
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -39,6 +40,7 @@ import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -49,6 +51,7 @@ import com.linroid.ketch.app.state.StatusFilter
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
+import com.linroid.ketch.app.state.runZoomCommand
 import com.linroid.ketch.app.state.speedLimitText
 import com.linroid.ketch.app.state.waitsInQueue
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
@@ -58,6 +61,7 @@ import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.displayName
 import com.linroid.ketch.app.util.links
+import com.linroid.ketch.config.AppearanceConfig
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.menu_add_device
 import ketch.app.desktop.generated.resources.menu_check_updates
@@ -199,6 +203,7 @@ internal fun menuBarContext(
     revealLabel = files?.revealLabel,
     platform = KeyboardPlatform.Mac,
     updates = updates,
+    zoom = controller.appSettings.zoomMenuState,
   )
 }
 
@@ -334,6 +339,7 @@ internal data class SelectedTask(val phase: TaskPhase, val local: Boolean)
  * @property allDevices whether the window shows every device rather than the active one.
  * @property revealLabel label of Reveal, such as "Show in Finder"; `null` keeps the command's.
  * @property updates whether the app updates itself, which adds "Check for Updates…" to Help.
+ * @property zoom what the zoom items of View allow.
  */
 internal data class MenuBarContext(
   val counts: PulseCounts,
@@ -348,7 +354,49 @@ internal data class MenuBarContext(
   val revealLabel: UiText? = null,
   val platform: KeyboardPlatform = KeyboardPlatform.Mac,
   val updates: Boolean = false,
+  val zoom: ZoomMenuState = ZoomMenuState(),
 )
+
+/**
+ * What the zoom items allow.
+ *
+ * @property canZoomIn whether Zoom in has a larger zoom to go to.
+ * @property canZoomOut whether Zoom out has a smaller zoom to go to.
+ * @property zoomed whether the windows are drawn at another size than their normal one, which
+ *   Actual size goes back to.
+ */
+internal data class ZoomMenuState(
+  val canZoomIn: Boolean = true,
+  val canZoomOut: Boolean = true,
+  val zoomed: Boolean = false,
+)
+
+/** What the zoom items allow at the app's zoom. */
+internal val AppSettingsController.zoomMenuState: ZoomMenuState
+  get() = ZoomMenuState(
+    canZoomIn = canZoomIn,
+    canZoomOut = canZoomOut,
+    zoomed = zoom != AppearanceConfig.DEFAULT_ZOOM,
+  )
+
+/**
+ * The zoom items of a View menu, as browsers order them: Actual size, Zoom in and Zoom out, each
+ * enabled while it would change the zoom.
+ */
+internal fun zoomItems(platform: KeyboardPlatform, zoom: ZoomMenuState): List<MenuEntry> = listOf(
+  commandItem(KetchCommands.ActualSize, platform, enabled = zoom.zoomed),
+  commandItem(KetchCommands.ZoomIn, platform, enabled = zoom.canZoomIn),
+  commandItem(KetchCommands.ZoomOut, platform, enabled = zoom.canZoomOut),
+)
+
+/**
+ * The keys [menus] run themselves on [platform]: their items' shortcuts. A window leaves them to
+ * the menus, which see a key press as the window does, so each runs once.
+ */
+internal fun menuKeys(menus: List<MenuBarMenu>, platform: KeyboardPlatform): Set<KeyPress> =
+  menus.flatMap { it.entries }
+    .filterIsInstance<MenuEntry.Item>()
+    .mapNotNullTo(HashSet()) { it.shortcut?.resolve(platform) }
 
 /** The menus of the menu bar in [context]. */
 internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
@@ -416,6 +464,8 @@ internal fun menuBar(context: MenuBarContext): List<MenuBarMenu> {
         add(item(KetchCommands.Connections))
         add(item(KetchCommands.Devices))
         add(item(KetchCommands.Activity))
+        add(MenuEntry.Separator)
+        addAll(zoomItems(platform, context.zoom))
       },
     ),
     MenuBarMenu(
@@ -518,7 +568,7 @@ private fun KeyChord.isTextEditing(): Boolean {
 
 private fun focusedChords(platform: KeyboardPlatform) = KetchCommands.all
   .filter { it.scope != CommandScope.Global }
-  .flatMap { it.chords(platform) }
+  .flatMap { it.boundChords(platform) }
   .map { it.resolve(platform) }
   .toSet()
 
@@ -718,6 +768,9 @@ internal class DesktopCommands(
       KetchCommands.CopyLink -> copyLinks()
       KetchCommands.Retry -> retrySelected()
       KetchCommands.Remove -> state.remove(selectedTasks())
+      KetchCommands.ZoomIn, KetchCommands.ZoomOut, KetchCommands.ActualSize -> {
+        controller.appSettings.runZoomCommand(command)
+      }
       else -> log.d { "No desktop binding for ${command.id}" }
     }
   }

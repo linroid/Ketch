@@ -28,6 +28,9 @@
   <string name="command_window_close">Close window</string>
   <string name="command_window_minimize">Minimize</string>
   <string name="command_quit">Quit Ketch</string>
+  <string name="command_zoom_in">Zoom in</string>
+  <string name="command_zoom_out">Zoom out</string>
+  <string name="command_zoom_actual_size">Actual size</string>
   <string name="command_list_up">Move up</string>
   <string name="command_list_down">Move down</string>
   <string name="command_list_extend_up">Extend selection up</string>

@@ -162,7 +162,11 @@ private val symbolNames = mapOf(
   Key.Comma to ",",
   Key.Slash to "/",
   Key.Equals to "=",
+  Key.Plus to "+",
   Key.Minus to "-",
+  // The keypad's keys print as their legends.
+  Key.NumPadAdd to "+",
+  Key.NumPadSubtract to "-",
   Key.Spacebar to "Space",
 )
 

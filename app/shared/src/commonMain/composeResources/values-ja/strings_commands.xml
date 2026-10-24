@@ -24,6 +24,9 @@
   <string name="command_window_close">ウィンドウを閉じる</string>
   <string name="command_window_minimize">最小化</string>
   <string name="command_quit">Ketchを終了</string>
+  <string name="command_zoom_in">拡大</string>
+  <string name="command_zoom_out">縮小</string>
+  <string name="command_zoom_actual_size">実際のサイズ</string>
   <string name="command_list_up">上へ移動</string>
   <string name="command_list_down">下へ移動</string>
   <string name="command_list_extend_up">選択範囲を上に広げる</string>

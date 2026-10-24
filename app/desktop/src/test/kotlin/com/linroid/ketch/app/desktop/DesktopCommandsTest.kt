@@ -160,6 +160,20 @@ class DesktopCommandsTest {
     assertEquals(1, fleet.windowShown)
   }
 
+  @Test
+  fun run_zoomCommands_zoomWithoutShowingTheWindow() = fleetTest { fleet ->
+    val settings = fleet.controller.appSettings
+
+    fleet.commands.run(KetchCommands.ZoomIn)
+    assertEquals(110, settings.zoom)
+    fleet.commands.run(KetchCommands.ZoomOut)
+    fleet.commands.run(KetchCommands.ZoomOut)
+    assertEquals(90, settings.zoom)
+    fleet.commands.run(KetchCommands.ActualSize)
+    assertEquals(100, settings.zoom)
+    assertEquals(0, fleet.windowShown)
+  }
+
   private fun fleetTest(
     clipboard: String? = null,
     speedMode: Boolean = false,

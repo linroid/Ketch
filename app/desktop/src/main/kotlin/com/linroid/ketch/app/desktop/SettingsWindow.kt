@@ -26,10 +26,15 @@ import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import com.linroid.ketch.app.components.LocalDeviceTypes
+import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.input.KeyPress
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
+import com.linroid.ketch.app.input.toKeyPress
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.DesktopHooks
 import com.linroid.ketch.app.platform.AppUpdates
@@ -38,11 +43,13 @@ import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.app.state.AppController
+import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.LocalTimeSource
 import com.linroid.ketch.app.state.SettingsTarget
+import com.linroid.ketch.app.state.runZoomCommand
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.theme.isDark
 import com.linroid.ketch.app.ui.devices.rememberDeviceTypes
@@ -50,6 +57,7 @@ import com.linroid.ketch.app.ui.settings.LocalFileLogger
 import com.linroid.ketch.app.ui.settings.SettingsHost
 import ketch.app.desktop.generated.resources.Res
 import ketch.app.desktop.generated.resources.menu_file
+import ketch.app.desktop.generated.resources.menu_view
 import ketch.app.desktop.generated.resources.menu_window
 import ketch.app.desktop.generated.resources.settings_window_title
 import kotlinx.coroutines.Dispatchers
@@ -172,10 +180,13 @@ internal fun SettingsWindow(
     title = stringResource(Res.string.settings_window_title),
     icon = icon,
     onPreviewKeyEvent = { event ->
-      val command = settingsShortcuts?.match(event, ShortcutContext())
+      val command = settingsShortcuts.match(event, ShortcutContext())
+        ?.takeUnless { event.toKeyPress() in settingsMenuKeys }
       when (command) {
+        null -> Unit
         KetchCommands.CloseWindow -> settings.close()
         KetchCommands.Quit -> onQuit()
+        else -> controller.appSettings.runZoomCommand(command)
       }
       command != null
     },
@@ -200,7 +211,11 @@ internal fun SettingsWindow(
       }
     }
     key(language) {
-      SettingsMenuBar(onClose = settings::close, onMinimize = { windowState.isMinimized = true })
+      SettingsMenuBar(
+        appSettings = controller.appSettings,
+        onClose = settings::close,
+        onMinimize = { windowState.isMinimized = true },
+      )
     }
     val focused = LocalWindowInfo.current.isWindowFocused
     SideEffect { settings.focused = focused }
@@ -237,31 +252,63 @@ internal fun SettingsWindow(
   }
 }
 
-/** The Settings window's macOS menu bar: Close Window and Minimize. */
+/** The Settings window's macOS menu bar: Close Window, the zoom items and Minimize. */
 @Composable
-private fun FrameWindowScope.SettingsMenuBar(onClose: () -> Unit, onMinimize: () -> Unit) {
+private fun FrameWindowScope.SettingsMenuBar(
+  appSettings: AppSettingsController,
+  onClose: () -> Unit,
+  onMinimize: () -> Unit,
+) {
   if (DesktopOs.current != DesktopOs.MAC) return
-  val platform = KeyboardPlatform.Mac
   val onAction: (MenuAction) -> Unit = { action ->
-    when ((action as? MenuAction.Run)?.command) {
+    when (val command = (action as? MenuAction.Run)?.command) {
+      null -> Unit
       KetchCommands.CloseWindow -> onClose()
       KetchCommands.Minimize -> onMinimize()
+      else -> appSettings.runZoomCommand(command)
     }
   }
+  val menus = settingsMenuBar(appSettings.zoomMenuState)
   MenuBar {
-    Menu(stringResource(Res.string.menu_file)) {
-      MenuEntries(listOf(commandItem(KetchCommands.CloseWindow, platform)), platform, onAction)
-    }
-    Menu(stringResource(Res.string.menu_window)) {
-      MenuEntries(listOf(commandItem(KetchCommands.Minimize, platform)), platform, onAction)
+    for (menu in menus) {
+      Menu(menu.title.resolve()) { MenuEntries(menu.entries, KeyboardPlatform.Mac, onAction) }
     }
   }
 }
 
-// Closing the window and quitting on Windows and Linux, which have no menu bar to own them; on
-// macOS the menu bars do.
-private val settingsShortcuts: ShortcutMatcher? = if (DesktopOs.current == DesktopOs.MAC) {
-  null
+/** The menus of the Settings window's macOS menu bar, whose zoom items allow [zoom]. */
+internal fun settingsMenuBar(zoom: ZoomMenuState): List<MenuBarMenu> {
+  val platform = KeyboardPlatform.Mac
+  return listOf(
+    MenuBarMenu(
+      Res.string.menu_file.text(),
+      listOf(commandItem(KetchCommands.CloseWindow, platform)),
+    ),
+    MenuBarMenu(Res.string.menu_view.text(), zoomItems(platform, zoom)),
+    MenuBarMenu(
+      Res.string.menu_window.text(),
+      listOf(commandItem(KetchCommands.Minimize, platform)),
+    ),
+  )
+}
+
+// The window's own shortcuts: the zoom everywhere, and on Windows and Linux, which have no menu
+// bar to own them, closing the window and quitting.
+private val settingsShortcuts = ShortcutMatcher(commands = settingsCommands(DesktopOs.current))
+
+// The keys the macOS menu bar runs itself, Zoom in's ⌘= among them; the window leaves them to it
+// and runs the rest of the zoom chords, such as ⌘+.
+private val settingsMenuKeys: Set<KeyPress> = if (DesktopOs.current == DesktopOs.MAC) {
+  menuKeys(settingsMenuBar(ZoomMenuState()), KeyboardPlatform.Mac)
 } else {
-  ShortcutMatcher(commands = listOf(KetchCommands.CloseWindow, KetchCommands.Quit))
+  emptySet()
+}
+
+private fun settingsCommands(os: DesktopOs): List<KetchCommand> {
+  val zoom = listOf(KetchCommands.ZoomIn, KetchCommands.ZoomOut)
+  return if (os == DesktopOs.MAC) {
+    zoom
+  } else {
+    zoom + listOf(KetchCommands.CloseWindow, KetchCommands.Quit)
+  }
 }

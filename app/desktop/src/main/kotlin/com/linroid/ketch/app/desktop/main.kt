@@ -54,8 +54,11 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KetchCommand
 import com.linroid.ketch.app.input.KetchCommands
+import com.linroid.ketch.app.input.KeyPress
+import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.input.ShortcutContext
 import com.linroid.ketch.app.input.ShortcutMatcher
+import com.linroid.ketch.app.input.toKeyPress
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.LocalServerHandle
@@ -609,6 +612,7 @@ private fun ApplicationScope.KetchApp(launch: LaunchContext) {
         icon = icon,
         onPreviewKeyEvent = { event ->
           val command = windowShortcuts.match(event, ShortcutContext())
+            ?.takeUnless { event.toKeyPress() in menuBarKeys }
           when (command) {
             null -> Unit
             // Settings has a window of its own, which opens without bringing this one forward.
@@ -1003,14 +1007,25 @@ private fun installSettingsHandlers(onSettings: () -> Unit, onAbout: () -> Unit)
   }
 }
 
-// The window's own shortcuts: Settings everywhere, and on Windows and Linux, which have no menu
-// bar to own them, closing the window and quitting.
+// The window's own shortcuts: Settings and the zoom everywhere, and on Windows and Linux, which
+// have no menu bar to own them, closing the window and quitting.
 private val windowShortcuts = ShortcutMatcher(commands = windowCommands(DesktopOs.current))
 
-private fun windowCommands(os: DesktopOs): List<KetchCommand> = if (os == DesktopOs.MAC) {
-  listOf(KetchCommands.Settings)
+// The keys the macOS menu bar runs itself, Zoom in's ⌘= among them; the window leaves them to it
+// and runs the rest of the zoom chords, such as ⌘+.
+private val menuBarKeys: Set<KeyPress> = if (DesktopOs.current == DesktopOs.MAC) {
+  menuKeys(placeholderMenuBar(slowLane = true), KeyboardPlatform.Mac)
 } else {
-  listOf(KetchCommands.Settings, KetchCommands.CloseWindow, KetchCommands.Quit)
+  emptySet()
+}
+
+private fun windowCommands(os: DesktopOs): List<KetchCommand> {
+  val everywhere = listOf(KetchCommands.Settings, KetchCommands.ZoomIn, KetchCommands.ZoomOut)
+  return if (os == DesktopOs.MAC) {
+    everywhere
+  } else {
+    everywhere + listOf(KetchCommands.CloseWindow, KetchCommands.Quit)
+  }
 }
 
 /**
@@ -1021,24 +1036,27 @@ private fun windowCommands(os: DesktopOs): List<KetchCommand> = if (os == Deskto
 internal fun hostShortcuts(os: DesktopOs, slowLane: Boolean): Set<KetchCommand> {
   val window = windowCommands(os).toSet()
   if (os != DesktopOs.MAC) return window
-  val menus = menuBar(
-    MenuBarContext(
-      counts = PulseCounts(),
-      failures = 0,
-      filter = StatusFilter.All,
-      devices = emptyList(),
-      activeDevice = null,
-      selection = emptyList(),
-      undoTitle = null,
-      slowLane = if (slowLane) false else null,
-    ),
-  )
-  val owned = menus.flatMap { it.entries }
+  val owned = placeholderMenuBar(slowLane).flatMap { it.entries }
     .filterIsInstance<MenuEntry.Item>()
     .filter { it.shortcut != null }
     .mapNotNull { (it.action as? MenuAction.Run)?.command }
   return window + owned
 }
+
+// The macOS menu bar with every item it may list, for the chords it owns. [slowLane] says whether
+// it lists Slow lane.
+private fun placeholderMenuBar(slowLane: Boolean): List<MenuBarMenu> = menuBar(
+  MenuBarContext(
+    counts = PulseCounts(),
+    failures = 0,
+    filter = StatusFilter.All,
+    devices = emptyList(),
+    activeDevice = null,
+    selection = emptyList(),
+    undoTitle = null,
+    slowLane = if (slowLane) false else null,
+  ),
+)
 
 /**
  * An error the window could not handle becomes an error message instead of closing it. A failure

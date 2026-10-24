@@ -53,7 +53,7 @@ class ShortcutMatcher(
     commands.groupBy { it.scope }.mapValues { (_, scoped) ->
       buildMap {
         for (command in scoped) {
-          for (chord in command.chords(platform)) {
+          for (chord in command.boundChords(platform)) {
             val press = chord.resolve(platform)
             if (press !in this) put(press, Binding(command, chord))
           }
