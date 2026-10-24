@@ -133,6 +133,8 @@
   <string name="settings_density_auto">Auto</string>
   <string name="settings_density_compact">Compact</string>
   <string name="settings_density_comfortable">Comfortable</string>
+  <string name="settings_general_zoom">Zoom</string>
+  <string name="settings_general_zoom_hint">Makes text and controls larger or smaller in every Ketch window.</string>
   <string name="settings_general_reduce_motion">Reduce motion</string>
   <string name="settings_general_reduce_motion_on">Turns off animations.</string>
   <string name="settings_general_reduce_motion_system">On in your system settings.</string>
@@ -939,6 +941,8 @@
   <string name="settings_search_accent_keywords">colour, appearance</string>
   <string name="settings_search_density">Auto, compact or comfortable</string>
   <string name="settings_search_density_keywords">size, spacing, touch, appearance</string>
+  <string name="settings_search_zoom">Larger or smaller text and controls</string>
+  <string name="settings_search_zoom_keywords">scale, text size, font size, bigger, smaller, magnify, accessibility, appearance</string>
   <string name="settings_search_reduce_motion">Fewer animations</string>
   <string name="settings_search_reduce_motion_keywords">animation, accessibility</string>
   <string name="settings_search_language_keywords">locale, translation</string>

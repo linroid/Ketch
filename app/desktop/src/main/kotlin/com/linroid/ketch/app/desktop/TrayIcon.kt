@@ -46,11 +46,13 @@ import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.theme.darkKetchColors
 import java.awt.EventQueue
+import java.awt.Font
 import java.awt.PopupMenu
 import java.awt.SystemTray
 import java.awt.TrayIcon
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import kotlin.math.roundToInt
 
 /**
  * What the tray icon shows of the downloads.
@@ -122,12 +124,24 @@ private fun rememberSpeedLabel(speed: Long?): TextLayoutResult? {
 }
 
 /**
- * The system tray icon (the menu bar extra on macOS) showing [image], with [menu] as its menu;
- * clicking it on Windows and Linux calls [onAction], and [state] sends notifications from it,
- * a click on which calls [onMessageClick].
+ * The font of the tray menu at [zoom] times its normal size, for Windows and Linux, where Java
+ * draws the menu: 12 pixels at 100 %, as tall as Windows draws its own menus' text and a pixel
+ * taller than Java's default. Java's menus on Windows only take its own fonts, so it stays its
+ * sans-serif. macOS draws the menu itself, in the system's font, and ignores it.
+ */
+internal fun trayMenuFont(zoom: Float): Font =
+  Font(Font.DIALOG, Font.PLAIN, (TRAY_MENU_TEXT_SIZE * zoom).roundToInt())
+
+/**
+ * The system tray icon (the menu bar extra on macOS) showing [image], with [menu] as its menu in
+ * [menuFont]; clicking it on Windows and Linux calls [onAction], and [state] sends notifications
+ * from it, a click on which calls [onMessageClick].
  *
  * Unlike Compose's `Tray`, which fits every image in a square, the macOS menu bar item takes the
  * width of [image], so text can follow the icon. Windows and Linux scale it to their tray's size.
+ *
+ * Windows measures menu items once, so [menu] should create its items again when [menuFont]
+ * changes, as by putting them in a `key` of it.
  */
 @Composable
 internal fun ApplicationScope.SystemTrayIcon(
@@ -136,6 +150,7 @@ internal fun ApplicationScope.SystemTrayIcon(
   tooltip: String?,
   onAction: () -> Unit,
   onMessageClick: () -> Unit,
+  menuFont: Font,
   menu: @Composable @MenuComposable MenuScope.() -> Unit,
 ) {
   val mac = DesktopOs.current == DesktopOs.MAC
@@ -166,9 +181,11 @@ internal fun ApplicationScope.SystemTrayIcon(
     if (tray.image !== awtImage) tray.image = awtImage
     if (tray.toolTip != tooltip) tray.toolTip = tooltip
   }
+  val popupMenu = remember(tray) { PopupMenu() }
+  // The items have no font of their own, so they take the menu's.
+  SideEffect { if (popupMenu.font != menuFont) popupMenu.font = menuFont }
   val composition = rememberCompositionContext()
   DisposableEffect(tray) {
-    val popupMenu = PopupMenu()
     tray.popupMenu = popupMenu
     val menuComposition = popupMenu.setContent(composition) { currentMenu() }
     SystemTray.getSystemTray().add(tray)
@@ -211,6 +228,8 @@ internal class TrayClicks(
 
 // A double click and the action it makes arrive well within this.
 private const val ICON_CLICK_WINDOW_NANOS = 1_000_000_000L
+
+private const val TRAY_MENU_TEXT_SIZE = 12
 
 private fun TrayIcon.displayMessage(notification: Notification) {
   val type = when (notification.type) {

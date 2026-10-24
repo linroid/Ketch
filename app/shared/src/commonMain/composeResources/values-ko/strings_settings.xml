@@ -97,6 +97,8 @@
   <string name="settings_density_auto">자동</string>
   <string name="settings_density_compact">촘촘하게</string>
   <string name="settings_density_comfortable">여유 있게</string>
+  <string name="settings_general_zoom">확대/축소</string>
+  <string name="settings_general_zoom_hint">Ketch의 모든 창에서 글자와 컨트롤을 크게 또는 작게 표시합니다.</string>
   <string name="settings_general_reduce_motion">동작 줄이기</string>
   <string name="settings_general_reduce_motion_on">애니메이션을 끕니다.</string>
   <string name="settings_general_reduce_motion_system">시스템 설정에서 켜져 있습니다.</string>
@@ -683,6 +685,8 @@
   <string name="settings_search_accent_keywords">색상, 색, 컬러, 테마</string>
   <string name="settings_search_density">자동, 촘촘하게 또는 여유 있게</string>
   <string name="settings_search_density_keywords">크기, 간격, 여백, 터치, 화면</string>
+  <string name="settings_search_zoom">글자와 컨트롤을 크게 또는 작게</string>
+  <string name="settings_search_zoom_keywords">확대, 축소, 줌, 배율, 글자 크기, 글꼴 크기, 화면 크기, 접근성</string>
   <string name="settings_search_reduce_motion">애니메이션 줄이기</string>
   <string name="settings_search_reduce_motion_keywords">애니메이션, 접근성, 움직임, 모션</string>
   <string name="settings_search_language_keywords">언어, 지역, 번역, 한국어, 영어</string>

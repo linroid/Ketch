@@ -38,6 +38,7 @@ import com.linroid.ketch.app.components.rememberFocusVisibility
 import com.linroid.ketch.app.components.trackFocusVisibility
 import com.linroid.ketch.app.i18n.AppLanguages
 import com.linroid.ketch.app.i18n.UiText
+import com.linroid.ketch.app.i18n.percentText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
@@ -49,6 +50,7 @@ import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.keepAwakeSupported
 import com.linroid.ketch.app.platform.localDeviceNoun
 import com.linroid.ketch.app.platform.rememberReduceMotion
+import com.linroid.ketch.app.platform.zoomSupported
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.WhenDownloadsFinish
@@ -111,6 +113,8 @@ import ketch.app.shared.generated.resources.settings_general_theme
 import ketch.app.shared.generated.resources.settings_general_this_device
 import ketch.app.shared.generated.resources.settings_general_when_done
 import ketch.app.shared.generated.resources.settings_general_when_done_hint
+import ketch.app.shared.generated.resources.settings_general_zoom
+import ketch.app.shared.generated.resources.settings_general_zoom_hint
 import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -173,6 +177,7 @@ fun GeneralSettings(state: AppState, systemDeviceName: String?) {
         )
       },
     )
+    if (zoomSupported) ZoomRow(appSettings)
     val systemReduces = rememberReduceMotion()
     SettingsRow(
       title = stringResource(Res.string.settings_general_reduce_motion),
@@ -449,6 +454,24 @@ private fun AccentPicker(selected: KetchAccent, onSelect: (KetchAccent) -> Unit)
 private val SwatchSize = 22.dp
 private val SwatchRing = 30.dp
 private val SwatchItemWidth = 52.dp
+
+/** How large the app draws its windows' content, picked from [ZoomLevels]. */
+@Composable
+private fun ZoomRow(appSettings: AppSettingsController) {
+  val zoom = appSettings.zoom
+  SettingsSelectRow(
+    title = stringResource(Res.string.settings_general_zoom),
+    description = stringResource(Res.string.settings_general_zoom_hint),
+    value = zoom,
+    // A zoom written into config.toml by hand stays listed while it is the one in use.
+    options = (ZoomLevels + zoom).distinct().sorted(),
+    label = ::percentText,
+    onSelect = appSettings::saveZoom,
+  )
+}
+
+/** The zooms Settings offers, in percent of the normal size. */
+private val ZoomLevels = listOf(90, 100, 110, 125, 150, 175, 200)
 
 /**
  * The language the app shows: a list of the translations and System where the app chooses it,

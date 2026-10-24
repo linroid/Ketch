@@ -97,6 +97,8 @@
   <string name="settings_density_auto">自動</string>
   <string name="settings_density_compact">コンパクト</string>
   <string name="settings_density_comfortable">ゆったり</string>
+  <string name="settings_general_zoom">ズーム</string>
+  <string name="settings_general_zoom_hint">Ketch のすべてのウィンドウで文字やコントロールを拡大・縮小します。</string>
   <string name="settings_general_reduce_motion">動きを減らす</string>
   <string name="settings_general_reduce_motion_on">アニメーションをオフにします。</string>
   <string name="settings_general_reduce_motion_system">システム設定でオンになっています。</string>
@@ -683,6 +685,8 @@
   <string name="settings_search_accent_keywords">色, カラー, 外観, テーマ</string>
   <string name="settings_search_density">自動、コンパクト、ゆったり</string>
   <string name="settings_search_density_keywords">サイズ, 間隔, 余白, タッチ, 外観, 密度</string>
+  <string name="settings_search_zoom">文字やコントロールを拡大・縮小</string>
+  <string name="settings_search_zoom_keywords">拡大, 縮小, 倍率, 文字サイズ, フォントサイズ, 表示サイズ, アクセシビリティ, 外観</string>
   <string name="settings_search_reduce_motion">アニメーションを減らす</string>
   <string name="settings_search_reduce_motion_keywords">アニメーション, アクセシビリティ, 視差効果, 動き</string>
   <string name="settings_search_language_keywords">言語, ロケール, 翻訳, 日本語, 英語</string>

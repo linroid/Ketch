@@ -97,6 +97,8 @@
   <string name="settings_density_auto">自动</string>
   <string name="settings_density_compact">紧凑</string>
   <string name="settings_density_comfortable">宽松</string>
+  <string name="settings_general_zoom">缩放</string>
+  <string name="settings_general_zoom_hint">放大或缩小 Ketch 所有窗口中的文字和控件。</string>
   <string name="settings_general_reduce_motion">减弱动态效果</string>
   <string name="settings_general_reduce_motion_on">关闭动画。</string>
   <string name="settings_general_reduce_motion_system">已在系统设置中开启。</string>
@@ -683,6 +685,8 @@
   <string name="settings_search_accent_keywords">颜色, 主题色, 强调色, 外观</string>
   <string name="settings_search_density">自动、紧凑或宽松</string>
   <string name="settings_search_density_keywords">大小, 间距, 触摸, 触控, 外观</string>
+  <string name="settings_search_zoom">放大或缩小文字和控件</string>
+  <string name="settings_search_zoom_keywords">放大, 缩小, 比例, 文字大小, 字体大小, 字号, 界面大小, 辅助功能, 无障碍, 外观</string>
   <string name="settings_search_reduce_motion">减少动画</string>
   <string name="settings_search_reduce_motion_keywords">动画, 动效, 辅助功能, 无障碍</string>
   <string name="settings_search_language_keywords">语言, 本地化, 翻译, 中文</string>

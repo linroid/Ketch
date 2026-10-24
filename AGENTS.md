@@ -1608,8 +1608,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   desktop, notifications, integration and power sections
 - `AiSettings`: AI discovery's saved LLM providers (`[[ai.providers]]`, `active`), search keys
   and page access (`access`, `[ai.access]`)
-- `AppearanceConfig`: accent palette, light/dark `ThemeMode` and the language chosen in
-  Settings (app-only; CLI and server ignore it)
+- `AppearanceConfig`: accent palette, light/dark `ThemeMode`, the language chosen in
+  Settings and the desktop app's `zoom` (percent, 50 to 300, read leniently: out of range loads
+  as the nearest, anything else as 100) (app-only; CLI and server ignore it)
 - `TorrentSettings`: `listenPort` (read by `ketch server` only), extra trackers for public
   torrents (`TorrentConfig.additionalTrackers`) and
   tracker list subscriptions, on by default (`trackerList`, `trackerListUrls`, default ngosang's
@@ -1893,6 +1894,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Compose's `Tray`, which squeezes every image into a square: its sail fills from the foot as
   downloads progress, the macOS menu bar shows the speed after it (`[desktop] menuBarSpeed`)
   and Windows paints it in the app icon's gradient
+- Zoom (desktop, `zoomSupported`): Settings → General → Zoom (90 % to 200 %, `[appearance]
+  zoom`) passes `AppSettingsController.zoomScale` to `KetchTheme(zoom)`, which multiplies the
+  `LocalDensity` of every Ketch window (main, Settings, the close dialog), so text, icons and
+  controls all grow and layouts pick their tier from the zoomed width; `WindowChrome.zoomed`
+  keeps the macOS traffic lights clear. Window sizes stay as they are. The tray menu, which Java
+  draws on Windows and Linux in its own sans-serif font only, takes `trayMenuFont(zoom)`, 12 px
+  at 100 % like Windows' menus. Phones follow the system's display and text size and browsers
+  zoom the web app, so neither offers it
 - Release notes (desktop, direct Android): What's new on the update toasts, and Settings → About,
   opens `ReleaseNotesDialog` (`ui/settings`; `AppState.releaseNotesRequest` for the toasts),
   which reads `AppUpdates.releaseNotes(version, since)`: the GitHub releases after `since`

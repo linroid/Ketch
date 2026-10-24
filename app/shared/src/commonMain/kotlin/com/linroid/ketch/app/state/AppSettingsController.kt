@@ -7,7 +7,9 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.app.i18n.AppLanguages
 import com.linroid.ketch.app.i18n.PlatformLanguage
 import com.linroid.ketch.app.i18n.appLanguageOf
+import com.linroid.ketch.app.platform.zoomSupported
 import com.linroid.ketch.config.AccentColor
+import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.ConfigStore
 import com.linroid.ketch.config.DesktopSettings
 import com.linroid.ketch.config.IntegrationSettings
@@ -42,6 +44,16 @@ class AppSettingsController(
 
   /** Whether the UI follows the system or forces light or dark. */
   val themeMode: ThemeMode get() = config.appearance.theme
+
+  /**
+   * How large the UI is drawn, in percent of its normal size: `[appearance] zoom` in the desktop
+   * app, the only one that offers a zoom of its own, and 100 elsewhere.
+   */
+  val zoom: Int
+    get() = if (zoomSupported) config.appearance.zoom else AppearanceConfig.DEFAULT_ZOOM
+
+  /** [zoom] as a factor of the normal size, as `KetchTheme` takes it. */
+  val zoomScale: Float get() = zoom / 100f
 
   /**
    * The language the UI shows: the tag of one of [AppLanguages], or `null` while it follows the
@@ -98,6 +110,12 @@ class AppSettingsController(
   /** Persists the light/dark mode. */
   fun saveThemeMode(mode: ThemeMode) {
     update { it.copy(appearance = it.appearance.copy(theme = mode)) }
+  }
+
+  /** Persists the zoom, in percent of the normal size, kept within the range config allows. */
+  fun saveZoom(percent: Int) {
+    val zoom = percent.coerceIn(AppearanceConfig.MIN_ZOOM, AppearanceConfig.MAX_ZOOM)
+    update { it.copy(appearance = it.appearance.copy(zoom = zoom)) }
   }
 
   /**

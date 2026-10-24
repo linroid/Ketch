@@ -109,6 +109,8 @@
   <string name="settings_density_auto">Авто</string>
   <string name="settings_density_compact">Компактная</string>
   <string name="settings_density_comfortable">Просторная</string>
+  <string name="settings_general_zoom">Масштаб</string>
+  <string name="settings_general_zoom_hint">Увеличивает или уменьшает текст и элементы управления во всех окнах Ketch.</string>
   <string name="settings_general_reduce_motion">Уменьшение движения</string>
   <string name="settings_general_reduce_motion_on">Отключает анимацию.</string>
   <string name="settings_general_reduce_motion_system">Включено в настройках системы.</string>
@@ -743,6 +745,8 @@
   <string name="settings_search_accent_keywords">цвет, оформление, акцент</string>
   <string name="settings_search_density">Авто, компактная или просторная</string>
   <string name="settings_search_density_keywords">размер, отступы, интервалы, сенсорный, оформление</string>
+  <string name="settings_search_zoom">Текст и элементы управления крупнее или мельче</string>
+  <string name="settings_search_zoom_keywords">увеличение, уменьшение, зум, размер текста, размер шрифта, крупнее, мельче, специальные возможности, оформление</string>
   <string name="settings_search_reduce_motion">Меньше анимации</string>
   <string name="settings_search_reduce_motion_keywords">анимация, движение, универсальный доступ, специальные возможности</string>
   <string name="settings_search_language_keywords">язык интерфейса, локализация, перевод</string>

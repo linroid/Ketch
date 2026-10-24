@@ -288,8 +288,10 @@ fun ApplicationScope.KetchTray(
   val now = LocalClock.current.now()
   val update = updates?.state?.collectAsState()?.value as? AppUpdateState.Ready
   val entries = trayMenu(TrayContext(fleet, speed, recent, now, devices, update))
-  // Text resolves as it composes, so the menu composes again in a new language.
+  // Text resolves as it composes, so the menu composes again in a new language, and Windows
+  // measures items once, so a new zoom creates them again in its font.
   val language = controller.appSettings.language
+  val zoom = controller.appSettings.zoomScale
   val showSpeed = controller.appSettings.config.desktop.menuBarSpeed
   val icon = rememberTrayIcon(
     look = trayIconLook(fleet, status.unseenFailures),
@@ -301,8 +303,9 @@ fun ApplicationScope.KetchTray(
     tooltip = trayTooltip(fleet, now).resolve(),
     onAction = actions.showWindow,
     onMessageClick = onMessageClick,
+    menuFont = remember(zoom) { trayMenuFont(zoom) },
   ) {
-    key(language) { MenuEntries(entries, KeyboardPlatform.current, commands::perform) }
+    key(language, zoom) { MenuEntries(entries, KeyboardPlatform.current, commands::perform) }
   }
 }
 

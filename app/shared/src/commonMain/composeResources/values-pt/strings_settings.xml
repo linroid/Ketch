@@ -101,6 +101,8 @@
   <string name="settings_density_auto">Automática</string>
   <string name="settings_density_compact">Compacta</string>
   <string name="settings_density_comfortable">Confortável</string>
+  <string name="settings_general_zoom">Zoom</string>
+  <string name="settings_general_zoom_hint">Aumenta ou diminui o texto e os controles em todas as janelas do Ketch.</string>
   <string name="settings_general_reduce_motion">Reduzir movimento</string>
   <string name="settings_general_reduce_motion_on">Desativa as animações.</string>
   <string name="settings_general_reduce_motion_system">Ativado nas configurações do sistema.</string>
@@ -703,6 +705,8 @@
   <string name="settings_search_accent_keywords">cor, cores, destaque, aparência</string>
   <string name="settings_search_density">Automática, compacta ou confortável</string>
   <string name="settings_search_density_keywords">tamanho, espaçamento, toque, aparência</string>
+  <string name="settings_search_zoom">Texto e controles maiores ou menores</string>
+  <string name="settings_search_zoom_keywords">escala, tamanho do texto, tamanho da fonte, maior, menor, ampliar, acessibilidade, aparência</string>
   <string name="settings_search_reduce_motion">Menos animações</string>
   <string name="settings_search_reduce_motion_keywords">animação, acessibilidade, movimento</string>
   <string name="settings_search_language_keywords">idioma, língua, tradução, localização, português</string>

@@ -109,6 +109,7 @@ fun App(
       accent = appSettings.accent,
       density = appSettings.ui.density,
       reduceMotion = appSettings.ui.reduceMotion || systemReducesMotion,
+      zoom = appSettings.zoomScale,
     ) {
       val platform = welcomePlatform
       Crossfade(
