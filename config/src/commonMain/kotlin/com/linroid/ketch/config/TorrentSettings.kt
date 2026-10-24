@@ -1,6 +1,9 @@
 package com.linroid.ketch.config
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.torrent.api.TorrentEncryptionSetting
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -185,6 +188,61 @@ data class TorrentSettings(
   /** These settings with [urls] as the tracker lists, leaving the 0.3.0 [trackerListUrl] behind. */
   fun withTrackerLists(urls: List<String>): TorrentSettings =
     copy(trackerListUrls = urls, trackerListUrl = null)
+
+  /**
+   * What these settings run every torrent with, as the torrent engine and its controller take
+   * them: all but [listenPort] and [uploadWifiOnly], which belong to the host.
+   */
+  val engineSettings: TorrentEngineSettings
+    get() = TorrentEngineSettings(
+      upload = when (upload) {
+        TorrentUploadMode.Off -> TorrentUploadSetting.OFF
+        TorrentUploadMode.WhileDownloading -> TorrentUploadSetting.WHILE_DOWNLOADING
+        TorrentUploadMode.Seed -> TorrentUploadSetting.SEED
+      },
+      uploadLimit = uploadLimit,
+      encryption = when (encryption) {
+        TorrentEncryptionMode.Preferred -> TorrentEncryptionSetting.PREFERRED
+        TorrentEncryptionMode.Required -> TorrentEncryptionSetting.REQUIRED
+        TorrentEncryptionMode.Off -> TorrentEncryptionSetting.OFF
+      },
+      utp = utp,
+      portMapping = portMapping,
+      localDiscovery = localDiscovery,
+      trackers = trackers,
+      trackerList = trackerList,
+      trackerListUrls = trackerListAddresses,
+    )
+
+  /**
+   * These settings with [settings] in place of their [engineSettings], keeping [listenPort] and
+   * [uploadWifiOnly], and the tracker lists as they are written while their addresses stay.
+   */
+  fun withEngineSettings(settings: TorrentEngineSettings): TorrentSettings {
+    val lists = if (settings.trackerListUrls == trackerListAddresses) {
+      this
+    } else {
+      withTrackerLists(settings.trackerListUrls)
+    }
+    return lists.copy(
+      trackers = settings.trackers,
+      trackerList = settings.trackerList,
+      upload = when (settings.upload) {
+        TorrentUploadSetting.OFF -> TorrentUploadMode.Off
+        TorrentUploadSetting.WHILE_DOWNLOADING -> TorrentUploadMode.WhileDownloading
+        TorrentUploadSetting.SEED -> TorrentUploadMode.Seed
+      },
+      uploadLimit = settings.uploadLimit,
+      encryption = when (settings.encryption) {
+        TorrentEncryptionSetting.PREFERRED -> TorrentEncryptionMode.Preferred
+        TorrentEncryptionSetting.REQUIRED -> TorrentEncryptionMode.Required
+        TorrentEncryptionSetting.OFF -> TorrentEncryptionMode.Off
+      },
+      utp = settings.utp,
+      portMapping = settings.portMapping,
+      localDiscovery = settings.localDiscovery,
+    )
+  }
 
   companion object {
     private const val NGOSANG_BEST =

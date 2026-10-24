@@ -23,7 +23,6 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.PageAccessMode
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.TorrentSettings
-import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.defaultConfigDir
 import com.linroid.ketch.config.defaultConfigPath
@@ -35,7 +34,7 @@ import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.engine.withNetworkInterfaces
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
-import com.linroid.ketch.torrent.TorrentEncryption
+import com.linroid.ketch.torrent.withSettings
 import com.linroid.ketch.dash.DashDownloadSource
 import com.linroid.ketch.webdav.WebDavDownloadSource
 import com.linroid.ketch.ftp.FtpDownloadSource
@@ -47,7 +46,6 @@ import com.linroid.ketch.server.KetchServer
 import com.linroid.ketch.server.systemProtectedDirectories
 import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.SqliteTaskStore
-import com.linroid.ketch.torrent.TorrentUploadPolicy
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -501,6 +499,7 @@ private fun runServer(args: Array<String>): Int {
   val taskStore = openTaskStore(dbPath)
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
+  val torrents = torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort)
   val ketch = Ketch(
     httpEngine = httpEngine,
     taskStore = taskStore,
@@ -508,8 +507,7 @@ private fun runServer(args: Array<String>): Int {
     name = instanceName,
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(
-      FtpDownloadSource(),
-      torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort),
+      FtpDownloadSource(), torrents,
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
       MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
@@ -530,12 +528,15 @@ private fun runServer(args: Array<String>): Int {
     // Health checks wait for the saved tasks, which serveDaemon restores once it listens.
     ready = false,
   )
-  // This process runs the downloads of the config directory, so it runs their hooks.
+  // This process runs the downloads of the config directory, so it runs their hooks, and saves
+  // the torrent settings its clients change.
   val hooks = HookRunner.start(ketch, mergedConfig.hooks)
+  val torrentSettings = torrents.saveSettingsTo(configPath ?: defaultConfigPath())
 
   Runtime.getRuntime().addShutdownHook(Thread {
     println("Shutting down Ketch server...")
     server.stop()
+    torrentSettings.close()
     // The process exits once this returns: downloads save where they stopped and torrents tell
     // their trackers before the HTTP engine closes.
     runBlocking { ketch.shutdown() }
@@ -1090,15 +1091,16 @@ private fun runStandaloneMcp(
   val taskStore = openTaskStore(defaultDbPath())
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
+  // It serves an agent while the client runs, so it does not share finished torrents again when
+  // it starts; MCP offers no seeding tool to stop them.
+  val torrents = torrentSource(fileConfig.torrent, restoreSeeding = false)
   val ketch = Ketch(
     httpEngine = httpEngine,
     taskStore = taskStore,
     config = downloadConfig,
     logger = Logger.console(ketchLogLevel),
     additionalSources = listOf(
-      // It serves an agent while the client runs, so it does not share finished torrents again
-      // when it starts; MCP offers no seeding tool to stop them.
-      FtpDownloadSource(), torrentSource(fileConfig.torrent, restoreSeeding = false),
+      FtpDownloadSource(), torrents,
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
       MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
@@ -1112,9 +1114,12 @@ private fun runStandaloneMcp(
     mdnsEnabled = false,
   )
   val hooks = HookRunner.start(ketch, fileConfig.hooks)
+  // The app shows this process's downloads as a device, whose torrent settings it may change.
+  val torrentSettings = torrents.saveSettingsTo(configPath ?: defaultConfigPath())
 
   Runtime.getRuntime().addShutdownHook(Thread {
     apiServer.stop()
+    torrentSettings.close()
     runBlocking { ketch.shutdown() }
     hooks?.close()
     instance.close()
@@ -1247,30 +1252,13 @@ private fun torrentSource(
   config = TorrentConfig(
     listenPort = listenPort,
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
-    additionalTrackers = settings.trackers,
-    trackerListUrls = settings.subscribedTrackerLists,
-    uploadPolicy = torrentUploadPolicy(settings.upload),
-    uploadRateLimit = settings.uploadLimit.bytesPerSecond,
-    encryption = torrentEncryption(settings.encryption),
-    utpEnabled = settings.utp,
-    portMapping = settings.portMapping,
-    localDiscovery = settings.localDiscovery,
-  ),
+  ).withSettings(settings.engineSettings),
   restoreSeeding = restoreSeeding,
 )
 
-/** The engine's upload policy for the `[torrent] upload` setting [mode]. */
-internal fun torrentUploadPolicy(mode: TorrentUploadMode): TorrentUploadPolicy = when (mode) {
-  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
-  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
-  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
-}
-
-internal fun torrentEncryption(mode: TorrentEncryptionMode): TorrentEncryption = when (mode) {
-  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
-  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
-  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
-}
+/** Saves the settings this source's clients change to the config file at [path]. */
+private fun TorrentDownloadSource.saveSettingsTo(path: String): TorrentSettingsSaver =
+  TorrentSettingsSaver(settings, settings.value, FileConfigStore(path)).start()
 
 /**
  * The default config file's settings, the defaults when there is none, or

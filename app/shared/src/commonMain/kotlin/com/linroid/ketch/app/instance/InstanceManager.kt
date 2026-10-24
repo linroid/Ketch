@@ -21,6 +21,7 @@ import com.linroid.ketch.config.ServerConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.remote.RemoteKetch
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_server_start_failed
 import kotlinx.coroutines.CancellationException
@@ -328,6 +329,13 @@ class InstanceManager(
 
   /** Downloads the embedded instance's subscribed tracker lists again now. */
   fun refreshTrackerList() = factory.refreshTrackerList()
+
+  /**
+   * The torrent settings the embedded instance runs, which other devices may change through its
+   * server; `null` without torrents.
+   */
+  val torrentEngineSettings: StateFlow<TorrentEngineSettings>?
+    get() = factory.torrentEngineSettings
 
   /**
    * Replaces [old] with a new remote instance that reaches it over HTTPS when [secure] or HTTP

@@ -109,9 +109,19 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   registered, `RemoteKetch` one over REST and SSE that fails closed against older servers),
   `TorrentInterest(taskId)` (a task's snapshots through `KetchApi.subscribe`, `null` once gone),
   `TorrentFeatures` (`CONTROL` = `torrent.control`), `TorrentCapabilities` (`TorrentCapability`:
-  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp`, `mse-pe` and `reachability`, which
-  the engine speaks whatever its settings, and `seeding` while the configured upload mode seeds,
-  also while uploads are paused), `TorrentReachability` (`TorrentController.reachability`, REST
+  `inspect`, `file-selection`, `v1`, `v2`, `hybrid`, `utp`, `mse-pe`, `reachability` and
+  `settings`, which the engine speaks whatever its settings, `local-discovery` where the platform
+  can join the LAN group (not iOS), and `seeding` while the configured upload mode seeds, also
+  while uploads are paused), `TorrentEngineSettings` (`TorrentController.settings`, REST
+  `GET /api/torrents/settings`: what every torrent runs with, `TorrentUploadSetting`
+  `off`/`while-downloading`/`seed`, the upload `SpeedLimit`, `TorrentEncryptionSetting`
+  `preferred`/`required`/`off`, uTP, port mapping, local discovery, extra trackers and the
+  tracker lists with their switch; not the listen port or Wi-Fi only, which are the host's;
+  unknown modes decode as `off` and `preferred`), `TorrentSettingsChange`
+  (`TorrentController.updateSettings`, REST `PUT /api/torrents/settings`: the fields it sets
+  replace the instance's and `null` ones keep theirs, `between`/`applyTo`; answers the settings
+  now, `invalid_input` past 1024 trackers, 64 lists or 8192-character URLs or for spaces),
+  `TorrentReachability` (`TorrentController.reachability`, REST
   `GET /api/torrents/reachability`: `TorrentReachabilityStatus` `reachable`, `forwarded`,
   `blocked`, `not-forwarded` or `unknown`, which unknown wire values decode as; the port, the
   NAT layers forwarding it, TCP peers that connected in and whether hole punching runs),
@@ -209,7 +219,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
-  `DownloadSource<TorrentSourceState>`; the state is opaque outside the module), `TorrentConfig`,
+  `DownloadSource<TorrentSourceState>`; the state is opaque outside the module; `settings`, a
+  `StateFlow<TorrentEngineSettings>` its setters, `applySettings` and the controller change, and
+  that hosts follow to save what remote clients changed), `TorrentConfig` (`withSettings`),
   `TorrentEncryption`, `TorrentUploadPolicy`, `TorrentDiscoveryPrivacy`, `TorrentMulticastLock`
   and `TrackerListState`; internal `TorrentSourceMetainfo` and the helpers every package uses
   (`TorrentLog`, `monotonicClock()`, `TorrentDispatchers`, `TorrentClient`). Everything else is
@@ -274,8 +286,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TaskEventType`, `ErrorResponse`, `ResolveUrlRequest`, `SpeedLimitRequest`,
   `PriorityRequest`, `ConnectionsRequest`, `FileSelectionRequest`, `PairingRequest`,
   `PairingTicket`, `PairingStatus`, `PairingState`, `HealthResponse`, `HealthStatus`
-- `com.linroid.ketch.endpoints.torrent` -- `Torrents` (the `/api/torrents` resources),
-  `TorrentSelectionRequest`, `TorrentSeedingRequest`
+- `com.linroid.ketch.endpoints.torrent` -- `Torrents` (the `/api/torrents` resources,
+  `Torrents.Settings` among them), `TorrentSelectionRequest`, `TorrentSeedingRequest`
 - `com.linroid.ketch.endpoints.stream` -- the event stream's wire format (see the
   [plan](docs/plans/event-stream.md)): `StreamEvents` (`FEATURE` = `events.stream`, event names,
   error codes, limits, `intervalStep`), `StreamSubscription` (`progressIntervalMs`,
@@ -1613,16 +1625,16 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `TorrentSettings`: `listenPort` (read by `ketch server` only), extra trackers for public
   torrents (`TorrentConfig.additionalTrackers`) and
   tracker list subscriptions, on by default (`trackerList`, `trackerListUrls`, default ngosang's
-  and XIU2's best lists; `TorrentConfig.trackerListUrls`; a 0.3.0 `trackerListUrl` is still
-  read), edited on the embedded instance's
-  BitTorrent settings page and applied to torrents as they start or resume; a remote instance's
-  trackers are only editable on that device. `upload` (`off`/`while-downloading`/`seed`,
-  `TorrentUploadMode`, `while-downloading` by default, mapped to `TorrentConfig.uploadPolicy` by
-  an exhaustive `when` at each of the four `TorrentConfig` sites) and `uploadLimit`
+  and XIU2's best lists; `TorrentConfig.trackerListUrls` and `trackerListsEnabled`; a 0.3.0
+  `trackerListUrl` is still read), edited on the BitTorrent settings page and applied to
+  torrents as they start or resume. `TorrentSettings.engineSettings` (`TorrentEngineSettings`,
+  all but `listenPort` and `uploadWifiOnly`) is what the four `TorrentConfig` sites pass to
+  `TorrentConfig.withSettings` and the apps to `TorrentDownloadSource.applySettings`;
+  `withEngineSettings` puts changed ones back. `upload` (`off`/`while-downloading`/`seed`,
+  `TorrentUploadMode`, `while-downloading` by default) and `uploadLimit`
   (`TorrentConfig.uploadRateLimit`), both read leniently (a value of any type that cannot be read
   loads as off, deliberately not the default, or unlimited, and a bare `uploadLimit` number is
-  bytes per second), are applied live through
-  `TorrentDownloadSource.setUploadPolicy`/`setUploadRateLimit`. The apps write every field, so an
+  bytes per second), are applied live. The apps write every field, so an
   install that saved `off` keeps it; files without the key (the CLI's, `ketch server`'s, Docker's,
   hand-written ones) upload while downloading, unless `ketch server` gets `--torrent-upload` or
   `KETCH_TORRENT_UPLOAD` (`ServerEnv.TORRENT_UPLOAD`, the mode ids in any case, read by
@@ -1630,10 +1642,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   Boolean) pauses uploads while the device is not on Wi-Fi or another unmetered network; only the
   Android and iOS apps follow it (`UploadNetwork.kt`), the desktop app, the CLI and the server ignore it.
   `encryption` (`TorrentEncryptionMode`: `preferred`/`required`/`off`, unknown values load as
-  `preferred`, mapped to `TorrentEncryption` at the four sites), `utp`, `portMapping` and
-  `localDiscovery` (all on), edited under Settings → BitTorrent → Connections (local discovery
-  only on desktop and Android, `localPeerDiscoverySupported`), apply live through
-  `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
+  `preferred`), `utp`, `portMapping` and `localDiscovery` (all on), edited under Settings →
+  BitTorrent → Connections (local discovery only where the device can: this app's
+  `localPeerDiscoverySupported`, a remote device's `local-discovery` capability), apply live
+  through `setEncryption`, `setUtpEnabled`, `setPortMapping` and `setLocalDiscovery` (the engine's
   `TorrentPeerEncryption.policy`, a uTP endpoint that refuses new connections while off, a port
   mapper started or stopped, and the LAN discovery group joined or left)
 - `SpeedSettings`: the embedded device's speed mode (Full speed, Slow lane, Auto with weekly
@@ -1663,7 +1675,14 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `InstanceSettingsController` (`AppState.settingsFor`): pushed live via
   `KetchApi.updateConfig` / `selectNetworkInterfaces`. Downloads settings are saved to
   `config.toml` only for the embedded instance; the network selection is runtime-only and
-  never saved. The Network page also edits the device's proxy (`ProxySettings`), shown for
+  never saved. BitTorrent settings go through `controller(TorrentController)` for a remote
+  device listing the `settings` capability (`loadTorrent`, then only the fields an edit changed,
+  `TorrentSettingsChange.between`; a refusal shows what it confirmed again), which saves them
+  itself; one without it shows `settings_torrent_remote` ("Update Ketch on X"), and Only on
+  Wi-Fi stays the embedded device's. The embedded device's changes made by other devices through
+  its server reach `[torrent]` of `config.toml` too (`followEngineTorrent` follows
+  `TorrentDownloadSource.settings`, passed as `InstanceFactory.torrentEngineSettings`). The
+  Network page also edits the device's proxy (`ProxySettings`), shown for
   devices listing `KetchFeatures.PROXY`. On devices listing `KetchFeatures.TRANSFER_TIMEOUTS`,
   the Downloads page's Retries stepper ends in Unlimited (`unlimitedRetries`) and a Stalled
   connections stepper sets `idleTimeoutMs` (Off, 15 s to 5 min); `minSpeed` has no control yet
@@ -1972,8 +1991,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   not change
 - Torrents: `PUT /api/tasks/{id}/files` (`FileSelectionRequest`) chooses a task's files; with
   `torrent.control` (the instance's `controller(TorrentController)`; without one the routes are
-  not installed and answer `404`), `/api/torrents` serves `capabilities`, `reachability`, a
-  task's snapshot, sorted
+  not installed and answer `404`), `/api/torrents` serves `capabilities`, `reachability`,
+  `settings` (`GET`, and `PUT` with a `TorrentSettingsChange`; a body it cannot read is
+  `invalid_input`, never echoed, as trackers may carry passkeys), a task's snapshot, sorted
   file pages (`files?limit&cursor&sort=torrent|name|size|extension|selected&desc=true`),
   `selection` and `seeding` commands guarded by a revision and an idempotency key, and an SSE
   `events` stream of snapshots (deprecated: the event stream carries them). Command failures
@@ -2097,6 +2117,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it) over `config.toml`, such as `--torrent-port`/`KETCH_TORRENT_PORT` and
   `--torrent-upload`/`KETCH_TORRENT_UPLOAD` (`[torrent] upload`). It exits 1 when it cannot start
   and 2 for invalid options
+- `ketch server` and `ketch mcp --standalone` save the torrent settings their clients change
+  (`PUT /api/torrents/settings`) to `[torrent]` of their config file (`--config`, else the
+  default; `TorrentSettingsSaver`): each change is written over the file as it is then, only the
+  fields that differ from what the engine started with, so a value a flag or environment
+  variable gave stays as the file has it until a client changes it, and keeps overriding the file
+  at the next start. A file that cannot be read is left alone; the change is saved with the next
+  one
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in

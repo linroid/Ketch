@@ -13,6 +13,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentInterest
@@ -20,6 +21,7 @@ import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentRevisionDecision
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.compareIncoming
 import io.ktor.client.HttpClient
@@ -105,6 +107,26 @@ internal class RemoteTorrentController(
     return checkNotNull(call<TorrentReachability>(notFoundIsNull = false) {
       httpClient.get(Torrents.Reachability())
     })
+  }
+
+  override suspend fun settings(): TorrentEngineSettings {
+    requireCapability(TorrentCapability.SETTINGS)
+    return checkNotNull(call<TorrentEngineSettings>(notFoundIsNull = false) {
+      httpClient.get(Torrents.Settings())
+    })
+  }
+
+  override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+    requireCapability(TorrentCapability.SETTINGS)
+    val updated = call<TorrentEngineSettings>(notFoundIsNull = false) {
+      httpClient.put(Torrents.Settings()) {
+        contentType(ContentType.Application.Json)
+        setBody(change)
+      }
+    } ?: throw IllegalStateException("Empty response")
+    // Some capabilities follow the settings, as seeding follows the upload mode.
+    mutex.withLock { cached = null }
+    return updated
   }
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {

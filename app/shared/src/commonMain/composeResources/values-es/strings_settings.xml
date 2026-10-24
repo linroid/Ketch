@@ -578,7 +578,7 @@
   <string name="settings_torrent_connections_footer">El cifrado oculta qué tipo de tráfico es, no con quién te conectas.</string>
   <string name="settings_torrent_trackers">Trackers adicionales</string>
   <string name="settings_torrent_no_trackers">Sin trackers adicionales</string>
-  <string name="settings_torrent_remote">Cambia los ajustes de BitTorrent directamente en %1$s o en su config.toml.</string>
+  <string name="settings_torrent_remote">Actualiza Ketch en %1$s para cambiar estos ajustes aquí.</string>
   <string name="settings_torrent_reach_reachable">Los pares pueden conectarse a %1$s en el puerto %2$d.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="one">El puerto %2$d se reenvía a %1$s a través de %3$d router, así que los pares pueden conectarse.</item>

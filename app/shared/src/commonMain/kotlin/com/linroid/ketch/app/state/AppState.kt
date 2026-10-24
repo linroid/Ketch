@@ -682,6 +682,11 @@ class AppState(
       }
     }
     scope.launch {
+      // Other devices may change the embedded device's torrent settings through its server.
+      instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)
+        ?.followEngineTorrent()
+    }
+    scope.launch {
       // A speed mode changes the embedded device's limit; read it back for the speed readout.
       localMode.drop(1).collect {
         instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)?.loadDownload()
@@ -703,6 +708,7 @@ class AppState(
         trackerList = instanceManager.trackerList,
         refreshTrackerList = instanceManager::refreshTrackerList,
         savedSpeedLimit = { config -> standingCap(config.speedLimit) },
+        engineTorrent = instanceManager.torrentEngineSettings.takeIf { entry is EmbeddedInstance },
       )
     }
 

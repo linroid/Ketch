@@ -5,8 +5,12 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.core.engine.ConnectionReporter
 import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentReachability
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,6 +110,22 @@ internal interface TorrentControlSource {
 
   /** Whether peers can reach the engine; what [TorrentController.reachability] answers. */
   suspend fun torrentReachability(): TorrentReachability = TorrentReachability()
+
+  /**
+   * The settings every torrent runs with, what [TorrentController.settings] answers, for sources
+   * whose [torrentCapabilities] list `settings`.
+   */
+  suspend fun torrentSettings(): TorrentEngineSettings = throw TorrentCommandException(
+    TorrentCommandError.UNSUPPORTED,
+    "Torrent settings are unavailable",
+  )
+
+  /** Applies the settings [change] sets, returning them all; see [torrentSettings]. */
+  suspend fun updateTorrentSettings(change: TorrentSettingsChange): TorrentEngineSettings =
+    throw TorrentCommandException(
+      TorrentCommandError.UNSUPPORTED,
+      "Torrent settings are unavailable",
+    )
 }
 
 /** [TorrentControlSource.sharingResumes] of sources whose sharing never comes back on. */

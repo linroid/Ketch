@@ -138,7 +138,10 @@ internal fun SettingsContent(
     if (fileLogger != null) add(SettingsFeature.Logs)
     if (keepAwakeSupported) add(SettingsFeature.KeepAwake)
     if (state.whenDownloadsFinish != null) add(SettingsFeature.WhenDownloadsFinish)
-    if (state.instanceManager.followsUploadNetwork) add(SettingsFeature.UploadWifiOnly)
+    // Only this device's uploads can wait for Wi-Fi from here.
+    if (state.instanceManager.followsUploadNetwork && device is EmbeddedInstance) {
+      add(SettingsFeature.UploadWifiOnly)
+    }
   }
   val index = rememberSettingsSearchIndex()
   val hits = remember(query, categories, features, index) {

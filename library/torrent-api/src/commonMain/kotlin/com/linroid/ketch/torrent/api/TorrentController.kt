@@ -91,4 +91,27 @@ interface TorrentController {
     error = TorrentCommandError.UNSUPPORTED,
     message = "Reachability is unavailable",
   )
+
+  /**
+   * The settings every torrent of the backend runs with; advertised as
+   * [TorrentCapability.SETTINGS].
+   */
+  suspend fun settings(): TorrentEngineSettings = throw TorrentCommandException(
+    error = TorrentCommandError.UNSUPPORTED,
+    message = "Torrent settings are unavailable",
+  )
+
+  /**
+   * Changes the settings [change] sets, keeping the others, and returns the settings every
+   * torrent runs with now: the upload mode and limit, encryption, uTP, port mapping and local
+   * discovery apply at once, extra trackers and tracker lists to torrents as they start or
+   * resume. The backend's host saves them, so they outlive a restart. Advertised as
+   * [TorrentCapability.SETTINGS]; a malformed change, such as too many trackers, fails with
+   * [TorrentCommandError.INVALID_INPUT].
+   */
+  suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings =
+    throw TorrentCommandException(
+      error = TorrentCommandError.UNSUPPORTED,
+      message = "Torrent settings are unavailable",
+    )
 }

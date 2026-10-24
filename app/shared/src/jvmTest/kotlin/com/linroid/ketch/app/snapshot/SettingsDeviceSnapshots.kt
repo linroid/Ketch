@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.RecordingConfigStore
@@ -35,6 +37,12 @@ import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -179,6 +187,24 @@ class SettingsDeviceSnapshots {
   }
 
   @Test
+  fun remote_bitTorrent_changesTheDevicesOwnSettings() {
+    pageSnapshots(
+      name = "settings-remote-bittorrent-editable",
+      category = SettingsCategory.BitTorrent,
+      sizes = listOf(Pane, PhonePage),
+      setup = DeviceSetup(
+        remote = true,
+        remoteTorrents = TorrentEngineSettings(
+          upload = TorrentUploadSetting.SEED,
+          uploadLimit = SpeedLimit.mbps(2),
+          trackers = listOf("udp://tracker.opentrackr.org:1337/announce"),
+          trackerListUrls = TorrentSettings.DEFAULT_TRACKER_LISTS,
+        ),
+      ),
+    )
+  }
+
+  @Test
   fun app_deviceSettingsPages_openThroughIntents() {
     val sizes = listOf(SnapshotSize.Medium, SnapshotSize.Phone)
     appPageSnapshots("app-settings-speed", sizes) { openSettings(SettingsTarget.Page.Speed) }
@@ -284,6 +310,8 @@ private fun PageFrame(
  * @property upload what the device shares with the peers of its torrents.
  * @property followsNetwork whether its uploads follow the network, as on a phone, which shows
  *   Only on Wi-Fi.
+ * @property remoteTorrents the torrent settings the remote device lets this app change; `null`
+ *   for one whose Ketch cannot.
  */
 private data class DeviceSetup(
   val speed: SpeedSettings = SpeedSettings(
@@ -313,6 +341,7 @@ private data class DeviceSetup(
   val proxy: Proxy = Proxy.System,
   val upload: TorrentUploadMode = TorrentUploadMode.Seed,
   val followsNetwork: Boolean = false,
+  val remoteTorrents: TorrentEngineSettings? = null,
 )
 
 /**
@@ -381,8 +410,9 @@ private class DeviceEnvironment(
       pauseUploads = {},
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
+        val nas = NetworkedApi(SampleKetchApi(data))
         RemoteInstance(
-          instance = NetworkedApi(SampleKetchApi(data)),
+          instance = setup.remoteTorrents?.let { TorrentSettingsApi(nas, it) } ?: nas,
           remoteConfig = config,
           connectionState = MutableStateFlow(ConnectionState.Connected),
         )
@@ -461,3 +491,28 @@ private class DeviceEnvironment(
   }
 }
 
+/** A remote device whose torrent settings this app can change, starting from [settings]. */
+private class TorrentSettingsApi(
+  private val api: KetchApi,
+  settings: TorrentEngineSettings,
+) : KetchApi by api {
+  private val torrents = object : TorrentController {
+    private var current = settings
+
+    override suspend fun capabilities() =
+      TorrentCapabilities(names = setOf("inspect", "settings", "local-discovery"))
+
+    override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+
+    override suspend fun settings() = current
+
+    override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+      current = change.applyTo(current)
+      return current
+    }
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    if (key === TorrentController.Key) torrents as T else api.controller(key)
+}

@@ -762,7 +762,7 @@
   <string name="settings_torrent_trackers">Extra trackers</string>
   <string name="settings_torrent_no_trackers">No extra trackers</string>
   <!-- On the page of a device that is not this one, %1$s. config.toml is a file name. -->
-  <string name="settings_torrent_remote">Change the BitTorrent settings on %1$s itself, or in its config.toml.</string>
+  <string name="settings_torrent_remote">Update Ketch on %1$s to change these settings here.</string>
   <!-- Whether peers on the internet can connect to a device. %1$s is the device's name, %2$d the
        port peers are told to use. -->
   <string name="settings_torrent_reach_reachable">Peers can connect to %1$s on port %2$d.</string>

@@ -30,8 +30,6 @@ import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.rememberAppController
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
-import com.linroid.ketch.config.TorrentEncryptionMode
-import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.dash.DashDownloadSource
@@ -42,8 +40,7 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
-import com.linroid.ketch.torrent.TorrentEncryption
-import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.torrent.withSettings
 import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -209,17 +206,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
   val instanceName = config.name
     ?: UIDevice.currentDevice.name
   val torrentSource = TorrentDownloadSource(
-    TorrentConfig(
-      stateDirectory = "$supportDir/torrent-state",
-      additionalTrackers = config.torrent.trackers,
-      trackerListUrls = config.torrent.subscribedTrackerLists,
-      uploadPolicy = config.torrent.upload.toUploadPolicy(),
-      uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
-      encryption = config.torrent.encryption.toEncryption(),
-      utpEnabled = config.torrent.utp,
-      portMapping = config.torrent.portMapping,
-      localDiscovery = config.torrent.localDiscovery,
-    ),
+    TorrentConfig(stateDirectory = "$supportDir/torrent-state")
+      .withSettings(config.torrent.engineSettings),
     // Paused until the path monitor reports the network, moments after launch.
     uploadsPaused = config.torrent.uploadWifiOnly,
   )
@@ -241,16 +229,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
           ),
         )
       },
-      applyTorrentSettings = {
-        torrentSource.setAdditionalTrackers(it.trackers)
-        torrentSource.setTrackerLists(it.subscribedTrackerLists)
-        torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
-        torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
-        torrentSource.setEncryption(it.encryption.toEncryption())
-        torrentSource.setUtpEnabled(it.utp)
-        torrentSource.setPortMapping(it.portMapping)
-        torrentSource.setLocalDiscovery(it.localDiscovery)
-      },
+      applyTorrentSettings = { torrentSource.applySettings(it.engineSettings) },
+      torrentEngineSettings = torrentSource.settings,
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {
           TrackerListStatus(it.url.orEmpty(), it.trackers, it.updatedAt, it.failed, it.updating)
@@ -307,15 +287,3 @@ private fun DownloadConfig.inDownloadsFolder(folder: String): DownloadConfig {
 private fun userDirectory(directory: NSSearchPathDirectory): String =
   (NSSearchPathForDirectoriesInDomains(directory, NSUserDomainMask, true) as List<String>).first()
 
-/** The engine's upload policy for this `[torrent] upload` setting. */
-private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
-  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
-  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
-  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
-}
-
-private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this) {
-  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
-  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
-  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
-}

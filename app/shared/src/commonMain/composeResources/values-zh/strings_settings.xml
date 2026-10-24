@@ -566,7 +566,7 @@
   <string name="settings_torrent_connections_footer">加密隐藏的是流量类型，而不是连接的对象。</string>
   <string name="settings_torrent_trackers">额外的 Tracker</string>
   <string name="settings_torrent_no_trackers">没有额外的 Tracker</string>
-  <string name="settings_torrent_remote">请在 %1$s 上打开 Ketch，或编辑该设备的 config.toml，修改 BitTorrent 设置。</string>
+  <string name="settings_torrent_remote">请更新 %1$s 上的 Ketch，以便在这里修改这些设置。</string>
   <string name="settings_torrent_reach_reachable">节点可以通过端口 %2$d 连接到 %1$s。</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="other">端口 %2$d 已经由 %3$d 个路由器转发到 %1$s，节点可以连接。</item>

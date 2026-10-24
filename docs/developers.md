@@ -174,6 +174,7 @@ These exist on servers listing `torrent.control`:
 | Method and path | What it does |
 |---|---|
 | `GET /api/torrents/capabilities` | What the server's torrent controller can do |
+| `GET /api/torrents/settings`, `PUT` | The settings every torrent runs with; `PUT` takes the fields to change and answers the result, which the server saves (`settings` capability) |
 | `GET /api/torrents/{id}` | A torrent task's snapshot |
 | `GET /api/torrents/{id}/files?limit=&cursor=&sort=&desc=true` | A page of its files, up to 1000, sorted `torrent`, `name`, `size`, `extension` or `selected` |
 | `PUT /api/torrents/{id}/selection`, `/seeding` | Choose its files, or start or stop seeding it, guarded by a revision and an idempotency key |

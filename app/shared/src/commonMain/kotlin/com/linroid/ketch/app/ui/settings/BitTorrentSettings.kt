@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +30,6 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.TrackerListStatus
-import com.linroid.ketch.app.platform.localPeerDiscoverySupported
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
@@ -50,6 +50,7 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_add
 import ketch.app.shared.generated.resources.action_show
 import ketch.app.shared.generated.resources.action_undo
+import ketch.app.shared.generated.resources.settings_loading_from
 import ketch.app.shared.generated.resources.settings_torrent_add
 import ketch.app.shared.generated.resources.settings_torrent_add_hint
 import ketch.app.shared.generated.resources.settings_torrent_connections
@@ -114,35 +115,49 @@ import org.jetbrains.compose.resources.stringResource
 private const val MAX_LISTED_REJECTIONS = 3
 
 /**
- * What [device] uploads to peers, its extra trackers and its tracker list. Uploading applies at
- * once, trackers to torrents as they start or resume. Only the embedded device's settings can be
- * changed here; a remote device gets a note instead.
+ * What [device] uploads to peers, how it reaches them, its extra trackers and its tracker list.
+ * Uploading and connections apply at once, trackers to torrents as they start or resume. A remote
+ * device's are read from it and saved there; one whose Ketch cannot change them from here gets a
+ * note instead.
  */
 @Composable
 fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
+  LaunchedEffect(controller) { controller.loadTorrent() }
   val torrent = controller.torrent
   // Trackers taken away by "Remove all", offered back until restored.
   var removed by remember { mutableStateOf(emptyList<String>()) }
   TorrentReachabilityNotice(state, device)
-  if (torrent == null) {
+  if (controller.torrentUnsupported) {
     SettingsNotice(
       text = stringResource(Res.string.settings_torrent_remote, device.label),
       tone = NoticeTone.Info,
     )
     return
   }
+  DeviceSettingsError(controller.torrentError, loaded = torrent != null) {
+    controller.loadTorrent()
+  }
+  if (torrent == null) {
+    if (controller.torrentError == null) {
+      SettingsLoading(stringResource(Res.string.settings_loading_from, device.label))
+    }
+    return
+  }
   val trackers = torrent.trackers
   val save = { list: List<String> -> controller.updateTorrent(torrent.copy(trackers = list)) }
-  controller.torrentError?.let {
-    SettingsNotice(text = it.resolve(), tone = NoticeTone.Error)
-  }
   UploadGroup(
     settings = torrent,
-    followsNetwork = state.instanceManager.followsUploadNetwork,
+    // Only the embedded device's uploads wait for Wi-Fi; a remote one's host decides.
+    followsNetwork = state.instanceManager.followsUploadNetwork && !controller.isRemote,
     onChange = controller::updateTorrent,
   )
-  ConnectionsGroup(settings = torrent, onChange = controller::updateTorrent)
+  ConnectionsGroup(
+    settings = torrent,
+    localDiscovery = controller.localDiscoverySupported,
+    onThisDevice = !controller.isRemote,
+    onChange = controller::updateTorrent,
+  )
   if (removed.isNotEmpty()) {
     SettingsNotice(
       text = pluralStringResource(
@@ -289,13 +304,19 @@ private fun UploadGroup(
 }
 
 /**
- * How this device reaches peers: protocol encryption, uTP, asking the router to forward its
- * port and finding peers on the local network. Each applies to connections opened after the
- * change. Switching local peer discovery on asks for the local network where the system blocks
- * it (Android 17), as joining the LAN group would otherwise fail silently.
+ * How the device reaches peers: protocol encryption, uTP, asking the router to forward its
+ * port and, where it can ([localDiscovery]), finding peers on the local network. Each applies to
+ * connections opened after the change. Switching local peer discovery on for this device
+ * ([onThisDevice]) asks for the local network where the system blocks it (Android 17), as
+ * joining the LAN group would otherwise fail silently.
  */
 @Composable
-private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+private fun ConnectionsGroup(
+  settings: TorrentSettings,
+  localDiscovery: Boolean,
+  onThisDevice: Boolean,
+  onChange: (TorrentSettings) -> Unit,
+) {
   val nearby = rememberNearbyAccess()
   SettingsGroup(
     title = stringResource(Res.string.settings_torrent_connections),
@@ -326,15 +347,14 @@ private fun ConnectionsGroup(settings: TorrentSettings, onChange: (TorrentSettin
       checked = settings.portMapping,
       onCheckedChange = { onChange(settings.copy(portMapping = it)) },
     )
-    // Only the embedded device's settings show here, so its platform decides.
-    if (localPeerDiscoverySupported) {
+    if (localDiscovery) {
       SettingsSwitchRow(
         title = stringResource(Res.string.settings_torrent_local_discovery),
         description = stringResource(Res.string.settings_torrent_local_discovery_hint),
         checked = settings.localDiscovery,
         onCheckedChange = { on ->
           onChange(settings.copy(localDiscovery = on))
-          if (on) nearby.request(search = false) {}
+          if (on && onThisDevice) nearby.request(search = false) {}
         },
       )
     }
