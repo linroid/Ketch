@@ -373,6 +373,7 @@
 
   <string name="settings_downloads_folder">Pasta de downloads</string>
   <string name="settings_downloads_remote">Estas configurações valem em %1$s até a próxima reinicialização.</string>
+  <string name="settings_downloads_remote_saved">Estas configurações são salvas em %1$s.</string>
   <string name="settings_loading_from">Carregando as configurações de %1$s…</string>
   <string name="settings_downloads_save_to">Salvar em</string>
   <string name="settings_downloads_save_to_row">Salvar downloads em</string>
@@ -465,6 +466,7 @@
   <string name="settings_speed_mode_slow_lane">Modo lento</string>
   <string name="settings_speed_mode_auto">Automático</string>
   <string name="settings_speed_remote">Estas configurações valem em %1$s até a próxima reinicialização. O modo lento e o modo Automático ainda não estão disponíveis nesse dispositivo.</string>
+  <string name="settings_speed_remote_saved">Estas configurações são salvas em %1$s. O modo lento e o modo Automático ainda não estão disponíveis nesse dispositivo.</string>
   <string name="settings_speed_limit_group">Limite</string>
   <string name="settings_speed_limit">Limite de velocidade</string>
   <string name="settings_speed_limit_hint">Todos os downloads dividem esse limite; o limite próprio de um download pode ser menor.</string>

@@ -609,6 +609,15 @@ class AppState(
   // Devices named by the last add of each kind this session, by device id.
   private val lastTargets = mutableMapOf<IntakeKind, String>()
 
+  // Download settings other devices change through this device's server are saved, and shown,
+  // as its own Settings page saves its changes; one at a time with those, on this scope.
+  private val sharedConfig: AutoCloseable = instanceManager.followSharedConfig { config ->
+    scope.async {
+      instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)
+        ?.acceptShared(config)
+    }.await()
+  }
+
   init {
     scope.launch {
       // Opened files, then links handed to the app, show one at a time in the add dialog, and
@@ -1894,10 +1903,14 @@ class AppState(
     }
   }
 
-  /** Commits the pending operations and stops Discover's searches; call it when the app closes. */
+  /**
+   * Commits the pending operations, stops Discover's searches and leaves saving what other
+   * devices change to the [instanceManager]; call it when the app closes.
+   */
   fun close() {
     pendingOps.flush()
     aiDiscover.close()
+    sharedConfig.close()
   }
 
   /** The device that runs [task]: the one whose task list holds it, else the active one. */

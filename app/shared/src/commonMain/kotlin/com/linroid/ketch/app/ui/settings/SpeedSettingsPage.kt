@@ -92,7 +92,6 @@ import ketch.app.shared.generated.resources.settings_speed_mode_full
 import ketch.app.shared.generated.resources.settings_speed_mode_group
 import ketch.app.shared.generated.resources.settings_speed_mode_slow_lane
 import ketch.app.shared.generated.resources.settings_speed_per_download
-import ketch.app.shared.generated.resources.settings_speed_remote
 import ketch.app.shared.generated.resources.settings_speed_rule_add
 import ketch.app.shared.generated.resources.settings_speed_rule_end
 import ketch.app.shared.generated.resources.settings_speed_rule_remove
@@ -147,9 +146,11 @@ fun SpeedSettingsPage(state: AppState, device: InstanceEntry) {
   val model = remember(state, device) { SpeedSettingsModel(state, device) }
   LaunchedEffect(controller) { controller.loadDownload() }
   val config = controller.download
+  val features by remember(state, device) { state.featuresFlow(device) }
+    .collectAsState(emptySet())
   if (controller.isRemote) {
     SettingsNotice(
-      text = stringResource(Res.string.settings_speed_remote, device.label),
+      text = stringResource(speedRemoteNotice(features), device.label),
       tone = NoticeTone.Info,
     )
   }

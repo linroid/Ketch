@@ -1,6 +1,7 @@
 package com.linroid.ketch.server
 
 import com.linroid.ketch.api.CountryDatabase
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.core.file.PathRejectedException
@@ -88,7 +89,8 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * ### Server
  * - `GET  /api/status`             — server health and task counts
- * - `PUT  /api/config`             — update the download configuration, e.g. speed limit
+ * - `PUT  /api/config`             — update the download configuration, e.g. speed limit; with
+ *   [onConfigChanged], saved too: `500` `config_not_saved` when that fails
  * - `GET  /api/network-interfaces` — discover interfaces and current selection
  * - `PUT  /api/network-interfaces` — select interfaces for new HTTP requests
  * - `POST /api/resolve`            — resolve URL metadata without downloading
@@ -162,6 +164,13 @@ import kotlin.coroutines.cancellation.CancellationException
  * Until [markReady], every other API endpoint but pairing answers `503 Service Unavailable` with
  * a `starting` `ErrorResponse` and `Retry-After: 1`, so no download is added while the saved
  * tasks load.
+ *
+ * ## Saved settings
+ *
+ * A server given [onConfigChanged] hands it every configuration `PUT /api/config` applies, so
+ * the host saves it where it starts from, and lists `config.persisted` in `/api/status`, which
+ * tells clients that a change outlasts a restart. Without it, a change lasts until the instance
+ * restarts. Requests to `PUT /api/config` run one at a time, so what is saved is what applies.
  *
  * ## Access token
  *
@@ -275,6 +284,9 @@ import kotlin.coroutines.cancellation.CancellationException
  * @param ready whether [ketch] already serves its saved tasks, as `GET /api/health` reports.
  *   Pass `false` to start listening before [KetchApi.start] returns, and call [markReady] then;
  *   until then the other API endpoints answer `503`.
+ * @param onConfigChanged saves a configuration `PUT /api/config` applied, once [ketch] accepted
+ *   it; what it throws answers the request with `500` `config_not_saved`, the change applied
+ *   until the instance restarts. `null` for a server whose changes last until then.
  */
 class KetchServer(
   private val ketch: KetchApi,
@@ -291,6 +303,7 @@ class KetchServer(
   pairingApprover: PairingApprover? = null,
   pairingOpen: () -> Boolean = { true },
   ready: Boolean = true,
+  private val onConfigChanged: (suspend (DownloadConfig) -> Unit)? = null,
 ) {
   private val log = KetchLogger("KetchServer")
   @Volatile
@@ -527,10 +540,10 @@ class KetchServer(
     routing {
       if (apiToken != null) {
         authenticate(AUTH_API) {
-          apiRoutes(ketch, destinations, connectionStreams, events)
+          apiRoutes(ketch, destinations, connectionStreams, events, onConfigChanged)
         }
       } else {
-        apiRoutes(ketch, destinations, connectionStreams, events)
+        apiRoutes(ketch, destinations, connectionStreams, events, onConfigChanged)
       }
       pairing?.let { pairingRoutes(it) }
       healthRoutes { ready }
@@ -564,8 +577,9 @@ private fun Route.apiRoutes(
   destinations: DestinationGuard,
   connectionStreams: ConnectionStreams,
   events: EventHub,
+  onConfigChanged: (suspend (DownloadConfig) -> Unit)?,
 ) {
-  serverRoutes(ketch, destinations)
+  serverRoutes(ketch, destinations, onConfigChanged)
   downloadRoutes(ketch, destinations)
   ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it) }
   ketch.controller(CountryDatabase)?.let { countryRoutes(it) }

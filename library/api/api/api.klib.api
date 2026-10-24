@@ -2055,6 +2055,8 @@ final object com.linroid.ketch.api/KetchFeatures { // com.linroid.ketch.api/Ketc
         final fun <get-CATEGORY_FOLDERS>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.CATEGORY_FOLDERS.<get-CATEGORY_FOLDERS>|<get-CATEGORY_FOLDERS>(){}[0]
     final const val CHECKSUM // com.linroid.ketch.api/KetchFeatures.CHECKSUM|{}CHECKSUM[0]
         final fun <get-CHECKSUM>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.CHECKSUM.<get-CHECKSUM>|<get-CHECKSUM>(){}[0]
+    final const val CONFIG_PERSISTED // com.linroid.ketch.api/KetchFeatures.CONFIG_PERSISTED|{}CONFIG_PERSISTED[0]
+        final fun <get-CONFIG_PERSISTED>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.CONFIG_PERSISTED.<get-CONFIG_PERSISTED>|<get-CONFIG_PERSISTED>(){}[0]
     final const val COUNTRIES // com.linroid.ketch.api/KetchFeatures.COUNTRIES|{}COUNTRIES[0]
         final fun <get-COUNTRIES>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.COUNTRIES.<get-COUNTRIES>|<get-COUNTRIES>(){}[0]
     final const val FILE_SELECTION // com.linroid.ketch.api/KetchFeatures.FILE_SELECTION|{}FILE_SELECTION[0]

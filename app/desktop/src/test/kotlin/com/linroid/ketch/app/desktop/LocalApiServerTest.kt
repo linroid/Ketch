@@ -1,11 +1,13 @@
 package com.linroid.ketch.app.desktop
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import java.lang.reflect.Proxy
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -20,7 +22,7 @@ class LocalApiServerTest {
   @Test
   fun connect_startsTheServerOnceAndRepliesWithItsAddressAndToken() {
     val tokens = mutableListOf<String>()
-    val server = LocalApiServer { _, token ->
+    val server = LocalApiServer { _, token, _ ->
       tokens += token
       LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
@@ -37,7 +39,7 @@ class LocalApiServerTest {
 
   @Test
   fun connect_beforeTheAppIsReady_waitsForIt() {
-    val server = LocalApiServer { _, token ->
+    val server = LocalApiServer { _, token, _ ->
       LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     val reply = Executors.newSingleThreadExecutor().submit<String> { server.connect(5.seconds) }
@@ -49,7 +51,7 @@ class LocalApiServerTest {
 
   @Test
   fun connect_whenTheAppNeverGetsReady_repliesWithAnError() {
-    val server = LocalApiServer { _, _ -> error("Must not start without the app") }
+    val server = LocalApiServer { _, _, _ -> error("Must not start without the app") }
     assertEquals(
       """{"error":"not_ready","message":"Ketch is still starting"}""",
       server.connect(10.milliseconds),
@@ -59,7 +61,7 @@ class LocalApiServerTest {
   @Test
   fun connect_afterTheServerFailedToStart_triesAgain() {
     var attempts = 0
-    val server = LocalApiServer { _, token ->
+    val server = LocalApiServer { _, token, _ ->
       if (++attempts == 1) throw IllegalStateException("port in use")
       LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
@@ -75,7 +77,7 @@ class LocalApiServerTest {
   @Test
   fun connect_eachTimeTheExtensionConnects_reportsIt() {
     var connections = 0
-    val server = LocalApiServer(onConnect = { connections++ }) { _, token ->
+    val server = LocalApiServer(onConnect = { connections++ }) { _, token, _ ->
       LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
@@ -89,7 +91,7 @@ class LocalApiServerTest {
   @Test
   fun connect_fromTheCommandLine_repliesWithoutReportingAnExtension() {
     var connections = 0
-    val server = LocalApiServer(onConnect = { connections++ }) { _, token ->
+    val server = LocalApiServer(onConnect = { connections++ }) { _, token, _ ->
       LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
@@ -102,7 +104,7 @@ class LocalApiServerTest {
 
   @Test
   fun connect_reportingTheConnectionFails_stillReplies() {
-    val server = LocalApiServer(onConnect = { error("no processes") }) { _, token ->
+    val server = LocalApiServer(onConnect = { error("no processes") }) { _, token, _ ->
       LocalApiServer.Started(port = 5123, token = token, stop = { })
     }
     server.attach(api)
@@ -113,7 +115,7 @@ class LocalApiServerTest {
   @Test
   fun connect_whenTheServerFails_reportsNoConnection() {
     var connections = 0
-    val server = LocalApiServer(onConnect = { connections++ }) { _, _ ->
+    val server = LocalApiServer(onConnect = { connections++ }) { _, _, _ ->
       throw IllegalStateException("port in use")
     }
     server.attach(api)
@@ -125,7 +127,7 @@ class LocalApiServerTest {
 
   @Test
   fun connect_whenRefused_repliesAtOnceWithTheReason() {
-    val server = LocalApiServer { _, _ -> error("Must not start without an engine") }
+    val server = LocalApiServer { _, _, _ -> error("Must not start without an engine") }
     server.refuse("Another Ketch process runs the downloads")
 
     // Long before the 20 seconds a client waits for an app that is starting.
@@ -142,8 +144,8 @@ class LocalApiServerTest {
       KetchApi::class.java.classLoader,
       arrayOf(KetchApi::class.java),
     ) { _, method, _ -> if (method.name == "close") closed += name else null } as KetchApi
-    val engine = LocalApiServer { _, token -> LocalApiServer.Started(5123, token, stop = { }) }
-    val relay = LocalApiServer { _, token -> LocalApiServer.Started(5124, token, stop = { }) }
+    val engine = LocalApiServer { _, token, _ -> LocalApiServer.Started(5123, token, stop = { }) }
+    val relay = LocalApiServer { _, token, _ -> LocalApiServer.Started(5124, token, stop = { }) }
     engine.attach(client("engine"))
     relay.attach(client("ketch server"), owned = true)
 
@@ -157,7 +159,7 @@ class LocalApiServerTest {
   @Test
   fun close_stopsTheServer() {
     var stopped = false
-    val server = LocalApiServer { _, token ->
+    val server = LocalApiServer { _, token, _ ->
       LocalApiServer.Started(port = 5123, token = token, stop = { stopped = true })
     }
     server.attach(api)
@@ -166,5 +168,20 @@ class LocalApiServerTest {
     server.close()
 
     assertTrue(stopped)
+  }
+
+  @Test
+  fun connect_startsTheServerWithTheSaveHookTheEngineCameWith() {
+    val hooks = mutableListOf<(suspend (DownloadConfig) -> Unit)?>()
+    val server = LocalApiServer { _, token, saveConfig ->
+      hooks += saveConfig
+      LocalApiServer.Started(port = 5123, token = token, stop = { })
+    }
+    val save: suspend (DownloadConfig) -> Unit = {}
+    server.attach(api, saveConfig = save)
+
+    server.connect()
+
+    assertSame(save, hooks.single())
   }
 }

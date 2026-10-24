@@ -373,6 +373,7 @@
 
   <string name="settings_downloads_folder">Dossier Téléchargements</string>
   <string name="settings_downloads_remote">Ces réglages s'appliquent à %1$s jusqu'à son prochain redémarrage.</string>
+  <string name="settings_downloads_remote_saved">Ces réglages sont enregistrés sur %1$s.</string>
   <string name="settings_loading_from">Chargement des réglages de %1$s…</string>
   <string name="settings_downloads_save_to">Enregistrer dans</string>
   <string name="settings_downloads_save_to_row">Enregistrer les téléchargements dans</string>
@@ -465,6 +466,7 @@
   <string name="settings_speed_mode_slow_lane">Vitesse réduite</string>
   <string name="settings_speed_mode_auto">Automatique</string>
   <string name="settings_speed_remote">Ces réglages s'appliquent à %1$s jusqu'à son prochain redémarrage. Les modes Vitesse réduite et Automatique ne sont pas encore disponibles sur cet appareil.</string>
+  <string name="settings_speed_remote_saved">Ces réglages sont enregistrés sur %1$s. Les modes Vitesse réduite et Automatique ne sont pas encore disponibles sur cet appareil.</string>
   <string name="settings_speed_limit_group">Limite</string>
   <string name="settings_speed_limit">Limite de vitesse</string>
   <string name="settings_speed_limit_hint">Tous les téléchargements se la partagent ; la limite propre à un téléchargement peut être plus basse.</string>

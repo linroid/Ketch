@@ -75,7 +75,7 @@ Ketch 在网络上提供服务时需要访问码，也就是它的 API 令牌。
 
 | 路径 | 存放 |
 |---|---|
-| `/config` | `config.toml`（可选）、任务数据库 `ketch.db`、访问码 `api-token`，以及 `torrent-state`（DHT 节点和 Tracker 列表） |
+| `/config` | `config.toml`（可选；在 App 里修改的设置会保存到这里）、任务数据库 `ketch.db`、访问码 `api-token`，以及 `torrent-state`（DHT 节点和 Tracker 列表） |
 | `/downloads` | 下载的文件，除非某个下载指定了别的文件夹 |
 
 两个都要挂载：不挂载的话，Docker 会把它们放在匿名卷里，重建容器时很容易丢失。客户端只能保存到
@@ -166,6 +166,11 @@ upload = "off"
 [`/config/config.toml`](../cli/README.md#configuration-file) 里。容器命令接受 `ketch server` 的
 [选项](../cli/README.md#server)：`docker run ... ghcr.io/linroid/ketch --port 9000`，或在 compose 里写
 `command: ["server", "--port", "9000"]`。
+
+在 Ketch App 里修改的下载和速度设置会保存到 `/config/config.toml`，重启容器后依然有效（参见
+[客户端修改的设置](../cli/README.md#settings-clients-change)）。为某项设置了环境变量的话，容器启动时
+会再次以变量为准，所以想在 App 里修改的设置，不要设置 `KETCH_SPEED_LIMIT` 和 `KETCH_MAX_*` 变量。镜像
+设置了 `KETCH_DOWNLOAD_DIR`，每次启动后都下载到 `/downloads`：把想用的文件夹挂载到那里。
 
 ## 健康检查
 

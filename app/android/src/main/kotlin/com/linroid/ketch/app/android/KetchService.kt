@@ -237,14 +237,14 @@ class KetchService : Service() {
             countries = DbIpCountryDatabase(File(noBackupFilesDir, COUNTRY_DATABASE_FILE)),
           )
         },
-        localServerFactory = { ketchApi, pairingRequests ->
+        localServerFactory = { context ->
           // Reloaded here so a restart from Settings picks up the
           // saved port, token and mDNS choice.
           val saved = configStore.load()
           val serverConfig = saved.server
           log.i { "Starting local server on port ${serverConfig.port}" }
           val server = KetchServer(
-            ketchApi,
+            context.api,
             host = serverConfig.host,
             port = serverConfig.port,
             apiToken = serverConfig.apiToken,
@@ -261,9 +261,10 @@ class KetchService : Service() {
             mdnsEnabled = serverConfig.mdnsEnabled,
             mdnsRegistrar = AndroidMdnsRegistrar(),
             pairingApprover = { request, address ->
-              pairingRequests.ask(request.name, request.code, request.os, address)
+              context.pairingRequests.ask(request.name, request.code, request.os, address)
             },
-            pairingOpen = { pairingRequests.isOpen },
+            pairingOpen = { context.pairingRequests.isOpen },
+            onConfigChanged = context.onConfigChanged,
           )
           server.start(wait = false)
           log.i { "Local server started on port ${serverConfig.port}" }

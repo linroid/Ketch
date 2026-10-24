@@ -389,6 +389,7 @@
 
   <string name="settings_downloads_folder">Папка «Загрузки»</string>
   <string name="settings_downloads_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска.</string>
+  <string name="settings_downloads_remote_saved">Эти настройки сохраняются на устройстве «%1$s».</string>
   <string name="settings_loading_from">Получение настроек с устройства «%1$s»…</string>
   <string name="settings_downloads_save_to">Сохранять в</string>
   <string name="settings_downloads_save_to_row">Сохранять загрузки в</string>
@@ -487,6 +488,7 @@
   <string name="settings_speed_mode_slow_lane">Низкая скорость</string>
   <string name="settings_speed_mode_auto">Авто</string>
   <string name="settings_speed_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска. Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
+  <string name="settings_speed_remote_saved">Эти настройки сохраняются на устройстве «%1$s». Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
   <string name="settings_speed_limit_group">Ограничение</string>
   <string name="settings_speed_limit">Ограничение скорости</string>
   <string name="settings_speed_limit_hint">Общее для всех загрузок; собственное ограничение загрузки может быть ниже.</string>

@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.instance
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.TorrentSettings
@@ -17,8 +18,7 @@ import kotlinx.coroutines.flow.Flow
  *   Each platform provides its own factory that wires up the core
  *   engine with platform-specific dependencies.
  * @param localServerFactory optional factory that starts an HTTP
- *   server exposing the embedded [KetchApi]. Receives the embedded
- *   KetchApi instance and the [pairingRequests] its pairing requests go to.
+ *   server exposing the embedded [KetchApi], as [LocalServerContext] describes it.
  *   When non-null, server controls appear in the Embedded instance entry.
  *   Provided by Android and JVM/Desktop.
  * @param applyTorrentSettings applies changed torrent settings to the
@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.Flow
 class InstanceFactory(
   val deviceName: String = "Embedded",
   private val embeddedFactory: (() -> KetchApi)? = null,
-  private val localServerFactory: ((KetchApi, PairingRequests) -> LocalServerHandle)? = null,
+  private val localServerFactory: ((LocalServerContext) -> LocalServerHandle)? = null,
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
   internal val trackerList: Flow<List<TrackerListStatus>>? = null,
   internal val refreshTrackerList: () -> Unit = {},
@@ -72,13 +72,13 @@ class InstanceFactory(
   fun createRemote(config: RemoteConfig): RemoteInstance = remoteFactory(config)
 
   /**
-   * Start a local HTTP server exposing [api].
-   * Does not change the active instance.
+   * Start a local HTTP server exposing [api], whose clients' download settings go to
+   * [onConfigChanged]. Does not change the active instance.
    */
-  fun startServer(api: KetchApi) {
+  fun startServer(api: KetchApi, onConfigChanged: suspend (DownloadConfig) -> Unit = {}) {
     val factory = localServerFactory
       ?: throw UnsupportedOperationException("Local server not supported on this platform")
-    localServer = factory(api, pairingRequests)
+    localServer = factory(LocalServerContext(api, pairingRequests, onConfigChanged))
   }
 
   /** Stop the local server if running (does not close Ketch). */
@@ -87,6 +87,21 @@ class InstanceFactory(
     localServer = null
   }
 }
+
+/**
+ * What a local server serves, for [InstanceFactory]'s `localServerFactory`.
+ *
+ * @property api the embedded instance the server exposes.
+ * @property pairingRequests where its pairing requests go.
+ * @property onConfigChanged saves the download settings a client changed through the server, as
+ *   the embedded device's Settings page saves its own; the server hands it every configuration
+ *   `PUT /api/config` applied (`KetchServer`'s `onConfigChanged`), so they outlast a restart.
+ */
+class LocalServerContext(
+  val api: KetchApi,
+  val pairingRequests: PairingRequests,
+  val onConfigChanged: suspend (DownloadConfig) -> Unit,
+)
 
 private fun remoteKetchInstance(config: RemoteConfig): RemoteInstance = RemoteInstance(
   client = RemoteKetch(config.host, config.port, config.apiToken, config.secure),

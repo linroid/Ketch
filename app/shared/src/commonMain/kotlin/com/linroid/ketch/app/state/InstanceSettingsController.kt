@@ -29,9 +29,11 @@ import kotlinx.coroutines.sync.withLock
  * to this app: download limits, network interfaces and torrent trackers.
  *
  * Changes apply immediately. For the embedded instance, download
- * settings are also saved to this app's config file; a remote instance
- * keeps them until it restarts, since the server does not persist them.
- * Torrent settings can only be changed on the embedded instance.
+ * settings are also saved to this app's config file, as are those other
+ * devices change through its server ([acceptShared]). A remote instance
+ * saves them itself when it lists `config.persisted`
+ * (`KetchFeatures.CONFIG_PERSISTED`), and otherwise keeps them until it
+ * restarts. Torrent settings can only be changed on the embedded instance.
  *
  * The download settings are read back from [KetchApi.status] after each
  * change, and whenever [loadDownload] is called, so they show what the
@@ -103,6 +105,10 @@ class InstanceSettingsController(
   // read-back only replaces what the page shows when no edit is waiting to be sent.
   private var edits = 0
   private var appliedEdit = 0
+
+  // Counts the edits the instance accepted, which save themselves: settings applied from
+  // elsewhere before one of them are not saved over it.
+  private var acceptedEdits = 0
   private var appliedTorrent: TorrentSettings? = null
 
   // What the instance last reported, to fall back to when a change fails.
@@ -164,6 +170,7 @@ class InstanceSettingsController(
         appliedEdit = edit
         attempt(onError = { downloadError = it }) {
           api.updateConfig(latest)
+          acceptedEdits++
           appliedDownload = latest
           local?.saveDownload(latest.copy(speedLimit = savedSpeedLimit(latest)))
         }
@@ -171,6 +178,24 @@ class InstanceSettingsController(
           attempt(onError = {}) { readDownload() }
         }
       }
+    }
+  }
+
+  /**
+   * Takes [config], download settings a client of this device's server applied to the embedded
+   * instance: saves them as [updateDownload] saves a change the instance accepted, and shows
+   * them unless an edit made here waits to be sent, which then replaces them. Saves nothing once
+   * the instance took an edit made here since, or for a remote instance.
+   */
+  suspend fun acceptShared(config: DownloadConfig) {
+    val app = local ?: return
+    val accepted = acceptedEdits
+    downloadLock.withLock {
+      // An edit made here that the instance took meanwhile replaced it, and was saved.
+      if (acceptedEdits != accepted) return@withLock
+      app.saveDownload(config.copy(speedLimit = savedSpeedLimit(config)))
+      appliedDownload = config
+      if (appliedEdit == edits) download = config
     }
   }
 

@@ -160,6 +160,9 @@ class InstanceManager(
   // The embedded device's torrent settings as last saved, which its uploads follow.
   private val torrentSettings = MutableStateFlow(TorrentSettings())
 
+  // What saves the download settings clients of the servers change; see followSharedConfig.
+  private val configHandlers = MutableStateFlow<List<suspend (DownloadConfig) -> Unit>>(emptyList())
+
   private val inForeground = MutableStateFlow(true)
   private val backgroundExpired = MutableStateFlow(false)
   private val localSpeedMode = MutableStateFlow<Flow<SpeedMode>>(flowOf(SpeedMode.Full))
@@ -293,7 +296,7 @@ class InstanceManager(
     val config = configStore?.load()?.server ?: ServerConfig()
     factory.stopServer()
     _serverState.value = try {
-      factory.startServer(api)
+      factory.startServer(api, ::sharedConfigChanged)
       ServerState.Running(config)
     } catch (e: Exception) {
       // Typically the port is taken; report it instead of crashing.
@@ -301,6 +304,34 @@ class InstanceManager(
         e.message?.let(::verbatim) ?: Res.string.device_server_start_failed.text(),
       )
     }
+  }
+
+  /**
+   * Saves [config], download settings a client of one of this device's servers applied to the
+   * embedded instance, so they outlast a restart: through the handlers [followSharedConfig]
+   * added, such as the app's Settings, else straight to [configStore]. The server started by
+   * [startServer] calls it, and so should a host's other servers of the embedded instance.
+   *
+   * @throws Exception when the settings cannot be saved
+   */
+  suspend fun sharedConfigChanged(config: DownloadConfig) {
+    val handlers = configHandlers.value
+    if (handlers.isEmpty()) {
+      val store = configStore ?: return
+      store.save(store.load().copy(download = config))
+    } else {
+      handlers.forEach { it(config) }
+    }
+  }
+
+  /**
+   * Has [handler] save the download settings clients of this device's servers change
+   * ([sharedConfigChanged]) in place of saving them as they are, until the handle it returns
+   * is closed.
+   */
+  fun followSharedConfig(handler: suspend (DownloadConfig) -> Unit): AutoCloseable {
+    configHandlers.update { it + handler }
+    return AutoCloseable { configHandlers.update { handlers -> handlers - handler } }
   }
 
   /** Stop the local HTTP server if running. */

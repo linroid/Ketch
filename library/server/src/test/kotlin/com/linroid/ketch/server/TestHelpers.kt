@@ -66,8 +66,13 @@ internal fun createTestKetch(
 internal fun createTestServer(
   ketch: KetchApi = createTestKetch(),
   allowedDirectories: List<String> = listOf("/tmp"),
+  onConfigChanged: (suspend (DownloadConfig) -> Unit)? = null,
 ): KetchServer {
-  return KetchServer(ketch, allowedDirectories = allowedDirectories)
+  return KetchServer(
+    ketch,
+    allowedDirectories = allowedDirectories,
+    onConfigChanged = onConfigChanged,
+  )
 }
 
 /**

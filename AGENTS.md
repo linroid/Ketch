@@ -308,8 +308,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `ConnectionGridModel`, `IntakeState`, `SpeedModeController`, `PendingOps`, `ForegroundPolicy`,
   `KeepAwake`, `SleepInhibitor`, `FileSelectionModel`, `FileOrder`, `AiDiscoverController`,
   `DiscoverSession`, `DiscoverHistoryStore`, `FileDiscoverHistoryStore` on JVM/Android), `instance`
-  (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`), `theme` (`KetchTheme`
-  tokens), `components` (the Ketch controls), `icons` (`KetchIcon`), `input` (`KetchCommands`,
+  (`InstanceManager`, `DevicePresence`, `DeviceScope`, `PairingRequests`, `LocalServerContext`),
+  `theme` (`KetchTheme` tokens), `components` (the Ketch controls), `icons` (`KetchIcon`),
+  `input` (`KetchCommands`,
   `CommandScope`, `ShortcutMatcher`), `feedback` (`MessageCenter`, `ActivityMonitor`,
   `UnreadableFiles`) and `util`
 - `ui` -- `AppShell` and `shell` (layout, navigation and its badges, device switcher, drop
@@ -716,6 +717,20 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `setConnections(0)` is Auto: the run's `DownloadConfig.maxConnectionsPerDownload` (a torrent's
   own peer default); a running batch resegments when the effective count differs from the
   segments it runs
+- `Ketch` keeps the config in memory; hosts save it. Changes made over REST are saved by servers
+  given `KetchServer(onConfigChanged = ...)`, which `PUT /api/config` calls, one request at a
+  time, with the config `DestinationGuard` passed and `updateConfig` accepted (a failure answers
+  500 `config_not_saved`, the change applied until a restart); `/api/status` then adds
+  `KetchFeatures.CONFIG_PERSISTED` (`config.persisted`, outside `KetchFeatures.ALL`).
+  `ketch server` passes `ServerConfigFile.save` (see [Daemon Server](#daemon-server-libraryserver));
+  the apps' shared servers pass `LocalServerContext.onConfigChanged`, which is
+  `InstanceManager.sharedConfigChanged`, as does the desktop's `LocalApiServer` for its own engine
+  (`attach(saveConfig = ...)`): it runs the handlers `followSharedConfig` added, else saves
+  `[download]` to the store as it is. `AppState` adds one (removed by `close`) that runs
+  `InstanceSettingsController.acceptShared` on its scope: saved through
+  `AppSettingsController.saveDownload` with `savedSpeedLimit`, so a Slow lane never becomes the
+  standing cap, and shown on the page, unless an edit made there was accepted since (it saved
+  itself)
 
 ### Speed Limiting
 - Global speed limit via `DownloadConfig.speedLimit`, changed at runtime with
@@ -1662,11 +1677,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - The Device pages edit the device chosen in Settings, by default the one shown, through its
   `InstanceSettingsController` (`AppState.settingsFor`): pushed live via
   `KetchApi.updateConfig` / `selectNetworkInterfaces`. Downloads settings are saved to
-  `config.toml` only for the embedded instance; the network selection is runtime-only and
-  never saved. The Network page also edits the device's proxy (`ProxySettings`), shown for
-  devices listing `KetchFeatures.PROXY`. On devices listing `KetchFeatures.TRANSFER_TIMEOUTS`,
-  the Downloads page's Retries stepper ends in Unlimited (`unlimitedRetries`) and a Stalled
-  connections stepper sets `idleTimeoutMs` (Off, 15 s to 5 min); `minSpeed` has no control yet
+  `config.toml` for the embedded instance, also when another device changes them through its
+  server ([Live Configuration](#live-configuration)); a remote device listing
+  `config.persisted` saves them itself, and the Downloads and Speed pages say so
+  (`downloadsRemoteNotice`, `speedRemoteNotice`), while older ones keep them until they restart.
+  The network selection is runtime-only and never saved. The Network page also edits the
+  device's proxy (`ProxySettings`), shown for devices listing `KetchFeatures.PROXY`. On devices
+  listing `KetchFeatures.TRANSFER_TIMEOUTS`, the Downloads page's Retries stepper ends in
+  Unlimited (`unlimitedRetries`) and a Stalled connections stepper sets `idleTimeoutMs` (Off,
+  15 s to 5 min); `minSpeed` has no control yet
 - `ServerConfig`: host, port, API token, CORS, `allowedHosts`, `allowedDirectories`, mDNS,
   `autoStart` (apps start the server on launch; Settings › Sharing turns it on with sharing
   and off with Stop sharing, and shows its switch outside Advanced)
@@ -2027,7 +2046,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   handles this URL"), as the resolve routes do, telling it by the `NoDownloadSourceException`
   cause of `Ketch.download`'s `IllegalArgumentException`; other refusals stay 400 `bad_request`
 - `PUT /api/config` keeps the server's value of every field the body leaves out (merged over
-  the current config), as clients older than category folders or idle timeouts send it
+  the current config), as clients older than category folders or idle timeouts send it. With
+  `onConfigChanged` the server saves what it applied and lists `config.persisted`; see
+  [Live Configuration](#live-configuration)
 - JSON bodies are read with `receiveJson` (`application/json`, else 415): 1 MiB, 32 MiB for
   `POST /api/tasks`, 16 MiB for uploaded content, 4 KiB for pairing; longer is 413
   `payload_too_large`
@@ -2097,6 +2118,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it) over `config.toml`, such as `--torrent-port`/`KETCH_TORRENT_PORT` and
   `--torrent-upload`/`KETCH_TORRENT_UPLOAD` (`[torrent] upload`). It exits 1 when it cannot start
   and 2 for invalid options
+- `ketch server` saves the download settings clients change (`ServerConfigFile`, its
+  `onConfigChanged`) to `[download]` of the `--config` file, else the default one, created when
+  missing (Docker's `/config/config.toml`): only the fields that differ from the config last saved
+  (the one it started with at first), compared as JSON, are written over what the file holds then
+  (`FileConfigStore`, which rewrites the file without its comments), so values from flags,
+  `KETCH_*` variables and defaults stay out of it. Fields a flag or variable sets
+  (`pinnedDownloadFields`) are saved too, with a warning, as those replace them at the next start.
+  A file that cannot be read or written fails the save, untouched, and the next change saves the
+  failed fields again
 
 ### Native CLI (`cli/`)
 - Released as a GraalVM native binary; reflection and resource metadata lives in
@@ -2462,7 +2492,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   "RemotePairing", "RemoteTorrents", "TokenBucket", "SqliteStore",
   "SqliteDriver", "ConfigStore", "KetchServer", "ServerRoutes", "DownloadRoutes", "TorrentRoutes",
   "ConnectionRoutes", "CountryDatabase", "EventRoutes", "StreamRoutes", "EventHub", "Pairing", "McpStdio",
-  "GitHubReleases", "Hooks", "Mirrors", "MetalinkSource";
+  "GitHubReleases", "Hooks", "Mirrors", "MetalinkSource", "ServerConfig";
   `ai:discover`, mDNS and app code tag by component name (e.g. "DiscoveryService", "KetchService")
 - Levels: verbose (speed limiter waits and per-peer detail), debug (internal operations and
   segment start/finish), info (user events and state transitions), warn (retries, recoverable

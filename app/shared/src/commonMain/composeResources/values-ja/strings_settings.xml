@@ -365,6 +365,7 @@
 
   <string name="settings_downloads_folder">ダウンロードフォルダ</string>
   <string name="settings_downloads_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。</string>
+  <string name="settings_downloads_remote_saved">設定は%1$sに保存されます。</string>
   <string name="settings_loading_from">%1$sから設定を読み込み中…</string>
   <string name="settings_downloads_save_to">保存先</string>
   <string name="settings_downloads_save_to_row">ダウンロードの保存先</string>
@@ -454,6 +455,7 @@
   <string name="settings_speed_mode_slow_lane">低速モード</string>
   <string name="settings_speed_mode_auto">自動</string>
   <string name="settings_speed_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。このデバイスでは低速モードと自動モードはまだ使えません。</string>
+  <string name="settings_speed_remote_saved">設定は%1$sに保存されます。このデバイスでは低速モードと自動モードはまだ使えません。</string>
   <string name="settings_speed_limit_group">制限</string>
   <string name="settings_speed_limit">速度制限</string>
   <string name="settings_speed_limit_hint">すべてのダウンロードで共有します。各ダウンロードの制限でさらに低くできます。</string>

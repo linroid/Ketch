@@ -498,6 +498,8 @@
   <string name="settings_downloads_folder">Downloads folder</string>
   <!-- On the page of a device that is not this one, %1$s, which forgets them when it restarts. -->
   <string name="settings_downloads_remote">Saved on %1$s until it restarts.</string>
+  <!-- On the page of a device that is not this one, %1$s, which keeps them when it restarts. -->
+  <string name="settings_downloads_remote_saved">Saved on %1$s.</string>
   <!-- While a device page loads. %1$s is the device's name. -->
   <string name="settings_loading_from">Loading settings from %1$s…</string>
   <string name="settings_downloads_save_to">Save to</string>
@@ -615,8 +617,10 @@
   <string name="settings_speed_mode_full">Full speed</string>
   <string name="settings_speed_mode_slow_lane">Slow lane</string>
   <string name="settings_speed_mode_auto">Auto</string>
-  <!-- On the page of a device that is not this one, %1$s. -->
+  <!-- On the page of a device that is not this one, %1$s, which forgets them when it restarts. -->
   <string name="settings_speed_remote">Saved on %1$s until it restarts. No Slow lane or Auto for it yet.</string>
+  <!-- On the page of a device that is not this one, %1$s, which keeps them when it restarts. -->
+  <string name="settings_speed_remote_saved">Saved on %1$s. No Slow lane or Auto for it yet.</string>
   <!-- The group and row of a device without speed modes, which has one limit. -->
   <string name="settings_speed_limit_group">Limit</string>
   <string name="settings_speed_limit">Speed limit</string>

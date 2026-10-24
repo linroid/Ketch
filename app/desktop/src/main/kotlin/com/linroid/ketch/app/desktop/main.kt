@@ -738,19 +738,18 @@ private fun createInstanceManager(
           ),
           countries = DbIpCountryDatabase(File(configDir, COUNTRY_DATABASE_FILE)),
         ).also { ketch ->
-          launch.localApiServer.attach(ketch)
           // The app runs this computer's downloads, so it runs the hooks of config.toml; for the
           // life of the process, as the engine.
           HookRunner.start(ketch, config.hooks)
         }
       },
-      localServerFactory = { ketchApi, pairingRequests ->
+      localServerFactory = { context ->
         // Reloaded here so a restart from Settings picks up the
         // saved port, token and mDNS choice.
         val saved = configStore.load()
         val serverConfig = saved.server
         val server = KetchServer(
-          ketch = ketchApi,
+          ketch = context.api,
           host = serverConfig.host,
           port = serverConfig.port,
           apiToken = serverConfig.apiToken,
@@ -765,9 +764,10 @@ private fun createInstanceManager(
           protectedDirectories = sharedServerProtectedDirectories(configDir),
           mdnsEnabled = serverConfig.mdnsEnabled,
           pairingApprover = { request, address ->
-            pairingRequests.ask(request.name, request.code, request.os, address)
+            context.pairingRequests.ask(request.name, request.code, request.os, address)
           },
-          pairingOpen = { pairingRequests.isOpen },
+          pairingOpen = { context.pairingRequests.isOpen },
+          onConfigChanged = context.onConfigChanged,
         )
         server.start(wait = false)
         object : LocalServerHandle {
@@ -795,7 +795,12 @@ private fun createInstanceManager(
     ),
     initialRemotes = config.remotes,
     configStore = configStore,
-  )
+  ).also { manager ->
+    // What the extension and the `ketch` commands change is saved like what other devices do.
+    manager.embedded?.let { ketch ->
+      launch.localApiServer.attach(ketch, saveConfig = manager::sharedConfigChanged)
+    }
+  }
 }
 
 /**
