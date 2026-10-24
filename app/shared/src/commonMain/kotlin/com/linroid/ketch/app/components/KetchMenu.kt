@@ -241,6 +241,14 @@ internal enum class MenuKey { Up, Down, Left, Right, Enter, Escape }
 @Stable
 internal class MenuLevel {
   var highlighted: Int by mutableIntStateOf(-1)
+
+  /**
+   * Whether this level's panel opened toward the start side (the left in left-to-right
+   * layouts), where its submenus then open first, as system menus keep cascading the way they
+   * turned. Set as the panel is placed, read as its submenus are.
+   */
+  var towardStart: Boolean = false
+
   var hovered: Int by mutableIntStateOf(-1)
     private set
   var openIndex: Int by mutableIntStateOf(-1)
@@ -370,8 +378,34 @@ fun KetchMenu(
   if (KetchTheme.density == KetchDensity.Comfortable) {
     MenuSheet(entries, onDismissRequest, title, modifier)
   } else {
-    MenuPopup(entries, onDismissRequest, offset, modifier)
+    val density = LocalDensity.current
+    val shift = with(density) { IntOffset(offset.x.roundToPx(), offset.y.roundToPx()) }
+    val gap = with(density) { MenuGap.roundToPx() }
+    val margin = with(density) { KetchTheme.spacing.s2.roundToPx() }
+    val position = remember(shift, gap, margin) { DropdownPositionProvider(shift, gap, margin) }
+    MenuPopup(entries, onDismissRequest, position, remember { MenuLevel() }, modifier)
   }
+}
+
+/**
+ * A [KetchMenu] that opens at [position], in pixels from the top start corner of the layout it is
+ * placed in, as system context menus open at the pointer: after and below it, or before or above
+ * it on a side where it would leave the layout, then moved into the layout. Its submenus open on
+ * the side it turned to, where they fit. It is the pointer's panel whatever the density.
+ */
+@Composable
+fun KetchContextMenu(
+  position: IntOffset,
+  onDismissRequest: () -> Unit,
+  modifier: Modifier = Modifier,
+  content: KetchMenuScope.() -> Unit,
+) {
+  val margin = with(LocalDensity.current) { KetchTheme.spacing.s2.roundToPx() }
+  val root = remember { MenuLevel() }
+  val provider = remember(position, margin, root) {
+    ContextMenuPositionProvider(position, margin, root)
+  }
+  MenuPopup(buildMenu(content), onDismissRequest, provider, root, modifier)
 }
 
 /** The panel of a [KetchMenu] as drawn in place, without a popup; for previews. */
@@ -393,20 +427,14 @@ internal fun KetchMenuPanel(
 private fun MenuPopup(
   entries: List<MenuEntry>,
   onDismiss: () -> Unit,
-  offset: DpOffset,
+  positionProvider: PopupPositionProvider,
+  root: MenuLevel,
   modifier: Modifier,
 ) {
-  val density = LocalDensity.current
-  val shift = with(density) { IntOffset(offset.x.roundToPx(), offset.y.roundToPx()) }
-  val gap = with(density) { MenuGap.roundToPx() }
-  val margin = with(density) { KetchTheme.spacing.s2.roundToPx() }
-  val root = remember { MenuLevel() }
   val menuFocus = remember { MenuFocus() }
   val currentEntries by rememberUpdatedState(entries)
   Popup(
-    popupPositionProvider = remember(shift, gap, margin) {
-      DropdownPositionProvider(shift, gap, margin)
-    },
+    popupPositionProvider = positionProvider,
     onDismissRequest = onDismiss,
     properties = PopupProperties(focusable = true),
   ) {
@@ -495,7 +523,7 @@ private fun MenuPanel(
           )
           val child = level.child
           if (level.openIndex == index && child != null) {
-            SubmenuPopup(entry, child, focus, onDismiss)
+            SubmenuPopup(entry, level, child, focus, onDismiss)
           }
         }
         MenuEntry.Divider -> MenuDivider(vertical = spacing.s1)
@@ -515,6 +543,7 @@ private fun MenuPanel(
 @Composable
 private fun SubmenuPopup(
   entry: MenuEntry.Submenu,
+  parent: MenuLevel,
   level: MenuLevel,
   focus: MenuFocus,
   onDismiss: () -> Unit,
@@ -523,7 +552,9 @@ private fun SubmenuPopup(
   val inset = with(density) { (MenuInset + 1.dp).roundToPx() }
   val margin = with(density) { KetchTheme.spacing.s2.roundToPx() }
   Popup(
-    popupPositionProvider = remember(inset, margin) { SubmenuPositionProvider(inset, margin) },
+    popupPositionProvider = remember(inset, margin, parent, level) {
+      SubmenuPositionProvider(inset, margin, parent, level)
+    },
     properties = PopupProperties(focusable = false),
   ) {
     MenuPanel(entry.entries, level, focus, onDismiss)
@@ -779,12 +810,16 @@ private class DropdownPositionProvider(
 }
 
 /**
- * Opens beside its row, on the end side when it fits, with its first item level with it, and
- * [margin] from the window's edges where the window has room for it.
+ * Opens [level] beside its row in [parent], with its first item level with it and [margin] from
+ * the window's edges where the window has room for it: on the side [parent] turned to when it
+ * fits there, as system menus keep cascading one way, else the other. A menu that did not turn
+ * opens its submenus on the end side first.
  */
-private class SubmenuPositionProvider(
+internal class SubmenuPositionProvider(
   private val inset: Int,
   private val margin: Int,
+  private val parent: MenuLevel,
+  private val level: MenuLevel,
 ) : PopupPositionProvider {
   override fun calculatePosition(
     anchorBounds: IntRect,
@@ -792,20 +827,93 @@ private class SubmenuPositionProvider(
     layoutDirection: LayoutDirection,
     popupContentSize: IntSize,
   ): IntOffset {
-    val end = anchorBounds.right + inset
-    val start = anchorBounds.left - inset - popupContentSize.width
-    val endFits = end + popupContentSize.width <= windowSize.width - margin
-    val startFits = start >= margin
-    val x = if (layoutDirection == LayoutDirection.Ltr) {
-      if (endFits || !startFits) end else start
-    } else {
-      if (startFits || !endFits) start else end
-    }
+    val right = anchorBounds.right + inset
+    val left = anchorBounds.left - inset - popupContentSize.width
+    val rightFits = right + popupContentSize.width <= windowSize.width - margin
+    val leftFits = left >= margin
+    val ltr = layoutDirection == LayoutDirection.Ltr
+    val prefersLeft = parent.towardStart == ltr
+    val toLeft = if (prefersLeft) leftFits || !rightFits else leftFits && !rightFits
+    level.towardStart = toLeft == ltr
+    val x = if (toLeft) left else right
     return IntOffset(
       inWindow(x, popupContentSize.width, windowSize.width, margin),
       inWindow(anchorBounds.top - inset, popupContentSize.height, windowSize.height, margin),
     )
   }
+}
+
+/**
+ * Opens [level] at [position] of its anchor, as [contextMenuOrigin] places it, and notes whether
+ * it turned toward the start side of that point, where its submenus then open.
+ */
+internal class ContextMenuPositionProvider(
+  private val position: IntOffset,
+  private val margin: Int,
+  private val level: MenuLevel,
+) : PopupPositionProvider {
+  override fun calculatePosition(
+    anchorBounds: IntRect,
+    windowSize: IntSize,
+    layoutDirection: LayoutDirection,
+    popupContentSize: IntSize,
+  ): IntOffset {
+    val point = if (layoutDirection == LayoutDirection.Ltr) {
+      IntOffset(anchorBounds.left + position.x, anchorBounds.top + position.y)
+    } else {
+      IntOffset(anchorBounds.right - position.x, anchorBounds.top + position.y)
+    }
+    val origin = contextMenuOrigin(point, popupContentSize, anchorBounds, margin, layoutDirection)
+    level.towardStart = if (layoutDirection == LayoutDirection.Ltr) {
+      origin.x < point.x
+    } else {
+      origin.x + popupContentSize.width > point.x
+    }
+    return origin
+  }
+}
+
+/**
+ * The top left corner of a context menu of [size] opened at [point] within [area], as system
+ * menus open at the pointer: after the point (right of it in left-to-right layouts) and below it,
+ * or before or above it on a side where it would leave the area, then moved into the area,
+ * [margin] from its edges where it has room for that. A click on a taskbar below a screen's work
+ * area opens it just above the taskbar, one on a taskbar beside it right next to it.
+ */
+internal fun contextMenuOrigin(
+  point: IntOffset,
+  size: IntSize,
+  area: IntRect,
+  margin: Int,
+  layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+): IntOffset = IntOffset(
+  x = menuAxis(
+    point.x,
+    size.width,
+    area.left,
+    area.right,
+    margin,
+    afterFirst = layoutDirection == LayoutDirection.Ltr,
+  ),
+  y = menuAxis(point.y, size.height, area.top, area.bottom, margin, afterFirst = true),
+)
+
+// One axis of contextMenuOrigin: the side of at given first when the extent fits there.
+private fun menuAxis(
+  at: Int,
+  extent: Int,
+  start: Int,
+  end: Int,
+  margin: Int,
+  afterFirst: Boolean,
+): Int {
+  val inset = if (end - start - extent >= margin * 2) margin else 0
+  val low = start + inset
+  val high = (end - inset - extent).coerceAtLeast(low)
+  val afterFits = at + extent <= end - inset
+  val beforeFits = at - extent >= low
+  val after = if (afterFirst) afterFits || !beforeFits else afterFits && !beforeFits
+  return (if (after) at else at - extent).coerceIn(low, high)
 }
 
 /**

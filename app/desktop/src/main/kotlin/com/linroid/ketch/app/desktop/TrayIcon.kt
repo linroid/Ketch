@@ -32,6 +32,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.ApplicationScope
@@ -124,24 +125,41 @@ private fun rememberSpeedLabel(speed: Long?): TextLayoutResult? {
 }
 
 /**
- * The font of the tray menu at [zoom] times its normal size, for Windows and Linux, where Java
- * draws the menu: 12 pixels at 100 %, as tall as Windows draws its own menus' text and a pixel
- * taller than Java's default. Java's menus on Windows only take its own fonts, so it stays its
- * sans-serif. macOS draws the menu itself, in the system's font, and ignores it.
+ * The font of the tray menu at [zoom] times its normal size, for Linux, where Java draws the
+ * menu: 12 pixels at 100 %, a pixel taller than Java's default. It is Java's sans-serif, which
+ * fontconfig maps to the system's. macOS draws the menu itself, in the system's font, and ignores
+ * it; on Windows Ketch draws the menu ([TrayMenuWindow]), as Java's menus there only take Java's
+ * own fonts.
  */
 internal fun trayMenuFont(zoom: Float): Font =
   Font(Font.DIALOG, Font.PLAIN, (TRAY_MENU_TEXT_SIZE * zoom).roundToInt())
 
+/** The menu of a tray icon. */
+internal sealed interface TrayIconMenu {
+  /**
+   * Java's menu in [font], which [content] fills: macOS draws it as its own, in the system's
+   * font, and Java draws it elsewhere. Windows measures items once, so [content] should create
+   * them again when [font] changes, as by putting them in a `key` of it.
+   */
+  class Java(
+    val font: Font,
+    val content: @Composable @MenuComposable MenuScope.() -> Unit,
+  ) : TrayIconMenu
+
+  /**
+   * A menu the app draws itself: a right click on the icon calls [onOpen] with where the pointer
+   * is on the screen, in the coordinates AWT places windows in.
+   */
+  class Drawn(val onOpen: (pointer: IntOffset) -> Unit) : TrayIconMenu
+}
+
 /**
- * The system tray icon (the menu bar extra on macOS) showing [image], with [menu] as its menu in
- * [menuFont]; clicking it on Windows and Linux calls [onAction], and [state] sends notifications
- * from it, a click on which calls [onMessageClick].
+ * The system tray icon (the menu bar extra on macOS) showing [image], with [menu] as its menu;
+ * clicking it on Windows and Linux calls [onAction], and [state] sends notifications from it, a
+ * click on which calls [onMessageClick].
  *
  * Unlike Compose's `Tray`, which fits every image in a square, the macOS menu bar item takes the
  * width of [image], so text can follow the icon. Windows and Linux scale it to their tray's size.
- *
- * Windows measures menu items once, so [menu] should create its items again when [menuFont]
- * changes, as by putting them in a `key` of it.
  */
 @Composable
 internal fun ApplicationScope.SystemTrayIcon(
@@ -150,8 +168,7 @@ internal fun ApplicationScope.SystemTrayIcon(
   tooltip: String?,
   onAction: () -> Unit,
   onMessageClick: () -> Unit,
-  menuFont: Font,
-  menu: @Composable @MenuComposable MenuScope.() -> Unit,
+  menu: TrayIconMenu,
 ) {
   val mac = DesktopOs.current == DesktopOs.MAC
   val density = LocalDensity.current
@@ -169,6 +186,17 @@ internal fun ApplicationScope.SystemTrayIcon(
     TrayIcon(awtImage).apply {
       isImageAutoSize = !mac
       addMouseListener(clicks)
+      addMouseListener(
+        object : MouseAdapter() {
+          // Windows opens context menus as the right button comes up.
+          override fun mouseReleased(e: MouseEvent) {
+            val drawn = currentMenu as? TrayIconMenu.Drawn ?: return
+            if (e.isPopupTrigger || e.button == MouseEvent.BUTTON3) {
+              drawn.onOpen(pointerOnScreen(fallback = IntOffset(e.xOnScreen, e.yOnScreen)))
+            }
+          }
+        },
+      )
       addActionListener {
         // The mouse events of a click on the icon may still wait in the queue behind it.
         EventQueue.invokeLater {
@@ -181,21 +209,36 @@ internal fun ApplicationScope.SystemTrayIcon(
     if (tray.image !== awtImage) tray.image = awtImage
     if (tray.toolTip != tooltip) tray.toolTip = tooltip
   }
-  val popupMenu = remember(tray) { PopupMenu() }
-  // The items have no font of their own, so they take the menu's.
-  SideEffect { if (popupMenu.font != menuFont) popupMenu.font = menuFont }
-  val composition = rememberCompositionContext()
+  // The menu is in place before the icon shows.
+  if (menu is TrayIconMenu.Java) JavaTrayMenu(tray, menu.font, menu.content)
   DisposableEffect(tray) {
-    tray.popupMenu = popupMenu
-    val menuComposition = popupMenu.setContent(composition) { currentMenu() }
     SystemTray.getSystemTray().add(tray)
-    onDispose {
-      menuComposition.dispose()
-      SystemTray.getSystemTray().remove(tray)
-    }
+    onDispose { SystemTray.getSystemTray().remove(tray) }
   }
   LaunchedEffect(tray, state) {
     state.notificationFlow.collect { tray.displayMessage(it) }
+  }
+}
+
+// Java's menu of [tray] in [font], filled by [content], while in the composition.
+@Composable
+private fun JavaTrayMenu(
+  tray: TrayIcon,
+  font: Font,
+  content: @Composable @MenuComposable MenuScope.() -> Unit,
+) {
+  val popupMenu = remember(tray) { PopupMenu() }
+  // The items have no font of their own, so they take the menu's.
+  SideEffect { if (popupMenu.font != font) popupMenu.font = font }
+  val currentContent by rememberUpdatedState(content)
+  val composition = rememberCompositionContext()
+  DisposableEffect(tray) {
+    tray.popupMenu = popupMenu
+    val menuComposition = popupMenu.setContent(composition) { currentContent() }
+    onDispose {
+      menuComposition.dispose()
+      tray.popupMenu = null
+    }
   }
 }
 
