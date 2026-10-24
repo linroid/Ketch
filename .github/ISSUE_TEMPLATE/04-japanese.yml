@@ -1,10 +1,14 @@
 name: "日本語"
 description: "バグ報告、改善案、質問を送信します。"
 body:
-  - type: markdown
+  - type: checkboxes
+    id: scope
     attributes:
-      value: |
-        **送信前にご確認ください:** Ketch はプロトコルレベルで動作する汎用ダウンローダーです。特定の動画サイトや SNS からのダウンロードへの対応、または DRM の回避に関するリクエストはクローズされます。ダウンロードする権利のあるコンテンツのみをダウンロードしてください。
+      label: "送信前にご確認ください"
+      description: "Ketch はプロトコルレベルで動作する汎用ダウンローダーです。特定の動画サイトや SNS からのダウンロードへの対応、または DRM の回避に関するリクエストはクローズされます。ダウンロードする権利のあるコンテンツのみをダウンロードしてください。"
+      options:
+        - label: "特定の動画サイトや SNS からのダウンロードへの対応、または DRM の回避を求めるリクエストではないことを確認しました。"
+          required: true
   - type: dropdown
     id: type
     attributes:

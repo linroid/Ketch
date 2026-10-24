@@ -1,10 +1,14 @@
 name: "Deutsch"
 description: "Melde Fehler, schlage Verbesserungen vor oder stelle Fragen."
 body:
-  - type: markdown
+  - type: checkboxes
+    id: scope
     attributes:
-      value: |
-        **Vor dem Absenden:** Ketch ist ein universeller Downloader, der auf Protokollebene arbeitet. Anfragen, Downloads von bestimmten Video- oder Social-Media-Seiten zu unterstützen oder DRM zu umgehen, werden geschlossen. Lade nur Inhalte herunter, zu deren Download du berechtigt bist.
+      label: "Vor dem Absenden"
+      description: "Ketch ist ein universeller Downloader, der auf Protokollebene arbeitet. Anfragen, Downloads von bestimmten Video- oder Social-Media-Seiten zu unterstützen oder DRM zu umgehen, werden geschlossen. Lade nur Inhalte herunter, zu deren Download du berechtigt bist."
+      options:
+        - label: "Ich bestätige, dass dies keine Anfrage ist, Downloads von einer bestimmten Video- oder Social-Media-Seite zu unterstützen oder DRM zu umgehen."
+          required: true
   - type: dropdown
     id: type
     attributes:
