@@ -126,4 +126,39 @@ class AppearanceConfigTest {
     )
     assertEquals(null, legacy.appearance.language)
   }
+
+  @Test
+  fun `zoom round trips as a whole number of percent`() {
+    val encoded = ConfigStore.encode(KetchConfig(appearance = AppearanceConfig(zoom = 150)))
+    assertTrue(encoded.contains("zoom = 150"), encoded)
+    assertEquals(150, ConfigStore.decode(encoded).appearance.zoom)
+  }
+
+  @Test
+  fun `zoom outside its range loads as the nearest one in it`() {
+    assertEquals(AppearanceConfig.MAX_ZOOM, decodeZoom("1000"))
+    assertEquals(AppearanceConfig.MIN_ZOOM, decodeZoom("10"))
+    assertEquals(AppearanceConfig.MIN_ZOOM, decodeZoom("-150"))
+  }
+
+  @Test
+  fun `zoom that is not a whole number loads as the default`() {
+    assertEquals(AppearanceConfig.DEFAULT_ZOOM, decodeZoom("\"large\""))
+    assertEquals(AppearanceConfig.DEFAULT_ZOOM, decodeZoom("1.5"))
+    assertEquals(AppearanceConfig.DEFAULT_ZOOM, decodeZoom("true"))
+    assertEquals(125, decodeZoom("\"125%\""))
+  }
+
+  @Test
+  fun `zoom left out of the file is the default`() {
+    assertEquals(AppearanceConfig.DEFAULT_ZOOM, ConfigStore.decode("[appearance]").appearance.zoom)
+  }
+
+  private fun decodeZoom(value: String): Int = ConfigStore.decode(
+    """
+    |[appearance]
+    |zoom = $value
+    |theme = "dark"
+    """.trimMargin(),
+  ).also { assertEquals(ThemeMode.Dark, it.appearance.theme) }.appearance.zoom
 }

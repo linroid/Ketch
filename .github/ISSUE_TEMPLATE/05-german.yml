@@ -35,6 +35,7 @@ body:
       description: "Wähle alle zutreffenden aus."
       multiple: true
       options:
+        - "Plattformunabhängig"
         - "Windows"
         - "macOS"
         - "Linux"

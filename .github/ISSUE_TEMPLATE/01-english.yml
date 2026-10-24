@@ -35,6 +35,7 @@ body:
       description: "Select all that apply."
       multiple: true
       options:
+        - "Not platform-specific"
         - "Windows"
         - "macOS"
         - "Linux"
