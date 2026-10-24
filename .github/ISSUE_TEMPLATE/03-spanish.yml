@@ -5,9 +5,9 @@ body:
     id: scope
     attributes:
       label: "Antes de enviar"
-      description: "Ketch es un gestor de descargas de uso general que funciona a nivel de protocolo. Se cerrarán las solicitudes para descargar desde sitios de vídeo o redes sociales concretos, o para eludir DRM. Descarga solo contenido que tengas derecho a descargar."
+      description: "Ketch es un gestor de descargas de uso general, no un descargador para sitios concretos. Cerraremos las solicitudes para dar soporte a un sitio de vídeo o red social en particular, o para eludir el DRM. Descarga solo contenido que tengas derecho a descargar."
       options:
-        - label: "Confirmo que no es una solicitud para descargar desde un sitio de vídeo o red social concreto, ni para eludir DRM."
+        - label: "Confirmo que no estoy pidiendo soporte para un sitio de vídeo o red social concreto, ni una forma de eludir el DRM."
           required: true
   - type: dropdown
     id: type

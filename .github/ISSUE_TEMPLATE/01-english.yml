@@ -5,9 +5,9 @@ body:
     id: scope
     attributes:
       label: "Before you submit"
-      description: "Ketch is a general-purpose downloader that works at the protocol level. Requests to support downloading from specific video or social media sites, or to bypass DRM, will be closed. Only download content you have the right to."
+      description: "Ketch is a general-purpose download manager, not a downloader for specific sites. Requests to support a particular video or social media site, or to bypass DRM, will be closed. Please only download content you have the right to."
       options:
-        - label: "I confirm this is not a request to support downloading from a specific video or social media site, or to bypass DRM."
+        - label: "This isn't a request to support a specific video or social media site, or to bypass DRM."
           required: true
   - type: dropdown
     id: type

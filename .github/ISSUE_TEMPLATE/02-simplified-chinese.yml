@@ -4,10 +4,10 @@ body:
   - type: checkboxes
     id: scope
     attributes:
-      label: "提交前请注意"
-      description: "Ketch 是在协议层面工作的通用下载工具。为特定视频或社交媒体网站添加下载支持、或绕过 DRM 的请求将被关闭。请只下载你有权下载的内容。"
+      label: "提交前须知"
+      description: "Ketch 是通用下载工具，不针对特定网站做适配。要求支持某个视频网站或社交平台、或破解 DRM 的 issue 会被直接关闭。请仅下载你有权下载的内容。"
       options:
-        - label: "我确认这不是为特定视频或社交媒体网站添加下载支持、或绕过 DRM 的请求。"
+        - label: "我确认本 issue 不涉及适配特定视频网站或社交平台，也不涉及破解 DRM。"
           required: true
   - type: dropdown
     id: type
