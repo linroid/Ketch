@@ -220,8 +220,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:torrent`
 - `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
   `DownloadSource<TorrentSourceState>`; the state is opaque outside the module; `settings`, a
-  `StateFlow<TorrentEngineSettings>` its setters, `applySettings` and the controller change, and
-  that hosts follow to save what remote clients changed), `TorrentConfig` (`withSettings`),
+  `StateFlow<TorrentEngineSettings>` its setters, `applySettings` and the controller change, a
+  change finishing under `NonCancellable` once started, and that hosts follow to save what remote
+  clients changed), `TorrentConfig` (`withSettings`),
   `TorrentEncryption`, `TorrentUploadPolicy`, `TorrentDiscoveryPrivacy`, `TorrentMulticastLock`
   and `TrackerListState`; internal `TorrentSourceMetainfo` and the helpers every package uses
   (`TorrentLog`, `monotonicClock()`, `TorrentDispatchers`, `TorrentClient`). Everything else is
@@ -1677,7 +1678,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `config.toml` only for the embedded instance; the network selection is runtime-only and
   never saved. BitTorrent settings go through `controller(TorrentController)` for a remote
   device listing the `settings` capability (`loadTorrent`, then only the fields an edit changed,
-  `TorrentSettingsChange.between`; a refusal shows what it confirmed again), which saves them
+  `TorrentSettingsChange.between`, kept as pending edits shown over what the device confirmed,
+  so another device's change made meanwhile is never sent back; a refusal shows what it
+  confirmed again), which saves them
   itself; one without it shows `settings_torrent_remote` ("Update Ketch on X"), and Only on
   Wi-Fi stays the embedded device's. The embedded device's changes made by other devices through
   its server reach `[torrent]` of `config.toml` too (`followEngineTorrent` follows

@@ -518,7 +518,8 @@ class TorrentDownloadSource(
    * Runs every torrent with [settings]: the upload mode and limit, encryption, uTP, port mapping
    * and local discovery apply at once, as their setters do, extra trackers and tracker lists to
    * torrents started or resumed after. Only the settings that changed are applied, and
-   * [TorrentDownloadSource.settings] changes once, after all of them. Never starts the engine.
+   * [TorrentDownloadSource.settings] changes once, after all of them; a change that started
+   * finishes even when its caller is cancelled. Never starts the engine.
    */
   suspend fun applySettings(settings: TorrentEngineSettings) {
     changeSettings { settings }
@@ -526,29 +527,32 @@ class TorrentDownloadSource(
 
   /**
    * Applies what [transform] makes of the current settings, one change at a time, and returns
-   * them; see [applySettings].
+   * them; see [applySettings]. Once started it finishes, also when its caller is cancelled, such
+   * as a client that left: the engine never runs settings [settings] does not report.
    */
   internal suspend fun changeSettings(
     transform: (TorrentEngineSettings) -> TorrentEngineSettings,
   ): TorrentEngineSettings = settingsMutex.withLock {
-    val before = settingsState.value
-    val after = transform(before)
-    if (after.upload != before.upload) storeUploadPolicy(after.upload.toPolicy())
-    if (after.uploadLimit != before.uploadLimit) {
-      storeUploadRateLimit(after.uploadLimit.bytesPerSecond)
+    withContext(NonCancellable) {
+      val before = settingsState.value
+      val after = transform(before)
+      if (after.upload != before.upload) storeUploadPolicy(after.upload.toPolicy())
+      if (after.uploadLimit != before.uploadLimit) {
+        storeUploadRateLimit(after.uploadLimit.bytesPerSecond)
+      }
+      if (after.encryption != before.encryption) storeEncryption(after.encryption.toEncryption())
+      if (after.utp != before.utp) storeUtpEnabled(after.utp)
+      if (after.portMapping != before.portMapping) storePortMapping(after.portMapping)
+      if (after.localDiscovery != before.localDiscovery) storeLocalDiscovery(after.localDiscovery)
+      if (after.trackers != before.trackers) storeAdditionalTrackers(after.trackers)
+      if (after.subscribedTrackerLists != before.subscribedTrackerLists) {
+        // After the configured lists' restore, which would otherwise subscribe to them again.
+        initialTrackerList?.let { withTimeoutOrNull(TRACKER_LIST_RESTORE_MS) { it.join() } }
+        trackerListSubscription.subscribe(after.subscribedTrackerLists)
+      }
+      settingsState.value = after
+      after
     }
-    if (after.encryption != before.encryption) storeEncryption(after.encryption.toEncryption())
-    if (after.utp != before.utp) storeUtpEnabled(after.utp)
-    if (after.portMapping != before.portMapping) storePortMapping(after.portMapping)
-    if (after.localDiscovery != before.localDiscovery) storeLocalDiscovery(after.localDiscovery)
-    if (after.trackers != before.trackers) storeAdditionalTrackers(after.trackers)
-    if (after.subscribedTrackerLists != before.subscribedTrackerLists) {
-      // After the configured lists' restore, which would otherwise subscribe to them again.
-      initialTrackerList?.let { withTimeoutOrNull(TRACKER_LIST_RESTORE_MS) { it.join() } }
-      trackerListSubscription.subscribe(after.subscribedTrackerLists)
-    }
-    settingsState.value = after
-    after
   }
 
   /**

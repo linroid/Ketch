@@ -90,6 +90,21 @@ internal class FakeTorrentEngine : TorrentEngine {
   override suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
     uploadPolicy = policy
   }
+
+  var encryption: TorrentEncryption? = null
+    private set
+
+  /** Holds every [setEncryption] until it completes; null lets them through. */
+  var encryptionGate: CompletableDeferred<Unit>? = null
+
+  /** Runs as each [setEncryption] begins, before [encryptionGate]. */
+  var beforeEncryption: () -> Unit = {}
+
+  override suspend fun setEncryption(encryption: TorrentEncryption) {
+    beforeEncryption()
+    encryptionGate?.await()
+    this.encryption = encryption
+  }
 }
 
 /**

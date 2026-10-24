@@ -26,6 +26,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,6 +44,9 @@ private class SettingsTorrentController(
   val changes = mutableListOf<TorrentSettingsChange>()
   var refuse = false
 
+  /** Holds every [updateSettings] until it completes; null lets them through. */
+  var gate: CompletableDeferred<Unit>? = null
+
   override suspend fun capabilities() = capabilities
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
@@ -50,6 +54,7 @@ private class SettingsTorrentController(
   override suspend fun settings() = settings
 
   override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+    gate?.await()
     if (refuse) throw IllegalStateException("Server said no")
     changes += change
     settings = change.applyTo(settings)
@@ -295,6 +300,37 @@ class InstanceSettingsControllerTest {
     // The remote device saves them; neither this app's file nor its engine changes.
     assertEquals(TorrentSettings(), store.load().torrent)
     assertEquals(emptyList(), applied)
+  }
+
+  @Test
+  fun updateTorrent_editQueuedWhileOneIsSent_keepsWhatAnotherDeviceChanged() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    val torrents = SettingsTorrentController().apply { this.gate = gate }
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(torrents = torrents),
+      local = null,
+      scope = this,
+    )
+    controller.loadTorrent()
+    advanceUntilIdle()
+
+    controller.updateTorrent(assertNotNull(controller.torrent).copy(utp = false))
+    runCurrent()
+    // Another device starts seeding while the first edit is on its way, and this page edits on.
+    controller.updateTorrent(assertNotNull(controller.torrent).copy(portMapping = false))
+    torrents.settings = torrents.settings.copy(upload = TorrentUploadSetting.SEED)
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(
+      listOf(TorrentSettingsChange(utp = false), TorrentSettingsChange(portMapping = false)),
+      torrents.changes,
+    )
+    assertEquals(TorrentUploadSetting.SEED, torrents.settings.upload)
+    val shown = assertNotNull(controller.torrent)
+    assertEquals(TorrentUploadMode.Seed, shown.upload)
+    assertFalse(shown.utp)
+    assertFalse(shown.portMapping)
   }
 
   @Test

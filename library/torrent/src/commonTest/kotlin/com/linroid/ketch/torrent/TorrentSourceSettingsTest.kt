@@ -1,10 +1,14 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.core.Ketch
+import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
@@ -13,12 +17,18 @@ import com.linroid.ketch.torrent.api.TorrentEncryptionSetting
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentUploadSetting
+import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.lsd.lsdSupported
+import com.linroid.ketch.torrent.metainfo.Bencode
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okio.FileSystem
+import okio.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -97,6 +107,35 @@ class TorrentSourceSettingsTest {
   }
 
   @Test
+  fun applySettings_callerCancelledMidway_stillReportsWhatTheEngineRuns() = runTest {
+    val engine = FakeTorrentEngine()
+    val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false))
+      .also { it.engineFactory = { engine } }
+    try {
+      startEngine(source, engine)
+      val gate = CompletableDeferred<Unit>()
+      engine.encryptionGate = gate
+      val wanted = TorrentEngineSettings(
+        upload = TorrentUploadSetting.SEED,
+        encryption = TorrentEncryptionSetting.REQUIRED,
+      )
+
+      // The upload policy applies first, then the encryption waits on the gate.
+      val change = launch { source.applySettings(wanted) }
+      runCurrent()
+      change.cancel()
+      gate.complete(Unit)
+      change.join()
+
+      assertEquals(TorrentUploadPolicy.SEED_AFTER_COMPLETION, engine.uploadPolicy)
+      assertEquals(TorrentEncryption.REQUIRED, engine.encryption)
+      assertEquals(wanted, source.settings.value)
+    } finally {
+      source.close()
+    }
+  }
+
+  @Test
   fun controller_updateSettings_appliesTheChangeAndKeepsTheRest() = runTest {
     val source = TorrentDownloadSource(TorrentConfig(dhtEnabled = false).withSettings(custom))
     val ketch = ketchWith(source)
@@ -142,6 +181,31 @@ class TorrentSourceSettingsTest {
     } finally {
       ketch.close()
     }
+  }
+
+  /** Starts [source]'s [engine] with a download the engine refuses. */
+  private suspend fun startEngine(source: TorrentDownloadSource, engine: FakeTorrentEngine) {
+    val resolved = source.resolveMetainfo(Bencode.encode(mapOf("info" to mapOf(
+      "name" to "payload", "length" to 4L, "piece length" to 4L,
+      "pieces" to sha1Digest(byteArrayOf(1, 2, 3, 4))))))
+    val context = DownloadContext(
+      taskId = "task", url = resolved.url, request = DownloadRequest(resolved.url),
+      fileAccessor = UnusedFileAccessor, segments = MutableStateFlow(emptyList()),
+      onProgress = { _, _ -> }, throttle = {}, headers = emptyMap(), preResolved = resolved,
+      outputPath = "unused-output",
+    )
+    engine.addTorrentError = KetchError.Disk(IOException("full"))
+    assertFailsWith<KetchError> { source.download(context, null) }
+    assertTrue(engine.isRunning)
+  }
+
+  private object UnusedFileAccessor : FileAccessor {
+    override suspend fun writeAt(offset: Long, data: ByteArray): Unit = error("Source owns I/O")
+    override suspend fun flush(): Unit = error("Source owns I/O")
+    override fun close() = Unit
+    override suspend fun delete(): Unit = error("Source owns I/O")
+    override suspend fun size(): Long = error("Source owns I/O")
+    override suspend fun preallocate(size: Long): Unit = error("Source owns I/O")
   }
 
   // A default folder of its own: the platform's needs an Android context.

@@ -133,11 +133,11 @@ class InstanceSettingsController(
   private var appliedEdit = 0
   private var appliedTorrent: TorrentSettings? = null
 
-  // What a remote instance last confirmed of its torrent settings. Edits are counted like download
-  // ones: a read-back only replaces what the page shows when every edit has been sent.
+  // What a remote instance last confirmed of its torrent settings, and the edits made since that
+  // are not sent yet, field by field. The page shows those edits over what it confirmed, so a
+  // setting another device changed meanwhile is kept rather than sent back.
   private var confirmedTorrent: TorrentEngineSettings? = null
-  private var torrentEdits = 0
-  private var sentTorrentEdit = 0
+  private var pendingTorrent = TorrentSettingsChange()
 
   // What the instance last reported, to fall back to when a change fails.
   private var confirmedNetworks: NetworkInterfaces? = null
@@ -229,7 +229,8 @@ class InstanceSettingsController(
    * Applies [settings] to the instance: the upload mode and limit, encryption, uTP, port mapping
    * and local discovery reach running torrents at once, extra trackers and tracker lists reach
    * torrents as they start or resume. The embedded instance's are saved here first; a remote one
-   * gets only what changed, which it saves, and a failure shows what it last confirmed again.
+   * gets only the fields an edit changed, which it saves, so what another device changed
+   * meanwhile stays, and a failure shows what it last confirmed again.
    */
   fun updateTorrent(settings: TorrentSettings) {
     val app = local ?: return updateRemoteTorrent(settings)
@@ -249,22 +250,25 @@ class InstanceSettingsController(
   }
 
   private fun updateRemoteTorrent(settings: TorrentSettings) {
-    if (confirmedTorrent == null) return
+    val shown = remoteTorrent ?: return
+    // Only what this edit changed of what the page showed.
+    val edit = TorrentSettingsChange.between(shown.engineSettings, settings.engineSettings)
+    if (edit.isEmpty) return
+    pendingTorrent = pendingTorrent.then(edit)
     remoteTorrent = settings
-    torrentEdits++
     torrentError = null
     scope.launch {
-      // Like updateDownload: each turn sends the newest edit, so the instance ends on what the
-      // page shows.
+      // Each turn sends every edit made since the last, so the instance ends on all of them.
       torrentLock.withLock {
-        val latest = remoteTorrent ?: return@withLock
-        val confirmed = confirmedTorrent ?: return@withLock
-        sentTorrentEdit = torrentEdits
-        val change = TorrentSettingsChange.between(confirmed, latest.engineSettings)
+        val change = pendingTorrent
         if (change.isEmpty) return@withLock
+        pendingTorrent = TorrentSettingsChange()
         attempt(onError = {
           torrentError = it
-          if (sentTorrentEdit == torrentEdits) remoteTorrent = confirmedTorrent?.asSettings()
+          // The edits sent are dropped; newer ones keep showing over what it last confirmed.
+          confirmedTorrent?.let { confirmed ->
+            remoteTorrent = pendingTorrent.applyTo(confirmed).asSettings()
+          }
         }) {
           val controller = api.controller(TorrentController)
           if (controller == null) {
@@ -274,7 +278,7 @@ class InstanceSettingsController(
           }
           val updated = controller.updateSettings(change)
           confirmedTorrent = updated
-          if (sentTorrentEdit == torrentEdits) remoteTorrent = updated.asSettings()
+          remoteTorrent = pendingTorrent.applyTo(updated).asSettings()
         }
       }
     }
@@ -342,7 +346,7 @@ class InstanceSettingsController(
 
   /**
    * Reads a remote instance's torrent settings and what it can do with them, under
-   * [torrentLock]; an edit not sent yet keeps showing.
+   * [torrentLock]; edits not sent yet keep showing over them.
    */
   private suspend fun readTorrent() {
     val controller = api.controller(TorrentController)
@@ -355,7 +359,7 @@ class InstanceSettingsController(
     torrentUnsupported = false
     localDiscoverySupported = capabilities.supports(TorrentCapability.LOCAL_DISCOVERY)
     confirmedTorrent = settings
-    if (sentTorrentEdit == torrentEdits) remoteTorrent = settings.asSettings()
+    remoteTorrent = pendingTorrent.applyTo(settings).asSettings()
   }
 
   /** Shows what the instance reports, unless an edit made meanwhile has not been sent yet. */
@@ -371,6 +375,19 @@ class InstanceSettingsController(
   /** A remote instance's torrent settings as the page edits them. */
   private fun TorrentEngineSettings.asSettings(): TorrentSettings =
     TorrentSettings().withEngineSettings(this)
+
+  /** This change, then [next]: the fields [next] sets replace this one's. */
+  private fun TorrentSettingsChange.then(next: TorrentSettingsChange) = TorrentSettingsChange(
+    upload = next.upload ?: upload,
+    uploadLimit = next.uploadLimit ?: uploadLimit,
+    encryption = next.encryption ?: encryption,
+    utp = next.utp ?: utp,
+    portMapping = next.portMapping ?: portMapping,
+    localDiscovery = next.localDiscovery ?: localDiscovery,
+    trackers = next.trackers ?: trackers,
+    trackerList = next.trackerList ?: trackerList,
+    trackerListUrls = next.trackerListUrls ?: trackerListUrls,
+  )
 
   private suspend fun attempt(onError: (UiText) -> Unit, block: suspend () -> Unit) {
     try {
