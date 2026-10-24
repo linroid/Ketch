@@ -39,6 +39,7 @@ import ketch.app.shared.generated.resources.settings_general_shortcuts
 import ketch.app.shared.generated.resources.settings_general_start_hidden
 import ketch.app.shared.generated.resources.settings_general_theme
 import ketch.app.shared.generated.resources.settings_general_when_done
+import ketch.app.shared.generated.resources.settings_general_zoom
 import ketch.app.shared.generated.resources.settings_integration_clipboard_suggest
 import ketch.app.shared.generated.resources.settings_integration_extension
 import ketch.app.shared.generated.resources.settings_integration_magnet
@@ -151,6 +152,8 @@ import ketch.app.shared.generated.resources.settings_search_web_search
 import ketch.app.shared.generated.resources.settings_search_web_search_keywords
 import ketch.app.shared.generated.resources.settings_search_websites_keywords
 import ketch.app.shared.generated.resources.settings_search_welcome_keywords
+import ketch.app.shared.generated.resources.settings_search_zoom
+import ketch.app.shared.generated.resources.settings_search_zoom_keywords
 import ketch.app.shared.generated.resources.settings_sharing_access_code
 import ketch.app.shared.generated.resources.settings_sharing_auto_start
 import ketch.app.shared.generated.resources.settings_sharing_discoverable
@@ -199,6 +202,13 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     title = Res.string.settings_general_density,
     description = Res.string.settings_search_density.text(),
     keywords = Res.string.settings_search_density_keywords,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.General,
+    title = Res.string.settings_general_zoom,
+    description = Res.string.settings_search_zoom.text(),
+    keywords = Res.string.settings_search_zoom_keywords,
+    needs = SettingsFeature.Zoom,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.General,

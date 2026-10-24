@@ -32,8 +32,8 @@ import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
+import com.linroid.ketch.app.instance.LocalServerContext
 import com.linroid.ketch.app.instance.LocalServerHandle
-import com.linroid.ketch.app.instance.PairingRequests
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.SystemClipboard
@@ -466,12 +466,11 @@ internal class SampleKetchApi(
       freeSpace = 412_316_860_416,
       usableSpace = 412_316_860_416,
     ),
-    // A device on this version, like the embedded one, whose features the app gets without asking.
-    features = if (speedModes == null) {
-      KetchFeatures.ALL - KetchFeatures.SPEED_MODES
-    } else {
-      KetchFeatures.ALL
-    },
+    // A device on this version, like the embedded one, whose features the app gets without
+    // asking, shared through a server that saves the settings other devices change; one without
+    // speed modes stands for an older Ketch.
+    features = KetchFeatures.ALL + KetchFeatures.CONFIG_PERSISTED -
+      setOfNotNull(KetchFeatures.SPEED_MODES.takeIf { speedModes == null }),
   )
 
   override suspend fun updateConfig(config: DownloadConfig) {
@@ -762,7 +761,7 @@ internal class MovableClock(@Volatile var now: Instant) : Clock {
 }
 
 /** Starts a sharing server that only pretends to listen. */
-internal val PretendServer: (KetchApi, PairingRequests) -> LocalServerHandle = { _, _ ->
+internal val PretendServer: (LocalServerContext) -> LocalServerHandle = {
   object : LocalServerHandle {
     override fun stop() {}
   }

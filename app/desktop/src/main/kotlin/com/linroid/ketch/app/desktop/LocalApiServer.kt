@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.desktop
 
+import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
@@ -24,7 +25,9 @@ import kotlin.time.Duration.Companion.seconds
  *
  * It serves the app's engine, or, while a `ketch server` runs this computer's downloads in the
  * app's place ([DownloadsLock]), a client of that server, so clients reach them through the app
- * either way and always get a token, which a loopback `ketch server` may not require.
+ * either way and always get a token, which a loopback `ketch server` may not require. Download
+ * settings its clients change, such as through `ketch mcp`, are saved as the app saves its own,
+ * or by that `ketch server`.
  *
  * @param onConnect called on the requesting thread each time the extension connects, before it
  *   gets the reply, while the native messaging host that asked for it still runs. A failure there
@@ -32,10 +35,17 @@ import kotlin.time.Duration.Companion.seconds
  */
 internal class LocalApiServer(
   private val onConnect: () -> Unit = {},
-  private val startServer: (api: KetchApi, token: String) -> Started = ::startKetchServer,
+  private val startServer: (
+    api: KetchApi,
+    token: String,
+    saveConfig: (suspend (DownloadConfig) -> Unit)?,
+  ) -> Started = ::startKetchServer,
 ) : AutoCloseable {
   private val log = KetchLogger("LocalApi")
   private val api = CompletableFuture<KetchApi>()
+
+  // Set before api completes, which publishes it to connect.
+  @Volatile private var saveConfig: (suspend (DownloadConfig) -> Unit)? = null
   private var started: Started? = null
 
   // Set by attach, which must not wait for connect's lock: connect holds it while it waits.
@@ -49,9 +59,16 @@ internal class LocalApiServer(
    *
    * @param owned whether [ketch] was made for this server, such as a client of the `ketch server`
    *   that runs the downloads in the app's place, which [close] then closes too.
+   * @param saveConfig saves the download settings clients change, for the app's own engine;
+   *   `null` when [ketch] saves them itself or not at all.
    */
-  fun attach(ketch: KetchApi, owned: Boolean = false) {
+  fun attach(
+    ketch: KetchApi,
+    owned: Boolean = false,
+    saveConfig: (suspend (DownloadConfig) -> Unit)? = null,
+  ) {
     if (owned) this.owned = ketch
+    this.saveConfig = saveConfig
     api.complete(ketch)
   }
 
@@ -80,7 +97,7 @@ internal class LocalApiServer(
         return errorReply(UNAVAILABLE, e.cause?.message.orEmpty())
       }
       try {
-        startServer(ketch, newToken())
+        startServer(ketch, newToken(), saveConfig)
       } catch (e: Exception) {
         return errorReply("server_failed", "Couldn't start the connection: ${e.message}")
       }.also { started = it }
@@ -123,13 +140,18 @@ internal const val CLI_CONNECT_REQUEST = "cli/connect"
 private fun newToken(): String =
   ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 
-private fun startKetchServer(api: KetchApi, token: String): LocalApiServer.Started {
+private fun startKetchServer(
+  api: KetchApi,
+  token: String,
+  saveConfig: (suspend (DownloadConfig) -> Unit)?,
+): LocalApiServer.Started {
   val server = KetchServer(
     ketch = api,
     host = "127.0.0.1",
     port = 0,
     apiToken = token,
     mdnsEnabled = false,
+    onConfigChanged = saveConfig,
   )
   server.start(wait = false)
   return LocalApiServer.Started(runBlocking { server.port() }, token, server::stop)

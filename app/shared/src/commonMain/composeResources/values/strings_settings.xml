@@ -133,6 +133,8 @@
   <string name="settings_density_auto">Auto</string>
   <string name="settings_density_compact">Compact</string>
   <string name="settings_density_comfortable">Comfortable</string>
+  <string name="settings_general_zoom">Zoom</string>
+  <string name="settings_general_zoom_hint">Makes text and controls larger or smaller in every Ketch window.</string>
   <string name="settings_general_reduce_motion">Reduce motion</string>
   <string name="settings_general_reduce_motion_on">Turns off animations.</string>
   <string name="settings_general_reduce_motion_system">On in your system settings.</string>
@@ -498,6 +500,8 @@
   <string name="settings_downloads_folder">Downloads folder</string>
   <!-- On the page of a device that is not this one, %1$s, which forgets them when it restarts. -->
   <string name="settings_downloads_remote">Saved on %1$s until it restarts.</string>
+  <!-- On the page of a device that is not this one, %1$s, which keeps them when it restarts. -->
+  <string name="settings_downloads_remote_saved">Saved on %1$s.</string>
   <!-- While a device page loads. %1$s is the device's name. -->
   <string name="settings_loading_from">Loading settings from %1$s…</string>
   <string name="settings_downloads_save_to">Save to</string>
@@ -615,9 +619,16 @@
   <string name="settings_speed_mode_full">Full speed</string>
   <string name="settings_speed_mode_slow_lane">Slow lane</string>
   <string name="settings_speed_mode_auto">Auto</string>
-  <!-- On the page of a device that is not this one, %1$s. -->
+  <!-- On the page of a device that is not this one, %1$s, which forgets them when it restarts. -->
   <string name="settings_speed_remote">Saved on %1$s until it restarts. No Slow lane or Auto for it yet.</string>
+  <!-- On the page of a device that is not this one, %1$s, which keeps them when it restarts. -->
+  <string name="settings_speed_remote_saved">Saved on %1$s. No Slow lane or Auto for it yet.</string>
+  <!-- On the page of a device that is not this one, %1$s, which runs its speed modes itself
+       and forgets its connection count when it restarts. -->
   <string name="settings_speed_remote_modes">%1$s runs its speed mode and rules itself, even while this app is closed. Connections per download last until it restarts.</string>
+  <!-- On the page of a device that is not this one, %1$s, which runs its speed modes itself
+       and keeps every setting when it restarts. -->
+  <string name="settings_speed_remote_modes_saved">Saved on %1$s, which runs its speed mode and rules itself, even while this app is closed.</string>
   <!-- The group and row of a device without speed modes, which has one limit. -->
   <string name="settings_speed_limit_group">Limit</string>
   <string name="settings_speed_limit">Speed limit</string>
@@ -940,6 +951,8 @@
   <string name="settings_search_accent_keywords">colour, appearance</string>
   <string name="settings_search_density">Auto, compact or comfortable</string>
   <string name="settings_search_density_keywords">size, spacing, touch, appearance</string>
+  <string name="settings_search_zoom">Larger or smaller text and controls</string>
+  <string name="settings_search_zoom_keywords">scale, text size, font size, bigger, smaller, magnify, accessibility, appearance</string>
   <string name="settings_search_reduce_motion">Fewer animations</string>
   <string name="settings_search_reduce_motion_keywords">animation, accessibility</string>
   <string name="settings_search_language_keywords">locale, translation</string>

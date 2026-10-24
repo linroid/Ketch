@@ -6,6 +6,7 @@ import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.config.AccentColor
 import com.linroid.ketch.config.AiSettings
+import com.linroid.ketch.config.AppearanceConfig
 import com.linroid.ketch.config.CloseAction
 import com.linroid.ketch.config.DesktopSettings
 import com.linroid.ketch.config.KetchConfig
@@ -98,6 +99,22 @@ class AppSettingsControllerTest {
     controller.saveThemeMode(ThemeMode.Light)
     assertEquals(ThemeMode.Light, controller.themeMode)
     assertEquals(KetchAccent.Teal, controller.accent)
+  }
+
+  @Test
+  fun saveZoom_outsideTheRange_savesTheNearestZoomAndKeepsTheAppearance() {
+    val store = RecordingConfigStore(
+      KetchConfig(appearance = AppearanceConfig(theme = ThemeMode.Dark)),
+    )
+    val controller = AppSettingsController(store)
+
+    controller.saveZoom(1000)
+    assertEquals(AppearanceConfig.MAX_ZOOM, store.load().appearance.zoom)
+    controller.saveZoom(10)
+    assertEquals(AppearanceConfig.MIN_ZOOM, store.load().appearance.zoom)
+    controller.saveZoom(150)
+    assertEquals(150, store.load().appearance.zoom)
+    assertEquals(ThemeMode.Dark, store.load().appearance.theme)
   }
 
   @Test

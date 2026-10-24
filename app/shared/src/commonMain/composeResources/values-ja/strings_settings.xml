@@ -97,6 +97,8 @@
   <string name="settings_density_auto">自動</string>
   <string name="settings_density_compact">コンパクト</string>
   <string name="settings_density_comfortable">ゆったり</string>
+  <string name="settings_general_zoom">ズーム</string>
+  <string name="settings_general_zoom_hint">Ketch のすべてのウィンドウで文字やコントロールを拡大・縮小します。</string>
   <string name="settings_general_reduce_motion">動きを減らす</string>
   <string name="settings_general_reduce_motion_on">アニメーションをオフにします。</string>
   <string name="settings_general_reduce_motion_system">システム設定でオンになっています。</string>
@@ -365,6 +367,7 @@
 
   <string name="settings_downloads_folder">ダウンロードフォルダ</string>
   <string name="settings_downloads_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。</string>
+  <string name="settings_downloads_remote_saved">設定は%1$sに保存されます。</string>
   <string name="settings_loading_from">%1$sから設定を読み込み中…</string>
   <string name="settings_downloads_save_to">保存先</string>
   <string name="settings_downloads_save_to_row">ダウンロードの保存先</string>
@@ -454,7 +457,9 @@
   <string name="settings_speed_mode_slow_lane">低速モード</string>
   <string name="settings_speed_mode_auto">自動</string>
   <string name="settings_speed_remote">設定は%1$sで有効になり、デバイスを再起動するとリセットされます。このデバイスでは低速モードと自動モードはまだ使えません。</string>
+  <string name="settings_speed_remote_saved">設定は%1$sに保存されます。このデバイスでは低速モードと自動モードはまだ使えません。</string>
   <string name="settings_speed_remote_modes">%1$sは速度モードとルールを自身で実行するため、このアプリを閉じていても適用されます。ダウンロードごとの接続数は再起動するとリセットされます。</string>
+  <string name="settings_speed_remote_modes_saved">設定は%1$sに保存されます。%1$sは速度モードとルールを自身で実行するため、このアプリを閉じていても適用されます。</string>
   <string name="settings_speed_limit_group">制限</string>
   <string name="settings_speed_limit">速度制限</string>
   <string name="settings_speed_limit_hint">すべてのダウンロードで共有します。各ダウンロードの制限でさらに低くできます。</string>
@@ -684,6 +689,8 @@
   <string name="settings_search_accent_keywords">色, カラー, 外観, テーマ</string>
   <string name="settings_search_density">自動、コンパクト、ゆったり</string>
   <string name="settings_search_density_keywords">サイズ, 間隔, 余白, タッチ, 外観, 密度</string>
+  <string name="settings_search_zoom">文字やコントロールを拡大・縮小</string>
+  <string name="settings_search_zoom_keywords">拡大, 縮小, 倍率, 文字サイズ, フォントサイズ, 表示サイズ, アクセシビリティ, 外観</string>
   <string name="settings_search_reduce_motion">アニメーションを減らす</string>
   <string name="settings_search_reduce_motion_keywords">アニメーション, アクセシビリティ, 視差効果, 動き</string>
   <string name="settings_search_language_keywords">言語, ロケール, 翻訳, 日本語, 英語</string>

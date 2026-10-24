@@ -402,6 +402,8 @@ web UI, which the Ketch apps and the browser extension connect to. It:
 - announces itself on the local network over mDNS, unless `mdnsEnabled` is `false`
 - listens on every interface by default, and then requires an [access token](#access-token)
 - runs the [hooks](../docs/hooks.md) of the config file
+- saves the download settings clients change, such as on the apps' Downloads and Speed pages, to
+  the config file ([settings clients change](#settings-clients-change))
 
 ### Examples
 
@@ -477,6 +479,26 @@ runs, or turn on **Settings → Sharing** in the app for other devices.
 The other way round, the Ketch app opened while `ketch server` runs leaves the downloads to the
 server: it shows them through the server, as a device named `ketch server`, and runs them itself
 again once you stop the server and reopen the app.
+
+### Settings clients change
+
+Download settings a client changes through `PUT /api/config`, such as on the Downloads and Speed
+pages of the Ketch apps, apply at once and are saved to the `[download]` table of the config file,
+so they outlast a restart: the file `--config` names, else the
+[default one](#config-file-locations), which the first change creates when there is none, such as
+`/config/config.toml` in the [Docker image](../docs/docker.md). The server lists
+`config.persisted` in `GET /api/status`, which tells the apps so.
+
+- Only the settings a change sets to a new value are written, over what the file holds then:
+  values that came from options, environment variables or defaults stay out of it, and edits made
+  to the file meanwhile are kept. The file is written anew, as the apps write theirs, so its
+  comments are not kept.
+- A setting an option or [environment variable](#environment-variables) sets, such as
+  `--speed-limit` or `KETCH_SPEED_LIMIT`, is saved too, but the option or variable replaces it
+  again at the next start, and the server logs a warning when it saves one. Leave them out for the
+  settings you change from the apps.
+- A file that cannot be read, such as one edited into invalid TOML, or written is left as it is:
+  the change applies until the server restarts, and the client gets `500` `config_not_saved`.
 
 ### Access token
 
@@ -861,8 +883,9 @@ naming the variable. The [Docker image](../docs/docker.md) is configured this wa
 the default one when it exists. Command-line options always take precedence over it, and
 `ketch server` reads [environment variables](#environment-variables) in between. The other
 commands read only parts of the default file: `ketch <url>` its `[download.proxy]` and
-`[torrent]` sections, and `ai-discover` its `[ai]` section. The CLI never writes the file, apart
-from `--generate-config`.
+`[torrent]` sections, and `ai-discover` its `[ai]` section. The CLI writes the file only for
+`--generate-config`, and for `ketch server` the download settings its clients change
+([settings clients change](#settings-clients-change)).
 
 ### Config file locations
 

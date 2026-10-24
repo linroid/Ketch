@@ -24,21 +24,36 @@ body:
     id: description
     attributes:
       label: "问题描述"
-      description: "请描述实际情况、预期结果或你希望新增的功能。"
-      placeholder: "请描述问题及相关背景。"
+      description: "请描述实际情况、预期结果或你希望新增的功能。如果是问题报告，请附上复现步骤。"
+      placeholder: "请描述问题。\n\n复现步骤：\n1. ...\n2. ..."
     validations:
       required: true
-  - type: textarea
-    id: steps
+  - type: dropdown
+    id: platform
     attributes:
-      label: "复现步骤"
-      description: "如果是问题报告，请列出复现问题的步骤。"
-      placeholder: "1. ...\n2. ..."
-  - type: textarea
-    id: environment
+      label: "平台"
+      description: "可多选。"
+      multiple: true
+      options:
+        - "与平台无关"
+        - "Windows"
+        - "macOS"
+        - "Linux"
+        - "Android"
+        - "iOS"
+        - "Web 版"
+        - "浏览器扩展"
+        - "CLI"
+        - "Docker"
+        - "库（SDK）"
+        - "其他"
+    validations:
+      required: false
+  - type: input
+    id: version
     attributes:
-      label: "运行环境"
-      description: "如有需要，请提供 Ketch 版本和平台信息。"
+      label: "Ketch 版本"
+      description: "可在 设置 → 关于 中查看。"
     validations:
       required: false
   - type: markdown

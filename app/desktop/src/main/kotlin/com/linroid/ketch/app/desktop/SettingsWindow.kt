@@ -227,6 +227,7 @@ internal fun SettingsWindow(
         accent = appSettings.accent,
         density = appSettings.ui.density,
         reduceMotion = appSettings.ui.reduceMotion || systemReducesMotion,
+        zoom = appSettings.zoomScale,
       ) {
         Box(Modifier.fillMaxSize().background(KetchTheme.colors.canvas)) {
           key(language) { SettingsHost(controller.state, target, onClose = settings::close) }

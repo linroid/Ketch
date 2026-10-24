@@ -65,6 +65,9 @@ internal enum class SettingsFeature {
 
   /** Uploads to peers can wait for Wi-Fi: the phone apps, whose uploads follow the network. */
   UploadWifiOnly,
+
+  /** The app zooms its own UI: desktop. */
+  Zoom,
 }
 
 /**

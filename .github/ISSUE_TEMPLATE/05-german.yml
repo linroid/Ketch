@@ -24,21 +24,36 @@ body:
     id: description
     attributes:
       label: "Beschreibung"
-      description: "Was ist passiert, was hast du erwartet oder was möchtest du sehen?"
-      placeholder: "Beschreibe das Problem mit relevantem Kontext."
+      description: "Was ist passiert, was hast du erwartet oder was möchtest du sehen? Gib bei einem Fehler die Schritte zur Reproduktion an."
+      placeholder: "Beschreibe das Problem.\n\nSchritte zur Reproduktion:\n1. ...\n2. ..."
     validations:
       required: true
-  - type: textarea
-    id: steps
+  - type: dropdown
+    id: platform
     attributes:
-      label: "Schritte zur Reproduktion"
-      description: "Gib bei Fehlerberichten die Schritte an, mit denen sich das Problem reproduzieren lässt."
-      placeholder: "1. ...\n2. ..."
-  - type: textarea
-    id: environment
+      label: "Plattform"
+      description: "Wähle alle zutreffenden aus."
+      multiple: true
+      options:
+        - "Plattformunabhängig"
+        - "Windows"
+        - "macOS"
+        - "Linux"
+        - "Android"
+        - "iOS"
+        - "Web-App"
+        - "Browsererweiterung"
+        - "CLI"
+        - "Docker"
+        - "Bibliothek (SDK)"
+        - "Sonstiges"
+    validations:
+      required: false
+  - type: input
+    id: version
     attributes:
-      label: "Umgebung"
-      description: "Gib bei Bedarf deine Ketch-Version und Plattform an."
+      label: "Ketch-Version"
+      description: "Steht unter Einstellungen → Über."
     validations:
       required: false
   - type: markdown

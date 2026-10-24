@@ -46,6 +46,7 @@ import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.keepAwakeSupported
+import com.linroid.ketch.app.platform.zoomSupported
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
@@ -137,6 +138,7 @@ internal fun SettingsContent(
     if (permission != null) add(SettingsFeature.BrowserNotifications)
     if (fileLogger != null) add(SettingsFeature.Logs)
     if (keepAwakeSupported) add(SettingsFeature.KeepAwake)
+    if (zoomSupported) add(SettingsFeature.Zoom)
     if (state.whenDownloadsFinish != null) add(SettingsFeature.WhenDownloadsFinish)
     if (state.instanceManager.followsUploadNetwork) add(SettingsFeature.UploadWifiOnly)
   }

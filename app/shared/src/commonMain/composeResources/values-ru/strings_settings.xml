@@ -109,6 +109,8 @@
   <string name="settings_density_auto">Авто</string>
   <string name="settings_density_compact">Компактная</string>
   <string name="settings_density_comfortable">Просторная</string>
+  <string name="settings_general_zoom">Масштаб</string>
+  <string name="settings_general_zoom_hint">Увеличивает или уменьшает текст и элементы управления во всех окнах Ketch.</string>
   <string name="settings_general_reduce_motion">Уменьшение движения</string>
   <string name="settings_general_reduce_motion_on">Отключает анимацию.</string>
   <string name="settings_general_reduce_motion_system">Включено в настройках системы.</string>
@@ -389,6 +391,7 @@
 
   <string name="settings_downloads_folder">Папка «Загрузки»</string>
   <string name="settings_downloads_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска.</string>
+  <string name="settings_downloads_remote_saved">Эти настройки сохраняются на устройстве «%1$s».</string>
   <string name="settings_loading_from">Получение настроек с устройства «%1$s»…</string>
   <string name="settings_downloads_save_to">Сохранять в</string>
   <string name="settings_downloads_save_to_row">Сохранять загрузки в</string>
@@ -487,7 +490,9 @@
   <string name="settings_speed_mode_slow_lane">Низкая скорость</string>
   <string name="settings_speed_mode_auto">Авто</string>
   <string name="settings_speed_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска. Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
+  <string name="settings_speed_remote_saved">Эти настройки сохраняются на устройстве «%1$s». Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
   <string name="settings_speed_remote_modes">Устройство «%1$s» само применяет режим скорости и правила, даже когда это приложение закрыто. Число подключений на загрузку действует до его следующего перезапуска.</string>
+  <string name="settings_speed_remote_modes_saved">Сохраняется на устройстве «%1$s», которое само применяет режим скорости и правила, даже когда это приложение закрыто.</string>
   <string name="settings_speed_limit_group">Ограничение</string>
   <string name="settings_speed_limit">Ограничение скорости</string>
   <string name="settings_speed_limit_hint">Общее для всех загрузок; собственное ограничение загрузки может быть ниже.</string>
@@ -744,6 +749,8 @@
   <string name="settings_search_accent_keywords">цвет, оформление, акцент</string>
   <string name="settings_search_density">Авто, компактная или просторная</string>
   <string name="settings_search_density_keywords">размер, отступы, интервалы, сенсорный, оформление</string>
+  <string name="settings_search_zoom">Текст и элементы управления крупнее или мельче</string>
+  <string name="settings_search_zoom_keywords">увеличение, уменьшение, зум, размер текста, размер шрифта, крупнее, мельче, специальные возможности, оформление</string>
   <string name="settings_search_reduce_motion">Меньше анимации</string>
   <string name="settings_search_reduce_motion_keywords">анимация, движение, универсальный доступ, специальные возможности</string>
   <string name="settings_search_language_keywords">язык интерфейса, локализация, перевод</string>

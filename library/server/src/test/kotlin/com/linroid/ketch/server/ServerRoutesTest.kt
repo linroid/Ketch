@@ -7,6 +7,8 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
@@ -14,6 +16,7 @@ import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
+import com.linroid.ketch.core.speed.SpeedModeOptions
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -29,6 +32,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -420,4 +424,127 @@ class ServerRoutesTest {
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(emptyList(), ketch.status().config.categories)
   }
+
+  @Test
+  fun `status lists config persisted only with a save hook`() {
+    assertFalse(KetchFeatures.CONFIG_PERSISTED in statusFeatures(createTestServer()))
+    val saving = createTestServer(onConfigChanged = {})
+    assertTrue(KetchFeatures.CONFIG_PERSISTED in statusFeatures(saving))
+  }
+
+  private fun statusFeatures(server: KetchServer): Set<String> {
+    var features = emptySet<String>()
+    testApplication {
+      application { with(server) { configureServer() } }
+      val response = client.get("/api/status")
+      features = json.decodeFromString<KetchStatus>(response.bodyAsText()).features
+    }
+    return features
+  }
+
+  @Test
+  fun `PUT config hands what the instance applied to the save hook`() = testApplication {
+    val ketch = createTestKetch()
+    val saved = mutableListOf<DownloadConfig>()
+    application {
+      with(createTestServer(ketch, onConfigChanged = { saved += it })) { configureServer() }
+    }
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"maxConcurrentDownloads": 2}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(listOf(ketch.status().config), saved)
+    assertEquals(2, saved.single().maxConcurrentDownloads)
+  }
+
+  @Test
+  fun `PUT config in the slow lane saves the standing cap`() = testApplication {
+    val ketch = Ketch(
+      httpEngine = NoOpHttpEngine(),
+      config = DownloadConfig(speedLimit = SpeedLimit.mbps(5)),
+      speedModes = SpeedModeOptions(SpeedSettings(mode = SpeedLimitMode.SlowLane)),
+    )
+    val saved = mutableListOf<DownloadConfig>()
+    application {
+      with(createTestServer(ketch, onConfigChanged = { saved += it })) { configureServer() }
+    }
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"maxConcurrentDownloads": 2}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(SpeedLimit.mbps(1), ketch.status().config.speedLimit)
+    assertEquals(SpeedLimit.mbps(5), saved.single().speedLimit)
+    assertEquals(2, saved.single().maxConcurrentDownloads)
+  }
+
+  @Test
+  fun `PUT config the instance rejects is not saved`() = testApplication {
+    val ketch = createTestKetch()
+    val parent = Files.createTempDirectory("ketch-routes")
+    val saved = mutableListOf<DownloadConfig>()
+    application {
+      val server = createTestServer(
+        ketch,
+        allowedDirectories = listOf(parent.toString()),
+        onConfigChanged = { saved += it },
+      )
+      with(server) { configureServer() }
+    }
+    val missing = parent.resolve("missing").toString()
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(DownloadConfig(defaultDirectory = missing)))
+    }
+
+    assertEquals(HttpStatusCode.BadRequest, response.status)
+    assertEquals(emptyList(), saved)
+  }
+
+  @Test
+  fun `PUT config with a folder the server refuses is not saved`() = testApplication {
+    val ketch = createTestKetch()
+    val saved = mutableListOf<DownloadConfig>()
+    // Only its own folder: temporary folders are in /tmp on Linux, which createTestServer allows.
+    val allowed = Files.createTempDirectory("ketch-allowed").toString()
+    application {
+      val server = createTestServer(
+        ketch,
+        allowedDirectories = listOf(allowed),
+        onConfigChanged = { saved += it },
+      )
+      with(server) { configureServer() }
+    }
+    val outside = Files.createTempDirectory("ketch-outside").toString()
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(DownloadConfig(defaultDirectory = outside)))
+    }
+
+    assertEquals(HttpStatusCode.Forbidden, response.status)
+    assertEquals(emptyList(), saved)
+  }
+
+  @Test
+  fun `PUT config whose save fails answers config_not_saved and keeps it applied`() =
+    testApplication {
+      val ketch = createTestKetch()
+      application {
+        val server = createTestServer(ketch, onConfigChanged = { throw IOException("disk full") })
+        with(server) { configureServer() }
+      }
+      val response = client.put("/api/config") {
+        contentType(ContentType.Application.Json)
+        setBody("""{"maxConcurrentDownloads": 2}""")
+      }
+
+      assertEquals(HttpStatusCode.InternalServerError, response.status)
+      val error = json.decodeFromString<ErrorResponse>(response.bodyAsText())
+      assertEquals("config_not_saved", error.error)
+      assertTrue("disk full" in error.message, error.message)
+      assertEquals(2, ketch.status().config.maxConcurrentDownloads)
+    }
 }

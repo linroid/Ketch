@@ -16,7 +16,8 @@ import kotlin.test.assertEquals
 
 class ServerSpeedModesTest {
   private val dir: File = Files.createTempDirectory("ketch-speed-modes").toFile()
-  private val store = FileConfigStore(File(dir, "config.toml").path)
+  private val path = File(dir, "config.toml").path
+  private val store = FileConfigStore(path)
 
   @AfterTest
   fun cleanUp() {
@@ -24,9 +25,26 @@ class ServerSpeedModesTest {
   }
 
   @Test
+  fun saveSettings_afterADownloadSettingSaved_keepsBoth() = runBlocking {
+    val file = file()
+    val options = serverSpeedModes(file, KetchConfig(), startCap = SpeedLimit.Unlimited)
+
+    file.save(DownloadConfig(maxConcurrentDownloads = 2))
+    options.saveSettings(SpeedSettings(mode = SpeedLimitMode.Auto))
+
+    val saved = store.load()
+    assertEquals(2, saved.download.maxConcurrentDownloads)
+    assertEquals(SpeedLimitMode.Auto, saved.speed.mode)
+  }
+
+  // The file the server saves to, started with the cap of startCap.
+  private fun file(startCap: SpeedLimit = SpeedLimit.Unlimited) =
+    ServerConfigFile(path, started = DownloadConfig(speedLimit = startCap))
+
+  @Test
   fun saveSettings_capFromAFlag_keepsTheFilesSpeedLimit() = runBlocking {
     store.save(KetchConfig(download = DownloadConfig(speedLimit = SpeedLimit.mbps(5))))
-    val options = serverSpeedModes(store, store.load(), startCap = SpeedLimit.mbps(10))
+    val options = serverSpeedModes(file(SpeedLimit.mbps(10)), store.load(), SpeedLimit.mbps(10))
 
     options.saveSettings(
       SpeedSettings(mode = SpeedLimitMode.SlowLane, standard = SpeedLimit.mbps(10)),
@@ -39,7 +57,7 @@ class ServerSpeedModesTest {
 
   @Test
   fun saveSettings_newCap_savedAsTheDownloadLimit() = runBlocking {
-    val options = serverSpeedModes(store, KetchConfig(), startCap = SpeedLimit.Unlimited)
+    val options = serverSpeedModes(file(), KetchConfig(), startCap = SpeedLimit.Unlimited)
 
     options.saveSettings(SpeedSettings(standard = SpeedLimit.mbps(20)))
 
@@ -48,7 +66,7 @@ class ServerSpeedModesTest {
 
   @Test
   fun savePeak_peak_savedUnderUi() = runBlocking {
-    val options = serverSpeedModes(store, KetchConfig(), startCap = SpeedLimit.Unlimited)
+    val options = serverSpeedModes(file(), KetchConfig(), startCap = SpeedLimit.Unlimited)
 
     options.savePeak(ObservedPeak(bytesPerSecond = 8_000_000, atEpochMillis = 1_000))
 

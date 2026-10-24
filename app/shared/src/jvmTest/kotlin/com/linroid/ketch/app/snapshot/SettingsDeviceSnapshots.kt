@@ -150,7 +150,7 @@ class SettingsDeviceSnapshots {
   }
 
   @Test
-  fun remote_devicePages_saveOnTheDeviceUntilItRestarts() {
+  fun remote_devicePages_saveOnTheDevice() {
     val remote = DeviceSetup(remote = true)
     for (category in listOf(SettingsCategory.Downloads, SettingsCategory.Speed)) {
       pageSnapshots(

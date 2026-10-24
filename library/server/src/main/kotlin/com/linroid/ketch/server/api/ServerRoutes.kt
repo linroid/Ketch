@@ -1,18 +1,21 @@
 package com.linroid.ketch.server.api
 
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.reason
 import com.linroid.ketch.api.resolve
 import com.linroid.ketch.endpoints.Api
-import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
@@ -23,37 +26,85 @@ import io.ktor.server.resources.post
 import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import kotlin.coroutines.cancellation.CancellationException
 
 private val log = KetchLogger("ServerRoutes")
 
 /**
- * Installs server-level status, configuration, network interface, and URL resolution endpoints.
- * A new download directory goes through [destinations].
+ * What of [config], applied to this instance, to save: while speed modes hold the limit, as the
+ * slow lane does, the limit in effect is not the one to keep, but the standing cap is.
  */
-internal fun Route.serverRoutes(ketch: KetchApi, destinations: DestinationGuard) {
+private suspend fun KetchApi.toSave(config: DownloadConfig): DownloadConfig {
+  val modes = controller(SpeedModes) ?: return config
+  val cap = try {
+    modes.state().settings.standard
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    // A client of a server without them, as a stand-in for its engine is.
+    log.d { "No speed modes to keep the cap of: ${e.describeCauses()}" }
+    return config
+  }
+  return config.copy(speedLimit = cap)
+}
+
+/**
+ * Installs server-level status, configuration, network interface, and URL resolution endpoints.
+ * A new download directory goes through [destinations], and a configuration the instance
+ * accepted to [onConfigChanged], which saves it.
+ */
+internal fun Route.serverRoutes(
+  ketch: KetchApi,
+  destinations: DestinationGuard,
+  onConfigChanged: (suspend (DownloadConfig) -> Unit)?,
+) {
+  // One change at a time, so a merge never starts from a configuration another is replacing,
+  // and the last configuration saved is the one that applies.
+  val configLock = Mutex()
+
   get<Api.Status> {
     log.d { "GET /api/status" }
     val status = ketch.status()
-    // The event stream is the server's, whatever the engine behind it.
-    call.respond(status.copy(features = status.features + StreamEvents.FEATURE))
+    // The event stream is the server's, whatever the engine behind it, and so is saving.
+    val features = status.features + StreamEvents.FEATURE +
+      listOfNotNull(KetchFeatures.CONFIG_PERSISTED.takeIf { onConfigChanged != null })
+    call.respond(status.copy(features = features))
   }
 
   put<Api.Config> {
     val fields = call.receiveJson<JsonObject>()
-    // Fields a client leaves out keep their current values: clients older than a setting, such
-    // as category folders or idle timeouts, must not reset it.
-    val current = ServerJson.encodeToJsonElement(DownloadConfig.serializer(), ketch.status().config)
-    val body = ServerJson.decodeFromJsonElement(
-      DownloadConfig.serializer(),
-      JsonObject(current.jsonObject + fields),
-    )
-    log.i { "PUT /api/config: speedLimit=${body.speedLimit}" }
-    destinations.checkConfig(body)
-    ketch.updateConfig(body)
-    call.respond(body)
+    configLock.withLock {
+      // Fields a client leaves out keep their current values: clients older than a setting,
+      // such as category folders or idle timeouts, must not reset it.
+      val current =
+        ServerJson.encodeToJsonElement(DownloadConfig.serializer(), ketch.status().config)
+      val body = ServerJson.decodeFromJsonElement(
+        DownloadConfig.serializer(),
+        JsonObject(current.jsonObject + fields),
+      )
+      log.i { "PUT /api/config: speedLimit=${body.speedLimit}" }
+      destinations.checkConfig(body)
+      ketch.updateConfig(body)
+      try {
+        onConfigChanged?.invoke(ketch.toSave(body))
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        log.w { "Applied the download settings but couldn't save them: ${e.describeCauses()}" }
+        val reason = e.message ?: e::class.simpleName
+        call.respond(
+          HttpStatusCode.InternalServerError,
+          ErrorResponse("config_not_saved", "Applied until Ketch restarts; not saved: $reason"),
+        )
+        return@put
+      }
+      call.respond(body)
+    }
   }
 
   get<Api.NetworkInterfaces> {

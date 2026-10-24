@@ -412,7 +412,7 @@ internal fun CloseDialogs(behavior: CloseBehavior, settings: AppSettingsControll
       // Asked from the tray or the Dock, Ketch is not the active app, so the keys would go
       // elsewhere.
       LaunchedEffect(Unit) { bringToFront(window) }
-      KetchTheme(darkTheme = darkTheme, accent = settings.accent) {
+      KetchTheme(darkTheme = darkTheme, accent = settings.accent, zoom = settings.zoomScale) {
         val spacing = KetchTheme.spacing
         Column(
           modifier = Modifier
