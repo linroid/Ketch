@@ -11,5 +11,3 @@ internal actual val HorizontalResizePointerIcon: PointerIcon = PointerIcon.Defau
 internal actual val keepAwakeSupported: Boolean = false
 
 internal actual val localPeerDiscoverySupported: Boolean = false
-
-internal actual val zoomSupported: Boolean = false
