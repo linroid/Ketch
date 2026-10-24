@@ -1772,7 +1772,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   sheet, the palette and the Discover page match their own with a `ShortcutMatcher`. `⌘K`
   opens the command palette and `⌘/` the shortcut sheet, grouped by scope (Discover's only where
   Discover is offered). Commands the window's shell must run from outside it, such as the macOS
-  menu bar's, go through `AppState.runInShell`
+  menu bar's, go through `AppState.runInShell`. A command's `alternates` are desktop chords that
+  run it too (`boundChords`) but that menus, tooltips and the sheet leave out, as Zoom in's `⌘+`
 - Toasts and banners go through `MessageCenter`; removals and other undoable operations wait in
   `PendingOps` for their Undo window. A message posted with `notify = true` (Discover's page
   access questions) also becomes a system notification, once, while the app is not in front or
@@ -1920,7 +1921,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   keeps the macOS traffic lights clear. Window sizes stay as they are. The tray menu, which Java
   draws on Windows and Linux in its own sans-serif font only, takes `trayMenuFont(zoom)`, 12 px
   at 100 % like Windows' menus. Phones follow the system's display and text size and browsers
-  zoom the web app, so neither offers it
+  zoom the web app, so neither offers it. Zoom in (`⌘=`, and as alternates `⇧⌘=`, the `+` key of
+  other layouts and the keypad's) and Zoom out (`⌘−`, the keypad's) step through `ZoomLevels`,
+  the levels Settings offers, from a zoom between them too, and stop at the ends
+  (`AppSettingsController.zoomIn`/`zoomOut`); Actual size (`resetZoom`) has no chord, as `⌘0`
+  shows Devices. The main and Settings windows run the chords before their content
+  (`windowCommands`, `settingsCommands`); on macOS both windows' View menus list the three and own
+  `⌘=` and `⌘−`, which the windows leave to them (`menuKeys`). The palette lists them too
 - Release notes (desktop, direct Android): What's new on the update toasts, and Settings → About,
   opens `ReleaseNotesDialog` (`ui/settings`; `AppState.releaseNotesRequest` for the toasts),
   which reads `AppUpdates.releaseNotes(version, since)`: the GitHub releases after `since`

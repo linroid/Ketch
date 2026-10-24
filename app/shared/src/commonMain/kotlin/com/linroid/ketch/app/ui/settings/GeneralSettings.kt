@@ -54,6 +54,7 @@ import com.linroid.ketch.app.platform.zoomSupported
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.WhenDownloadsFinish
+import com.linroid.ketch.app.state.ZoomLevels
 import com.linroid.ketch.app.state.label
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchTheme
@@ -469,9 +470,6 @@ private fun ZoomRow(appSettings: AppSettingsController) {
     onSelect = appSettings::saveZoom,
   )
 }
-
-/** The zooms Settings offers, in percent of the normal size. */
-private val ZoomLevels = listOf(90, 100, 110, 125, 150, 175, 200)
 
 /**
  * The language the app shows: a list of the translations and System where the app chooses it,

@@ -72,6 +72,9 @@ import ketch.app.shared.generated.resources.command_switch_to_device
 import ketch.app.shared.generated.resources.command_undo
 import ketch.app.shared.generated.resources.command_window_close
 import ketch.app.shared.generated.resources.command_window_minimize
+import ketch.app.shared.generated.resources.command_zoom_actual_size
+import ketch.app.shared.generated.resources.command_zoom_in
+import ketch.app.shared.generated.resources.command_zoom_out
 import ketch.app.shared.generated.resources.discover_new_search
 
 /**
@@ -313,6 +316,49 @@ object KetchCommands {
     mac = KeyChord(Key.Slash, primary = true),
     web = listOf(KeyChord(Key.Slash, shift = true)),
     inMenus = true,
+  )
+
+  /**
+   * Draws every window one zoom level larger, as Settings → General → Zoom does; only the desktop
+   * app offers it.
+   */
+  val ZoomIn: KetchCommand = KetchCommand(
+    id = "zoom.in",
+    label = Res.string.command_zoom_in.text(),
+    icon = null,
+    mac = KeyChord(Key.Equals, primary = true),
+    // ⌘+ as browsers take it: ⇧= on US keyboards, the + key of other layouts and the keypad's.
+    alternates = listOf(
+      KeyChord(Key.Equals, primary = true, shift = true),
+      KeyChord(Key.Plus, primary = true),
+      KeyChord(Key.NumPadAdd, primary = true),
+    ),
+    inMenus = true,
+    onWeb = false,
+  )
+
+  /** Draws every window one zoom level smaller; only the desktop app offers it. */
+  val ZoomOut: KetchCommand = KetchCommand(
+    id = "zoom.out",
+    label = Res.string.command_zoom_out.text(),
+    icon = null,
+    mac = KeyChord(Key.Minus, primary = true),
+    alternates = listOf(KeyChord(Key.NumPadSubtract, primary = true)),
+    inMenus = true,
+    onWeb = false,
+  )
+
+  /**
+   * Draws every window at its normal size again; only the desktop app offers it. It has no chord:
+   * ⌘0, which browsers use for it, shows Devices.
+   */
+  val ActualSize: KetchCommand = KetchCommand(
+    id = "zoom.actualSize",
+    label = Res.string.command_zoom_actual_size.text(),
+    icon = null,
+    mac = null,
+    inMenus = true,
+    onWeb = false,
   )
 
   /** Closes the window; Ketch keeps running. */
@@ -766,6 +812,7 @@ object KetchCommands {
     addAll(devices)
     addAll(listOf(AllDevices, SwitchDevice, PauseAll, ResumeAll, RetryFailed, SlowLane))
     addAll(listOf(ShowDetails, ToggleSidebar, Activity, Undo, Settings, Shortcuts))
+    addAll(listOf(ZoomIn, ZoomOut, ActualSize))
     addAll(listOf(CloseWindow, Minimize, Quit))
     addAll(listOf(ListUp, ListDown, ExtendSelectionUp, ExtendSelectionDown))
     addAll(listOf(ListFirst, ListLast, ListPageUp, ListPageDown, SelectAll, ClearSelection))

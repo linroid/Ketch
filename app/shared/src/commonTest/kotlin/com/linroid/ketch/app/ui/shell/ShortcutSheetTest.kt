@@ -28,6 +28,19 @@ class ShortcutSheetTest {
   }
 
   @Test
+  fun shortcutGroups_zoom_showsTheMainChordsAlone() = runTest {
+    val general = shortcutGroups(KeyboardPlatform.Pc) { true }.first {
+      it.title.load() == "General"
+    }
+    suspend fun keys(label: String) = general.lines.singleOrNull { it.label.load() == label }?.keys
+
+    assertEquals(listOf("Ctrl+="), keys("Zoom in"))
+    assertEquals(listOf("Ctrl+-"), keys("Zoom out"))
+    // Actual size has no chord.
+    assertNull(keys("Actual size"))
+  }
+
+  @Test
   fun shortcutGroups_web_leavesOutTheWindowCommands() = runTest {
     val groups = shortcutGroups(KeyboardPlatform.WebPc) { true }
     val labels = groups.flatMap { it.lines }.map { it.label }.load()
