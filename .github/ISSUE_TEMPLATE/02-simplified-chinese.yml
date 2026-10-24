@@ -1,6 +1,10 @@
 name: "简体中文"
 description: "报告问题、提出改进建议或提问。"
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **提交前请注意：** Ketch 是在协议层面工作的通用下载工具。为特定视频或社交媒体网站添加下载支持、或绕过 DRM 的请求将被关闭。请只下载你有权下载的内容。
   - type: dropdown
     id: type
     attributes:

@@ -1,6 +1,10 @@
 name: "Deutsch"
 description: "Melde Fehler, schlage Verbesserungen vor oder stelle Fragen."
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Vor dem Absenden:** Ketch ist ein universeller Downloader, der auf Protokollebene arbeitet. Anfragen, Downloads von bestimmten Video- oder Social-Media-Seiten zu unterstützen oder DRM zu umgehen, werden geschlossen. Lade nur Inhalte herunter, zu deren Download du berechtigt bist.
   - type: dropdown
     id: type
     attributes:

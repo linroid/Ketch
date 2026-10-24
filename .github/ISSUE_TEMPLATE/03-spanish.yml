@@ -1,6 +1,10 @@
 name: "Español"
 description: "Informa de errores, sugiere mejoras o haz preguntas."
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Antes de enviar:** Ketch es un gestor de descargas de uso general que funciona a nivel de protocolo. Se cerrarán las solicitudes para descargar desde sitios de vídeo o redes sociales concretos, o para eludir DRM. Descarga solo contenido que tengas derecho a descargar.
   - type: dropdown
     id: type
     attributes:

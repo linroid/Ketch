@@ -1,6 +1,10 @@
 name: "English (Recommended)"
 description: "Report a bug, suggest an improvement, or ask a question."
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before you submit:** Ketch is a general-purpose downloader that works at the protocol level. Requests to support downloading from specific video or social media sites, or to bypass DRM, will be closed. Only download content you have the right to.
   - type: dropdown
     id: type
     attributes:
