@@ -5,3 +5,5 @@ package com.linroid.ketch.torrent.lsd
  * which Ketch does not have, so local service discovery does not run there.
  */
 internal actual suspend fun openLsdMulticast(): LsdTransport? = null
+
+internal actual val lsdSupported: Boolean = false

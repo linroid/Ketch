@@ -20,6 +20,7 @@ import com.linroid.ketch.torrent.api.TorrentFeatures
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
+import com.linroid.ketch.torrent.lsd.lsdSupported
 import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.metainfo.InfoHash
 import com.linroid.ketch.torrent.storage.TorrentCheckpoint
@@ -214,7 +215,10 @@ class TorrentDownloadSourceTest {
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.FILE_SELECTION,
       KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL), source.features)
-    assertEquals(setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability"),
+    val engine = setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability",
+      "settings")
+    // Local discovery only where the platform can join the LAN group.
+    assertEquals(if (lsdSupported) engine + "local-discovery" else engine,
       source.torrentCapabilities)
     assertTrue(source.seedingTaskIds.value.isEmpty())
     assertFalse(source.restoresSeeding)

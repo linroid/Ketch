@@ -584,7 +584,7 @@
   <string name="settings_torrent_connections_footer">Verschlüsselung verbirgt, welche Art von Datenverkehr es ist, nicht, mit wem du dich verbindest.</string>
   <string name="settings_torrent_trackers">Zusätzliche Tracker</string>
   <string name="settings_torrent_no_trackers">Keine zusätzlichen Tracker</string>
-  <string name="settings_torrent_remote">Ändere die BitTorrent-Einstellungen direkt auf %1$s oder in seiner config.toml.</string>
+  <string name="settings_torrent_remote">Aktualisiere Ketch auf %1$s, um diese Einstellungen hier zu ändern.</string>
   <string name="settings_torrent_reach_reachable">Peers können sich auf Port %2$d mit %1$s verbinden.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="one">Port %2$d wird über %3$d Router an %1$s weitergeleitet, Peers können sich also verbinden.</item>

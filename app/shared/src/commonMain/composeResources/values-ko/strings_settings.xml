@@ -572,7 +572,7 @@
   <string name="settings_torrent_connections_footer">암호화는 트래픽의 종류를 숨길 뿐, 누구와 연결하는지는 숨기지 않습니다.</string>
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>
-  <string name="settings_torrent_remote">BitTorrent 설정은 %1$s 기기에서 직접 또는 해당 기기의 config.toml에서 변경하세요.</string>
+  <string name="settings_torrent_remote">여기에서 이 설정을 변경하려면 %1$s의 Ketch를 업데이트하세요.</string>
   <string name="settings_torrent_reach_reachable">피어가 포트 %2$d로 %1$s에 연결할 수 있습니다.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="other">포트 %2$d가 라우터 %3$d대를 거쳐 %1$s로 전달되므로 피어가 연결할 수 있습니다.</item>

@@ -24,8 +24,10 @@ import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.core.engine.unknownFilesMessage
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentFeatures
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.control.LiveTorrent
 import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
@@ -45,6 +47,7 @@ import com.linroid.ketch.torrent.engine.TorrentSessionRegistry
 import com.linroid.ketch.torrent.engine.TorrentSessionState
 import com.linroid.ketch.torrent.engine.TorrentTaskSpec
 import com.linroid.ketch.torrent.engine.TorrentV2TaskSpec
+import com.linroid.ketch.torrent.lsd.lsdSupported
 import com.linroid.ketch.torrent.lsd.openLsdMulticast
 import com.linroid.ketch.torrent.magnet.MAX_PENDING_METADATA
 import com.linroid.ketch.torrent.magnet.MagnetUri
@@ -157,6 +160,9 @@ class TorrentDownloadSource(
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMapping = AtomicBoolean(config.portMapping)
   private val localDiscovery = AtomicBoolean(config.localDiscovery)
+  // What [settings] reports; changed only by changeSettings, under settingsMutex.
+  private val settingsState = MutableStateFlow(config.engineSettings())
+  private val settingsMutex = Mutex()
 
   /** The upload policy of running and later torrents: the configured one or the last set. */
   internal val currentUploadPolicy: TorrentUploadPolicy get() = uploadPolicy.load()
@@ -275,6 +281,11 @@ class TorrentDownloadSource(
       source.changeSeedingSelection(taskId, fileIds)
 
     override suspend fun torrentReachability() = source.reachability()
+
+    override suspend fun torrentSettings() = source.settings.value
+
+    override suspend fun updateTorrentSettings(change: TorrentSettingsChange) =
+      source.changeSettings(change::applyTo)
   }
 
   /**
@@ -295,6 +306,8 @@ class TorrentDownloadSource(
       add(TorrentCapability.UTP.wireName)
       add(TorrentCapability.ENCRYPTION.wireName)
       add(TorrentCapability.REACHABILITY.wireName)
+      add(TorrentCapability.SETTINGS.wireName)
+      if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
         add(TorrentCapability.SEEDING.wireName)
@@ -360,7 +373,8 @@ class TorrentDownloadSource(
 
   // The configured lists' trackers without downloading: the shipped copies at once, then the
   // saved ones, which the first engine waits for so the first magnet already announces to them.
-  private val initialTrackerList: Job? = config.trackerListUrls.takeIf { it.isNotEmpty() }
+  private val initialTrackerList: Job? = config.trackerListUrls
+    .takeIf { config.trackerListsEnabled && it.isNotEmpty() }
     ?.let { urls ->
       listedTrackers.store(urls.flatMap(::bundledTrackers).distinct())
       scope.launch { trackerListSubscription.subscribe(urls) }
@@ -493,10 +507,63 @@ class TorrentDownloadSource(
     portMapping = portMapping.load(), localDiscovery = localDiscovery.load())
 
   /**
+   * The settings every torrent runs with, which `ketch.controller(TorrentController)` reads and
+   * changes: the config's at first, then what [applySettings], the setters and the controller
+   * changed since. A host that keeps them, such as in a config file, follows it to save the
+   * changes the controller made, as a remote client asked for them.
+   */
+  val settings: StateFlow<TorrentEngineSettings> = settingsState.asStateFlow()
+
+  /**
+   * Runs every torrent with [settings]: the upload mode and limit, encryption, uTP, port mapping
+   * and local discovery apply at once, as their setters do, extra trackers and tracker lists to
+   * torrents started or resumed after. Only the settings that changed are applied, and
+   * [TorrentDownloadSource.settings] changes once, after all of them; a change that started
+   * finishes even when its caller is cancelled. Never starts the engine.
+   */
+  suspend fun applySettings(settings: TorrentEngineSettings) {
+    changeSettings { settings }
+  }
+
+  /**
+   * Applies what [transform] makes of the current settings, one change at a time, and returns
+   * them; see [applySettings]. Once started it finishes, also when its caller is cancelled, such
+   * as a client that left: the engine never runs settings [settings] does not report.
+   */
+  internal suspend fun changeSettings(
+    transform: (TorrentEngineSettings) -> TorrentEngineSettings,
+  ): TorrentEngineSettings = settingsMutex.withLock {
+    withContext(NonCancellable) {
+      val before = settingsState.value
+      val after = transform(before)
+      if (after.upload != before.upload) storeUploadPolicy(after.upload.toPolicy())
+      if (after.uploadLimit != before.uploadLimit) {
+        storeUploadRateLimit(after.uploadLimit.bytesPerSecond)
+      }
+      if (after.encryption != before.encryption) storeEncryption(after.encryption.toEncryption())
+      if (after.utp != before.utp) storeUtpEnabled(after.utp)
+      if (after.portMapping != before.portMapping) storePortMapping(after.portMapping)
+      if (after.localDiscovery != before.localDiscovery) storeLocalDiscovery(after.localDiscovery)
+      if (after.trackers != before.trackers) storeAdditionalTrackers(after.trackers)
+      if (after.subscribedTrackerLists != before.subscribedTrackerLists) {
+        // After the configured lists' restore, which would otherwise subscribe to them again.
+        initialTrackerList?.let { withTimeoutOrNull(TRACKER_LIST_RESTORE_MS) { it.join() } }
+        trackerListSubscription.subscribe(after.subscribedTrackerLists)
+      }
+      settingsState.value = after
+      after
+    }
+  }
+
+  /**
    * Replaces [TorrentConfig.encryption] for connections opened from now on; open ones keep
    * theirs. Never starts the engine.
    */
   suspend fun setEncryption(value: TorrentEncryption) {
+    changeSettings { it.copy(encryption = value.toSetting()) }
+  }
+
+  private suspend fun storeEncryption(value: TorrentEncryption) {
     engineMutex.withLock {
       encryption.store(value)
       engine.load()?.setEncryption(value)
@@ -508,6 +575,10 @@ class TorrentDownloadSource(
    * keep running. Never starts the engine.
    */
   suspend fun setUtpEnabled(enabled: Boolean) {
+    changeSettings { it.copy(utp = enabled) }
+  }
+
+  private suspend fun storeUtpEnabled(enabled: Boolean) {
     engineMutex.withLock {
       utpEnabled.store(enabled)
       engine.load()?.setUtpEnabled(enabled)
@@ -519,6 +590,10 @@ class TorrentDownloadSource(
    * forward its listen port, removing the mapping it has. Never starts the engine.
    */
   suspend fun setPortMapping(enabled: Boolean) {
+    changeSettings { it.copy(portMapping = enabled) }
+  }
+
+  private suspend fun storePortMapping(enabled: Boolean) {
     engineMutex.withLock {
       portMapping.store(enabled)
       engine.load()?.setPortMapping(enabled)
@@ -530,6 +605,10 @@ class TorrentDownloadSource(
    * torrents on the LAN and dialing the peers announced there. Never starts the engine.
    */
   suspend fun setLocalDiscovery(enabled: Boolean) {
+    changeSettings { it.copy(localDiscovery = enabled) }
+  }
+
+  private suspend fun storeLocalDiscovery(enabled: Boolean) {
     engineMutex.withLock {
       localDiscovery.store(enabled)
       engine.load()?.setLocalDiscovery(enabled)
@@ -545,6 +624,10 @@ class TorrentDownloadSource(
    * under [TorrentUploadPolicy.DISABLED]. Never starts the engine.
    */
   suspend fun setUploadPolicy(policy: TorrentUploadPolicy) {
+    changeSettings { it.copy(upload = policy.toSetting()) }
+  }
+
+  private suspend fun storeUploadPolicy(policy: TorrentUploadPolicy) {
     val paused = engineMutex.withLock {
       val before = engineUploadPolicy()
       uploadPolicy.store(policy)
@@ -588,6 +671,10 @@ class TorrentDownloadSource(
    */
   suspend fun setUploadRateLimit(bytesPerSecond: Long) {
     require(bytesPerSecond >= 0)
+    changeSettings { it.copy(uploadLimit = speedLimitOf(bytesPerSecond)) }
+  }
+
+  private suspend fun storeUploadRateLimit(bytesPerSecond: Long) {
     engineMutex.withLock {
       uploadRateLimit.store(bytesPerSecond)
       engine.load()?.setUploadRateLimit(bytesPerSecond)
@@ -615,7 +702,11 @@ class TorrentDownloadSource(
    * Replace [TorrentConfig.additionalTrackers]. Torrents started or resumed afterwards use the new
    * list; running torrents keep the trackers they started with.
    */
-  suspend fun setAdditionalTrackers(urls: List<String>) = engineMutex.withLock {
+  suspend fun setAdditionalTrackers(urls: List<String>) {
+    changeSettings { it.copy(trackers = urls) }
+  }
+
+  private suspend fun storeAdditionalTrackers(urls: List<String>) = engineMutex.withLock {
     additionalTrackers.store(urls)
     val running = engine.load() as? KotlinTorrentEngine
     if (running == null) log.d { "Extra trackers saved for the next engine start: ${urls.size}" }
@@ -623,10 +714,13 @@ class TorrentDownloadSource(
   }
 
   /**
-   * Replace [TorrentConfig.trackerListUrls]; empty unsubscribes. New lists are downloaded at once;
-   * like [setAdditionalTrackers], their trackers reach torrents started or resumed after.
+   * Replace [TorrentConfig.trackerListUrls] and subscribe to them; empty subscribes to none. New
+   * lists are downloaded at once; like [setAdditionalTrackers], their trackers reach torrents
+   * started or resumed after.
    */
-  suspend fun setTrackerLists(urls: List<String>) = trackerListSubscription.subscribe(urls)
+  suspend fun setTrackerLists(urls: List<String>) {
+    changeSettings { it.copy(trackerList = true, trackerListUrls = urls) }
+  }
 
   /** Download the subscribed tracker lists now rather than at their next daily refresh. */
   fun refreshTrackerLists() = trackerListSubscription.refresh()

@@ -3,6 +3,7 @@ package com.linroid.ketch.server
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
@@ -13,6 +14,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
@@ -21,7 +23,9 @@ import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentReachabilityStatus
 import com.linroid.ketch.torrent.api.TorrentRevision
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import io.ktor.client.request.get
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -61,6 +65,19 @@ class TorrentRoutesTest {
   /** Answers like a controller with one torrent, `t1`; `gone` is removed after a snapshot. */
   private inner class ScriptedController : TorrentController {
     val pages = mutableListOf<Triple<TorrentPageRequest, TorrentFileOrder, Boolean>>()
+    val changes = mutableListOf<TorrentSettingsChange>()
+    var settings = TorrentEngineSettings(trackers = listOf("udp://tracker.example:1337"))
+
+    override suspend fun settings() = settings
+
+    override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+      if (change.trackers?.any { it.isBlank() } == true) {
+        throw TorrentCommandException(TorrentCommandError.INVALID_INPUT, "Blank tracker")
+      }
+      changes += change
+      settings = change.applyTo(settings)
+      return settings
+    }
 
     override suspend fun capabilities() =
       TorrentCapabilities(names = setOf("inspect", "file-selection"), maxPageSize = 1000)
@@ -175,6 +192,52 @@ class TorrentRoutesTest {
         holePunching = true),
       json.decodeFromString<TorrentReachability>(body),
     )
+  }
+
+  @Test
+  fun settings_getAndPut_reachTheController() = testApplication {
+    val controller = ScriptedController()
+    val initial = controller.settings
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val read = client.get("/api/torrents/settings")
+    val changed = client.put("/api/torrents/settings") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"upload":"seed","uploadLimit":"1m","utp":false}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, read.status)
+    assertEquals(initial, json.decodeFromString<TorrentEngineSettings>(read.bodyAsText()))
+    assertEquals(HttpStatusCode.OK, changed.status)
+    val expected = TorrentSettingsChange(
+      upload = TorrentUploadSetting.SEED,
+      uploadLimit = SpeedLimit.mbps(1),
+      utp = false,
+    )
+    assertEquals(listOf(expected), controller.changes)
+    assertEquals(controller.settings,
+      json.decodeFromString<TorrentEngineSettings>(changed.bodyAsText()))
+  }
+
+  @Test
+  fun settings_malformedChange_answersInvalidInput() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val unreadable = client.put("/api/torrents/settings") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"uploadLimit":"fast"}""")
+    }
+    val refused = client.put("/api/torrents/settings") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(TorrentSettingsChange(trackers = listOf(" "))))
+    }
+
+    assertEquals(HttpStatusCode.BadRequest, unreadable.status)
+    assertEquals("invalid_input", unreadable.error().error)
+    assertEquals(HttpStatusCode.BadRequest, refused.status)
+    assertEquals("invalid_input", refused.error().error)
+    assertTrue(controller.changes.isEmpty())
   }
 
   @Test
@@ -326,8 +389,8 @@ class TorrentRoutesTest {
     }
 
     for (path in listOf(
-      "/api/torrents/capabilities", "/api/torrents/t1", "/api/torrents/t1/files",
-      "/api/torrents/t1/events",
+      "/api/torrents/capabilities", "/api/torrents/settings", "/api/torrents/t1",
+      "/api/torrents/t1/files", "/api/torrents/t1/events",
     )) {
       assertEquals(HttpStatusCode.Unauthorized, client.get(path).status, path)
     }
@@ -338,5 +401,10 @@ class TorrentRoutesTest {
       )
     }
     assertEquals(HttpStatusCode.Unauthorized, put.status)
+    val settings = client.put("/api/torrents/settings") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(TorrentSettingsChange(utp = false)))
+    }
+    assertEquals(HttpStatusCode.Unauthorized, settings.status)
   }
 }

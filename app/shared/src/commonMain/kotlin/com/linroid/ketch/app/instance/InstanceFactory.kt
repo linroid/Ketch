@@ -5,7 +5,9 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.RemoteKetch
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Creates [KetchApi] instances for each instance type.
@@ -27,6 +29,9 @@ import kotlinx.coroutines.flow.Flow
  * @param trackerList what each of the embedded instance's subscribed tracker lists holds; `null` when it
  *   has no torrent support.
  * @param refreshTrackerList downloads the subscribed tracker lists again now.
+ * @param torrentEngineSettings the torrent settings the embedded instance runs, which other
+ *   devices may change through its server; the app saves their changes. `null` when it has no
+ *   torrent support.
  * @param uploadNetwork whether the device is on Wi-Fi or another unmetered network, as it
  *   changes. With [pauseUploads], [InstanceManager] pauses the embedded instance's uploads while
  *   it is not and [TorrentSettings.uploadWifiOnly] is on; `null` where uploads ignore the
@@ -42,6 +47,7 @@ class InstanceFactory(
   internal val applyTorrentSettings: (suspend (TorrentSettings) -> Unit)? = null,
   internal val trackerList: Flow<List<TrackerListStatus>>? = null,
   internal val refreshTrackerList: () -> Unit = {},
+  internal val torrentEngineSettings: StateFlow<TorrentEngineSettings>? = null,
   internal val uploadNetwork: Flow<Boolean>? = null,
   internal val pauseUploads: (suspend (Boolean) -> Unit)? = null,
   private val remoteFactory: (RemoteConfig) -> RemoteInstance = ::remoteKetchInstance,

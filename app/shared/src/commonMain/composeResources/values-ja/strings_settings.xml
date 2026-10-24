@@ -572,7 +572,7 @@
   <string name="settings_torrent_connections_footer">暗号化で隠れるのは通信の種類で、接続相手は隠れません。</string>
   <string name="settings_torrent_trackers">追加トラッカー</string>
   <string name="settings_torrent_no_trackers">追加トラッカーはありません</string>
-  <string name="settings_torrent_remote">BitTorrentの設定は、%1$s本体またはそのconfig.tomlで変更してください。</string>
+  <string name="settings_torrent_remote">これらの設定をここで変更するには、%1$sのKetchをアップデートしてください。</string>
   <string name="settings_torrent_reach_reachable">ピアはポート%2$dで%1$sに接続できます。</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="other">ポート%2$dは%3$d台のルーターを経由して%1$sに転送されているため、ピアは接続できます。</item>

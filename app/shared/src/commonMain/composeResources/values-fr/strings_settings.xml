@@ -584,7 +584,7 @@
   <string name="settings_torrent_connections_footer">Le chiffrement cache la nature du trafic, pas les pairs auxquels vous vous connectez.</string>
   <string name="settings_torrent_trackers">Trackers supplémentaires</string>
   <string name="settings_torrent_no_trackers">Aucun tracker supplémentaire</string>
-  <string name="settings_torrent_remote">Modifiez les réglages BitTorrent sur %1$s lui-même, ou dans son config.toml.</string>
+  <string name="settings_torrent_remote">Mettez à jour Ketch sur %1$s pour modifier ces réglages ici.</string>
   <string name="settings_torrent_reach_reachable">Les pairs peuvent se connecter à %1$s sur le port %2$d.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="one">Le port %2$d est redirigé vers %1$s via %3$d routeur, les pairs peuvent donc se connecter.</item>
