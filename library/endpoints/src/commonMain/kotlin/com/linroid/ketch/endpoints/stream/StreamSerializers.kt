@@ -16,6 +16,7 @@ val StreamSerializers: SerializersModule = SerializersModule {
     subclass(Interest.Segments::class)
     subclass(Interest.Stats::class)
     subclass(Interest.Connections::class)
+    subclass(Interest.SpeedMode::class)
     subclass(TorrentInterest::class)
     subclass(UnknownInterest::class)
     defaultDeserializer { UnknownInterest.serializer() }

@@ -25,6 +25,8 @@ internal actual suspend fun openLsdMulticast(): LsdTransport? =
     if (ipv4.isEmpty() && ipv6.isEmpty()) null else JvmLsdTransport.open(ipv4, ipv6, LSD_PORT)
   }
 
+internal actual val lsdSupported: Boolean = true
+
 /**
  * What identifies the interfaces offered for noticing a network change: names with their IPv4
  * addresses, and their link-local and unique local IPv6 ones (never global IPv6 addresses, which

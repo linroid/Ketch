@@ -5,6 +5,8 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_downloads_remote
 import ketch.app.shared.generated.resources.settings_downloads_remote_saved
 import ketch.app.shared.generated.resources.settings_speed_remote
+import ketch.app.shared.generated.resources.settings_speed_remote_modes
+import ketch.app.shared.generated.resources.settings_speed_remote_modes_saved
 import ketch.app.shared.generated.resources.settings_speed_remote_saved
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,8 +26,18 @@ class RemoteSettingsNoticesTest {
   }
 
   @Test
-  fun speedRemoteNotice_followsWhetherTheServerSaves() {
-    assertEquals(Res.string.settings_speed_remote_saved, speedRemoteNotice(saving))
-    assertEquals(Res.string.settings_speed_remote, speedRemoteNotice(KetchFeatures.ALL))
+  fun speedRemoteNotice_withoutSpeedModes_followsWhetherTheServerSaves() {
+    val older = KetchFeatures.ALL - KetchFeatures.SPEED_MODES
+    assertEquals(
+      Res.string.settings_speed_remote_saved,
+      speedRemoteNotice(older + KetchFeatures.CONFIG_PERSISTED),
+    )
+    assertEquals(Res.string.settings_speed_remote, speedRemoteNotice(older))
+  }
+
+  @Test
+  fun speedRemoteNotice_withSpeedModes_followsWhetherTheServerSaves() {
+    assertEquals(Res.string.settings_speed_remote_modes_saved, speedRemoteNotice(saving))
+    assertEquals(Res.string.settings_speed_remote_modes, speedRemoteNotice(KetchFeatures.ALL))
   }
 }

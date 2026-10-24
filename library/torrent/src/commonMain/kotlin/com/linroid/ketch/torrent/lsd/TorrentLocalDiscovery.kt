@@ -58,6 +58,9 @@ internal interface LsdTransport {
  */
 internal expect suspend fun openLsdMulticast(): LsdTransport?
 
+/** Whether this platform can run local service discovery: [openLsdMulticast] can join the group. */
+internal expect val lsdSupported: Boolean
+
 /** BEP 14's IPv4 and IPv6 groups and their port. */
 internal const val LSD_GROUP_IPV4 = "239.192.152.143"
 internal const val LSD_GROUP_IPV6 = "ff15::efc0:988f"

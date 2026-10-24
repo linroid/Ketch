@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -21,10 +23,7 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.FinishAction
 import com.linroid.ketch.app.state.FinishActions
 import com.linroid.ketch.app.state.LocalAppState
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsTarget
-import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.settings.SettingsContent
@@ -38,18 +37,11 @@ import com.linroid.ketch.config.PageAccessSettings
 import com.linroid.ketch.config.SearchProvider
 import com.linroid.ketch.config.SearchSettings
 import com.linroid.ketch.config.ServerConfig
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.remote.ConnectionState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.days
 
 /**
  * Settings as a whole: its pages beside the list of pages in the desktop Settings window, inside
@@ -370,8 +362,13 @@ internal class SettingsEnvironment(
     remotes = listOf(nas),
     ui = { it.copy(settingsPage = lastPage?.name) },
   )
-  private val api = NetworkedApi(SampleKetchApi(data))
-  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
+  private val api = NetworkedApi(
+    SampleKetchApi(
+      data,
+      speed = SpeedSettings(mode = SpeedLimitMode.SlowLane, slowLane = SpeedLimit.mbps(1)),
+      observedPeak = 10_840_000,
+    ),
+  )
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
@@ -408,19 +405,6 @@ internal class SettingsEnvironment(
     ),
     context = SnapshotHarness.ui,
   )
-  private val speedMode = SpeedModeController(
-    config = { api.status().config },
-    apply = { api.updateConfig(it) },
-    scope = speedScope,
-    settings = SpeedSettings(mode = SpeedLimitMode.SlowLane, slowLane = SpeedLimit.mbps(1)),
-    observedPeak = ObservedPeak(
-      bytesPerSecond = 10_840_000,
-      atEpochMillis = (SampleData.NOW - 1.days).toEpochMilliseconds(),
-    ),
-    scheduler = SpeedScheduler { TimeZone.UTC },
-    clock = SampleData.CLOCK,
-  )
-
   /** The controller Settings and the app root show. */
   override val controller = AppController(
     instanceManager = instanceManager,
@@ -428,7 +412,6 @@ internal class SettingsEnvironment(
     context = SnapshotHarness.ui,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
-    speedMode = speedMode,
     clock = SampleData.CLOCK,
     finishActions = DesktopFinishActions.takeIf { finishActions },
   )
@@ -439,7 +422,6 @@ internal class SettingsEnvironment(
 
   override fun close() {
     controller.close()
-    speedScope.cancel()
     instanceManager.close()
   }
 }

@@ -5,6 +5,8 @@ import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_downloads_remote
 import ketch.app.shared.generated.resources.settings_downloads_remote_saved
 import ketch.app.shared.generated.resources.settings_speed_remote
+import ketch.app.shared.generated.resources.settings_speed_remote_modes
+import ketch.app.shared.generated.resources.settings_speed_remote_modes_saved
 import ketch.app.shared.generated.resources.settings_speed_remote_saved
 import org.jetbrains.compose.resources.StringResource
 
@@ -20,10 +22,19 @@ internal fun downloadsRemoteNotice(features: Set<String>): StringResource =
     Res.string.settings_downloads_remote
   }
 
-/** [downloadsRemoteNotice] for the Speed page, which also says the device has no speed mode. */
-internal fun speedRemoteNotice(features: Set<String>): StringResource =
-  if (KetchFeatures.CONFIG_PERSISTED in features) {
-    Res.string.settings_speed_remote_saved
-  } else {
-    Res.string.settings_speed_remote
+/**
+ * [downloadsRemoteNotice] for the Speed page, which also says whether the device runs its speed
+ * mode itself ([KetchFeatures.SPEED_MODES]), or has none.
+ */
+internal fun speedRemoteNotice(features: Set<String>): StringResource {
+  val saved = KetchFeatures.CONFIG_PERSISTED in features
+  return when {
+    KetchFeatures.SPEED_MODES !in features -> if (saved) {
+      Res.string.settings_speed_remote_saved
+    } else {
+      Res.string.settings_speed_remote
+    }
+    saved -> Res.string.settings_speed_remote_modes_saved
+    else -> Res.string.settings_speed_remote_modes
   }
+}

@@ -900,6 +900,15 @@ public final class com/linroid/ketch/api/Interest$Segments$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/linroid/ketch/api/Interest$SpeedMode : com/linroid/ketch/api/Interest {
+	public static final field INSTANCE Lcom/linroid/ketch/api/Interest$SpeedMode;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueSerializer ()Lkotlinx/serialization/KSerializer;
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/linroid/ketch/api/Interest$Stats : com/linroid/ketch/api/Interest {
 	public static final field INSTANCE Lcom/linroid/ketch/api/Interest$Stats;
 	public fun equals (Ljava/lang/Object;)Z
@@ -1319,6 +1328,7 @@ public final class com/linroid/ketch/api/KetchFeatures {
 	public static final field PROXY Ljava/lang/String;
 	public static final field QUEUE_POSITION Ljava/lang/String;
 	public static final field REQUEST_ID Ljava/lang/String;
+	public static final field SPEED_MODES Ljava/lang/String;
 	public static final field TRANSFER_TIMEOUTS Ljava/lang/String;
 	public final fun getALL ()Ljava/util/Set;
 }
@@ -1894,6 +1904,199 @@ public final class com/linroid/ketch/api/SpeedLimit$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/linroid/ketch/api/SpeedLimitMode : java/lang/Enum {
+	public static final field Auto Lcom/linroid/ketch/api/SpeedLimitMode;
+	public static final field Companion Lcom/linroid/ketch/api/SpeedLimitMode$Companion;
+	public static final field Full Lcom/linroid/ketch/api/SpeedLimitMode;
+	public static final field SlowLane Lcom/linroid/ketch/api/SpeedLimitMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/SpeedLimitMode;
+	public static fun values ()[Lcom/linroid/ketch/api/SpeedLimitMode;
+}
+
+public final class com/linroid/ketch/api/SpeedLimitMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedModeChange {
+	public static final field Companion Lcom/linroid/ketch/api/SpeedModeChange$Companion;
+	public fun <init> ()V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/SpeedLimitMode;Lcom/linroid/ketch/api/SpeedLimit;Lcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/SpeedLimitMode;Lcom/linroid/ketch/api/SpeedLimit;Lcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/SpeedLimitMode;
+	public final fun component2-gntZ40E ()Lcom/linroid/ketch/api/SpeedLimit;
+	public final fun component3-gntZ40E ()Lcom/linroid/ketch/api/SpeedLimit;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy-KFYxECg (Lcom/linroid/ketch/api/SpeedLimitMode;Lcom/linroid/ketch/api/SpeedLimit;Lcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;)Lcom/linroid/ketch/api/SpeedModeChange;
+	public static synthetic fun copy-KFYxECg$default (Lcom/linroid/ketch/api/SpeedModeChange;Lcom/linroid/ketch/api/SpeedLimitMode;Lcom/linroid/ketch/api/SpeedLimit;Lcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/SpeedModeChange;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMode ()Lcom/linroid/ketch/api/SpeedLimitMode;
+	public final fun getRules ()Ljava/util/List;
+	public final fun getSlowLane-gntZ40E ()Lcom/linroid/ketch/api/SpeedLimit;
+	public final fun getStandard-gntZ40E ()Lcom/linroid/ketch/api/SpeedLimit;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/SpeedModeChange$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/SpeedModeChange$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/SpeedModeChange;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/SpeedModeChange;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedModeChange$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedModeState {
+	public static final field Companion Lcom/linroid/ketch/api/SpeedModeState$Companion;
+	public fun <init> ()V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/SpeedSettings;ZLkotlin/time/Instant;JJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/SpeedSettings;ZLkotlin/time/Instant;JJJJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/SpeedSettings;
+	public final fun component2 ()Z
+	public final fun component3 ()Lkotlin/time/Instant;
+	public final fun component4-3Xq65sA ()J
+	public final fun component5-3Xq65sA ()J
+	public final fun component6-3Xq65sA ()J
+	public final fun component7 ()J
+	public final fun copy-_iv4z3o (Lcom/linroid/ketch/api/SpeedSettings;ZLkotlin/time/Instant;JJJJ)Lcom/linroid/ketch/api/SpeedModeState;
+	public static synthetic fun copy-_iv4z3o$default (Lcom/linroid/ketch/api/SpeedModeState;Lcom/linroid/ketch/api/SpeedSettings;ZLkotlin/time/Instant;JJJJILjava/lang/Object;)Lcom/linroid/ketch/api/SpeedModeState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInSlowLane ()Z
+	public final fun getLimit-3Xq65sA ()J
+	public final fun getObservedPeak ()J
+	public final fun getSettings ()Lcom/linroid/ketch/api/SpeedSettings;
+	public final fun getSlowLaneSpeed-3Xq65sA ()J
+	public final fun getSuggestedSlowLane-3Xq65sA ()J
+	public final fun getUntil ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/SpeedModeState$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/SpeedModeState$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/SpeedModeState;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/SpeedModeState;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedModeState$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/linroid/ketch/api/SpeedModes {
+	public static final field Key Lcom/linroid/ketch/api/SpeedModes$Key;
+	public abstract fun state (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun update (Lcom/linroid/ketch/api/SpeedModeChange;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/SpeedModes$Key : com/linroid/ketch/api/ControlKey {
+	public fun getName ()Ljava/lang/String;
+}
+
+public final class com/linroid/ketch/api/SpeedRule {
+	public static final field Companion Lcom/linroid/ketch/api/SpeedRule$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Set;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;)Lcom/linroid/ketch/api/SpeedRule;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/SpeedRule;Ljava/util/Set;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/linroid/ketch/api/SpeedRule;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDays ()Ljava/util/Set;
+	public final fun getEnd ()Ljava/lang/String;
+	public final fun getStart ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/SpeedRule$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/SpeedRule$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/SpeedRule;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/SpeedRule;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedRule$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedScheduler {
+	public fun <init> ()V
+	public fun <init> (Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun evaluate (Ljava/util/List;Lkotlin/time/Instant;)Lcom/linroid/ketch/api/SpeedWindow;
+}
+
+public final class com/linroid/ketch/api/SpeedSettings {
+	public static final field Companion Lcom/linroid/ketch/api/SpeedSettings$Companion;
+	public static final field MAX_RULES I
+	public static final field SLOW_LANE_PERCENT I
+	public fun <init> ()V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/SpeedLimitMode;JLcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lcom/linroid/ketch/api/SpeedLimitMode;JLcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/linroid/ketch/api/SpeedLimitMode;
+	public final fun component2-3Xq65sA ()J
+	public final fun component3-gntZ40E ()Lcom/linroid/ketch/api/SpeedLimit;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy-CpC48eY (Lcom/linroid/ketch/api/SpeedLimitMode;JLcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;)Lcom/linroid/ketch/api/SpeedSettings;
+	public static synthetic fun copy-CpC48eY$default (Lcom/linroid/ketch/api/SpeedSettings;Lcom/linroid/ketch/api/SpeedLimitMode;JLcom/linroid/ketch/api/SpeedLimit;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/SpeedSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMode ()Lcom/linroid/ketch/api/SpeedLimitMode;
+	public final fun getRules ()Ljava/util/List;
+	public final fun getSlowLane-gntZ40E ()Lcom/linroid/ketch/api/SpeedLimit;
+	public final fun getStandard-3Xq65sA ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/linroid/ketch/api/SpeedSettings$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/linroid/ketch/api/SpeedSettings$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/linroid/ketch/api/SpeedSettings;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/linroid/ketch/api/SpeedSettings;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/SpeedSettings$Companion {
+	public final fun getDEFAULT_SLOW_LANE-3Xq65sA ()J
+	public final fun getMIN_SLOW_LANE-3Xq65sA ()J
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public final fun suggestSlowLane-Brh3pi0 (J)J
+}
+
+public final class com/linroid/ketch/api/SpeedWindow {
+	public fun <init> (ZLkotlin/time/Instant;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Lkotlin/time/Instant;
+	public final fun copy (ZLkotlin/time/Instant;)Lcom/linroid/ketch/api/SpeedWindow;
+	public static synthetic fun copy$default (Lcom/linroid/ketch/api/SpeedWindow;ZLkotlin/time/Instant;ILjava/lang/Object;)Lcom/linroid/ketch/api/SpeedWindow;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSlowLane ()Z
+	public final fun getUntil ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/linroid/ketch/api/SystemInfo {
 	public static final field Companion Lcom/linroid/ketch/api/SystemInfo$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJJJLjava/lang/String;Ljava/lang/String;JJJ)V
@@ -1943,6 +2146,25 @@ public final synthetic class com/linroid/ketch/api/SystemInfo$$serializer : kotl
 }
 
 public final class com/linroid/ketch/api/SystemInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/linroid/ketch/api/Weekday : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/Weekday$Companion;
+	public static final field Friday Lcom/linroid/ketch/api/Weekday;
+	public static final field Monday Lcom/linroid/ketch/api/Weekday;
+	public static final field Saturday Lcom/linroid/ketch/api/Weekday;
+	public static final field Sunday Lcom/linroid/ketch/api/Weekday;
+	public static final field Thursday Lcom/linroid/ketch/api/Weekday;
+	public static final field Tuesday Lcom/linroid/ketch/api/Weekday;
+	public static final field Wednesday Lcom/linroid/ketch/api/Weekday;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/Weekday;
+	public static fun values ()[Lcom/linroid/ketch/api/Weekday;
+}
+
+public final class com/linroid/ketch/api/Weekday$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 

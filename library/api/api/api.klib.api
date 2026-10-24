@@ -155,6 +155,46 @@ final enum class com.linroid.ketch.api/NetworkKind : kotlin/Enum<com.linroid.ket
     }
 }
 
+final enum class com.linroid.ketch.api/SpeedLimitMode : kotlin/Enum<com.linroid.ketch.api/SpeedLimitMode> { // com.linroid.ketch.api/SpeedLimitMode|null[0]
+    enum entry Auto // com.linroid.ketch.api/SpeedLimitMode.Auto|null[0]
+    enum entry Full // com.linroid.ketch.api/SpeedLimitMode.Full|null[0]
+    enum entry SlowLane // com.linroid.ketch.api/SpeedLimitMode.SlowLane|null[0]
+
+    final val entries // com.linroid.ketch.api/SpeedLimitMode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.linroid.ketch.api/SpeedLimitMode> // com.linroid.ketch.api/SpeedLimitMode.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.linroid.ketch.api/SpeedLimitMode // com.linroid.ketch.api/SpeedLimitMode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.linroid.ketch.api/SpeedLimitMode> // com.linroid.ketch.api/SpeedLimitMode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/SpeedLimitMode.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SpeedLimitMode> // com.linroid.ketch.api/SpeedLimitMode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/SpeedLimitMode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.linroid.ketch.api/Weekday : kotlin/Enum<com.linroid.ketch.api/Weekday> { // com.linroid.ketch.api/Weekday|null[0]
+    enum entry Friday // com.linroid.ketch.api/Weekday.Friday|null[0]
+    enum entry Monday // com.linroid.ketch.api/Weekday.Monday|null[0]
+    enum entry Saturday // com.linroid.ketch.api/Weekday.Saturday|null[0]
+    enum entry Sunday // com.linroid.ketch.api/Weekday.Sunday|null[0]
+    enum entry Thursday // com.linroid.ketch.api/Weekday.Thursday|null[0]
+    enum entry Tuesday // com.linroid.ketch.api/Weekday.Tuesday|null[0]
+    enum entry Wednesday // com.linroid.ketch.api/Weekday.Wednesday|null[0]
+
+    final val entries // com.linroid.ketch.api/Weekday.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.linroid.ketch.api/Weekday> // com.linroid.ketch.api/Weekday.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val id // com.linroid.ketch.api/Weekday.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.linroid.ketch.api/Weekday.id.<get-id>|<get-id>(){}[0]
+
+    final fun valueOf(kotlin/String): com.linroid.ketch.api/Weekday // com.linroid.ketch.api/Weekday.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.linroid.ketch.api/Weekday> // com.linroid.ketch.api/Weekday.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/Weekday.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/Weekday> // com.linroid.ketch.api/Weekday.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/Weekday.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 abstract interface <#A: kotlin/Any> com.linroid.ketch.api/ControlKey { // com.linroid.ketch.api/ControlKey|null[0]
     abstract val name // com.linroid.ketch.api/ControlKey.name|{}name[0]
         abstract fun <get-name>(): kotlin/String // com.linroid.ketch.api/ControlKey.name.<get-name>|<get-name>(){}[0]
@@ -225,6 +265,17 @@ abstract interface <#A: kotlin/Any?> com.linroid.ketch.api/Interest { // com.lin
     final object Companion { // com.linroid.ketch.api/Interest.Companion|null[0]
         final val DEFAULT_INTERVAL // com.linroid.ketch.api/Interest.Companion.DEFAULT_INTERVAL|{}DEFAULT_INTERVAL[0]
             final fun <get-DEFAULT_INTERVAL>(): kotlin.time/Duration // com.linroid.ketch.api/Interest.Companion.DEFAULT_INTERVAL.<get-DEFAULT_INTERVAL>|<get-DEFAULT_INTERVAL>(){}[0]
+    }
+
+    final object SpeedMode : com.linroid.ketch.api/Interest<com.linroid.ketch.api/SpeedModeState>, kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/Interest.SpeedMode|null[0]
+        final val valueSerializer // com.linroid.ketch.api/Interest.SpeedMode.valueSerializer|{}valueSerializer[0]
+            final fun <get-valueSerializer>(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SpeedModeState> // com.linroid.ketch.api/Interest.SpeedMode.valueSerializer.<get-valueSerializer>|<get-valueSerializer>(){}[0]
+
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/Interest.SpeedMode.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.linroid.ketch.api/Interest.SpeedMode.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/Interest.SpeedMode> // com.linroid.ketch.api/Interest.SpeedMode.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/Interest.SpeedMode.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // com.linroid.ketch.api/Interest.SpeedMode.toString|toString(){}[0]
     }
 
     final object Stats : com.linroid.ketch.api/Interest<com.linroid.ketch.api/KetchStats>, kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/Interest.Stats|null[0]
@@ -326,6 +377,16 @@ abstract interface com.linroid.ketch.api/KetchApi { // com.linroid.ketch.api/Ket
             final fun <get-REVISION>(): kotlin/String // com.linroid.ketch.api/KetchApi.Companion.REVISION.<get-REVISION>|<get-REVISION>(){}[0]
         final val VERSION // com.linroid.ketch.api/KetchApi.Companion.VERSION|{}VERSION[0]
             final fun <get-VERSION>(): kotlin/String // com.linroid.ketch.api/KetchApi.Companion.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
+    }
+}
+
+abstract interface com.linroid.ketch.api/SpeedModes { // com.linroid.ketch.api/SpeedModes|null[0]
+    abstract suspend fun state(): com.linroid.ketch.api/SpeedModeState // com.linroid.ketch.api/SpeedModes.state|state(){}[0]
+    abstract suspend fun update(com.linroid.ketch.api/SpeedModeChange): com.linroid.ketch.api/SpeedModeState // com.linroid.ketch.api/SpeedModes.update|update(com.linroid.ketch.api.SpeedModeChange){}[0]
+
+    final object Key : com.linroid.ketch.api/ControlKey<com.linroid.ketch.api/SpeedModes> { // com.linroid.ketch.api/SpeedModes.Key|null[0]
+        final val name // com.linroid.ketch.api/SpeedModes.Key.name|{}name[0]
+            final fun <get-name>(): kotlin/String // com.linroid.ketch.api/SpeedModes.Key.name.<get-name>|<get-name>(){}[0]
     }
 }
 
@@ -1267,6 +1328,190 @@ final class com.linroid.ketch.api/SourceFile { // com.linroid.ketch.api/SourceFi
     }
 }
 
+final class com.linroid.ketch.api/SpeedModeChange { // com.linroid.ketch.api/SpeedModeChange|null[0]
+    constructor <init>(com.linroid.ketch.api/SpeedLimitMode? = ..., com.linroid.ketch.api/SpeedLimit? = ..., com.linroid.ketch.api/SpeedLimit? = ..., kotlin.collections/List<com.linroid.ketch.api/SpeedRule>? = ...) // com.linroid.ketch.api/SpeedModeChange.<init>|<init>(com.linroid.ketch.api.SpeedLimitMode?;com.linroid.ketch.api.SpeedLimit?;com.linroid.ketch.api.SpeedLimit?;kotlin.collections.List<com.linroid.ketch.api.SpeedRule>?){}[0]
+
+    final val mode // com.linroid.ketch.api/SpeedModeChange.mode|{}mode[0]
+        final fun <get-mode>(): com.linroid.ketch.api/SpeedLimitMode? // com.linroid.ketch.api/SpeedModeChange.mode.<get-mode>|<get-mode>(){}[0]
+    final val rules // com.linroid.ketch.api/SpeedModeChange.rules|{}rules[0]
+        final fun <get-rules>(): kotlin.collections/List<com.linroid.ketch.api/SpeedRule>? // com.linroid.ketch.api/SpeedModeChange.rules.<get-rules>|<get-rules>(){}[0]
+    final val slowLane // com.linroid.ketch.api/SpeedModeChange.slowLane|{}slowLane[0]
+        final fun <get-slowLane>(): com.linroid.ketch.api/SpeedLimit? // com.linroid.ketch.api/SpeedModeChange.slowLane.<get-slowLane>|<get-slowLane>(){}[0]
+    final val standard // com.linroid.ketch.api/SpeedModeChange.standard|{}standard[0]
+        final fun <get-standard>(): com.linroid.ketch.api/SpeedLimit? // com.linroid.ketch.api/SpeedModeChange.standard.<get-standard>|<get-standard>(){}[0]
+
+    final fun component1(): com.linroid.ketch.api/SpeedLimitMode? // com.linroid.ketch.api/SpeedModeChange.component1|component1(){}[0]
+    final fun component2(): com.linroid.ketch.api/SpeedLimit? // com.linroid.ketch.api/SpeedModeChange.component2|component2(){}[0]
+    final fun component3(): com.linroid.ketch.api/SpeedLimit? // com.linroid.ketch.api/SpeedModeChange.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.linroid.ketch.api/SpeedRule>? // com.linroid.ketch.api/SpeedModeChange.component4|component4(){}[0]
+    final fun copy(com.linroid.ketch.api/SpeedLimitMode? = ..., com.linroid.ketch.api/SpeedLimit? = ..., com.linroid.ketch.api/SpeedLimit? = ..., kotlin.collections/List<com.linroid.ketch.api/SpeedRule>? = ...): com.linroid.ketch.api/SpeedModeChange // com.linroid.ketch.api/SpeedModeChange.copy|copy(com.linroid.ketch.api.SpeedLimitMode?;com.linroid.ketch.api.SpeedLimit?;com.linroid.ketch.api.SpeedLimit?;kotlin.collections.List<com.linroid.ketch.api.SpeedRule>?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/SpeedModeChange.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/SpeedModeChange.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.linroid.ketch.api/SpeedModeChange.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.linroid.ketch.api/SpeedModeChange> { // com.linroid.ketch.api/SpeedModeChange.$serializer|null[0]
+        final val descriptor // com.linroid.ketch.api/SpeedModeChange.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.linroid.ketch.api/SpeedModeChange.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.linroid.ketch.api/SpeedModeChange.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.linroid.ketch.api/SpeedModeChange // com.linroid.ketch.api/SpeedModeChange.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.linroid.ketch.api/SpeedModeChange) // com.linroid.ketch.api/SpeedModeChange.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.linroid.ketch.api.SpeedModeChange){}[0]
+    }
+
+    final object Companion { // com.linroid.ketch.api/SpeedModeChange.Companion|null[0]
+        final val $childSerializers // com.linroid.ketch.api/SpeedModeChange.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SpeedModeChange> // com.linroid.ketch.api/SpeedModeChange.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.linroid.ketch.api/SpeedModeState { // com.linroid.ketch.api/SpeedModeState|null[0]
+    constructor <init>(com.linroid.ketch.api/SpeedSettings = ..., kotlin/Boolean = ..., kotlin.time/Instant? = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Long = ...) // com.linroid.ketch.api/SpeedModeState.<init>|<init>(com.linroid.ketch.api.SpeedSettings;kotlin.Boolean;kotlin.time.Instant?;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.SpeedLimit;kotlin.Long){}[0]
+
+    final val inSlowLane // com.linroid.ketch.api/SpeedModeState.inSlowLane|{}inSlowLane[0]
+        final fun <get-inSlowLane>(): kotlin/Boolean // com.linroid.ketch.api/SpeedModeState.inSlowLane.<get-inSlowLane>|<get-inSlowLane>(){}[0]
+    final val limit // com.linroid.ketch.api/SpeedModeState.limit|{}limit[0]
+        final fun <get-limit>(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedModeState.limit.<get-limit>|<get-limit>(){}[0]
+    final val observedPeak // com.linroid.ketch.api/SpeedModeState.observedPeak|{}observedPeak[0]
+        final fun <get-observedPeak>(): kotlin/Long // com.linroid.ketch.api/SpeedModeState.observedPeak.<get-observedPeak>|<get-observedPeak>(){}[0]
+    final val settings // com.linroid.ketch.api/SpeedModeState.settings|{}settings[0]
+        final fun <get-settings>(): com.linroid.ketch.api/SpeedSettings // com.linroid.ketch.api/SpeedModeState.settings.<get-settings>|<get-settings>(){}[0]
+    final val slowLaneSpeed // com.linroid.ketch.api/SpeedModeState.slowLaneSpeed|{}slowLaneSpeed[0]
+        final fun <get-slowLaneSpeed>(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedModeState.slowLaneSpeed.<get-slowLaneSpeed>|<get-slowLaneSpeed>(){}[0]
+    final val suggestedSlowLane // com.linroid.ketch.api/SpeedModeState.suggestedSlowLane|{}suggestedSlowLane[0]
+        final fun <get-suggestedSlowLane>(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedModeState.suggestedSlowLane.<get-suggestedSlowLane>|<get-suggestedSlowLane>(){}[0]
+    final val until // com.linroid.ketch.api/SpeedModeState.until|{}until[0]
+        final fun <get-until>(): kotlin.time/Instant? // com.linroid.ketch.api/SpeedModeState.until.<get-until>|<get-until>(){}[0]
+
+    final fun component1(): com.linroid.ketch.api/SpeedSettings // com.linroid.ketch.api/SpeedModeState.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.linroid.ketch.api/SpeedModeState.component2|component2(){}[0]
+    final fun component3(): kotlin.time/Instant? // com.linroid.ketch.api/SpeedModeState.component3|component3(){}[0]
+    final fun component4(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedModeState.component4|component4(){}[0]
+    final fun component5(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedModeState.component5|component5(){}[0]
+    final fun component6(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedModeState.component6|component6(){}[0]
+    final fun component7(): kotlin/Long // com.linroid.ketch.api/SpeedModeState.component7|component7(){}[0]
+    final fun copy(com.linroid.ketch.api/SpeedSettings = ..., kotlin/Boolean = ..., kotlin.time/Instant? = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Long = ...): com.linroid.ketch.api/SpeedModeState // com.linroid.ketch.api/SpeedModeState.copy|copy(com.linroid.ketch.api.SpeedSettings;kotlin.Boolean;kotlin.time.Instant?;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.SpeedLimit;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/SpeedModeState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/SpeedModeState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.linroid.ketch.api/SpeedModeState.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.linroid.ketch.api/SpeedModeState> { // com.linroid.ketch.api/SpeedModeState.$serializer|null[0]
+        final val descriptor // com.linroid.ketch.api/SpeedModeState.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.linroid.ketch.api/SpeedModeState.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.linroid.ketch.api/SpeedModeState.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.linroid.ketch.api/SpeedModeState // com.linroid.ketch.api/SpeedModeState.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.linroid.ketch.api/SpeedModeState) // com.linroid.ketch.api/SpeedModeState.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.linroid.ketch.api.SpeedModeState){}[0]
+    }
+
+    final object Companion { // com.linroid.ketch.api/SpeedModeState.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SpeedModeState> // com.linroid.ketch.api/SpeedModeState.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.linroid.ketch.api/SpeedRule { // com.linroid.ketch.api/SpeedRule|null[0]
+    constructor <init>(kotlin.collections/Set<com.linroid.ketch.api/Weekday> = ..., kotlin/String = ..., kotlin/String = ...) // com.linroid.ketch.api/SpeedRule.<init>|<init>(kotlin.collections.Set<com.linroid.ketch.api.Weekday>;kotlin.String;kotlin.String){}[0]
+
+    final val days // com.linroid.ketch.api/SpeedRule.days|{}days[0]
+        final fun <get-days>(): kotlin.collections/Set<com.linroid.ketch.api/Weekday> // com.linroid.ketch.api/SpeedRule.days.<get-days>|<get-days>(){}[0]
+    final val end // com.linroid.ketch.api/SpeedRule.end|{}end[0]
+        final fun <get-end>(): kotlin/String // com.linroid.ketch.api/SpeedRule.end.<get-end>|<get-end>(){}[0]
+    final val start // com.linroid.ketch.api/SpeedRule.start|{}start[0]
+        final fun <get-start>(): kotlin/String // com.linroid.ketch.api/SpeedRule.start.<get-start>|<get-start>(){}[0]
+
+    final fun component1(): kotlin.collections/Set<com.linroid.ketch.api/Weekday> // com.linroid.ketch.api/SpeedRule.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.linroid.ketch.api/SpeedRule.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.linroid.ketch.api/SpeedRule.component3|component3(){}[0]
+    final fun copy(kotlin.collections/Set<com.linroid.ketch.api/Weekday> = ..., kotlin/String = ..., kotlin/String = ...): com.linroid.ketch.api/SpeedRule // com.linroid.ketch.api/SpeedRule.copy|copy(kotlin.collections.Set<com.linroid.ketch.api.Weekday>;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/SpeedRule.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/SpeedRule.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.linroid.ketch.api/SpeedRule.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.linroid.ketch.api/SpeedRule> { // com.linroid.ketch.api/SpeedRule.$serializer|null[0]
+        final val descriptor // com.linroid.ketch.api/SpeedRule.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.linroid.ketch.api/SpeedRule.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.linroid.ketch.api/SpeedRule.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.linroid.ketch.api/SpeedRule // com.linroid.ketch.api/SpeedRule.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.linroid.ketch.api/SpeedRule) // com.linroid.ketch.api/SpeedRule.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.linroid.ketch.api.SpeedRule){}[0]
+    }
+
+    final object Companion { // com.linroid.ketch.api/SpeedRule.Companion|null[0]
+        final val $childSerializers // com.linroid.ketch.api/SpeedRule.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SpeedRule> // com.linroid.ketch.api/SpeedRule.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.linroid.ketch.api/SpeedScheduler { // com.linroid.ketch.api/SpeedScheduler|null[0]
+    constructor <init>(kotlin/Function0<kotlinx.datetime/TimeZone> = ...) // com.linroid.ketch.api/SpeedScheduler.<init>|<init>(kotlin.Function0<kotlinx.datetime.TimeZone>){}[0]
+
+    final fun evaluate(kotlin.collections/List<com.linroid.ketch.api/SpeedRule>, kotlin.time/Instant): com.linroid.ketch.api/SpeedWindow // com.linroid.ketch.api/SpeedScheduler.evaluate|evaluate(kotlin.collections.List<com.linroid.ketch.api.SpeedRule>;kotlin.time.Instant){}[0]
+}
+
+final class com.linroid.ketch.api/SpeedSettings { // com.linroid.ketch.api/SpeedSettings|null[0]
+    constructor <init>(com.linroid.ketch.api/SpeedLimitMode = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/SpeedLimit? = ..., kotlin.collections/List<com.linroid.ketch.api/SpeedRule> = ...) // com.linroid.ketch.api/SpeedSettings.<init>|<init>(com.linroid.ketch.api.SpeedLimitMode;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.SpeedLimit?;kotlin.collections.List<com.linroid.ketch.api.SpeedRule>){}[0]
+
+    final val mode // com.linroid.ketch.api/SpeedSettings.mode|{}mode[0]
+        final fun <get-mode>(): com.linroid.ketch.api/SpeedLimitMode // com.linroid.ketch.api/SpeedSettings.mode.<get-mode>|<get-mode>(){}[0]
+    final val rules // com.linroid.ketch.api/SpeedSettings.rules|{}rules[0]
+        final fun <get-rules>(): kotlin.collections/List<com.linroid.ketch.api/SpeedRule> // com.linroid.ketch.api/SpeedSettings.rules.<get-rules>|<get-rules>(){}[0]
+    final val slowLane // com.linroid.ketch.api/SpeedSettings.slowLane|{}slowLane[0]
+        final fun <get-slowLane>(): com.linroid.ketch.api/SpeedLimit? // com.linroid.ketch.api/SpeedSettings.slowLane.<get-slowLane>|<get-slowLane>(){}[0]
+    final val standard // com.linroid.ketch.api/SpeedSettings.standard|{}standard[0]
+        final fun <get-standard>(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedSettings.standard.<get-standard>|<get-standard>(){}[0]
+
+    final fun component1(): com.linroid.ketch.api/SpeedLimitMode // com.linroid.ketch.api/SpeedSettings.component1|component1(){}[0]
+    final fun component2(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedSettings.component2|component2(){}[0]
+    final fun component3(): com.linroid.ketch.api/SpeedLimit? // com.linroid.ketch.api/SpeedSettings.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.linroid.ketch.api/SpeedRule> // com.linroid.ketch.api/SpeedSettings.component4|component4(){}[0]
+    final fun copy(com.linroid.ketch.api/SpeedLimitMode = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/SpeedLimit? = ..., kotlin.collections/List<com.linroid.ketch.api/SpeedRule> = ...): com.linroid.ketch.api/SpeedSettings // com.linroid.ketch.api/SpeedSettings.copy|copy(com.linroid.ketch.api.SpeedLimitMode;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.SpeedLimit?;kotlin.collections.List<com.linroid.ketch.api.SpeedRule>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/SpeedSettings.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/SpeedSettings.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.linroid.ketch.api/SpeedSettings.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.linroid.ketch.api/SpeedSettings> { // com.linroid.ketch.api/SpeedSettings.$serializer|null[0]
+        final val descriptor // com.linroid.ketch.api/SpeedSettings.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.linroid.ketch.api/SpeedSettings.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.linroid.ketch.api/SpeedSettings.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.linroid.ketch.api/SpeedSettings // com.linroid.ketch.api/SpeedSettings.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.linroid.ketch.api/SpeedSettings) // com.linroid.ketch.api/SpeedSettings.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.linroid.ketch.api.SpeedSettings){}[0]
+    }
+
+    final object Companion { // com.linroid.ketch.api/SpeedSettings.Companion|null[0]
+        final const val MAX_RULES // com.linroid.ketch.api/SpeedSettings.Companion.MAX_RULES|{}MAX_RULES[0]
+            final fun <get-MAX_RULES>(): kotlin/Int // com.linroid.ketch.api/SpeedSettings.Companion.MAX_RULES.<get-MAX_RULES>|<get-MAX_RULES>(){}[0]
+        final const val SLOW_LANE_PERCENT // com.linroid.ketch.api/SpeedSettings.Companion.SLOW_LANE_PERCENT|{}SLOW_LANE_PERCENT[0]
+            final fun <get-SLOW_LANE_PERCENT>(): kotlin/Int // com.linroid.ketch.api/SpeedSettings.Companion.SLOW_LANE_PERCENT.<get-SLOW_LANE_PERCENT>|<get-SLOW_LANE_PERCENT>(){}[0]
+
+        final val $childSerializers // com.linroid.ketch.api/SpeedSettings.Companion.$childSerializers|{}$childSerializers[0]
+        final val DEFAULT_SLOW_LANE // com.linroid.ketch.api/SpeedSettings.Companion.DEFAULT_SLOW_LANE|{}DEFAULT_SLOW_LANE[0]
+            final fun <get-DEFAULT_SLOW_LANE>(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedSettings.Companion.DEFAULT_SLOW_LANE.<get-DEFAULT_SLOW_LANE>|<get-DEFAULT_SLOW_LANE>(){}[0]
+        final val MIN_SLOW_LANE // com.linroid.ketch.api/SpeedSettings.Companion.MIN_SLOW_LANE|{}MIN_SLOW_LANE[0]
+            final fun <get-MIN_SLOW_LANE>(): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedSettings.Companion.MIN_SLOW_LANE.<get-MIN_SLOW_LANE>|<get-MIN_SLOW_LANE>(){}[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/SpeedSettings> // com.linroid.ketch.api/SpeedSettings.Companion.serializer|serializer(){}[0]
+        final fun suggestSlowLane(kotlin/Long): com.linroid.ketch.api/SpeedLimit // com.linroid.ketch.api/SpeedSettings.Companion.suggestSlowLane|suggestSlowLane(kotlin.Long){}[0]
+    }
+}
+
+final class com.linroid.ketch.api/SpeedWindow { // com.linroid.ketch.api/SpeedWindow|null[0]
+    constructor <init>(kotlin/Boolean, kotlin.time/Instant?) // com.linroid.ketch.api/SpeedWindow.<init>|<init>(kotlin.Boolean;kotlin.time.Instant?){}[0]
+
+    final val slowLane // com.linroid.ketch.api/SpeedWindow.slowLane|{}slowLane[0]
+        final fun <get-slowLane>(): kotlin/Boolean // com.linroid.ketch.api/SpeedWindow.slowLane.<get-slowLane>|<get-slowLane>(){}[0]
+    final val until // com.linroid.ketch.api/SpeedWindow.until|{}until[0]
+        final fun <get-until>(): kotlin.time/Instant? // com.linroid.ketch.api/SpeedWindow.until.<get-until>|<get-until>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.linroid.ketch.api/SpeedWindow.component1|component1(){}[0]
+    final fun component2(): kotlin.time/Instant? // com.linroid.ketch.api/SpeedWindow.component2|component2(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin.time/Instant? = ...): com.linroid.ketch.api/SpeedWindow // com.linroid.ketch.api/SpeedWindow.copy|copy(kotlin.Boolean;kotlin.time.Instant?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/SpeedWindow.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.linroid.ketch.api/SpeedWindow.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.linroid.ketch.api/SpeedWindow.toString|toString(){}[0]
+}
+
 final class com.linroid.ketch.api/SystemInfo { // com.linroid.ketch.api/SystemInfo|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Int, kotlin/Long, kotlin/Long, kotlin/Long, kotlin/String, kotlin/String? = ..., kotlin/Long, kotlin/Long, kotlin/Long) // com.linroid.ketch.api/SystemInfo.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.String;kotlin.String?;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
@@ -2075,6 +2320,8 @@ final object com.linroid.ketch.api/KetchFeatures { // com.linroid.ketch.api/Ketc
         final fun <get-QUEUE_POSITION>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.QUEUE_POSITION.<get-QUEUE_POSITION>|<get-QUEUE_POSITION>(){}[0]
     final const val REQUEST_ID // com.linroid.ketch.api/KetchFeatures.REQUEST_ID|{}REQUEST_ID[0]
         final fun <get-REQUEST_ID>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.REQUEST_ID.<get-REQUEST_ID>|<get-REQUEST_ID>(){}[0]
+    final const val SPEED_MODES // com.linroid.ketch.api/KetchFeatures.SPEED_MODES|{}SPEED_MODES[0]
+        final fun <get-SPEED_MODES>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.SPEED_MODES.<get-SPEED_MODES>|<get-SPEED_MODES>(){}[0]
     final const val TRANSFER_TIMEOUTS // com.linroid.ketch.api/KetchFeatures.TRANSFER_TIMEOUTS|{}TRANSFER_TIMEOUTS[0]
         final fun <get-TRANSFER_TIMEOUTS>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.TRANSFER_TIMEOUTS.<get-TRANSFER_TIMEOUTS>|<get-TRANSFER_TIMEOUTS>(){}[0]
 

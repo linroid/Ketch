@@ -1,13 +1,16 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
@@ -46,6 +49,9 @@ class FakeInstanceFactory(
   /** Operating system new remote clients report in their status. */
   var announcedOs: String = "Linux"
 
+  /** Speed modes new remote clients run; `null` for none, as an older Ketch. */
+  var speedModes: FakeSpeedModes? = null
+
   /** The factory to build the manager with. */
   val factory: InstanceFactory = InstanceFactory(
     deviceName = "MacBook Pro",
@@ -57,7 +63,7 @@ class FakeInstanceFactory(
   fun clientsOf(deviceId: String): List<FakeRemote> = remotes.filter { it.deviceId == deviceId }
 
   private fun createRemote(config: RemoteConfig): RemoteInstance {
-    val client = FakeRemote(config, stateOnStart, announcedName, announcedOs)
+    val client = FakeRemote(config, stateOnStart, announcedName, announcedOs, speedModes)
     remotes += client
     return RemoteInstance(client, config, client.connection)
   }
@@ -68,14 +74,21 @@ class FakeInstanceFactory(
  * [startedAfterClose] instead, so a test notices a manager reusing a closed client.
  *
  * @property config the connection it was created for.
+ * @property speedModes the speed modes the device runs; `null` for none.
  */
 class FakeRemote(
   val config: RemoteConfig,
   private val stateOnStart: ConnectionState,
   private val announcedName: String,
   private val announcedOs: String,
+  val speedModes: FakeSpeedModes? = null,
 ) : KetchApi {
-  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> = emptyFlow()
+  override fun <T> subscribe(interest: Interest<T>, interval: Duration): Flow<T> =
+    speedModes?.follow(interest) ?: emptyFlow()
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    speedModes.takeIf { key === SpeedModes.Key } as T?
 
   /** `host:port` of the device. */
   val deviceId: String = "${config.host}:${config.port}"
@@ -117,6 +130,7 @@ class FakeRemote(
       freeSpace = 1_800_000_000_000,
       usableSpace = 1_800_000_000_000,
     ),
+    features = if (speedModes == null) emptySet() else setOf(KetchFeatures.SPEED_MODES),
   )
 
   override suspend fun download(request: DownloadRequest): DownloadTask =

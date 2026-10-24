@@ -57,6 +57,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.NetworkInterfaceInfo
 import com.linroid.ketch.api.NetworkInterfaces
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.components.DevicePennant
 import com.linroid.ketch.app.components.DevicePennantDefaults
 import com.linroid.ketch.app.components.KetchEyebrow
@@ -106,7 +107,6 @@ import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
 import com.linroid.ketch.config.SearchProvider
-import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.ThemeMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_target_choose

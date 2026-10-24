@@ -1,12 +1,12 @@
 package com.linroid.ketch.app.ui.devices
 
-import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.FakeKetchApi
+import com.linroid.ketch.app.SpeedModeEngine
 import com.linroid.ketch.app.fixtureTest
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.verbatim
@@ -48,30 +48,16 @@ class DeviceActionsTest {
   @BeforeTest
   fun loadStrings() = runTest { warmStrings() }
 
-  /** The embedded engine: it keeps the config it is given. */
-  private class Engine : KetchApi by FakeKetchApi() {
-    var config = DownloadConfig()
-
-    override suspend fun updateConfig(config: DownloadConfig) {
-      this.config = config
-    }
-  }
-
   private class Fixture(
     val controller: AppController,
     val nas: InstanceEntry,
-    val speed: SpeedModeController,
   ) {
     val state get() = controller.state
+    val speed: SpeedModeController get() = checkNotNull(state.speedMode)
   }
 
   private fun TestScope.fixture(nasApi: KetchApi): Fixture {
-    val engine = Engine()
-    val speed = SpeedModeController(
-      config = { engine.config },
-      apply = { engine.updateConfig(it) },
-      scope = backgroundScope,
-    )
+    val engine = SpeedModeEngine()
     val manager = InstanceManager(
       factory = InstanceFactory(
         deviceName = "MacBook Pro",
@@ -86,9 +72,8 @@ class DeviceActionsTest {
     val controller = AppController(
       instanceManager = manager,
       context = StandardTestDispatcher(testScheduler),
-      speedMode = speed,
     )
-    return Fixture(controller, manager.instances.value.first { it is RemoteInstance }, speed)
+    return Fixture(controller, manager.instances.value.first { it is RemoteInstance })
   }
 
   private fun devicesTest(block: suspend TestScope.(Fixture) -> Unit) =
@@ -171,6 +156,22 @@ class DeviceActionsTest {
     message.actions.single { it.label.load() == "Undo" }.onClick()
     runCurrent()
     assertEquals(SpeedMode.Full, f.speed.mode.value)
+  }
+
+  @Test
+  fun toggleSlowLane_nasRunningSpeedModes_switchesTheNas() = runTest {
+    val nas = SpeedModeEngine()
+    val f = fixture(nas)
+    runCurrent()
+
+    val device = presence(f.nas, "NAS-Basement", verbatim("nas.local:8642"), DeviceHealth.Live)
+    f.state.toggleSlowLane(device)
+    runCurrent()
+
+    assertEquals(SpeedLimit.mbps(1), nas.config.speedLimit)
+    assertEquals(SpeedMode.Full, f.speed.mode.value)
+    assertEquals("Slow lane on · 1 MB/s", f.state.messages.active.value.last().title.load())
+    f.controller.close()
   }
 
   @Test

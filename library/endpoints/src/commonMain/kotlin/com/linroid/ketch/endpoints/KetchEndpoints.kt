@@ -1,9 +1,9 @@
 package com.linroid.ketch.endpoints
 
-import com.linroid.ketch.api.ActiveConnections as ConnectionsSnapshot
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
+import com.linroid.ketch.api.ActiveConnections as ConnectionsSnapshot
 
 /**
  * Type-safe Ktor Resource definitions for the Ketch REST API.
@@ -86,6 +86,14 @@ class Api {
     @Resource("download")
     data class Download(val parent: Countries = Countries())
   }
+
+  /**
+   * The instance's speed modes, served where the status lists `speed.modes`: `GET` answers the
+   * `SpeedModeState`, `PUT` applies a `SpeedModeChange` and answers the state that results.
+   */
+  @Serializable
+  @Resource("speed")
+  data class Speed(val parent: Api = Api())
 
   @Serializable
   @Resource("network-interfaces")

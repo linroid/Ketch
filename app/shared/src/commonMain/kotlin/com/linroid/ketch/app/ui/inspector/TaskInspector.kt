@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.resolve
@@ -55,7 +56,6 @@ import com.linroid.ketch.app.ui.inspector.tabs.count
 import com.linroid.ketch.app.ui.inspector.tabs.rememberFeatures
 import com.linroid.ketch.app.ui.inspector.tabs.rememberInspectorTabs
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_copied_name
 import ketch.app.shared.generated.resources.inspector_copy_failed_name

@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.ui.palette
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.text
@@ -17,7 +18,6 @@ import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.app.ui.pulse.activeSpeedMode
 import com.linroid.ketch.app.ui.pulse.setSpeedLimit
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.palette_full_speed_already
 import ketch.app.shared.generated.resources.palette_speed_not_loaded

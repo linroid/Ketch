@@ -3,6 +3,8 @@ package com.linroid.ketch.app.state
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.app.i18n.ByteUnit
@@ -14,8 +16,6 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.i18n.weekdayShortText
 import com.linroid.ketch.app.util.clockText
 import com.linroid.ketch.app.util.percentDecode
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.Weekday
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.settings_auto_day_at
 import ketch.app.shared.generated.resources.settings_auto_full_speed_all_week

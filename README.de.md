@@ -166,7 +166,8 @@ Versionen: die Desktop-App über Einstellungen → Über, die Kommandozeile mit 
 ### Deine Bandbreite im Griff
 
 - **Geschwindigkeitsmodi** — Volle Geschwindigkeit, **Drosselung** für mehr Spielraum bei
-  Videoanrufen oder **Automatisch**, das nach einem Wochenplan zwischen beiden wechselt.
+  Videoanrufen oder **Automatisch**, das nach einem Wochenplan zwischen beiden wechselt. Jedes
+  Gerät führt seine eigenen aus, sodass ein NAS seinen Plan auch einhält, wenn das Handy fehlt.
 - **Jeden Download einzeln steuern** — Ändere Tempolimits, Verbindungszahlen und Prioritäten im
   laufenden Betrieb. **Dringend** pausiert einen weniger wichtigen Download und startet sofort.
 - **Eine flexible Warteschlange** — Begrenze gleichzeitige Downloads insgesamt und pro Website,

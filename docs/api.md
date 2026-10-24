@@ -403,6 +403,7 @@ these rather than on version numbers: older servers send fewer.
 | `TRANSFER_TIMEOUTS` | `download.timeouts` | `idleTimeoutMs`, `minSpeed`, `unlimitedRetries` |
 | `CHECKSUM` | `download.checksum` | `DownloadRequest.checksum` |
 | `ACTIVE_CONNECTIONS` | `net.activeConnections` | `Interest.Connections` |
+| `SPEED_MODES` | `speed.modes` | `controller(SpeedModes)` and `Interest.SpeedMode` |
 | `FILE_SELECTION` | `download.fileSelection` | `selectFiles` (listed by sources that choose files) |
 | `AWAIT_FILE_SELECTION` | `download.awaitFileSelection` | `awaitFileSelection` |
 | `FINITE_HLS`, `FINITE_DASH` | `hls.finite`, `dash.finite` | The HLS and DASH sources; `FINITE_MEDIA` (`media.finite`) is listed when both are |
@@ -719,6 +720,38 @@ ketch.download(
 
 A per-task limit applies on top of the global one, so a task never exceeds the lower of the two.
 Both can change while downloads run.
+
+### Speed modes
+
+`Ketch(speedModes = SpeedModeOptions(...))` runs Full speed, the Slow lane and Auto weekly rules
+over the global limit itself, so they hold while no client is connected. `SpeedModeOptions`
+names the `SpeedSettings` to start from, such as `[speed]` of `config.toml`, the observed peak,
+and where each change is saved. `controller(SpeedModes)` changes them and
+`subscribe(Interest.SpeedMode)` follows them:
+
+```kotlin
+val modes = checkNotNull(ketch.controller(SpeedModes))
+modes.update(SpeedModeChange(mode = SpeedLimitMode.SlowLane, slowLane = SpeedLimit.mbps(2)))
+modes.update(
+  SpeedModeChange(
+    mode = SpeedLimitMode.Auto,
+    rules = listOf(SpeedRule(days = setOf(Weekday.Saturday), start = "09:00", end = "18:00")),
+  ),
+)
+```
+
+- The standing cap (`SpeedSettings.standard`) is what downloads run at outside the slow lane. The
+  instance starts from `DownloadConfig.speedLimit` as the cap; at full speed every limit set is
+  the cap.
+- `DownloadConfig.speedLimit` reports the limit in effect, the slow lane's while it holds. An
+  `updateConfig` with another limit sets the cap; writing back the config you read changes
+  nothing.
+- Rules are wall-clock times in the instance's time zone; an end before the start ends the next
+  day. The slow lane never runs faster than the cap, and without its own speed runs at
+  `SpeedSettings.SLOW_LANE_PERCENT` of the highest speed seen in a week.
+- Over REST: `GET /api/speed` and `PUT /api/speed` with a `SpeedModeChange`, whose fields left out
+  stay as they are. `RemoteKetch.controller(SpeedModes)` fails closed against servers without
+  `speed.modes`.
 
 ### Schedules and conditions
 

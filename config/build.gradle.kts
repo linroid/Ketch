@@ -29,6 +29,7 @@ kotlin {
   sourceSets {
     commonMain.dependencies {
       api(projects.library.api)
+      api(projects.library.torrentApi)
       implementation(libs.okio)
       implementation(libs.ktoml.core)
     }

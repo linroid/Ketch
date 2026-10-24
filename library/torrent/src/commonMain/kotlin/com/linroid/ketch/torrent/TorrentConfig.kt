@@ -104,6 +104,12 @@ data class TorrentConfig(
    */
   val trackerListUrls: List<String> = emptyList(),
   /**
+   * Whether [trackerListUrls] are subscribed to. Off keeps them as the lists
+   * [TorrentDownloadSource.settings] reports, to subscribe to once switched back on, without
+   * downloading them.
+   */
+  val trackerListsEnabled: Boolean = true,
+  /**
    * Upload cap shared by every torrent, in bytes per second; zero means unlimited. A piece read
    * back from disk to prove its block hashes (BEP 52) counts against it like uploading it.
    */

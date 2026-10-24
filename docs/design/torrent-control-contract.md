@@ -110,12 +110,18 @@ serve them. What the runtime does, where it narrows the contract above:
   are paused (`TorrentDownloadSource.setUploadsPaused`, as the phone apps pause them off Wi-Fi):
   the pause is a network condition, not a policy, so clients keep offering Seed. `utp` and
   `mse-pe` say the engine speaks uTP and protocol encryption, whether or not `utp` is on and
-  `encryption` is off in the settings at the moment. Every other name is never advertised.
+  `encryption` is off in the settings at the moment. `reachability` and `settings` are always
+  advertised, and `local-discovery` where the platform can join the LAN group (not iOS). Every
+  other name is never advertised.
   `maxPageSize` is 1000, `maxSubscriptions` 16, and `backgroundTransfers` is false: seeding runs
   only while the process runs. The remote adapter fails closed: it checks the server's capabilities,
-  read once per connection, before every command and refuses with `UNSUPPORTED` before sending
+  read once per connection and again after a settings change, before every command and refuses with `UNSUPPORTED` before sending
   anything when a capability is missing, as with older servers, and a response, or a capabilities
   answer, that arrives after the connection changed fails with `CONNECTION_CHANGED`.
+- **Settings.** `settings()` and `updateSettings(change)` cover what every torrent runs with
+  (`TorrentEngineSettings`), not a task, so they take no revision or idempotency key: a change
+  sets only the fields it names, so two clients changing different settings never undo each
+  other, and repeating one changes nothing. The host that owns the configuration saves it.
 - **Preconditions.** `expectedRevision` is selection-scoped: it must be at least the revision of the
   task's last control change (a selection or seeding change) in the same epoch, so progress-only
   revisions never make a command conflict. A stale one fails with `CONFLICT` and the current

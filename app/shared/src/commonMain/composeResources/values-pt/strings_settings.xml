@@ -469,6 +469,8 @@
   <string name="settings_speed_mode_auto">Automático</string>
   <string name="settings_speed_remote">Estas configurações valem em %1$s até a próxima reinicialização. O modo lento e o modo Automático ainda não estão disponíveis nesse dispositivo.</string>
   <string name="settings_speed_remote_saved">Estas configurações são salvas em %1$s. O modo lento e o modo Automático ainda não estão disponíveis nesse dispositivo.</string>
+  <string name="settings_speed_remote_modes">%1$s aplica sozinho o modo de velocidade e as regras, mesmo com este app fechado. As conexões por download valem até a próxima reinicialização.</string>
+  <string name="settings_speed_remote_modes_saved">Salvo em %1$s, que aplica sozinho o modo de velocidade e as regras, mesmo com este app fechado.</string>
   <string name="settings_speed_limit_group">Limite</string>
   <string name="settings_speed_limit">Limite de velocidade</string>
   <string name="settings_speed_limit_hint">Todos os downloads dividem esse limite; o limite próprio de um download pode ser menor.</string>
@@ -582,7 +584,7 @@
   <string name="settings_torrent_connections_footer">A criptografia esconde que tipo de tráfego é, não com quem você se conecta.</string>
   <string name="settings_torrent_trackers">Trackers extras</string>
   <string name="settings_torrent_no_trackers">Nenhum tracker extra</string>
-  <string name="settings_torrent_remote">Altere as configurações de BitTorrent diretamente em %1$s ou no config.toml dele.</string>
+  <string name="settings_torrent_remote">Atualize o Ketch em %1$s para alterar estas configurações aqui.</string>
   <string name="settings_torrent_reach_reachable">Os peers podem se conectar a %1$s na porta %2$d.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="one">A porta %2$d é redirecionada para %1$s por %3$d roteador, então os peers podem se conectar.</item>

@@ -18,6 +18,7 @@ import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.api.isDirectory
 import com.linroid.ketch.api.isName
 import com.linroid.ketch.api.log.KetchLogger
@@ -63,7 +64,6 @@ import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.app.util.toCopy
 import com.linroid.ketch.app.util.transferSummary
 import com.linroid.ketch.config.IntakePreferences
-import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentFeatures
@@ -196,6 +196,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -245,8 +246,6 @@ val InstanceEntry.deviceId: String
  * meant to be used from the main thread.
  *
  * @param scope runs the commands; it should use a `SupervisorJob` and the main dispatcher.
- * @param speedMode speed mode of the embedded device, owned by the host, such as the service whose
- *   notification switches it; `null` when the host keeps none.
  * @param unreadableFiles files the host moved aside because it could not read them, such as
  *   `config.toml`; each is reported to the user once.
  * @param discoverHistory keeps the Discover sessions between runs of the app.
@@ -268,7 +267,6 @@ class AppState(
   val aiSettings: AiSettingsController = AiSettingsController(),
   val incoming: IncomingDownloads = IncomingDownloads(),
   val messages: MessageCenter = MessageCenter(),
-  val speedMode: SpeedModeController? = null,
   val clock: Clock = Clock.System,
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
@@ -534,8 +532,18 @@ class AppState(
   internal var droppedFileApi: KetchApi? = null
     private set
 
-  /** Speed mode of the embedded device; full speed when the host keeps no [speedMode]. */
-  private val localMode: StateFlow<SpeedMode> = speedMode?.mode ?: MutableStateFlow(SpeedMode.Full)
+  /** Speed mode of the embedded device, which its engine runs; `null` without one. */
+  val speedMode: SpeedModeController? get() = instanceManager.embeddedSpeedMode
+
+  /** Speed mode of each device that runs them, by device id. */
+  private val speedModes: Flow<Map<String, SpeedMode>> =
+    instanceManager.speedModes.flatMapLatest { controllers ->
+      if (controllers.isEmpty()) {
+        flowOf(emptyMap())
+      } else {
+        combine(controllers.map { (id, c) -> c.mode.map { id to it } }) { it.toMap() }
+      }
+    }
 
   // Every device is listed and watched, shown or not, so switching keeps each device's speed
   // samples, histories and timelines. Built on the main thread, which owns the settings cache;
@@ -582,8 +590,9 @@ class AppState(
   val pulse: PulseModel = PulseModel(
     sources = pulseSources,
     pulseScope = shownScope().map { it.toPulseScope() },
-    mode = combine(activeInstance, deviceScope, localMode) { entry, shown, mode ->
-      if (entry is RemoteInstance && shown != DeviceScope.All) SpeedMode.Full else mode
+    mode = combine(activeInstance, deviceScope, speedModes) { entry, shown, modes ->
+      val deviceId = if (shown == DeviceScope.All) LOCAL_DEVICE_ID else entry?.deviceId
+      modes[deviceId] ?: SpeedMode.Full
     },
     scope = scope,
   )
@@ -691,10 +700,18 @@ class AppState(
       }
     }
     scope.launch {
-      // A speed mode changes the embedded device's limit; read it back for the speed readout.
-      localMode.drop(1).collect {
-        instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)?.loadDownload()
-      }
+      // Other devices may change the embedded device's torrent settings through its server.
+      instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)
+        ?.followEngineTorrent()
+    }
+    scope.launch {
+      // A speed mode changes its device's limit; read it back for the speed readout.
+      instanceManager.speedModes.flatMapLatest { controllers ->
+        controllers.values.map { controller ->
+          controller.state.map { it?.limit }.distinctUntilChanged().drop(1)
+            .map { controller.deviceId }
+        }.merge()
+      }.collect { deviceId -> settingsOf(deviceId)?.loadDownload() }
     }
   }
 
@@ -712,6 +729,7 @@ class AppState(
         trackerList = instanceManager.trackerList,
         refreshTrackerList = instanceManager::refreshTrackerList,
         savedSpeedLimit = { config -> standingCap(config.speedLimit) },
+        engineTorrent = instanceManager.torrentEngineSettings.takeIf { entry is EmbeddedInstance },
       )
     }
 
@@ -1983,7 +2001,7 @@ class AppState(
       ),
       tasks = visibleTasksOf(entry),
       config = snapshotFlow { settings.download },
-      slowLane = if (remote) flowOf(false) else localMode.map { it.isSlowLane },
+      slowLane = speedModes.map { it[entry.deviceId]?.isSlowLane == true }.distinctUntilChanged(),
       features = featuresFlow(entry),
     )
   }

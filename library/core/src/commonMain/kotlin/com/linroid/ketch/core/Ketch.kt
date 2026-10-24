@@ -27,6 +27,7 @@ import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.defaultSelection
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.Logger
@@ -57,8 +58,10 @@ import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.unknownFilesMessage
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
-import com.linroid.ketch.core.geo.CountryLookup
 import com.linroid.ketch.core.file.requireDownloadDirectory
+import com.linroid.ketch.core.geo.CountryLookup
+import com.linroid.ketch.core.speed.SpeedModeKeeper
+import com.linroid.ketch.core.speed.SpeedModeOptions
 import com.linroid.ketch.core.task.ControlCommand
 import com.linroid.ketch.core.task.ControlLedgerException
 import com.linroid.ketch.core.task.ControlOutcome
@@ -108,6 +111,7 @@ import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
@@ -127,6 +131,9 @@ import kotlin.uuid.Uuid
  *   controllers and lifecycle hooks through [DownloadSource.attach].
  * @param countries names the countries of [com.linroid.ketch.api.ActiveConnection]s, offered through [controller] as
  *   the [CountryDatabase]; `null` for none
+ * @param speedModes runs Full speed, the Slow lane and Auto rules over the global speed limit,
+ *   offered through [controller] as [SpeedModes] and followed by [Interest.SpeedMode]; `null`
+ *   for none, leaving the limit to [updateConfig] alone
  * @param logger logging backend
  * @param dispatchers dispatchers for task management, network operations and file I/O; by
  *   default [KetchDispatchers.Default], which every instance in the process shares. Its pools
@@ -145,19 +152,14 @@ class Ketch(
   logger: Logger = Logger.None,
   internal val dispatchers: KetchDispatchers = KetchDispatchers.Default,
   private val countries: CountryLookup? = null,
+  speedModes: SpeedModeOptions? = null,
 ) : KetchApi {
   private val startMark = TimeSource.Monotonic.markNow()
 
   @Volatile
   private var currentConfig: DownloadConfig = config
 
-  private val globalLimiter = DelegatingSpeedLimiter(
-    if (config.speedLimit.isUnlimited) {
-      SpeedLimiter.Unlimited
-    } else {
-      TokenBucket(config.speedLimit.bytesPerSecond)
-    },
-  )
+  private val globalLimiter = DelegatingSpeedLimiter(limiterFor(config.speedLimit))
 
   private val httpSource = HttpDownloadSource(httpEngine)
 
@@ -184,6 +186,7 @@ class Ketch(
     add(KetchFeatures.ACTIVE_CONNECTIONS)
     add(KetchFeatures.CHECKSUM)
     if (countries != null) add(KetchFeatures.COUNTRIES)
+    if (speedModes != null) add(KetchFeatures.SPEED_MODES)
     additionalSources.forEach { addAll(it.features) }
     if (KetchFeatures.FINITE_HLS in this && KetchFeatures.FINITE_DASH in this) {
       add(KetchFeatures.FINITE_MEDIA)
@@ -232,6 +235,17 @@ class Ketch(
   /** Observable list of all download tasks. */
   override val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 
+  /** Runs the [SpeedModes] of [speedModes]; every speed limit then goes through it. */
+  private val speedModeKeeper: SpeedModeKeeper? = speedModes?.let { options ->
+    SpeedModeKeeper(
+      options = options,
+      cap = config.speedLimit,
+      apply = ::applySpeedLimit,
+      scope = scope,
+      speed = downloadSpeed(),
+    )
+  }
+
   init {
     KetchLogger.setLogger(logger)
     log.i { "Ketch v${KetchApi.VERSION} (${KetchApi.REVISION}) initialized: name=$name" }
@@ -241,6 +255,15 @@ class Ketch(
     }
     if (additionalSources.isNotEmpty()) {
       log.i { "Additional sources: ${additionalSources.joinToString { it.type }}" }
+    }
+    speedModeKeeper?.let { keeper ->
+      val state = keeper.state.value
+      log.i { "Speed mode: ${state.settings.mode}, limit ${state.limit}" }
+      // Nothing transfers yet, so the limiter can be replaced.
+      if (state.limit != config.speedLimit) {
+        currentConfig = currentConfig.copy(speedLimit = state.limit)
+        globalLimiter.delegate = limiterFor(state.limit)
+      }
     }
   }
 
@@ -647,6 +670,7 @@ class Ketch(
   @Suppress("UNCHECKED_CAST")
   override fun <T : Any> controller(key: ControlKey<T>): T? {
     if (key === CountryDatabase.Key) return countries as T?
+    if (key === SpeedModes.Key) return speedModeKeeper as T?
     return extensions.firstNotNullOfOrNull { (_, extension) -> extension.controller(key) }
   }
 
@@ -1109,10 +1133,30 @@ class Ketch(
     if (directory != null && directory != currentConfig.defaultDirectory) {
       requireDownloadDirectory(directory)
     }
-    currentConfig = config
+    val keeper = speedModeKeeper
+    if (keeper == null) {
+      applyConfig(config)
+    } else {
+      // The speed modes decide what becomes of the speed limit.
+      keeper.configure(config.speedLimit) { limit -> applyConfig(config.copy(speedLimit = limit)) }
+    }
+  }
 
-    // Apply speed limit
-    val limit = config.speedLimit
+  private suspend fun applyConfig(config: DownloadConfig) {
+    currentConfig = config
+    setGlobalLimit(config.speedLimit)
+    // Apply queue limits, starting queued tasks if a limit was raised
+    queue.updateLimits(config.maxConcurrentDownloads, config.maxConnectionsPerHost)
+    log.i { "Config updated: $config" }
+  }
+
+  // The speed modes' own changes of the limit, which they serialize with updateConfig.
+  private suspend fun applySpeedLimit(limit: SpeedLimit) {
+    currentConfig = currentConfig.copy(speedLimit = limit)
+    setGlobalLimit(limit)
+  }
+
+  private suspend fun setGlobalLimit(limit: SpeedLimit) {
     val current = globalLimiter.delegate
     if (limit.isUnlimited) {
       (current as? TokenBucket)?.updateRate(0)
@@ -1122,11 +1166,14 @@ class Ketch(
     } else {
       globalLimiter.delegate = TokenBucket(limit.bytesPerSecond)
     }
+  }
 
-    // Apply queue limits, starting queued tasks if a limit was raised
-    queue.updateLimits(config.maxConcurrentDownloads, config.maxConnectionsPerHost)
-
-    log.i { "Config updated: $config" }
+  // The summed speed of the downloading tasks, once a second, for the speed modes' peak.
+  private fun downloadSpeed(): Flow<Long> = flow {
+    while (true) {
+      emit(KetchStats.of(tasks.value.map { it.state.value }).downloadBps)
+      delay(SPEED_SAMPLE_INTERVAL)
+    }
   }
 
   /**
@@ -1188,6 +1235,8 @@ class Ketch(
       is Interest.Segments -> segmentsOf(interest.taskIds)
       Interest.Stats -> statsEvery(interval)
       is Interest.Connections -> connectionRegistry.snapshots(interest.limit)
+      Interest.SpeedMode -> speedModeKeeper?.state
+        ?: flow { throw UnsupportedOperationException("Ketch runs no speed modes") }
       else -> extensions.firstNotNullOfOrNull { (_, extension) ->
         extension.subscribe(interest, interval)
       } ?: flow { throw UnsupportedOperationException("Ketch does not report $interest") }
@@ -1277,5 +1326,11 @@ class Ketch(
   }
 }
 
+private fun limiterFor(limit: SpeedLimit): SpeedLimiter =
+  if (limit.isUnlimited) SpeedLimiter.Unlimited else TokenBucket(limit.bytesPerSecond)
+
 /** How long a task's retry ledger keeps a command: 15 minutes. */
 private const val LEDGER_WINDOW_MS = 15 * 60 * 1000L
+
+/** How often the speed modes sample the download speed for their observed peak. */
+private val SPEED_SAMPLE_INTERVAL = 1.seconds

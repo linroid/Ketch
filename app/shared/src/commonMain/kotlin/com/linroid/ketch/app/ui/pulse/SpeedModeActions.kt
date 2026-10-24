@@ -1,20 +1,24 @@
 package com.linroid.ketch.app.ui.pulse
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedModeChange
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.app.state.SpeedModeController
+import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.state.isSlowLane
 import com.linroid.ketch.app.state.speedLimitText
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_try_again
 import ketch.app.shared.generated.resources.action_undo
@@ -29,11 +33,18 @@ import kotlinx.coroutines.Job
 private val log = KetchLogger("SpeedMode")
 
 /**
- * Speed mode of [entry], or `null` when it has none: only the embedded device has one, and only
- * when the host passed it to the app.
+ * Speed mode of [entry], or `null` when it runs none: a remote device running an older Ketch,
+ * one that has not reported its speed mode yet, or an engine its host gave none.
  */
 internal fun AppState.speedModeFor(entry: InstanceEntry?): SpeedModeController? =
-  speedMode?.takeIf { entry is EmbeddedInstance }
+  entry?.let(instanceManager::speedModeOf)
+
+/** [speedModeFor] [entry], kept current as devices connect and report their speed modes. */
+@Composable
+internal fun AppState.rememberSpeedModeOf(entry: InstanceEntry?): SpeedModeController? {
+  val controllers by instanceManager.speedModes.collectAsState()
+  return entry?.let { controllers[it.deviceId] }
+}
 
 /** Speed mode of the active device, or `null` when it has none (see [speedModeFor]). */
 val AppState.activeSpeedMode: SpeedModeController?
@@ -78,7 +89,7 @@ internal fun AppState.switchSpeedMode(
   if (mode == previous) return null
   return launchCommand {
     val failure = Res.string.pulse_switch_failed.text(speedModeName(mode))
-    val applied = speedModeCommand("setMode(${mode.name})", failure) {
+    val applied = speedModeCommand(controller, "setMode(${mode.name})", failure) {
       controller.setMode(mode)
     }
     if (!applied) return@launchCommand
@@ -127,12 +138,12 @@ internal fun AppState.setSpeedLimit(
     return null
   }
   return launchCommand {
-    speedModeCommand("setSpeedLimit", Res.string.pulse_limit_failed.text()) {
+    speedModeCommand(controller, "setSpeedLimit", Res.string.pulse_limit_failed.text()) {
       if (asSlowLane) {
-        controller.setSlowLane(limit)
-        if (controller.settings.value.mode == SpeedLimitMode.Full) {
-          controller.setMode(SpeedLimitMode.SlowLane)
-        }
+        val full = controller.settings.value.mode == SpeedLimitMode.Full
+        controller.update(
+          SpeedModeChange(slowLane = limit, mode = SpeedLimitMode.SlowLane.takeIf { full }),
+        )
       } else {
         controller.setStandard(limit)
       }
@@ -156,10 +167,11 @@ internal val SpeedModeController.slowLaneLimit: SpeedLimit
     standard = settings.value.standard,
   )
 
-// Runs a speed mode change, reads the device's limit back for the Pulse bar and posts a failure
-// titled failure with Try again. command names the change in the log. Returns whether the
-// change applied.
+// Runs a speed mode change of controller's device, reads its limit back for the Pulse bar and
+// posts a failure titled failure with Try again. command names the change in the log. Returns
+// whether the change applied.
 private suspend fun AppState.speedModeCommand(
+  controller: SpeedModeController,
   command: String,
   failure: UiText,
   block: suspend () -> Unit,
@@ -169,20 +181,21 @@ private suspend fun AppState.speedModeCommand(
   } catch (e: CancellationException) {
     throw e
   } catch (e: Exception) {
-    log.w { "Speed mode command $command failed: ${e.describeCauses()}" }
+    val deviceId = controller.deviceId
+    log.w { "Speed mode command $command failed on deviceId=$deviceId: ${e.describeCauses()}" }
     messages.post(
       level = MessageLevel.Error,
       title = failure,
       actions = listOf(
         MessageAction(Res.string.action_try_again.text()) {
-          launchCommand { speedModeCommand(command, failure, block) }
+          launchCommand { speedModeCommand(controller, command, failure, block) }
         }
       ),
+      deviceId = deviceId,
       cause = e,
     )
     return false
   }
-  // Only the embedded device has a speed mode.
-  instances.value.firstOrNull { it is EmbeddedInstance }?.let(::settingsFor)?.loadDownload()
+  settingsOf(controller.deviceId)?.loadDownload()
   return true
 }

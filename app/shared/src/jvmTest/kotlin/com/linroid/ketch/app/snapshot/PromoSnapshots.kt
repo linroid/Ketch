@@ -40,6 +40,10 @@ import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.app.App
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.components.StepperCount
@@ -60,10 +64,7 @@ import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsTarget
-import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchAccent
 import com.linroid.ketch.app.theme.KetchDensity
@@ -74,10 +75,6 @@ import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
 import com.linroid.ketch.config.ServerConfig
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.SpeedSettings
-import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.command_palette
@@ -95,15 +92,11 @@ import ketch.app.shared.generated.resources.priority_low
 import ketch.app.shared.generated.resources.priority_urgent
 import ketch.app.shared.generated.resources.settings_network_spread
 import ketch.app.shared.generated.resources.settings_speed_mode
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.yield
-import kotlinx.datetime.TimeZone
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -1843,6 +1836,7 @@ private class PromoEnvironment(
     directory = ShowcaseData.HOME_DIR,
     version = PromoVersion,
   )
+  private val speed = PromoSpeed.takeIf { device == PromoDevice.SettingsDesktop }
   private val laptop = NetworkedApi(
     SampleKetchApi(
       name = ShowcaseData.LAPTOP,
@@ -1850,10 +1844,10 @@ private class PromoEnvironment(
       config = DownloadConfig(defaultDirectory = ShowcaseData.LAPTOP_DIR),
       directory = ShowcaseData.LAPTOP_DIR,
       version = PromoVersion,
+      speed = speed,
+      observedPeak = PROMO_PEAK,
     ),
   )
-  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
-  private val speed = PromoSpeed.takeIf { device == PromoDevice.SettingsDesktop }
 
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
@@ -1888,26 +1882,10 @@ private class PromoEnvironment(
     clock = SampleData.CLOCK,
   )
 
-  private val speedMode = speed?.let { settings ->
-    SpeedModeController(
-      config = { laptop.status().config },
-      apply = { laptop.updateConfig(it) },
-      scope = speedScope,
-      settings = settings,
-      observedPeak = ObservedPeak(
-        bytesPerSecond = PROMO_PEAK,
-        atEpochMillis = (SampleData.NOW - 1.days).toEpochMilliseconds(),
-      ),
-      scheduler = SpeedScheduler { TimeZone.UTC },
-      clock = SampleData.CLOCK,
-    )
-  }
-
   override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = aiProviderFactory,
     context = SnapshotHarness.ui,
-    speedMode = speedMode,
     clock = SampleData.CLOCK,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
@@ -1967,7 +1945,6 @@ private class PromoEnvironment(
 
   override fun close() {
     controller.close()
-    speedScope.cancel()
     instanceManager.close()
   }
 

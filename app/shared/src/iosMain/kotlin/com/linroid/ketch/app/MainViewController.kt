@@ -1,7 +1,6 @@
 package com.linroid.ketch.app
 
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -18,23 +17,18 @@ import com.linroid.ketch.app.feedback.reportActivity
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.TrackerListStatus
+import com.linroid.ketch.app.instance.embeddedSpeedModes
 import com.linroid.ketch.app.instance.unmeteredNetworkChanges
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.FolderBookmarks
 import com.linroid.ketch.app.platform.rememberFileActions
 import com.linroid.ketch.app.state.IncomingDownloads
-import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
-import com.linroid.ketch.app.state.ObservedPeak
-import com.linroid.ketch.app.state.PulseModel
-import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.rememberAppController
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
-import com.linroid.ketch.config.TorrentEncryptionMode
-import com.linroid.ketch.config.TorrentUploadMode
 import com.linroid.ketch.core.Ketch
-import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.dash.DashDownloadSource
+import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.ftp.FtpDownloadSource
 import com.linroid.ketch.hls.HlsDownloadSource
 import com.linroid.ketch.metalink.MetalinkDownloadSource
@@ -42,19 +36,13 @@ import com.linroid.ketch.sqlite.DriverFactory
 import com.linroid.ketch.sqlite.createSqliteTaskStore
 import com.linroid.ketch.torrent.TorrentConfig
 import com.linroid.ketch.torrent.TorrentDownloadSource
-import com.linroid.ketch.torrent.TorrentEncryption
-import com.linroid.ketch.torrent.TorrentUploadPolicy
+import com.linroid.ketch.torrent.withSettings
 import com.linroid.ketch.webdav.WebDavDownloadSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okio.FileSystem
 import okio.IOException
 import okio.Path.Companion.toPath
@@ -64,7 +52,6 @@ import platform.Foundation.NSSearchPathDirectory
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 import platform.UIKit.UIDevice
-import kotlin.time.Duration.Companion.seconds
 
 private val log = KetchLogger("MainViewController")
 
@@ -95,17 +82,11 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
   DisposableEffect(Unit) {
     onDispose { instanceManager.close() }
   }
-  val speedMode = remember(instanceManager) { LocalSpeedMode(instanceManager) }
-  DisposableEffect(speedMode) {
-    onDispose { speedMode.close() }
-  }
   val controller = rememberAppController(
     instanceManager = instanceManager,
     incoming = incoming,
-    speedMode = speedMode.controller,
     unreadableFiles = unreadableFiles,
   )
-  LaunchedEffect(controller) { speedMode.follow(controller.pulse) }
   val fileActions by rememberUpdatedState(rememberFileActions())
   // This view controller owns the activity monitor: toasts while Ketch is in front,
   // notifications otherwise.
@@ -121,74 +102,6 @@ fun MainViewController(incoming: IncomingDownloads) = ComposeUIViewController {
     onDispose { background?.dispose() }
   }
   App(controller, activityEvents = activityEvents, fileLogger = fileLogger)
-}
-
-/**
- * Speed mode of this device: full speed, the slow lane or Auto speed rules, which the app
- * switches. It runs in a scope of its own on the main thread, like the app's settings, and saves
- * the speed settings and the observed peak to `config.toml` as they change.
- */
-private class LocalSpeedMode(manager: InstanceManager) {
-  private val scope = MainScope()
-  private val speed = MutableStateFlow(0L)
-  private val configStore = manager.configStore
-
-  /** The controller of the embedded device's speed; `null` without one. */
-  val controller: SpeedModeController? = manager.embedded?.let { embedded ->
-    val config = configStore?.load() ?: KetchConfig()
-    SpeedModeController(
-      config = { embedded.status().config },
-      apply = { embedded.updateConfig(it) },
-      scope = scope,
-      settings = config.speed,
-      observedPeak = ObservedPeak(config.ui.observedPeak, config.ui.observedPeakAt),
-      speed = speed,
-    ).also(::save)
-  }
-
-  /** Records this device's speed from [pulse] until cancelled; it raises the observed peak. */
-  suspend fun follow(pulse: PulseModel) {
-    pulse.devices.collect { devices ->
-      speed.value = devices.firstOrNull { it.deviceId == LOCAL_DEVICE_ID }?.speed ?: 0
-    }
-  }
-
-  fun close() {
-    scope.cancel()
-  }
-
-  @OptIn(FlowPreview::class)
-  private fun save(speedMode: SpeedModeController) {
-    scope.launch {
-      speedMode.settings.drop(1).collect { speed -> saveConfig { it.copy(speed = speed) } }
-    }
-    scope.launch {
-      // The peak climbs in steps while a download speeds up.
-      speedMode.observedPeak.drop(1).debounce(PEAK_SAVE_DELAY).collect { peak ->
-        saveConfig {
-          it.copy(
-            ui = it.ui.copy(
-              observedPeak = peak.bytesPerSecond,
-              observedPeakAt = peak.atEpochMillis,
-            ),
-          )
-        }
-      }
-    }
-  }
-
-  private fun saveConfig(transform: (KetchConfig) -> KetchConfig) {
-    val store = configStore ?: return
-    try {
-      store.save(transform(store.load()))
-    } catch (e: Exception) {
-      log.w { "Couldn't save the speed settings to config.toml: ${e.describeCauses()}" }
-    }
-  }
-
-  private companion object {
-    val PEAK_SAVE_DELAY = 10.seconds
-  }
 }
 
 private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceManager {
@@ -209,17 +122,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
   val instanceName = config.name
     ?: UIDevice.currentDevice.name
   val torrentSource = TorrentDownloadSource(
-    TorrentConfig(
-      stateDirectory = "$supportDir/torrent-state",
-      additionalTrackers = config.torrent.trackers,
-      trackerListUrls = config.torrent.subscribedTrackerLists,
-      uploadPolicy = config.torrent.upload.toUploadPolicy(),
-      uploadRateLimit = config.torrent.uploadLimit.bytesPerSecond,
-      encryption = config.torrent.encryption.toEncryption(),
-      utpEnabled = config.torrent.utp,
-      portMapping = config.torrent.portMapping,
-      localDiscovery = config.torrent.localDiscovery,
-    ),
+    TorrentConfig(stateDirectory = "$supportDir/torrent-state")
+      .withSettings(config.torrent.engineSettings),
     // Paused until the path monitor reports the network, moments after launch.
     uploadsPaused = config.torrent.uploadWifiOnly,
   )
@@ -239,18 +143,14 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
             HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
             MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
           ),
+          // Saved on the main thread, like the app's settings.
+          speedModes = embeddedSpeedModes(config) { transform ->
+            withContext(Dispatchers.Main) { saveConfig(configStore, transform) }
+          },
         )
       },
-      applyTorrentSettings = {
-        torrentSource.setAdditionalTrackers(it.trackers)
-        torrentSource.setTrackerLists(it.subscribedTrackerLists)
-        torrentSource.setUploadPolicy(it.upload.toUploadPolicy())
-        torrentSource.setUploadRateLimit(it.uploadLimit.bytesPerSecond)
-        torrentSource.setEncryption(it.encryption.toEncryption())
-        torrentSource.setUtpEnabled(it.utp)
-        torrentSource.setPortMapping(it.portMapping)
-        torrentSource.setLocalDiscovery(it.localDiscovery)
-      },
+      applyTorrentSettings = { torrentSource.applySettings(it.engineSettings) },
+      torrentEngineSettings = torrentSource.settings,
       trackerList = torrentSource.trackerLists.map { lists ->
         lists.map {
           TrackerListStatus(it.url.orEmpty(), it.trackers, it.updatedAt, it.failed, it.updating)
@@ -307,15 +207,10 @@ private fun DownloadConfig.inDownloadsFolder(folder: String): DownloadConfig {
 private fun userDirectory(directory: NSSearchPathDirectory): String =
   (NSSearchPathForDirectoriesInDomains(directory, NSUserDomainMask, true) as List<String>).first()
 
-/** The engine's upload policy for this `[torrent] upload` setting. */
-private fun TorrentUploadMode.toUploadPolicy(): TorrentUploadPolicy = when (this) {
-  TorrentUploadMode.Off -> TorrentUploadPolicy.DISABLED
-  TorrentUploadMode.WhileDownloading -> TorrentUploadPolicy.WHILE_DOWNLOADING
-  TorrentUploadMode.Seed -> TorrentUploadPolicy.SEED_AFTER_COMPLETION
-}
-
-private fun TorrentEncryptionMode.toEncryption(): TorrentEncryption = when (this) {
-  TorrentEncryptionMode.Preferred -> TorrentEncryption.PREFERRED
-  TorrentEncryptionMode.Required -> TorrentEncryption.REQUIRED
-  TorrentEncryptionMode.Off -> TorrentEncryption.DISABLED
+private fun saveConfig(store: FileConfigStore, transform: (KetchConfig) -> KetchConfig) {
+  try {
+    store.save(transform(store.load()))
+  } catch (e: Exception) {
+    log.w { "Couldn't save the speed settings to config.toml: ${e.describeCauses()}" }
+  }
 }

@@ -153,7 +153,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 ### In control of your bandwidth
 
 - **Speed modes** — Full speed, **Slow lane** to leave room for a video call, or **Auto**, which
-  switches between them on a weekly schedule.
+  switches between them on a weekly schedule. Each device runs its own, so a NAS keeps to its
+  schedule while the phone that set it is away.
 - **Per-download control** — Speed limits, connection counts and priorities you can change while
   a download runs. **Urgent** pauses a less important download to start right away.
 - **A queue that behaves** — Limit how many downloads run at once and per site, and start a
