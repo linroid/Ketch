@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+// On the JVM, which has every time zone; Node.js has UTC alone unless js-joda's are loaded.
 class SpeedSchedulerTest {
 
   private val zone = TimeZone.of("America/New_York")

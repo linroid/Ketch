@@ -7,7 +7,7 @@ import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.config.FileConfigStore
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.core.speed.ObservedPeak
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
@@ -24,7 +24,7 @@ class ServerSpeedModesTest {
   }
 
   @Test
-  fun saveSettings_capFromAFlag_keepsTheFilesSpeedLimit() = runTest {
+  fun saveSettings_capFromAFlag_keepsTheFilesSpeedLimit() = runBlocking {
     store.save(KetchConfig(download = DownloadConfig(speedLimit = SpeedLimit.mbps(5))))
     val options = serverSpeedModes(store, store.load(), startCap = SpeedLimit.mbps(10))
 
@@ -38,7 +38,7 @@ class ServerSpeedModesTest {
   }
 
   @Test
-  fun saveSettings_newCap_savedAsTheDownloadLimit() = runTest {
+  fun saveSettings_newCap_savedAsTheDownloadLimit() = runBlocking {
     val options = serverSpeedModes(store, KetchConfig(), startCap = SpeedLimit.Unlimited)
 
     options.saveSettings(SpeedSettings(standard = SpeedLimit.mbps(20)))
@@ -47,7 +47,7 @@ class ServerSpeedModesTest {
   }
 
   @Test
-  fun savePeak_peak_savedUnderUi() = runTest {
+  fun savePeak_peak_savedUnderUi() = runBlocking {
     val options = serverSpeedModes(store, KetchConfig(), startCap = SpeedLimit.Unlimited)
 
     options.savePeak(ObservedPeak(bytesPerSecond = 8_000_000, atEpochMillis = 1_000))

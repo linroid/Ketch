@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import okio.FileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -36,7 +37,11 @@ class KetchSpeedModesTest {
     val dispatcher = StandardTestDispatcher(testScheduler)
     return Ketch(
       httpEngine = FakeHttpEngine(),
-      config = DownloadConfig(speedLimit = cap),
+      // Android host tests have no application context to resolve the default folder.
+      config = DownloadConfig(
+        speedLimit = cap,
+        defaultDirectory = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.toString(),
+      ),
       dispatchers = KetchDispatchers(dispatcher, dispatcher, dispatcher),
       speedModes = speedModes,
     )
