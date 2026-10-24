@@ -532,4 +532,41 @@ class InstanceSettingsControllerTest {
     assertEquals(second, controller.download)
     assertEquals(listOf(first, second), api.applied)
   }
+
+  @Test
+  fun acceptShared_savesTheStandingCapAndShowsTheSettings() = runTest {
+    val store = RecordingConfigStore()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = AppSettingsController(store),
+      scope = this,
+      savedSpeedLimit = { SpeedLimit.Unlimited },
+    )
+    // A phone changes the queue while the slow lane holds this device's limit.
+    val shared = DownloadConfig(maxConcurrentDownloads = 2, speedLimit = SpeedLimit.kbps(200))
+
+    controller.acceptShared(shared)
+
+    assertEquals(shared.copy(speedLimit = SpeedLimit.Unlimited), store.load().download)
+    assertEquals(shared, controller.download)
+  }
+
+  @Test
+  fun acceptShared_editTheInstanceTookMeanwhile_keepsTheEdit() = runTest {
+    val store = RecordingConfigStore()
+    val api = SettingsKetchApi()
+    val controller = InstanceSettingsController(api, AppSettingsController(store), this)
+    val edit = DownloadConfig(maxConcurrentDownloads = 3)
+    api.gate = CompletableDeferred()
+    controller.updateDownload(edit)
+    advanceUntilIdle() // the edit is in flight
+
+    launch { controller.acceptShared(DownloadConfig(maxConcurrentDownloads = 2)) }
+    advanceUntilIdle()
+    api.gate?.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(edit, store.load().download)
+    assertEquals(edit, controller.download)
+  }
 }

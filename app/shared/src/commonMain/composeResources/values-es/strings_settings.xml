@@ -101,6 +101,8 @@
   <string name="settings_density_auto">Automática</string>
   <string name="settings_density_compact">Compacta</string>
   <string name="settings_density_comfortable">Cómoda</string>
+  <string name="settings_general_zoom">Zoom</string>
+  <string name="settings_general_zoom_hint">Agranda o reduce el texto y los controles en todas las ventanas de Ketch.</string>
   <string name="settings_general_reduce_motion">Reducir movimiento</string>
   <string name="settings_general_reduce_motion_on">Desactiva las animaciones.</string>
   <string name="settings_general_reduce_motion_system">Activado en los ajustes del sistema.</string>
@@ -373,6 +375,7 @@
 
   <string name="settings_downloads_folder">Carpeta de descargas</string>
   <string name="settings_downloads_remote">Estos ajustes se aplican a %1$s hasta su próximo reinicio.</string>
+  <string name="settings_downloads_remote_saved">Estos ajustes se guardan en %1$s.</string>
   <string name="settings_loading_from">Cargando los ajustes de %1$s…</string>
   <string name="settings_downloads_save_to">Guardar en</string>
   <string name="settings_downloads_save_to_row">Guardar las descargas en</string>
@@ -465,6 +468,7 @@
   <string name="settings_speed_mode_slow_lane">Modo lento</string>
   <string name="settings_speed_mode_auto">Automático</string>
   <string name="settings_speed_remote">Estos ajustes se aplican a %1$s hasta su próximo reinicio. El modo lento y el modo Automático aún no están disponibles en este dispositivo.</string>
+  <string name="settings_speed_remote_saved">Estos ajustes se guardan en %1$s. El modo lento y el modo Automático aún no están disponibles en este dispositivo.</string>
   <string name="settings_speed_limit_group">Límite</string>
   <string name="settings_speed_limit">Límite de velocidad</string>
   <string name="settings_speed_limit_hint">Todas las descargas lo comparten; el límite propio de una descarga puede ser menor.</string>
@@ -703,6 +707,8 @@
   <string name="settings_search_accent_keywords">color, aspecto, apariencia</string>
   <string name="settings_search_density">Automática, compacta o cómoda</string>
   <string name="settings_search_density_keywords">tamaño, espaciado, táctil, aspecto</string>
+  <string name="settings_search_zoom">Texto y controles más grandes o más pequeños</string>
+  <string name="settings_search_zoom_keywords">escala, tamaño del texto, tamaño de fuente, más grande, más pequeño, ampliar, accesibilidad, aspecto</string>
   <string name="settings_search_reduce_motion">Menos animaciones</string>
   <string name="settings_search_reduce_motion_keywords">animación, animaciones, accesibilidad</string>
   <string name="settings_search_language_keywords">idioma, lengua, traducción, región</string>

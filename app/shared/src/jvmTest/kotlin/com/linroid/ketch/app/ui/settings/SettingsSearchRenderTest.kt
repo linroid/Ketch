@@ -73,7 +73,8 @@ class SettingsSearchRenderTest {
       null,
       SettingsFeature.Desktop,
       SettingsFeature.SetupChecklist,
-      SettingsFeature.KeepAwake
+      SettingsFeature.KeepAwake,
+      SettingsFeature.Zoom,
     )
 
     /**

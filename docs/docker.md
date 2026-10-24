@@ -77,7 +77,7 @@ deleting the file makes a new one on the next start.
 
 | Path | Holds |
 |---|---|
-| `/config` | `config.toml` (optional), the task database `ketch.db`, the access code `api-token`, and `torrent-state` (DHT nodes and tracker lists) |
+| `/config` | `config.toml` (optional; settings changed from the apps are saved there), the task database `ketch.db`, the access code `api-token`, and `torrent-state` (DHT nodes and tracker lists) |
 | `/downloads` | Downloads, unless a download names another folder |
 
 Mount both: without a mount, Docker keeps them in an anonymous volume that is easy to lose when
@@ -177,6 +177,14 @@ Settings without a variable, such as extra trackers or retries, go in
 [`/config/config.toml`](../cli/README.md#configuration-file). The container's command takes
 `ketch server` [options](../cli/README.md#server): `docker run ... ghcr.io/linroid/ketch --port
 9000`, or `command: ["server", "--port", "9000"]` in compose.
+
+Download and speed settings changed in the Ketch apps are saved to `/config/config.toml`, so they
+outlast a restart of the container
+([settings clients change](../cli/README.md#settings-clients-change)). A variable set for one of
+them replaces it again when the container starts, so leave `KETCH_SPEED_LIMIT` and the
+`KETCH_MAX_*` variables unset for the settings you change in the apps. The image sets
+`KETCH_DOWNLOAD_DIR`, so downloads go to `/downloads` after every start: mount the folder you want
+there.
 
 ## Health check
 

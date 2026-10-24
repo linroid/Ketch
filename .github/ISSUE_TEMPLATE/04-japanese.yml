@@ -24,21 +24,36 @@ body:
     id: description
     attributes:
       label: "説明"
-      description: "発生したこと、期待した動作、または追加してほしい内容を記入してください。"
-      placeholder: "問題の内容や関連する情報を記入してください。"
+      description: "発生したこと、期待した動作、または追加してほしい内容を記入してください。バグの場合は再現手順も記入してください。"
+      placeholder: "問題の内容を記入してください。\n\n再現手順:\n1. ...\n2. ..."
     validations:
       required: true
-  - type: textarea
-    id: steps
+  - type: dropdown
+    id: platform
     attributes:
-      label: "再現手順"
-      description: "バグ報告の場合は、問題を再現する手順を記入してください。"
-      placeholder: "1. ...\n2. ..."
-  - type: textarea
-    id: environment
+      label: "プラットフォーム"
+      description: "該当するものをすべて選択してください。"
+      multiple: true
+      options:
+        - "プラットフォームに依存しない"
+        - "Windows"
+        - "macOS"
+        - "Linux"
+        - "Android"
+        - "iOS"
+        - "Web アプリ"
+        - "ブラウザー拡張機能"
+        - "CLI"
+        - "Docker"
+        - "ライブラリ（SDK）"
+        - "その他"
+    validations:
+      required: false
+  - type: input
+    id: version
     attributes:
-      label: "環境"
-      description: "必要に応じて、Ketch のバージョンとプラットフォームを記入してください。"
+      label: "Ketch のバージョン"
+      description: "設定 → アプリについて で確認できます。"
     validations:
       required: false
   - type: markdown

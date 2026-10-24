@@ -1308,6 +1308,7 @@ public final class com/linroid/ketch/api/KetchFeatures {
 	public static final field AWAIT_FILE_SELECTION Ljava/lang/String;
 	public static final field CATEGORY_FOLDERS Ljava/lang/String;
 	public static final field CHECKSUM Ljava/lang/String;
+	public static final field CONFIG_PERSISTED Ljava/lang/String;
 	public static final field COUNTRIES Ljava/lang/String;
 	public static final field FILE_SELECTION Ljava/lang/String;
 	public static final field FINITE_DASH Ljava/lang/String;

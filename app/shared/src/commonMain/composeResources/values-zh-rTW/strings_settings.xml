@@ -97,6 +97,8 @@
   <string name="settings_density_auto">自動</string>
   <string name="settings_density_compact">緊湊</string>
   <string name="settings_density_comfortable">寬鬆</string>
+  <string name="settings_general_zoom">縮放</string>
+  <string name="settings_general_zoom_hint">放大或縮小 Ketch 所有視窗中的文字和控制項。</string>
   <string name="settings_general_reduce_motion">減少動態效果</string>
   <string name="settings_general_reduce_motion_on">關閉動畫。</string>
   <string name="settings_general_reduce_motion_system">已在系統設定中開啟。</string>
@@ -365,6 +367,7 @@
 
   <string name="settings_downloads_folder">下載資料夾</string>
   <string name="settings_downloads_remote">設定將在 %1$s 上生效，重新啟動該裝置後會重設。</string>
+  <string name="settings_downloads_remote_saved">設定將儲存在 %1$s 上。</string>
   <string name="settings_loading_from">正在從 %1$s 載入設定…</string>
   <string name="settings_downloads_save_to">儲存至</string>
   <string name="settings_downloads_save_to_row">將下載儲存至</string>
@@ -454,6 +457,7 @@
   <string name="settings_speed_mode_slow_lane">低速模式</string>
   <string name="settings_speed_mode_auto">自動</string>
   <string name="settings_speed_remote">設定將在 %1$s 上生效，重新啟動該裝置後會重設。該裝置尚不支援低速模式和自動模式。</string>
+  <string name="settings_speed_remote_saved">設定將儲存在 %1$s 上。該裝置尚不支援低速模式和自動模式。</string>
   <string name="settings_speed_limit_group">限制</string>
   <string name="settings_speed_limit">速度限制</string>
   <string name="settings_speed_limit_hint">所有下載的總速度受此限制；個別下載可設定更低的速度上限。</string>
@@ -683,6 +687,8 @@
   <string name="settings_search_accent_keywords">顏色, 色彩, 主題色, 外觀</string>
   <string name="settings_search_density">自動、緊湊或寬鬆</string>
   <string name="settings_search_density_keywords">大小, 間距, 觸控, 外觀</string>
+  <string name="settings_search_zoom">放大或縮小文字和控制項</string>
+  <string name="settings_search_zoom_keywords">放大, 縮小, 比例, 文字大小, 字型大小, 字級, 介面大小, 輔助使用, 無障礙, 外觀</string>
   <string name="settings_search_reduce_motion">減少動畫</string>
   <string name="settings_search_reduce_motion_keywords">動畫, 動態, 無障礙, 輔助使用</string>
   <string name="settings_search_language_keywords">語系, 翻譯, 地區, 中文, language</string>

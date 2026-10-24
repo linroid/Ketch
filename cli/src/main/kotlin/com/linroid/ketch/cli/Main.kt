@@ -470,6 +470,20 @@ private fun runServer(args: Array<String>): Int {
 
   val downloadConfig = mergedConfig.download
   val instanceName = mergedConfig.name ?: "Ketch"
+  // Download settings clients change are saved where the server started from, the default file
+  // when there was none, so they outlast a restart.
+  val settingsPath = configPath ?: defaultConfigPath()
+  val settingsFile = ServerConfigFile(
+    settingsPath,
+    started = downloadConfig,
+    pinned = pinnedDownloadFields(
+      environment,
+      flags = buildMap {
+        if (cliDownloadDir != null) put("defaultDirectory", "--dir")
+        if (cliSpeedLimit != null) put("speedLimit", "--speed-limit")
+      },
+    ),
+  )
   val token = try {
     resolveServerToken(
       cliToken = cliToken,
@@ -527,6 +541,7 @@ private fun runServer(args: Array<String>): Int {
     mdnsEnabled = serverConfig.mdnsEnabled,
     // Health checks wait for the saved tasks, which serveDaemon restores once it listens.
     ready = false,
+    onConfigChanged = settingsFile::save,
   )
   // This process runs the downloads of the config directory, so it runs their hooks, and saves
   // the torrent settings its clients change.
@@ -549,9 +564,7 @@ private fun runServer(args: Array<String>): Int {
   println("  Port:          ${serverConfig.port}")
   println("  Download dir:  ${downloadConfig.defaultDirectory}")
   println("  Database:      $dbPath")
-  if (configPath != null) {
-    println("  Config:        $configPath")
-  }
+  println("  Config:        $settingsPath")
   serverEnvironmentNames(environment).takeIf { it.isNotEmpty() }?.let { names ->
     println("  Environment:   " + names.joinToString(", "))
   }

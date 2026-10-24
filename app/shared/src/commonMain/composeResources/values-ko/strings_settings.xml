@@ -97,6 +97,8 @@
   <string name="settings_density_auto">자동</string>
   <string name="settings_density_compact">촘촘하게</string>
   <string name="settings_density_comfortable">여유 있게</string>
+  <string name="settings_general_zoom">확대/축소</string>
+  <string name="settings_general_zoom_hint">Ketch의 모든 창에서 글자와 컨트롤을 크게 또는 작게 표시합니다.</string>
   <string name="settings_general_reduce_motion">동작 줄이기</string>
   <string name="settings_general_reduce_motion_on">애니메이션을 끕니다.</string>
   <string name="settings_general_reduce_motion_system">시스템 설정에서 켜져 있습니다.</string>
@@ -365,6 +367,7 @@
 
   <string name="settings_downloads_folder">다운로드 폴더</string>
   <string name="settings_downloads_remote">설정은 %1$s 기기에 적용되며, 해당 기기를 다시 시작하면 초기화됩니다.</string>
+  <string name="settings_downloads_remote_saved">설정은 %1$s 기기에 저장됩니다.</string>
   <string name="settings_loading_from">%1$s에서 설정을 불러오는 중…</string>
   <string name="settings_downloads_save_to">저장 위치</string>
   <string name="settings_downloads_save_to_row">다운로드 저장 위치</string>
@@ -454,6 +457,7 @@
   <string name="settings_speed_mode_slow_lane">저속 모드</string>
   <string name="settings_speed_mode_auto">자동</string>
   <string name="settings_speed_remote">설정은 %1$s 기기에 적용되며, 해당 기기를 다시 시작하면 초기화됩니다. 이 기기는 아직 저속 모드와 자동 모드를 지원하지 않습니다.</string>
+  <string name="settings_speed_remote_saved">설정은 %1$s 기기에 저장됩니다. 이 기기는 아직 저속 모드와 자동 모드를 지원하지 않습니다.</string>
   <string name="settings_speed_limit_group">제한</string>
   <string name="settings_speed_limit">속도 제한</string>
   <string name="settings_speed_limit_hint">모든 다운로드가 나눠 씁니다. 다운로드별 제한은 이보다 낮게 설정할 수 있습니다.</string>
@@ -683,6 +687,8 @@
   <string name="settings_search_accent_keywords">색상, 색, 컬러, 테마</string>
   <string name="settings_search_density">자동, 촘촘하게 또는 여유 있게</string>
   <string name="settings_search_density_keywords">크기, 간격, 여백, 터치, 화면</string>
+  <string name="settings_search_zoom">글자와 컨트롤을 크게 또는 작게</string>
+  <string name="settings_search_zoom_keywords">확대, 축소, 줌, 배율, 글자 크기, 글꼴 크기, 화면 크기, 접근성</string>
   <string name="settings_search_reduce_motion">애니메이션 줄이기</string>
   <string name="settings_search_reduce_motion_keywords">애니메이션, 접근성, 움직임, 모션</string>
   <string name="settings_search_language_keywords">언어, 지역, 번역, 한국어, 영어</string>

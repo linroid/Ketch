@@ -101,6 +101,8 @@
   <string name="settings_density_auto">Automatisch</string>
   <string name="settings_density_compact">Kompakt</string>
   <string name="settings_density_comfortable">Komfortabel</string>
+  <string name="settings_general_zoom">Zoom</string>
+  <string name="settings_general_zoom_hint">Vergrößert oder verkleinert Text und Bedienelemente in allen Ketch-Fenstern.</string>
   <string name="settings_general_reduce_motion">Bewegung reduzieren</string>
   <string name="settings_general_reduce_motion_on">Schaltet Animationen aus.</string>
   <string name="settings_general_reduce_motion_system">In deinen Systemeinstellungen aktiviert.</string>
@@ -373,6 +375,7 @@
 
   <string name="settings_downloads_folder">Downloads-Ordner</string>
   <string name="settings_downloads_remote">Die Einstellungen gelten auf %1$s bis zum nächsten Neustart.</string>
+  <string name="settings_downloads_remote_saved">Die Einstellungen werden auf %1$s gespeichert.</string>
   <string name="settings_loading_from">Einstellungen werden von %1$s geladen…</string>
   <string name="settings_downloads_save_to">Speichern in</string>
   <string name="settings_downloads_save_to_row">Downloads speichern in</string>
@@ -465,6 +468,7 @@
   <string name="settings_speed_mode_slow_lane">Drosselung</string>
   <string name="settings_speed_mode_auto">Automatisch</string>
   <string name="settings_speed_remote">Die Einstellungen gelten auf %1$s bis zum nächsten Neustart. Drosselung und Automatikmodus werden dort noch nicht unterstützt.</string>
+  <string name="settings_speed_remote_saved">Die Einstellungen werden auf %1$s gespeichert. Drosselung und Automatikmodus werden dort noch nicht unterstützt.</string>
   <string name="settings_speed_limit_group">Limit</string>
   <string name="settings_speed_limit">Tempolimit</string>
   <string name="settings_speed_limit_hint">Alle Downloads teilen es sich; das eigene Limit eines Downloads kann niedriger sein.</string>
@@ -703,6 +707,8 @@
   <string name="settings_search_accent_keywords">Farbe, Akzent, Darstellung</string>
   <string name="settings_search_density">Automatisch, kompakt oder komfortabel</string>
   <string name="settings_search_density_keywords">Größe, Abstand, Touch, Darstellung</string>
+  <string name="settings_search_zoom">Text und Bedienelemente größer oder kleiner</string>
+  <string name="settings_search_zoom_keywords">Skalierung, Textgröße, Schriftgröße, größer, kleiner, vergrößern, Bedienungshilfen, Barrierefreiheit, Darstellung</string>
   <string name="settings_search_reduce_motion">Weniger Animationen</string>
   <string name="settings_search_reduce_motion_keywords">Animation, Bewegung, Barrierefreiheit, Bedienungshilfen</string>
   <string name="settings_search_language_keywords">Übersetzung, Gebietsschema, Englisch, Region</string>

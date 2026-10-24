@@ -81,7 +81,6 @@ import ketch.app.shared.generated.resources.settings_downloads_private_folder
 import ketch.app.shared.generated.resources.settings_downloads_queue
 import ketch.app.shared.generated.resources.settings_downloads_queue_footer
 import ketch.app.shared.generated.resources.settings_downloads_recent
-import ketch.app.shared.generated.resources.settings_downloads_remote
 import ketch.app.shared.generated.resources.settings_downloads_retries
 import ketch.app.shared.generated.resources.settings_downloads_retries_count
 import ketch.app.shared.generated.resources.settings_downloads_retries_fewer
@@ -117,16 +116,19 @@ private val log = KetchLogger("DownloadSettings")
 /**
  * Download settings of [device]: where downloads are saved, the folders the add sheet offers,
  * and the queue. Every change applies as soon as it is made; the embedded device also saves it
- * to `config.toml`, while a remote one keeps it until it restarts.
+ * to `config.toml`, as does a remote one whose server saves changes, while an older one keeps
+ * it until it restarts.
  */
 @Composable
 fun DownloadSettings(state: AppState, device: InstanceEntry) {
   val controller = state.settingsFor(device)
   LaunchedEffect(controller) { controller.loadDownload() }
   val config = controller.download
+  val features by remember(state, device) { state.featuresFlow(device) }
+    .collectAsState(emptySet())
   if (controller.isRemote) {
     SettingsNotice(
-      text = stringResource(Res.string.settings_downloads_remote, device.label),
+      text = stringResource(downloadsRemoteNotice(features), device.label),
       tone = NoticeTone.Info,
     )
   }

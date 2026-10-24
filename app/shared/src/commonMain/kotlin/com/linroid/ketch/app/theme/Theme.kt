@@ -12,6 +12,8 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import com.linroid.ketch.app.i18n.ProvideLoadEnvironment
 import com.linroid.ketch.app.platform.rememberReduceMotion
 import com.linroid.ketch.config.DensityMode
@@ -50,6 +52,8 @@ fun ThemeMode.isDark(): Boolean = when (this) {
  * @param reduceMotion whether motion is reduced; follows the system by default.
  * @param windowChrome space the window's own controls take inside the content; by default the
  *   value an enclosing `LocalWindowChrome` provider set, so a host can provide it around `App`.
+ * @param zoom how large to draw [content], as a factor of its normal size: text, icons, spacing
+ *   and controls all grow by it, as a browser's zoom makes them.
  */
 @Composable
 fun KetchTheme(
@@ -58,9 +62,28 @@ fun KetchTheme(
   density: DensityMode = DensityMode.Auto,
   reduceMotion: Boolean = rememberReduceMotion(),
   windowChrome: WindowChrome = LocalWindowChrome.current,
+  zoom: Float = 1f,
   content: @Composable () -> Unit,
 ) {
   ProvideLoadEnvironment()
+  // Provided at every zoom, 1 included, so changing it keeps the state of the content.
+  val base = LocalDensity.current
+  val zoomed = remember(base, zoom) { Density(base.density * zoom, base.fontScale) }
+  CompositionLocalProvider(LocalDensity provides zoomed) {
+    KetchTokens(darkTheme, accent, density, reduceMotion, windowChrome.zoomed(zoom), content)
+  }
+}
+
+/** Provides the design tokens and a Material theme mapped onto them to [content]. */
+@Composable
+private fun KetchTokens(
+  darkTheme: Boolean,
+  accent: KetchAccent,
+  density: DensityMode,
+  reduceMotion: Boolean,
+  windowChrome: WindowChrome,
+  content: @Composable () -> Unit,
+) {
   DensityHost(density) { resolvedDensity ->
     val colors = remember(darkTheme, accent) {
       if (darkTheme) darkKetchColors(accent) else lightKetchColors(accent)

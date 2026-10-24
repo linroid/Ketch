@@ -406,6 +406,7 @@ these rather than on version numbers: older servers send fewer.
 | `FILE_SELECTION` | `download.fileSelection` | `selectFiles` (listed by sources that choose files) |
 | `AWAIT_FILE_SELECTION` | `download.awaitFileSelection` | `awaitFileSelection` |
 | `FINITE_HLS`, `FINITE_DASH` | `hls.finite`, `dash.finite` | The HLS and DASH sources; `FINITE_MEDIA` (`media.finite`) is listed when both are |
+| `CONFIG_PERSISTED` | `config.persisted` | `updateConfig` outlasts a restart; listed by servers that save it, not by `Ketch` (not in `ALL`) |
 
 Modules beside `library:api` name their own: the torrent source lists `TorrentFeatures.CONTROL`
 (`torrent.control`). On servers without `QUEUE_POSITION` tasks report no position, and without
@@ -602,6 +603,10 @@ DownloadConfig(
   download to pick them up.
 - A changed `defaultDirectory` that does not exist or is not a folder is rejected with
   `IllegalArgumentException`, and the previous configuration stays in effect.
+- `Ketch` keeps the configuration in memory: saving it, such as in `config.toml`, is up to the
+  host. A `RemoteKetch` change is saved by servers that list `CONFIG_PERSISTED`
+  (`config.persisted`), as `ketch server` and the apps' shared devices do (`KetchServer`'s
+  `onConfigChanged`); older ones keep it until they restart.
 
 ### Folders
 

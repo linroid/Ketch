@@ -40,3 +40,10 @@ internal expect val keepAwakeSupported: Boolean
  * no engine of its own.
  */
 internal expect val localPeerDiscoverySupported: Boolean
+
+/**
+ * Whether the app offers a zoom of its own (`[appearance] zoom`): the desktop app, whose text can
+ * be too small on a large display the system does not scale. Phones follow the system's display
+ * and text size, and browsers zoom the web app themselves.
+ */
+internal expect val zoomSupported: Boolean

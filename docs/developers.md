@@ -140,7 +140,7 @@ curl -X POST http://localhost:8642/api/tasks \
 | Method and path | What it does |
 |---|---|
 | `GET /api/status` | Name, version, uptime, configuration, download folder, free space and supported `features` |
-| `PUT /api/config` | Replace the `DownloadConfig`; fields the body leaves out keep their current values |
+| `PUT /api/config` | Replace the `DownloadConfig`; fields the body leaves out keep their current values. Servers listing `config.persisted` save it, so it outlasts a restart, and answer `500 config_not_saved` when they cannot (it still applies until then) |
 | `GET`, `PUT /api/network-interfaces` | List the network interfaces, choose the ones to use |
 | `POST /api/resolve` | Probe a URL (`{"url": ..., "properties": {...}}`): size, file name, resume support, a torrent's files. A URL no source handles answers `415 unsupported`, as does one its source lacks something for, such as a usable proxy (the message says why); one its source refuses `422` with the error, whose `detail` says why, and `"error": "source_error"` |
 | `POST /api/resolve/content?fileName=` | Probe file content sent as the request body, such as a `.torrent` file (up to 16 MiB); refusals answer as for a URL |
