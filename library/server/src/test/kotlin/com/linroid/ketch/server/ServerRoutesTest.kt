@@ -483,8 +483,15 @@ class ServerRoutesTest {
   fun `PUT config with a folder the server refuses is not saved`() = testApplication {
     val ketch = createTestKetch()
     val saved = mutableListOf<DownloadConfig>()
+    // Only its own folder: temporary folders are in /tmp on Linux, which createTestServer allows.
+    val allowed = Files.createTempDirectory("ketch-allowed").toString()
     application {
-      with(createTestServer(ketch, onConfigChanged = { saved += it })) { configureServer() }
+      val server = createTestServer(
+        ketch,
+        allowedDirectories = listOf(allowed),
+        onConfigChanged = { saved += it },
+      )
+      with(server) { configureServer() }
     }
     val outside = Files.createTempDirectory("ketch-outside").toString()
     val response = client.put("/api/config") {
