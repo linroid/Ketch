@@ -43,24 +43,28 @@ import platform.posix.renameat
 import platform.posix.stat
 import platform.posix.unlinkat
 
-/** All payload and metadata mutations use no-follow traversal relative to directory descriptors. */
+/**
+ * All payload and metadata mutations open their parent directory without following a symlink in
+ * any component ([O_NOFOLLOW_ANY]) and act on the name relative to its descriptor.
+ *
+ * The parent is opened in one call, never by walking down from the root: the app sandbox lets a
+ * directory be opened for reading only inside the app's own containers, so opening
+ * `/private/var/mobile/Containers/Data/Application` on the way down fails with `EPERM` on a
+ * device, and with it every torrent write, however much space is free.
+ */
 @OptIn(ExperimentalForeignApi::class)
 internal object SafeTorrentFileSystem : ForwardingFileSystem(FileSystem.SYSTEM) {
   private fun <T> parent(path: Path, action: (Int, String) -> T): T {
     var absolute = if (path.isAbsolute) path.normalized() else
       (delegate.canonicalize(".".toPath()) / path).normalized()
+    // Trusted Darwin system aliases are not torrent-supplied directory symlinks.
     if (absolute.segments.firstOrNull() in listOf("tmp", "var", "etc")) {
       absolute = "/private".toPath() / absolute.toString().removePrefix("/")
     }
-    var descriptor = open("/", O_RDONLY or O_DIRECTORY or O_NOFOLLOW)
+    val directory = absolute.parent ?: absolute
+    val descriptor = open(directory.toString(), O_RDONLY or O_DIRECTORY or O_NOFOLLOW_ANY)
     checked(descriptor >= 0)
     try {
-      for (part in absolute.segments.dropLast(1)) {
-        val child = openat(descriptor, part, O_RDONLY or O_DIRECTORY or O_NOFOLLOW)
-        checked(child >= 0)
-        close(descriptor)
-        descriptor = child
-      }
       return action(descriptor, absolute.name)
     } finally { close(descriptor) }
   }
@@ -132,6 +136,9 @@ internal object SafeTorrentFileSystem : ForwardingFileSystem(FileSystem.SYSTEM) 
   private fun checked(success: Boolean) {
     if (!success) throw IOException("Torrent filesystem operation failed (errno=$errno)")
   }
+
+  /** `<sys/fcntl.h>`'s flag refusing symlinks in every path component (iOS 14.5, macOS 11.3). */
+  private const val O_NOFOLLOW_ANY = 0x20000000
 
   private class DescriptorHandle(private val descriptor: Int, writable: Boolean) :
     FileHandle(writable) {
