@@ -48,8 +48,9 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Adds links shared from another app, or text sent from a selection with "Download with Ketch",
- * without leaving that app: a translucent window that shows only the add sheet and finishes
+ * Adds links shared from another app, text sent from a selection with "Download with Ketch", or a
+ * file link chosen to download with Ketch from a browser's "Download file with" chooser, without
+ * leaving that app: a translucent window that shows only the add sheet and finishes
  * once the sheet closes. The sheet's adds run on after that, and their outcome shows as a system
  * toast.
  */
@@ -68,7 +69,10 @@ class QuickAddActivity : ComponentActivity() {
     if (!model.offered) {
       model.offered = true
       val incoming = model.incoming
-      val offered = sharedText(intent)?.let { incoming.offerText(it, LinkSource.Share) } == true
+      val offered = when (intent?.action) {
+        Intent.ACTION_VIEW -> viewedLink(intent)?.let { incoming.offerLink(it, LinkSource.OpenUrl) }
+        else -> sharedText(intent)?.let { incoming.offerText(it, LinkSource.Share) }
+      } == true
       // A shared pairing link is confirmed in the app, which is where devices are managed.
       for (pairing in incoming.pendingPairings.value) {
         val open = Intent(Intent.ACTION_VIEW, pairing.link.toUri(), this, MainActivity::class.java)
@@ -94,6 +98,14 @@ class QuickAddActivity : ComponentActivity() {
     Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
     else -> null
   }?.toString()?.takeIf { it.isNotBlank() }
+
+  /**
+   * The link a browser's "Download file with" chooser handed over: an `http(s)` link viewed
+   * with the file's type (`null` for links of other schemes, which the main activity opens).
+   */
+  private fun viewedLink(intent: Intent): String? = intent.data
+    ?.takeIf { it.scheme?.lowercase() in setOf("http", "https") }
+    ?.toString()
 }
 
 /**

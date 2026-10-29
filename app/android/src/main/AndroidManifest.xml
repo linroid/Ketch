@@ -105,6 +105,19 @@
         <category android:name="android.intent.category.DEFAULT" />
         <data android:mimeType="text/plain" />
       </intent-filter>
+      <!--
+        Direct file links from a browser's "Download file with" chooser: an http(s) link viewed
+        with the file's type, whatever it is. A tapped web link carries no type and never matches,
+        so Ketch is not offered for opening web pages.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="http" />
+        <data android:scheme="https" />
+        <data android:mimeType="*/*" />
+      </intent-filter>
     </activity>
     <service
       android:name="com.linroid.ketch.app.android.KetchService"

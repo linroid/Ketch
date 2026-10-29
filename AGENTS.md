@@ -1417,7 +1417,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `--torrent-port`; 16881 in the Docker image): the apps and other commands may run beside it
 - Apps open `.torrent` files from the system file manager (Android, desktop, iOS, installed web
   app) and resolve their content through `KetchApi.resolve`, like dropped files (dropped files
-  and the add sheet also take `.meta4` and `.metalink`, `isContentFile`)
+  and the add sheet also take `.meta4` and `.metalink`, `isContentFile`). On Android,
+  `QuickAddActivity` also takes `http(s)` links viewed with a MIME type, which is how browsers'
+  "Download file with" chooser hands a file link over, and shows the add sheet over the browser
+  (`LinkSource.OpenUrl`); a tapped web link carries no type, so Ketch is never offered for pages
 - Native torrent engine dependencies exist only in interoperability tests
 - uTP (BEP 29), `TorrentConfig.utpEnabled` (on by default): `UtpPacket` (codec, selective-ack
   and unknown extensions, `looksLikeUtp`) and `UtpSocket`, a deterministic state machine without
