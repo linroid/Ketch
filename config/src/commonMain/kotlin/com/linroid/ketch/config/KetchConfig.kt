@@ -1,6 +1,7 @@
 package com.linroid.ketch.config
 
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.SpeedSettings
 import kotlinx.serialization.Serializable
 
 /**
@@ -15,7 +16,7 @@ import kotlinx.serialization.Serializable
  * @property ai AI resource discovery settings.
  * @property appearance app look and feel settings.
  * @property torrent BitTorrent engine settings.
- * @property speed speed modes and rules for the embedded device.
+ * @property speed speed modes and rules of the engine that runs this directory's downloads.
  * @property ui app UI state remembered between launches.
  * @property desktop desktop app window and startup behavior.
  * @property notifications which activity the apps report.

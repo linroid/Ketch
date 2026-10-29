@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchMenuScope
 import com.linroid.ketch.app.components.SpeedLimitPickerPresets
@@ -26,7 +27,6 @@ import com.linroid.ketch.app.ui.devices.speedModeOf
 import com.linroid.ketch.app.ui.pulse.setSpeedLimit
 import com.linroid.ketch.app.ui.pulse.slowLaneLimit
 import com.linroid.ketch.app.ui.pulse.switchSpeedMode
-import com.linroid.ketch.config.SpeedLimitMode
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.device_switch_to
 import ketch.app.shared.generated.resources.sidebar_menu_full_speed
@@ -135,8 +135,8 @@ internal fun KetchMenuScope.deviceCommands(
 }
 
 /**
- * Full speed and the Slow lane for a device with a speed mode; the speed limits otherwise, as
- * remote devices only take a limit.
+ * Full speed and the Slow lane for a device with a speed mode; the speed limits otherwise, as a
+ * device running an older Ketch only takes a limit.
  */
 private fun KetchMenuScope.speedEntries(state: AppState, device: DevicePresence) {
   val controller = state.speedModeOf(device)

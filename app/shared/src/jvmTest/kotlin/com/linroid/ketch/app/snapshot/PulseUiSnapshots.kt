@@ -19,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.app.feedback.AppMessage
 import com.linroid.ketch.app.feedback.MessageAction
 import com.linroid.ketch.app.feedback.MessageLevel
@@ -32,11 +34,9 @@ import com.linroid.ketch.app.state.DevicePulse
 import com.linroid.ketch.app.state.DiskSpace
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.LocalAppState
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SpeedMode
-import com.linroid.ketch.app.state.SpeedModeController
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
@@ -64,8 +64,6 @@ import com.linroid.ketch.app.ui.pulse.SpeedModeView
 import com.linroid.ketch.app.ui.pulse.rememberSpeedModeView
 import com.linroid.ketch.app.ui.pulse.speedModeLabelText
 import com.linroid.ketch.app.ui.pulse.totalHistory
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -499,15 +497,13 @@ private fun withPulseApp(
       data = SampleData.downloads(),
       theme = theme,
       density = size.density.toMode(),
-      speedMode = { engine, scope ->
-        SpeedModeController(
-          config = { engine.status().config },
-          apply = { engine.updateConfig(it) },
-          scope = scope,
-          settings = SpeedSettings(
+      embedded = { data ->
+        SampleKetchApi(
+          data,
+          speed = SpeedSettings(
             mode = if (slowLane) SpeedLimitMode.SlowLane else SpeedLimitMode.Full,
           ),
-          observedPeak = ObservedPeak(10L shl 20, SampleData.NOW.toEpochMilliseconds()),
+          observedPeak = 10L shl 20,
         )
       },
       wave = { second, _ -> 0.8 + 0.18 * sin(second * PI / 23) },

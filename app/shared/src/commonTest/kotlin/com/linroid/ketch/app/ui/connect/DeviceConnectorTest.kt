@@ -210,10 +210,53 @@ class DeviceConnectorTest {
   }
 
   @Test
+  fun connect_deviceReportingThisDevicesIdentity_addsNothing() = runTest {
+    val manager = manager(FakeInstanceFactory(instanceId = THIS_DEVICE))
+    val probe = Probe(ProbeResult(ConnectionState.Connected, instanceId = THIS_DEVICE))
+
+    val outcome = connector(manager, probe).connect(link)
+
+    assertEquals(ConnectOutcome.ThisDevice, outcome)
+    assertTrue(manager.remotes().isEmpty())
+    assertTrue(shown.isEmpty())
+    manager.close()
+  }
+
+  @Test
+  fun connect_deviceReportingAnotherIdentity_addsItWithThatIdentity() = runTest {
+    val manager = manager(FakeInstanceFactory(instanceId = THIS_DEVICE))
+    val probe = Probe(ProbeResult(ConnectionState.Connected, instanceId = OTHER_DEVICE))
+
+    val outcome = connector(manager, probe).connect(link)
+
+    val device = manager.remotes().single()
+    assertEquals(ConnectOutcome.Connected(device), outcome)
+    assertEquals(OTHER_DEVICE, device.remoteConfig.instanceId)
+    manager.close()
+  }
+
+  @Test
+  fun connect_appWithoutIdentity_addsADeviceWhateverItReports() = runTest {
+    // The web app, which has no device of its own.
+    val manager = manager(FakeInstanceFactory(embeddedFactory = null))
+    val probe = Probe(ProbeResult(ConnectionState.Connected, instanceId = OTHER_DEVICE))
+
+    val outcome = connector(manager, probe).connect(link)
+
+    assertIs<ConnectOutcome.Connected>(outcome)
+    manager.close()
+  }
+
+  @Test
   fun toRemoteConfig_httpsLink_keepsSchemeAndCode() {
     val config = PairingLink("nas.local", 443, token = "t", name = "Ketch", secure = true)
       .toRemoteConfig()
 
     assertEquals(RemoteConfig("nas.local", 443, apiToken = "t", secure = true), config)
+  }
+
+  private companion object {
+    const val THIS_DEVICE = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10"
+    const val OTHER_DEVICE = "5d2c8e1f-3a4b-4c6d-8e9f-0a1b2c3d4e5f"
   }
 }

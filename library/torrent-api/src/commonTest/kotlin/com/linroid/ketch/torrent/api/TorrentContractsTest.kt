@@ -161,8 +161,53 @@ class TorrentContractsTest {
     val errors = listOf(
       assertFailsWith<TorrentCommandException> { controller.files("task") },
       assertFailsWith<TorrentCommandException> { controller.select("task", setOf("0"), context) },
-      assertFailsWith<TorrentCommandException> { controller.setSeeding("task", true, context) }
+      assertFailsWith<TorrentCommandException> { controller.setSeeding("task", true, context) },
+      assertFailsWith<TorrentCommandException> { controller.settings() },
+      assertFailsWith<TorrentCommandException> {
+        controller.updateSettings(TorrentSettingsChange(utp = false))
+      }
     )
     assertTrue(errors.all { it.error == TorrentCommandError.UNSUPPORTED })
+  }
+
+  @Test
+  fun settings_encodeModesByWireName_andReadUnknownOnesSafely() {
+    val settings = TorrentEngineSettings(
+      upload = TorrentUploadSetting.SEED,
+      encryption = TorrentEncryptionSetting.REQUIRED,
+    )
+    val text = Json.encodeToString(settings)
+    assertTrue(text.contains("\"upload\":\"seed\""), text)
+    assertTrue(text.contains("\"encryption\":\"required\""), text)
+    // A mode a newer version adds never reads as uploading.
+    val unknown = Json.decodeFromString<TorrentEngineSettings>(
+      """{"upload":"ratio","encryption":"quantum"}"""
+    )
+    assertEquals(TorrentUploadSetting.OFF, unknown.upload)
+    assertEquals(TorrentEncryptionSetting.PREFERRED, unknown.encryption)
+  }
+
+  @Test
+  fun settingsChange_between_setsOnlyWhatDiffers_andAppliesBack() {
+    val from = TorrentEngineSettings(trackerListUrls = listOf("https://lists.example/a.txt"))
+    val to = from.copy(utp = false, trackers = listOf("udp://tracker.example:1337"))
+    val change = TorrentSettingsChange.between(from, to)
+
+    assertEquals(
+      TorrentSettingsChange(utp = false, trackers = listOf("udp://tracker.example:1337")),
+      change,
+    )
+    assertEquals(to, change.applyTo(from))
+    assertTrue(TorrentSettingsChange.between(to, to).isEmpty)
+  }
+
+  @Test
+  fun settingsChange_keepsWhatAnotherClientChanged() {
+    val server = TorrentEngineSettings(upload = TorrentUploadSetting.SEED)
+    // Read before the server's upload mode changed, and changed only uTP since.
+    val read = TorrentEngineSettings()
+    val change = TorrentSettingsChange.between(read, read.copy(utp = false))
+
+    assertEquals(server.copy(utp = false), change.applyTo(server))
   }
 }

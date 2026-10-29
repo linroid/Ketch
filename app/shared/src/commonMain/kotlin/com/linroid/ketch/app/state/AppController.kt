@@ -34,9 +34,6 @@ import kotlin.time.TimeSource
  * @param aiProviderFactory builds the AI discovery engine; `null` where it cannot run.
  * @param incoming downloads opened from outside the app.
  * @param context dispatcher of [scope]; the main thread by default.
- * @param speedMode speed mode of the embedded device when the host owns one, such as the
- *   service whose notification switches it, so the app and the host never fight over the speed
- *   limit; `null` when the host keeps none. Its mode also feeds the devices' presence.
  * @param clock current time of the task list, the speed history and the messages.
  * @param unreadableFiles files the host moved aside because it could not read them, such as
  *   `config.toml`, which the app reports to the user once.
@@ -54,7 +51,6 @@ class AppController(
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   incoming: IncomingDownloads = IncomingDownloads(),
   context: CoroutineContext = Dispatchers.Main,
-  speedMode: SpeedModeController? = null,
   clock: Clock = Clock.System,
   unreadableFiles: UnreadableFiles = UnreadableFiles(),
   discoverHistory: DiscoverHistoryStore = InMemoryDiscoverHistoryStore(),
@@ -87,7 +83,6 @@ class AppController(
     aiSettings = aiSettings,
     incoming = incoming,
     messages = MessageCenter(clock = clock),
-    speedMode = speedMode,
     clock = clock,
     unreadableFiles = unreadableFiles,
     discoverHistory = discoverHistory,
@@ -95,10 +90,6 @@ class AppController(
     timeSource = timeSource,
     finishActions = finishActions,
   )
-
-  init {
-    speedMode?.let { instanceManager.setLocalSpeedMode(it.mode) }
-  }
 
   /** Toasts, banners and the Activity history. */
   val messages: MessageCenter get() = state.messages
@@ -112,7 +103,7 @@ class AppController(
   /** Speed, counts, speed limit, free space and health of the active device. */
   val pulse: PulseModel get() = state.pulse
 
-  /** Speed mode of the embedded device, as the host passed it; `null` when it keeps none. */
+  /** Speed mode of the embedded device, which its engine runs; `null` without one. */
   val speedMode: SpeedModeController? get() = state.speedMode
 
   /**
@@ -140,7 +131,6 @@ fun rememberAppController(
   instanceManager: InstanceManager,
   aiProviderFactory: AiDiscoveryProviderFactory? = null,
   incoming: IncomingDownloads? = null,
-  speedMode: SpeedModeController? = null,
   unreadableFiles: UnreadableFiles? = null,
   discoverHistory: DiscoverHistoryStore? = null,
 ): AppController {
@@ -148,7 +138,6 @@ fun rememberAppController(
     instanceManager,
     aiProviderFactory,
     incoming,
-    speedMode,
     unreadableFiles,
     discoverHistory
   ) {
@@ -156,7 +145,6 @@ fun rememberAppController(
       instanceManager = instanceManager,
       aiProviderFactory = aiProviderFactory,
       incoming = incoming ?: IncomingDownloads(),
-      speedMode = speedMode,
       unreadableFiles = unreadableFiles ?: UnreadableFiles(),
       discoverHistory = discoverHistory ?: InMemoryDiscoverHistoryStore(),
     )

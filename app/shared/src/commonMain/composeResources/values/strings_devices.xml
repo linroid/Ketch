@@ -185,6 +185,8 @@
   <!-- %1$s is the address that did not answer, such as "nas.local:8642". -->
   <string name="connect_unreachable">Couldn't reach %1$s. Check that Ketch is sharing there and that both devices are on the same network.</string>
   <string name="connect_add_anyway">Add anyway</string>
+  <!-- %1$s is the address of this device's own shared Ketch, typed or found, such as "192.168.1.5:8642". -->
+  <string name="connect_this_device">%1$s is this device. Its downloads already show here.</string>
   <!-- %1$s says why, such as "Connection lost. Check the connection and try again." -->
   <string name="connect_add_failed">Couldn't add the device: %1$s</string>
   <!-- Toasts once a device is added. %1$s is its name. -->

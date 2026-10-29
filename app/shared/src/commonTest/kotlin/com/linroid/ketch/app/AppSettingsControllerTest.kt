@@ -18,6 +18,7 @@ import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -115,6 +116,79 @@ class AppSettingsControllerTest {
     controller.saveZoom(150)
     assertEquals(150, store.load().appearance.zoom)
     assertEquals(ThemeMode.Dark, store.load().appearance.theme)
+  }
+
+  @Test
+  fun zoomIn_fromTheSmallest_stepsThroughTheLevelsAndStopsAtTheLargest() {
+    val store = RecordingConfigStore(KetchConfig(appearance = AppearanceConfig(zoom = 90)))
+    val controller = AppSettingsController(store)
+
+    val zooms = List(7) {
+      controller.zoomIn()
+      store.config.appearance.zoom
+    }
+
+    assertEquals(listOf(100, 110, 125, 150, 175, 200, 200), zooms)
+    assertFalse(controller.canZoomIn)
+    assertTrue(controller.canZoomOut)
+  }
+
+  @Test
+  fun zoomOut_fromTheLargest_stepsThroughTheLevelsAndStopsAtTheSmallest() {
+    val store = RecordingConfigStore(KetchConfig(appearance = AppearanceConfig(zoom = 200)))
+    val controller = AppSettingsController(store)
+
+    val zooms = List(7) {
+      controller.zoomOut()
+      store.config.appearance.zoom
+    }
+
+    assertEquals(listOf(175, 150, 125, 110, 100, 90, 90), zooms)
+    assertFalse(controller.canZoomOut)
+    assertTrue(controller.canZoomIn)
+  }
+
+  @Test
+  fun zoomInAndOut_betweenTwoLevels_goToTheNearestLevelThatWay() {
+    val store = RecordingConfigStore(KetchConfig(appearance = AppearanceConfig(zoom = 115)))
+    val controller = AppSettingsController(store)
+
+    controller.zoomIn()
+    assertEquals(125, store.config.appearance.zoom)
+
+    controller.saveZoom(115)
+    controller.zoomOut()
+    assertEquals(110, store.config.appearance.zoom)
+  }
+
+  @Test
+  fun zoomInAndOut_pastTheLevels_stepBackInsideAndStayOutwards() {
+    val store = RecordingConfigStore(
+      KetchConfig(appearance = AppearanceConfig(zoom = AppearanceConfig.MAX_ZOOM)),
+    )
+    val controller = AppSettingsController(store)
+
+    controller.zoomIn()
+    assertEquals(AppearanceConfig.MAX_ZOOM, store.config.appearance.zoom)
+    assertEquals(0, store.saves)
+    controller.zoomOut()
+    assertEquals(200, store.config.appearance.zoom)
+
+    controller.saveZoom(AppearanceConfig.MIN_ZOOM)
+    controller.zoomOut()
+    assertEquals(AppearanceConfig.MIN_ZOOM, store.config.appearance.zoom)
+    controller.zoomIn()
+    assertEquals(90, store.config.appearance.zoom)
+  }
+
+  @Test
+  fun resetZoom_zoomed_savesTheNormalSize() {
+    val store = RecordingConfigStore(KetchConfig(appearance = AppearanceConfig(zoom = 175)))
+    val controller = AppSettingsController(store)
+
+    controller.resetZoom()
+
+    assertEquals(AppearanceConfig.DEFAULT_ZOOM, store.config.appearance.zoom)
   }
 
   @Test

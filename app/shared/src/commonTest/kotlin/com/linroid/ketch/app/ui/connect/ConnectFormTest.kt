@@ -200,6 +200,24 @@ class ConnectFormTest {
   }
 
   @Test
+  fun connect_ownSharedServer_keepsTheFormSayingItIsThisDevice() = runTest {
+    val manager = InstanceManager(
+      factory = FakeInstanceFactory(instanceId = THIS_DEVICE).factory,
+      context = backgroundScope.coroutineContext,
+    )
+    val probe = ConnectionProbe { ProbeResult(ConnectionState.Connected, instanceId = THIS_DEVICE) }
+    val form = ConnectForm("192.168.1.5")
+    var connected = false
+
+    form.connect(this, DeviceConnector(manager, {}, probe)) { connected = true }
+    runCurrent()
+
+    assertFalse(connected)
+    assertEquals(ConnectProblem.ThisDevice("192.168.1.5:8642"), form.problem)
+    assertFalse(form.connecting)
+  }
+
+  @Test
   fun pick_serverThatAsksForCode_showsTheCodeFieldAndKeepsItsName() {
     val form = ConnectForm()
 
@@ -381,5 +399,9 @@ class ConnectFormTest {
     assertTrue(form.codeShown)
     assertFalse(form.isEdited)
     assertEquals(PairingLink("nas.local", 9443, secure = true), form.target)
+  }
+
+  private companion object {
+    const val THIS_DEVICE = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10"
   }
 }

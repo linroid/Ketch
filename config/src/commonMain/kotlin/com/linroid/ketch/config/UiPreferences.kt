@@ -92,7 +92,8 @@ data class IntakePreferences(
  * @property lastClipHash hash of the clipboard text last offered, so the same
  *   link is not offered twice.
  * @property observedPeak highest total download speed seen in the last 7 days,
- *   in bytes per second; `0` until there is history.
+ *   in bytes per second; `0` until there is history. The engine that runs this directory's
+ *   downloads keeps it for its speed modes (`SpeedModeOptions`).
  * @property observedPeakAt when [observedPeak] was seen, in epoch milliseconds.
  * @property onboardingVersion version of the welcome flow the user finished;
  *   `0` when it has not been shown.

@@ -6,19 +6,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.TrackerListStatus
 import com.linroid.ketch.app.state.AppController
-import com.linroid.ketch.app.state.ObservedPeak
 import com.linroid.ketch.app.state.SettingsCategory
 import com.linroid.ketch.app.state.SettingsTarget
-import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.state.deviceId
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
@@ -28,19 +31,17 @@ import com.linroid.ketch.config.DensityMode
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.ServerConfig
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.SpeedSettings
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
-import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.datetime.TimeZone
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.days
@@ -179,6 +180,34 @@ class SettingsDeviceSnapshots {
   }
 
   @Test
+  fun remote_speedPage_offersTheSpeedModesTheDeviceRuns() {
+    pageSnapshots(
+      name = "settings-remote-speed-modes",
+      category = SettingsCategory.Speed,
+      sizes = listOf(Pane, PhonePage),
+      setup = DeviceSetup(remote = true, remoteSpeedModes = true),
+    )
+  }
+
+  @Test
+  fun remote_bitTorrent_changesTheDevicesOwnSettings() {
+    pageSnapshots(
+      name = "settings-remote-bittorrent-editable",
+      category = SettingsCategory.BitTorrent,
+      sizes = listOf(Pane, PhonePage),
+      setup = DeviceSetup(
+        remote = true,
+        remoteTorrents = TorrentEngineSettings(
+          upload = TorrentUploadSetting.SEED,
+          uploadLimit = SpeedLimit.mbps(2),
+          trackers = listOf("udp://tracker.opentrackr.org:1337/announce"),
+          trackerListUrls = TorrentSettings.DEFAULT_TRACKER_LISTS,
+        ),
+      ),
+    )
+  }
+
+  @Test
   fun app_deviceSettingsPages_openThroughIntents() {
     val sizes = listOf(SnapshotSize.Medium, SnapshotSize.Phone)
     appPageSnapshots("app-settings-speed", sizes) { openSettings(SettingsTarget.Page.Speed) }
@@ -279,11 +308,15 @@ private fun PageFrame(
  * @property folder the download folder chosen for it; `null` uses its Downloads folder.
  * @property pendingPort a port saved after sharing started, which asks for a restart.
  * @property remote whether the pages show the NAS, a remote device, instead of this one.
+ * @property remoteSpeedModes whether the NAS runs [speed] itself; without, it runs an older
+ *   Ketch with a plain speed limit.
  * @property networksFail whether asking the device for its networks fails.
  * @property proxy how the device's downloads reach servers.
  * @property upload what the device shares with the peers of its torrents.
  * @property followsNetwork whether its uploads follow the network, as on a phone, which shows
  *   Only on Wi-Fi.
+ * @property remoteTorrents the torrent settings the remote device lets this app change; `null`
+ *   for one whose Ketch cannot.
  */
 private data class DeviceSetup(
   val speed: SpeedSettings = SpeedSettings(
@@ -309,10 +342,12 @@ private data class DeviceSetup(
   val folder: String? = null,
   val pendingPort: Int? = null,
   val remote: Boolean = false,
+  val remoteSpeedModes: Boolean = false,
   val networksFail: Boolean = false,
   val proxy: Proxy = Proxy.System,
   val upload: TorrentUploadMode = TorrentUploadMode.Seed,
   val followsNetwork: Boolean = false,
+  val remoteTorrents: TorrentEngineSettings? = null,
 )
 
 /**
@@ -346,9 +381,11 @@ private class DeviceEnvironment(
       },
     )
   }
-  private val api = NetworkedApi(SampleKetchApi(data), fail = setup.networksFail)
+  private val api = NetworkedApi(
+    SampleKetchApi(data, speed = setup.speed, observedPeak = PEAK),
+    fail = setup.networksFail,
+  )
   private val store = RecordingConfigStore(config(theme, density, setup))
-  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
   private val instanceManager = InstanceManager(
     factory = InstanceFactory(
       deviceName = data.deviceName,
@@ -381,8 +418,15 @@ private class DeviceEnvironment(
       pauseUploads = {},
       // The NAS answers like this device, from its own copy of the sample.
       remoteFactory = { config ->
+        val nas = NetworkedApi(
+          SampleKetchApi(
+            data,
+            speed = setup.speed.takeIf { setup.remoteSpeedModes },
+            observedPeak = PEAK,
+          ),
+        )
         RemoteInstance(
-          instance = NetworkedApi(SampleKetchApi(data)),
+          instance = setup.remoteTorrents?.let { TorrentSettingsApi(nas, it) } ?: nas,
           remoteConfig = config,
           connectionState = MutableStateFlow(ConnectionState.Connected),
         )
@@ -392,26 +436,12 @@ private class DeviceEnvironment(
     configStore = store,
     context = SnapshotHarness.ui,
   )
-  private val speedMode = SpeedModeController(
-    config = { api.status().config },
-    apply = { api.updateConfig(it) },
-    scope = speedScope,
-    settings = setup.speed,
-    observedPeak = ObservedPeak(
-      bytesPerSecond = PEAK,
-      atEpochMillis = (SampleData.NOW - 1.days).toEpochMilliseconds(),
-    ),
-    scheduler = SpeedScheduler { TimeZone.UTC },
-    clock = SampleData.CLOCK,
-  )
-
   /** The controller the pages and the app root show. */
   override val controller = AppController(
     instanceManager = instanceManager,
     context = SnapshotHarness.ui,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
-    speedMode = speedMode,
     clock = SampleData.CLOCK,
   )
 
@@ -425,7 +455,6 @@ private class DeviceEnvironment(
 
   override fun close() {
     controller.close()
-    speedScope.cancel()
     instanceManager.close()
   }
 
@@ -461,3 +490,28 @@ private class DeviceEnvironment(
   }
 }
 
+/** A remote device whose torrent settings this app can change, starting from [settings]. */
+private class TorrentSettingsApi(
+  private val api: KetchApi,
+  settings: TorrentEngineSettings,
+) : KetchApi by api {
+  private val torrents = object : TorrentController {
+    private var current = settings
+
+    override suspend fun capabilities() =
+      TorrentCapabilities(names = setOf("inspect", "settings", "local-discovery"))
+
+    override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+
+    override suspend fun settings() = current
+
+    override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+      current = change.applyTo(current)
+      return current
+    }
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    if (key === TorrentController.Key) torrents as T else api.controller(key)
+}

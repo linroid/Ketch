@@ -30,6 +30,9 @@ enum class CommandScope {
  * @property label sentence-case name, such as "Pause all".
  * @property icon glyph shown next to [label], or `null` for none.
  * @property scope where the chords are listened for.
+ * @property alternates further chords that run the command on desktop keyboards, written once for
+ *   Apple and PC keyboards as [KeyChord] is: [boundChords] lists them after [chords], but menus,
+ *   tooltips and the shortcut sheet only show [chords].
  * @property inMenus whether the menu bar lists the command.
  * @property onWeb whether the web app offers the command; window commands belong to the
  *   browser there.
@@ -45,6 +48,7 @@ class KetchCommand internal constructor(
   private val mac: KeyChord?,
   private val pc: KeyChord? = mac,
   private val web: List<KeyChord>? = null,
+  private val alternates: List<KeyChord> = emptyList(),
   val inMenus: Boolean = false,
   val onWeb: Boolean = true,
   val yieldsToTextField: Boolean = false,
@@ -61,6 +65,15 @@ class KetchCommand internal constructor(
       !onWeb -> emptyList()
       else -> web ?: desktop
     }
+  }
+
+  /**
+   * Every chord that runs this command on [platform]: its [chords], then on desktop keyboards the
+   * alternates no menu, tooltip or shortcut sheet shows, such as ⌘+ beside ⌘= for Zoom in.
+   */
+  fun boundChords(platform: KeyboardPlatform): List<KeyChord> {
+    val shown = chords(platform)
+    return if (platform.isWeb) shown else shown + alternates
   }
 
   /** The label of the first chord on [platform], such as "⇧⌘P"; `null` when there is none. */

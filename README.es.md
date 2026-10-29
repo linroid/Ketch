@@ -164,7 +164,8 @@ publicadas aquí: la aplicación desde Ajustes → Acerca de y la línea de coma
 ### Controla tu ancho de banda
 
 - **Modos de velocidad** — Velocidad máxima, **Modo lento** para dejar espacio a una videollamada o
-  **Automático**, que alterna entre ambos según un horario semanal.
+  **Automático**, que alterna entre ambos según un horario semanal. Cada dispositivo aplica los
+  suyos, así que un NAS sigue su horario aunque el teléfono que lo configuró no esté.
 - **Control por descarga** — Cambia límites de velocidad, conexiones y prioridades durante la
   descarga. **Urgente** pausa una descarga menos importante para empezar de inmediato.
 - **Una cola a tu medida** — Limita las descargas simultáneas y por sitio, o programa una descarga

@@ -26,9 +26,18 @@ kotlin {
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs { browser() }
 
+  // Intermediate source set shared between JVM and Android
+  applyDefaultHierarchyTemplate()
   sourceSets {
+    val jvmAndAndroidMain = create("jvmAndAndroidMain") {
+      dependsOn(commonMain.get())
+    }
+    androidMain.get().dependsOn(jvmAndAndroidMain)
+    jvmMain.get().dependsOn(jvmAndAndroidMain)
+
     commonMain.dependencies {
       api(projects.library.api)
+      api(projects.library.torrentApi)
       implementation(libs.okio)
       implementation(libs.ktoml.core)
     }

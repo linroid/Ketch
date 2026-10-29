@@ -129,6 +129,7 @@
   <string name="connect_port">포트</string>
   <string name="connect_use_https">HTTPS 사용</string>
   <string name="connect_unreachable">%1$s에 연결할 수 없습니다. 해당 기기에서 Ketch 공유가 켜져 있고 두 기기가 같은 네트워크에 있는지 확인하세요.</string>
+  <string name="connect_this_device">%1$s 주소는 이 기기입니다. 이 기기의 다운로드는 이미 여기에 표시됩니다.</string>
   <string name="connect_add_anyway">그래도 추가</string>
   <string name="connect_add_failed">기기를 추가할 수 없음: %1$s</string>
   <string name="connect_connected">%1$s에 연결됨</string>

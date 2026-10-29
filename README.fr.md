@@ -167,7 +167,8 @@ publiées ici : l'application via Réglages → À propos, la ligne de commande
 ### Maîtrisez votre bande passante
 
 - **Modes de vitesse** — Pleine vitesse, **Vitesse réduite** pour laisser de la place à un appel
-  vidéo, ou **Automatique**, qui alterne selon un programme hebdomadaire.
+  vidéo, ou **Automatique**, qui alterne selon un programme hebdomadaire. Chaque appareil applique
+  les siens : un NAS suit son programme même quand le téléphone qui l'a réglé est absent.
 - **Réglages par téléchargement** — Modifiez les limites de vitesse, le nombre de connexions et
   les priorités pendant le téléchargement. **Urgente** met en pause un téléchargement moins
   important pour démarrer immédiatement.

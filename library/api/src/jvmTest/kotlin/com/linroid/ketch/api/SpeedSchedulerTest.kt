@@ -1,7 +1,5 @@
-package com.linroid.ketch.app.state
+package com.linroid.ketch.api
 
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.Weekday
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -10,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
+// On the JVM, which has every time zone; Node.js has UTC alone unless js-joda's are loaded.
 class SpeedSchedulerTest {
 
   private val zone = TimeZone.of("America/New_York")

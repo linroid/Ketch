@@ -43,7 +43,6 @@ import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.icons.KetchIconImage
 import com.linroid.ketch.app.input.KetchCommands
-import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.SpeedMode
@@ -65,7 +64,7 @@ import org.jetbrains.compose.resources.stringResource
  * What the speed mode pill and popover show for the active device.
  *
  * @property mode mode in effect.
- * @property limit limit downloads run at, from [effectiveCap].
+ * @property limit limit downloads run at, as the device reports it.
  * @property label text of the pill, from [speedModeLabelText].
  * @property controller the device's speed mode; `null` when it has none, which leaves only the
  *   speed limit to change.
@@ -94,7 +93,7 @@ internal data class SpeedModeView(
 internal fun rememberSpeedModeView(state: AppState): SpeedModeView {
   val pulse by state.pulse.state.collectAsState()
   val active by state.activeInstance.collectAsState()
-  return speedModeView(state.speedMode.takeIf { active is EmbeddedInstance }, pulse.mode, pulse.cap)
+  return speedModeView(state.rememberSpeedModeOf(active), pulse.mode, pulse.cap)
 }
 
 /**
@@ -107,15 +106,10 @@ internal fun speedModeView(
   fallbackMode: SpeedMode,
   cap: SpeedLimit,
 ): SpeedModeView {
-  val settings = controller?.settings?.collectAsState()?.value
+  val reported = controller?.state?.collectAsState()?.value
   val mode = controller?.mode?.collectAsState()?.value ?: fallbackMode
-  // The suggested slow lane speed follows the observed peak.
-  controller?.observedPeak?.collectAsState()?.value
-  val limit = if (controller == null || settings == null) {
-    cap
-  } else {
-    effectiveCap(mode, cap, controller.slowLaneSpeed, settings.standard)
-  }
+  // The device reports the limit its mode holds it to.
+  val limit = reported?.limit ?: cap
   val now = LocalClock.current.now()
   val label = speedModeLabelText(mode, limit, now, TimeZone.currentSystemDefault())
   return SpeedModeView(mode, limit, label, controller)
@@ -146,8 +140,8 @@ internal fun rememberPendingJob(): PendingJob = remember { PendingJob() }
  * or "Auto · Slow lane until 18:00", amber whenever a limit holds downloads back.
  *
  * Clicking it turns the Slow lane on or off with an Undo toast, like `⇧⌘L`; its chevron opens
- * the [SpeedModePopover]. A device without a speed mode, such as a remote one, opens the
- * popover from both, to change its speed limit.
+ * the [SpeedModePopover]. A device without a speed mode, such as one running an older Ketch,
+ * opens the popover from both, to change its speed limit.
  */
 @Composable
 fun SpeedModePill(state: AppState, modifier: Modifier = Modifier) {

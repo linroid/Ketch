@@ -61,6 +61,17 @@ interface Interest<T> {
       get() = ActiveConnections.serializer()
   }
 
+  /**
+   * The instance's [SpeedModes]: their state at once, then each change, such as an Auto rule
+   * turning the slow lane on. Needs [KetchFeatures.SPEED_MODES].
+   */
+  @Serializable
+  @SerialName("speedMode")
+  data object SpeedMode : Interest<SpeedModeState> {
+    override val valueSerializer: KSerializer<SpeedModeState>
+      get() = SpeedModeState.serializer()
+  }
+
   companion object {
     /** [KetchApi.subscribe]'s default interval. */
     val DEFAULT_INTERVAL: Duration = 1.seconds

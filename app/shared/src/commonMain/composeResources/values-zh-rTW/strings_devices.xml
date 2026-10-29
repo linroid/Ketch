@@ -129,6 +129,7 @@
   <string name="connect_port">連接埠</string>
   <string name="connect_use_https">使用 HTTPS</string>
   <string name="connect_unreachable">無法連線至 %1$s。請確認 Ketch 已在該裝置上開啟共享，且兩台裝置位於同一個網路。</string>
+  <string name="connect_this_device">%1$s 就是這台裝置，它的下載已經顯示在這裡。</string>
   <string name="connect_add_anyway">仍要新增</string>
   <string name="connect_add_failed">無法新增裝置：%1$s</string>
   <string name="connect_connected">已連線至 %1$s</string>

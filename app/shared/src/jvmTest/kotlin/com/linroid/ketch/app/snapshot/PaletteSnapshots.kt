@@ -23,10 +23,10 @@ import kotlin.test.Test
 
 /**
  * The command palette (`⌘K`) over the app: what it lists before anything is typed, a pasted
- * link with a row per device, a typed speed, a device command, downloads found by name and by
- * search token, the Discover fallback, no matches, and the highlight moved by the keyboard, also
- * under a resting pointer and to both ends of a scrolled list; see [SnapshotHarness] for how to
- * run it.
+ * link with a row per device, a typed speed, a device command, the zoom commands, downloads found
+ * by name and by search token, the Discover fallback, no matches, and the highlight moved by the
+ * keyboard, also under a resting pointer and to both ends of a scrolled list; see
+ * [SnapshotHarness] for how to run it.
  *
  * The app shows the sample's downloads on this Mac, with the NAS connected, the Slow lane on
  * and Discover set up ([SettingsEnvironment]).
@@ -64,6 +64,13 @@ class PaletteSnapshots {
   fun deviceCommand_desktop_findsTheNas() {
     for (theme in SnapshotTheme.entries) {
       paletteSnapshot("palette-pause-nas", SnapshotSize.Desktop, theme, query = "pause nas")
+    }
+  }
+
+  @Test
+  fun zoom_desktop_listsTheZoomCommands() {
+    for (theme in SnapshotTheme.entries) {
+      paletteSnapshot("palette-zoom", SnapshotSize.Desktop, theme, query = "zoom")
     }
   }
 

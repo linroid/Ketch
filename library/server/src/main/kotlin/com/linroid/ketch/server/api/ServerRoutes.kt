@@ -1,20 +1,21 @@
 package com.linroid.ketch.server.api
 
-import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.NetworkInterfaceConfig
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
+import com.linroid.ketch.api.SpeedModes
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.api.reason
 import com.linroid.ketch.api.resolve
 import com.linroid.ketch.endpoints.Api
-import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import com.linroid.ketch.endpoints.stream.StreamEvents
 import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
@@ -33,6 +34,24 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.coroutines.cancellation.CancellationException
 
 private val log = KetchLogger("ServerRoutes")
+
+/**
+ * What of [config], applied to this instance, to save: while speed modes hold the limit, as the
+ * slow lane does, the limit in effect is not the one to keep, but the standing cap is.
+ */
+private suspend fun KetchApi.toSave(config: DownloadConfig): DownloadConfig {
+  val modes = controller(SpeedModes) ?: return config
+  val cap = try {
+    modes.state().settings.standard
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    // A client of a server without them, as a stand-in for its engine is.
+    log.d { "No speed modes to keep the cap of: ${e.describeCauses()}" }
+    return config
+  }
+  return config.copy(speedLimit = cap)
+}
 
 /**
  * Installs server-level status, configuration, network interface, and URL resolution endpoints.
@@ -72,7 +91,7 @@ internal fun Route.serverRoutes(
       destinations.checkConfig(body)
       ketch.updateConfig(body)
       try {
-        onConfigChanged?.invoke(body)
+        onConfigChanged?.invoke(ketch.toSave(body))
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {

@@ -1,6 +1,8 @@
 package com.linroid.ketch.config
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.torrent.api.TorrentEncryptionSetting
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -259,5 +261,38 @@ class TorrentSettingsTest {
       """.trimMargin(),
     )
     assertEquals(TorrentEncryptionMode.Preferred, decoded.torrent.encryption)
+  }
+
+  @Test
+  fun `engine settings changed elsewhere keep what only the host decides`() {
+    val saved = TorrentSettings(listenPort = 16881, uploadWifiOnly = false)
+    val engine = saved.engineSettings.copy(
+      upload = TorrentUploadSetting.SEED,
+      uploadLimit = SpeedLimit.kbps(256),
+      encryption = TorrentEncryptionSetting.OFF,
+      localDiscovery = false,
+      trackers = listOf("udp://tracker.example:1337/announce"),
+      trackerList = false,
+    )
+
+    val adopted = saved.withEngineSettings(engine)
+
+    assertEquals(engine, adopted.engineSettings)
+    assertEquals(16881, adopted.listenPort)
+    assertEquals(false, adopted.uploadWifiOnly)
+    // Switched off, the lists stay for when they are switched on again.
+    assertEquals(TorrentSettings.DEFAULT_TRACKER_LISTS, adopted.trackerListUrls)
+  }
+
+  @Test
+  fun `a list saved by 0_3_0 stays written as it was while its address stays`() {
+    val legacy = TorrentSettings(trackerListUrl = "https://lists.example/old.txt")
+    val engine = legacy.engineSettings
+
+    assertEquals(listOf("https://lists.example/old.txt"), engine.trackerListUrls)
+    assertEquals(legacy.copy(utp = false), legacy.withEngineSettings(engine.copy(utp = false)))
+    val replaced = legacy.withEngineSettings(engine.copy(trackerListUrls = listOf("https://n/t")))
+    assertEquals(null, replaced.trackerListUrl)
+    assertEquals(listOf("https://n/t"), replaced.trackerListAddresses)
   }
 }

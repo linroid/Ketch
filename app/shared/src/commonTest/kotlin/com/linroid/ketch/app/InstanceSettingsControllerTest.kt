@@ -1,5 +1,6 @@
 package com.linroid.ketch.app
 
+import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchStatus
@@ -10,22 +11,62 @@ import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.state.AppSettingsController
 import com.linroid.ketch.app.state.InstanceSettingsController
+import com.linroid.ketch.config.KetchConfig
+import com.linroid.ketch.config.TorrentEncryptionMode
 import com.linroid.ketch.config.TorrentSettings
 import com.linroid.ketch.config.TorrentUploadMode
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentEncryptionSetting
+import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentSettingsChange
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/** Torrent controls of a remote device that keeps its settings, with [names] as capabilities. */
+private class SettingsTorrentController(
+  names: Set<String> = setOf("inspect", "settings", "local-discovery"),
+  var settings: TorrentEngineSettings = TorrentEngineSettings(),
+) : TorrentController {
+  private val capabilities = TorrentCapabilities(names = names)
+  val changes = mutableListOf<TorrentSettingsChange>()
+  var refuse = false
+
+  /** Holds every [updateSettings] until it completes; null lets them through. */
+  var gate: CompletableDeferred<Unit>? = null
+
+  override suspend fun capabilities() = capabilities
+
+  override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+
+  override suspend fun settings() = settings
+
+  override suspend fun updateSettings(change: TorrentSettingsChange): TorrentEngineSettings {
+    gate?.await()
+    if (refuse) throw IllegalStateException("Server said no")
+    changes += change
+    settings = change.applyTo(settings)
+    return settings
+  }
+}
 
 /** Instance that records the settings pushed to it. */
 private class SettingsKetchApi(
   var config: DownloadConfig = DownloadConfig(),
   var networks: NetworkInterfaces = NetworkInterfaces(),
+  private val torrents: TorrentController? = null,
 ) : KetchApi by FakeKetchApi("Settings") {
   val applied = mutableListOf<DownloadConfig>()
   val networkRequests = mutableListOf<List<String>>()
@@ -45,6 +86,10 @@ private class SettingsKetchApi(
   }
 
   override suspend fun networkInterfaces(): NetworkInterfaces = networks
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    if (key === TorrentController.Key) torrents as T? else null
 
   override suspend fun selectNetworkInterfaces(config: NetworkInterfaceConfig): NetworkInterfaces {
     gate?.await()
@@ -185,7 +230,7 @@ class InstanceSettingsControllerTest {
   }
 
   @Test
-  fun `remote instances offer no torrent settings`() = runTest {
+  fun loadTorrent_remoteWithoutTorrentControls_isUnsupported() = runTest {
     val applied = mutableListOf<TorrentSettings>()
     val controller = InstanceSettingsController(
       api = SettingsKetchApi(),
@@ -194,11 +239,153 @@ class InstanceSettingsControllerTest {
       applyTorrent = { applied += it },
     )
 
-    assertNull(controller.torrent)
+    controller.loadTorrent()
+    advanceUntilIdle()
     controller.updateTorrent(TorrentSettings(trackers = listOf("https://tracker.example/a")))
     advanceUntilIdle()
 
+    assertTrue(controller.torrentUnsupported)
+    assertNull(controller.torrent)
     assertEquals(emptyList(), applied)
+  }
+
+  @Test
+  fun loadTorrent_olderRemote_isUnsupportedWithoutAsking() = runTest {
+    val torrents = SettingsTorrentController(names = setOf("inspect", "reachability"))
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(torrents = torrents),
+      local = null,
+      scope = this,
+    )
+
+    controller.loadTorrent()
+    advanceUntilIdle()
+
+    assertTrue(controller.torrentUnsupported)
+    assertNull(controller.torrent)
+  }
+
+  @Test
+  fun updateTorrent_remote_sendsOnlyTheEditAndShowsWhatItSaved() = runTest {
+    val store = RecordingConfigStore()
+    val remote = TorrentEngineSettings(
+      upload = TorrentUploadSetting.SEED,
+      trackerListUrls = listOf("https://lists.example/best.txt"),
+    )
+    val torrents = SettingsTorrentController(settings = remote)
+    val applied = mutableListOf<TorrentSettings>()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(torrents = torrents),
+      local = null,
+      scope = this,
+      applyTorrent = { applied += it },
+    )
+
+    assertNull(controller.torrent)
+    controller.loadTorrent()
+    advanceUntilIdle()
+    val shown = assertNotNull(controller.torrent)
+    assertEquals(TorrentUploadMode.Seed, shown.upload)
+    assertEquals(listOf("https://lists.example/best.txt"), shown.trackerListAddresses)
+    assertTrue(controller.localDiscoverySupported)
+
+    controller.updateTorrent(shown.copy(utp = false, encryption = TorrentEncryptionMode.Off))
+    advanceUntilIdle()
+
+    assertEquals(
+      listOf(TorrentSettingsChange(encryption = TorrentEncryptionSetting.OFF, utp = false)),
+      torrents.changes,
+    )
+    assertEquals(false, controller.torrent?.utp)
+    // The remote device saves them; neither this app's file nor its engine changes.
+    assertEquals(TorrentSettings(), store.load().torrent)
+    assertEquals(emptyList(), applied)
+  }
+
+  @Test
+  fun updateTorrent_editQueuedWhileOneIsSent_keepsWhatAnotherDeviceChanged() = runTest {
+    val gate = CompletableDeferred<Unit>()
+    val torrents = SettingsTorrentController().apply { this.gate = gate }
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(torrents = torrents),
+      local = null,
+      scope = this,
+    )
+    controller.loadTorrent()
+    advanceUntilIdle()
+
+    controller.updateTorrent(assertNotNull(controller.torrent).copy(utp = false))
+    runCurrent()
+    // Another device starts seeding while the first edit is on its way, and this page edits on.
+    controller.updateTorrent(assertNotNull(controller.torrent).copy(portMapping = false))
+    torrents.settings = torrents.settings.copy(upload = TorrentUploadSetting.SEED)
+    gate.complete(Unit)
+    advanceUntilIdle()
+
+    assertEquals(
+      listOf(TorrentSettingsChange(utp = false), TorrentSettingsChange(portMapping = false)),
+      torrents.changes,
+    )
+    assertEquals(TorrentUploadSetting.SEED, torrents.settings.upload)
+    val shown = assertNotNull(controller.torrent)
+    assertEquals(TorrentUploadMode.Seed, shown.upload)
+    assertFalse(shown.utp)
+    assertFalse(shown.portMapping)
+  }
+
+  @Test
+  fun updateTorrent_remoteRefuses_showsWhatItConfirmed() = runTest {
+    val torrents = SettingsTorrentController().apply { refuse = true }
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(torrents = torrents),
+      local = null,
+      scope = this,
+    )
+    controller.loadTorrent()
+    advanceUntilIdle()
+
+    controller.updateTorrent(assertNotNull(controller.torrent).copy(portMapping = false))
+    advanceUntilIdle()
+
+    assertNotNull(controller.torrentError)
+    assertEquals(true, controller.torrent?.portMapping)
+  }
+
+  @Test
+  fun followEngineTorrent_changedByAnotherDevice_isSavedKeepingTheHosts() = runTest {
+    val saved = TorrentSettings(listenPort = 16881, uploadWifiOnly = false)
+    val store = RecordingConfigStore(KetchConfig(torrent = saved))
+    val engine = MutableStateFlow(saved.engineSettings)
+    val applied = mutableListOf<TorrentSettings>()
+    val controller = InstanceSettingsController(
+      api = SettingsKetchApi(),
+      local = AppSettingsController(store),
+      scope = this,
+      applyTorrent = {
+        applied += it
+        engine.value = it.engineSettings
+      },
+      engineTorrent = engine,
+    )
+    val following = launch { controller.followEngineTorrent() }
+    advanceUntilIdle()
+    assertEquals(0, store.saves)
+
+    engine.value = saved.engineSettings.copy(upload = TorrentUploadSetting.SEED, utp = false)
+    advanceUntilIdle()
+
+    val adopted = store.load().torrent
+    assertEquals(engine.value, adopted.engineSettings)
+    assertEquals(16881, adopted.listenPort)
+    assertEquals(false, adopted.uploadWifiOnly)
+    assertEquals(adopted, controller.torrent)
+
+    // Putting back what this page last applied reaches the engine, as it no longer runs it.
+    controller.updateTorrent(saved)
+    advanceUntilIdle()
+    assertEquals(listOf(saved), applied)
+    assertEquals(saved, store.load().torrent)
+    following.cancel()
   }
 
   @Test

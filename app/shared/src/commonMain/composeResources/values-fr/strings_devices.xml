@@ -135,6 +135,7 @@
   <string name="connect_port">Port</string>
   <string name="connect_use_https">Utiliser HTTPS</string>
   <string name="connect_unreachable">Impossible de joindre %1$s. Vérifiez que le partage est activé dans Ketch sur cet appareil et que les deux appareils sont sur le même réseau.</string>
+  <string name="connect_this_device">%1$s est cet appareil. Ses téléchargements s'affichent déjà ici.</string>
   <string name="connect_add_anyway">Ajouter quand même</string>
   <string name="connect_add_failed">Impossible d'ajouter l'appareil : %1$s</string>
   <string name="connect_connected">Connecté à %1$s</string>

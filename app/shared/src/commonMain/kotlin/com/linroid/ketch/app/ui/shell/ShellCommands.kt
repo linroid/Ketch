@@ -11,9 +11,11 @@ import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.platform.FilePicker
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.platform.isMobilePlatform
+import com.linroid.ketch.app.platform.zoomSupported
 import com.linroid.ketch.app.state.AppDestination
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.IntakeRequest
+import com.linroid.ketch.app.state.runZoomCommand
 import com.linroid.ketch.app.ui.pulse.toggleSlowLane
 import com.linroid.ketch.app.util.LinkParser
 import com.linroid.ketch.app.util.links
@@ -78,9 +80,10 @@ internal val AppState.quickAddsLinks: Boolean
 /**
  * Runs the global [KetchCommands] in the window: adding, the tabs and destinations, the devices
  * and their switcher, the speed and queue commands, the sidebar, the inspector, Activity, Undo,
- * Settings, the shortcut sheet and the command palette (`⌘K`). While Settings shows, `⌘F` is
- * left to Settings' own search; `⌘E` also puts the keyboard in Discover's composer. Discover's
- * page keys, such as `⇧⌘H`, go to the Discover page shown, when the keyboard is not in it.
+ * Settings, the shortcut sheet, the command palette (`⌘K`) and, where the app has a zoom of its
+ * own, the zoom commands. While Settings shows, `⌘F` is left to Settings' own search; `⌘E` also
+ * puts the keyboard in Discover's composer. Discover's page keys, such as `⇧⌘H`, go to the
+ * Discover page shown, when the keyboard is not in it.
  *
  * @param clipboard where pasted and added links come from.
  * @param files picks `.torrent` files to open.
@@ -100,6 +103,7 @@ internal class ShellCommands(
   /** Whether [run] does anything for [command]. */
   fun binds(command: KetchCommand): Boolean =
     command in bound ||
+      (zoomSupported && command in zoom) ||
       KetchCommands.tabFilter(command) != null ||
       KetchCommands.deviceNumber(command) != null
 
@@ -157,6 +161,7 @@ internal class ShellCommands(
       KetchCommands.DiscoverHistory,
       KetchCommands.DiscoverStop,
       -> return shell.discover.pageCommand?.invoke(command) ?: false
+      in zoom -> return zoomSupported && state.appSettings.runZoomCommand(command)
       else -> return false
     }
     return true
@@ -246,5 +251,8 @@ internal class ShellCommands(
       KetchCommands.DiscoverHistory,
       KetchCommands.DiscoverStop,
     )
+
+    val zoom: Set<KetchCommand> =
+      setOf(KetchCommands.ZoomIn, KetchCommands.ZoomOut, KetchCommands.ActualSize)
   }
 }

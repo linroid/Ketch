@@ -491,6 +491,8 @@
   <string name="settings_speed_mode_auto">Авто</string>
   <string name="settings_speed_remote">Эти настройки действуют на устройстве «%1$s» до его следующего перезапуска. Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
   <string name="settings_speed_remote_saved">Эти настройки сохраняются на устройстве «%1$s». Режимы «Низкая скорость» и «Авто» на нём пока недоступны.</string>
+  <string name="settings_speed_remote_modes">Устройство «%1$s» само применяет режим скорости и правила, даже когда это приложение закрыто. Число подключений на загрузку действует до его следующего перезапуска.</string>
+  <string name="settings_speed_remote_modes_saved">Сохраняется на устройстве «%1$s», которое само применяет режим скорости и правила, даже когда это приложение закрыто.</string>
   <string name="settings_speed_limit_group">Ограничение</string>
   <string name="settings_speed_limit">Ограничение скорости</string>
   <string name="settings_speed_limit_hint">Общее для всех загрузок; собственное ограничение загрузки может быть ниже.</string>
@@ -606,7 +608,7 @@
   <string name="settings_torrent_connections_footer">Шифрование скрывает, что это за трафик, но не то, с кем вы соединяетесь.</string>
   <string name="settings_torrent_trackers">Дополнительные трекеры</string>
   <string name="settings_torrent_no_trackers">Нет дополнительных трекеров</string>
-  <string name="settings_torrent_remote">Измените настройки BitTorrent на самом устройстве «%1$s» или в его config.toml.</string>
+  <string name="settings_torrent_remote">Обновите Ketch на устройстве «%1$s», чтобы менять эти настройки здесь.</string>
   <string name="settings_torrent_reach_reachable">Пиры могут подключиться к %1$s через порт %2$d.</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="one">Порт %2$d проброшен на %1$s через %3$d роутер, поэтому пиры могут подключиться.</item>

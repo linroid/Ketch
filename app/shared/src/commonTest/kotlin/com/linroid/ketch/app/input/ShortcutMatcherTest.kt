@@ -32,6 +32,26 @@ class ShortcutMatcherTest {
   }
 
   @Test
+  fun match_zoomChordsOnPc_runTheZoomCommandsWhileTyping() {
+    val zoomIn = listOf(
+      KeyPress(Key.Equals, ctrl = true),
+      KeyPress(Key.Equals, ctrl = true, shift = true),
+      KeyPress(Key.Plus, ctrl = true),
+      KeyPress(Key.NumPadAdd, ctrl = true),
+    )
+    val zoomOut = listOf(
+      KeyPress(Key.Minus, ctrl = true),
+      KeyPress(Key.NumPadSubtract, ctrl = true),
+    )
+
+    for (press in zoomIn) assertSame(KetchCommands.ZoomIn, pc.match(press, typing), "$press")
+    for (press in zoomOut) assertSame(KetchCommands.ZoomOut, pc.match(press, typing), "$press")
+    val macPlus = KeyPress(Key.Equals, meta = true, shift = true)
+    assertSame(KetchCommands.ZoomIn, mac.match(macPlus, idle))
+    assertNull(webPc.match(KeyPress(Key.Equals, ctrl = true), idle))
+  }
+
+  @Test
   fun match_extraModifier_returnsNull() {
     val press = KeyPress(Key.P, meta = true, shift = true, alt = true)
     assertNull(mac.match(press, idle))

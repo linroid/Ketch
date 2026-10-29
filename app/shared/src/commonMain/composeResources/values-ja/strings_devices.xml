@@ -129,6 +129,7 @@
   <string name="connect_port">ポート</string>
   <string name="connect_use_https">HTTPSを使用</string>
   <string name="connect_unreachable">%1$sに接続できませんでした。そのデバイスでKetchが共有中であること、両方のデバイスが同じネットワークにあることを確認してください。</string>
+  <string name="connect_this_device">%1$sはこのデバイスです。このデバイスのダウンロードはすでにここに表示されています。</string>
   <string name="connect_add_anyway">このまま追加</string>
   <string name="connect_add_failed">デバイスを追加できませんでした：%1$s</string>
   <string name="connect_connected">%1$sに接続しました</string>

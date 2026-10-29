@@ -3,6 +3,7 @@ package com.linroid.ketch.cli
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.config.FileConfigStore
+import com.linroid.ketch.config.KetchConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -65,6 +66,24 @@ internal class ServerConfigFile(
       saved = config
     }
   }
+
+  /**
+   * Applies [transform] to the file as it is now and saves the result, under the lock [save]
+   * takes, so neither drops what the other wrote, such as the speed modes' `[speed]`.
+   *
+   * @throws Exception when the file cannot be read or written; the file is left as it was.
+   */
+  suspend fun update(transform: (KetchConfig) -> KetchConfig) {
+    lock.withLock {
+      withContext(Dispatchers.IO) {
+        val store = FileConfigStore(path)
+        store.save(transform(store.load()))
+      }
+    }
+  }
+
+  /** What sets [field] of `[download]` at every start, replacing what is saved; `null` for none. */
+  fun pinnedBy(field: String): String? = pinned[field]
 }
 
 /**

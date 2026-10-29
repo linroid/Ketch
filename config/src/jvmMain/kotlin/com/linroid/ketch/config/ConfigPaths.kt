@@ -50,3 +50,8 @@ fun defaultDbPath(): String {
   dir.mkdirs()
   return File(dir, "ketch.db").absolutePath
 }
+
+/** Returns the default device identity path: `<configDir>/device.json`, beside [defaultDbPath]. */
+fun defaultDevicePath(): String {
+  return File(defaultConfigDir(), DEVICE_FILE_NAME).absolutePath
+}

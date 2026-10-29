@@ -458,6 +458,8 @@
   <string name="settings_speed_mode_auto">自动</string>
   <string name="settings_speed_remote">设置将在 %1$s 上生效，重启该设备后会重置。该设备暂不支持低速模式和自动模式。</string>
   <string name="settings_speed_remote_saved">设置将保存在 %1$s 上。该设备暂不支持低速模式和自动模式。</string>
+  <string name="settings_speed_remote_modes">%1$s 会自行执行速度模式和规则，即使关闭本应用也会生效。每个下载的连接数在该设备重启后会重置。</string>
+  <string name="settings_speed_remote_modes_saved">设置保存在 %1$s 上，它会自行执行速度模式和规则，即使关闭本应用也会生效。</string>
   <string name="settings_speed_limit_group">限速</string>
   <string name="settings_speed_limit">限速</string>
   <string name="settings_speed_limit_hint">所有下载的总速度受此限制；单个下载可设置更低的限速。</string>
@@ -570,7 +572,7 @@
   <string name="settings_torrent_connections_footer">加密隐藏的是流量类型，而不是连接的对象。</string>
   <string name="settings_torrent_trackers">额外的 Tracker</string>
   <string name="settings_torrent_no_trackers">没有额外的 Tracker</string>
-  <string name="settings_torrent_remote">请在 %1$s 上打开 Ketch，或编辑该设备的 config.toml，修改 BitTorrent 设置。</string>
+  <string name="settings_torrent_remote">请更新 %1$s 上的 Ketch，以便在这里修改这些设置。</string>
   <string name="settings_torrent_reach_reachable">节点可以通过端口 %2$d 连接到 %1$s。</string>
   <plurals name="settings_torrent_reach_forwarded">
     <item quantity="other">端口 %2$d 已经由 %3$d 个路由器转发到 %1$s，节点可以连接。</item>

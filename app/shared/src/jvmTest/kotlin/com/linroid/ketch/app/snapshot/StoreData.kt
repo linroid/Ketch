@@ -11,6 +11,10 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedRule
+import com.linroid.ketch.api.SpeedSettings
+import com.linroid.ketch.api.Weekday
 import com.linroid.ketch.app.RecordingConfigStore
 import com.linroid.ketch.app.instance.InstanceFactory
 import com.linroid.ketch.app.instance.InstanceManager
@@ -26,27 +30,16 @@ import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.DiscoveryStep
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.ListTestTask
-import com.linroid.ketch.app.state.ObservedPeak
-import com.linroid.ketch.app.state.SpeedModeController
-import com.linroid.ketch.app.state.SpeedScheduler
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.config.AiSettings
 import com.linroid.ketch.config.LlmProvider
 import com.linroid.ketch.config.LlmSettings
-import com.linroid.ketch.config.SpeedLimitMode
-import com.linroid.ketch.config.SpeedRule
-import com.linroid.ketch.config.SpeedSettings
-import com.linroid.ketch.config.Weekday
 import com.linroid.ketch.remote.ConnectionState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.yield
-import kotlinx.datetime.TimeZone
 import kotlin.math.PI
 import kotlin.math.roundToLong
 import kotlin.math.sin
@@ -289,6 +282,8 @@ internal class StoreEnvironment(
       os = device.os,
       directory = device.directory,
       version = StoreData.VERSION,
+      speed = StoreData.Speed,
+      observedPeak = OBSERVED_PEAK,
     ),
   )
   private val studio = SampleKetchApi(
@@ -333,27 +328,12 @@ internal class StoreEnvironment(
     context = SnapshotHarness.ui,
   )
 
-  private val speedScope = CoroutineScope(SupervisorJob() + SnapshotHarness.ui)
-  private val speedMode = SpeedModeController(
-    config = { phone.status().config },
-    apply = { phone.updateConfig(it) },
-    scope = speedScope,
-    settings = StoreData.Speed,
-    observedPeak = ObservedPeak(
-      bytesPerSecond = OBSERVED_PEAK,
-      atEpochMillis = (SampleData.NOW - 1.days).toEpochMilliseconds(),
-    ),
-    scheduler = SpeedScheduler { TimeZone.UTC },
-    clock = SampleData.CLOCK,
-  )
-
   override val controller: AppController = AppController(
     instanceManager = instanceManager,
     aiProviderFactory = if (device.apple) null else StoreDiscovery,
     context = SnapshotHarness.ui,
     listDispatcher = SnapshotHarness.ui,
     timeSource = SnapshotClock.timeSource,
-    speedMode = speedMode,
     clock = SampleData.CLOCK,
   )
 
@@ -411,7 +391,6 @@ internal class StoreEnvironment(
 
   override fun close() {
     controller.close()
-    speedScope.cancel()
     instanceManager.close()
   }
 

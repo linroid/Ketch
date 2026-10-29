@@ -69,6 +69,7 @@ import ketch.app.shared.generated.resources.palette_slow_lane_on
 import ketch.app.shared.generated.resources.palette_slow_lane_to
 import ketch.app.shared.generated.resources.palette_slow_lane_turns_on
 import ketch.app.shared.generated.resources.palette_verb_download
+import ketch.app.shared.generated.resources.settings_general_zoom
 import ketch.app.shared.generated.resources.shell_discover_query
 import kotlinx.datetime.TimeZone
 import kotlin.time.Instant
@@ -324,6 +325,8 @@ private suspend fun commandItem(
     }
   }
   val shown = title?.load() ?: label
+  // "Zoom" finds Actual size too, and the zoom commands of languages that name them otherwise.
+  val zoom = if (command in ZOOM_COMMANDS) Res.string.settings_general_zoom.text().load() else null
   return PaletteItem(
     id = "command.${command.id}",
     provider = PaletteProvider.Commands,
@@ -332,7 +335,7 @@ private suspend fun commandItem(
     icon = PaletteIcon.Glyph(command.icon ?: KetchIcon.Command),
     action = PaletteAction.Command(command),
     shortcut = command.shortcutLabel(source.platform),
-    keywords = if (shown != label) listOf(label) else emptyList(),
+    keywords = listOfNotNull(label.takeIf { shown != label }, zoom),
   )
 }
 
@@ -622,6 +625,13 @@ private val NOT_COMMANDS: Set<KetchCommand> = setOf(
   KetchCommands.Connections,
   KetchCommands.Devices,
   KetchCommands.AllDevices
+)
+
+/** Commands that change the zoom, which also answer to the name of the Zoom setting. */
+private val ZOOM_COMMANDS: Set<KetchCommand> = setOf(
+  KetchCommands.ZoomIn,
+  KetchCommands.ZoomOut,
+  KetchCommands.ActualSize
 )
 
 /** Row actions that only copy something, which ↩ on a failed download never runs. */

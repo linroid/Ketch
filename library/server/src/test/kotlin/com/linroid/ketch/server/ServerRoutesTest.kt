@@ -7,6 +7,8 @@ import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
+import com.linroid.ketch.api.SpeedSettings
 import com.linroid.ketch.api.DownloadCategory
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.log.KetchLogger
@@ -14,6 +16,7 @@ import com.linroid.ketch.api.log.Logger
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.DownloadSource
+import com.linroid.ketch.core.speed.SpeedModeOptions
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.model.ResolveUrlRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -198,6 +201,19 @@ class ServerRoutesTest {
     val status = json.decodeFromString<KetchStatus>(response.bodyAsText())
     assertTrue(KetchFeatures.AUTO_CONNECTIONS in status.features)
     assertTrue(KetchFeatures.QUEUE_POSITION in status.features)
+  }
+
+  @Test
+  fun status_reportsTheEnginesInstanceId() = testApplication {
+    val id = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10"
+    val ketch = Ketch(httpEngine = NoOpHttpEngine(), instanceId = id)
+    application {
+      val server = createTestServer(ketch = ketch)
+      with(server) { configureServer() }
+    }
+    val response = client.get("/api/status")
+    val status = json.decodeFromString<KetchStatus>(response.bodyAsText())
+    assertEquals(id, status.instanceId)
   }
 
   @Test
@@ -453,6 +469,28 @@ class ServerRoutesTest {
 
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(listOf(ketch.status().config), saved)
+    assertEquals(2, saved.single().maxConcurrentDownloads)
+  }
+
+  @Test
+  fun `PUT config in the slow lane saves the standing cap`() = testApplication {
+    val ketch = Ketch(
+      httpEngine = NoOpHttpEngine(),
+      config = DownloadConfig(speedLimit = SpeedLimit.mbps(5)),
+      speedModes = SpeedModeOptions(SpeedSettings(mode = SpeedLimitMode.SlowLane)),
+    )
+    val saved = mutableListOf<DownloadConfig>()
+    application {
+      with(createTestServer(ketch, onConfigChanged = { saved += it })) { configureServer() }
+    }
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"maxConcurrentDownloads": 2}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(SpeedLimit.mbps(1), ketch.status().config.speedLimit)
+    assertEquals(SpeedLimit.mbps(5), saved.single().speedLimit)
     assertEquals(2, saved.single().maxConcurrentDownloads)
   }
 

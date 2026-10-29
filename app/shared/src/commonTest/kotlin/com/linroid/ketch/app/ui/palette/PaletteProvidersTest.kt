@@ -70,6 +70,14 @@ class PaletteProvidersTest {
   }
 
   @Test
+  fun paletteItems_zoom_findsEveryZoomCommand() = runTest {
+    val titles = results(source("zoom")).filter { it.provider == PaletteProvider.Commands }
+      .map { it.title }
+
+    assertEquals(setOf("Zoom in", "Zoom out", "Actual size"), titles.toSet())
+  }
+
+  @Test
   fun paletteItems_full_offersFullSpeed() = runTest {
     val first = results(source("full")).first()
 

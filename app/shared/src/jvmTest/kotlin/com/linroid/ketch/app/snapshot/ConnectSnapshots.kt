@@ -18,6 +18,7 @@ import com.linroid.ketch.app.state.LinkSource
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.ui.connect.AddDeviceDialog
 import com.linroid.ketch.app.ui.connect.ConnectForm
+import com.linroid.ketch.app.ui.connect.ConnectionProbe
 import com.linroid.ketch.app.ui.connect.ConnectLandingContent
 import com.linroid.ketch.app.ui.connect.DeviceConnector
 import com.linroid.ketch.app.ui.connect.NearbySearch
@@ -220,6 +221,22 @@ class ConnectSnapshots {
   }
 
   @Test
+  fun addDevice_ownSharedServer_saysItIsThisDevice() {
+    for ((size, theme) in listOf(
+      SnapshotSize.Desktop to SnapshotTheme.Light,
+      SnapshotSize.Desktop to SnapshotTheme.Dark,
+      SnapshotSize.Phone to SnapshotTheme.Light,
+    )) {
+      snapshot("add-device-this-device", size, theme) {
+        val form = remember {
+          formAfter("192.168.1.5:8642", ConnectionState.Connected, thisDevice = true)
+        }
+        AddDeviceSample(form)
+      }
+    }
+  }
+
+  @Test
   fun addDevice_codeRejected_asksForANewOne() {
     val device = sampleRemote(RemoteConfig("nas.local", name = "NAS-Basement"))
     for ((size, theme) in listOf(
@@ -370,14 +387,23 @@ private fun formAfterPairing(answer: PairingResult): ConnectForm {
   return form
 }
 
-/** A form that tried [link] and got [answer]. */
-private fun formAfter(link: String, answer: ConnectionState): ConnectForm {
+/**
+ * A form that tried [link] and got [answer]; with [thisDevice] the device there reported this
+ * device's identity.
+ */
+private fun formAfter(
+  link: String,
+  answer: ConnectionState,
+  thisDevice: Boolean = false,
+): ConnectForm {
   val form = ConnectForm(link)
-  val manager = InstanceManager(InstanceFactory())
+  val id = "0b9f3a52-6c1e-4d3e-9a51-2f4c7d8e9b10"
+  val manager = InstanceManager(InstanceFactory(instanceId = id))
+  val probe = ConnectionProbe { ProbeResult(answer, instanceId = id.takeIf { thisDevice }) }
   try {
     runBlocking {
       coroutineScope {
-        form.connect(this, DeviceConnector(manager, {}, { ProbeResult(answer) })) {}
+        form.connect(this, DeviceConnector(manager, {}, probe)) {}
       }
     }
   } finally {

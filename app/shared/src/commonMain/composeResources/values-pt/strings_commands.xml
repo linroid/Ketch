@@ -24,6 +24,9 @@
   <string name="command_window_close">Fechar janela</string>
   <string name="command_window_minimize">Minimizar</string>
   <string name="command_quit">Sair do Ketch</string>
+  <string name="command_zoom_in">Ampliar</string>
+  <string name="command_zoom_out">Reduzir</string>
+  <string name="command_zoom_actual_size">Tamanho real</string>
   <string name="command_list_up">Mover para cima</string>
   <string name="command_list_down">Mover para baixo</string>
   <string name="command_list_extend_up">Estender seleção para cima</string>

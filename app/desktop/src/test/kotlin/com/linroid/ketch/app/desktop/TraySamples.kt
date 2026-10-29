@@ -1,6 +1,7 @@
 package com.linroid.ketch.app.desktop
 
 import com.linroid.ketch.api.SpeedLimit
+import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.DevicePresence
 import com.linroid.ketch.app.instance.EmbeddedInstance
@@ -12,7 +13,6 @@ import com.linroid.ketch.app.state.PulseCounts
 import com.linroid.ketch.app.state.PulseState
 import com.linroid.ketch.app.state.SpeedMode
 import com.linroid.ketch.config.RemoteConfig
-import com.linroid.ketch.config.SpeedLimitMode
 import com.linroid.ketch.remote.ConnectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.time.Instant

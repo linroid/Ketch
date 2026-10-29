@@ -113,6 +113,8 @@ kotlin {
     }
     nonWebMain.dependencies {
       implementation(libs.dnssd)
+      // The embedded engine's speed modes (EmbeddedSpeedModes.kt).
+      implementation(projects.library.core)
     }
     jvmAndAndroidMain.dependencies {
       implementation(projects.ai.discover)

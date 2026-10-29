@@ -158,7 +158,6 @@ internal class QuickAddModel(application: Application) : AndroidViewModel(applic
       controller = AppController(
         instanceManager = service.instanceManager,
         incoming = incoming,
-        speedMode = service.speedMode,
       ).also(::relayToasts)
     }
 

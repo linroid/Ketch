@@ -15,6 +15,9 @@ import kotlinx.serialization.Serializable
  *   switching to it is instant and its speed and failures stay current.
  * @property os operating system the device last reported, such as "Linux" or "Android 15", which
  *   tells the apps what kind of device it is while it is offline; `null` until it connects.
+ * @property instanceId the device's identity (`KetchStatus.instanceId`), which tells the apps
+ *   the same device apart from another one at its address, and their own device from others;
+ *   `null` until it connects, and for devices that report none.
  */
 @Serializable
 data class RemoteConfig(
@@ -25,4 +28,5 @@ data class RemoteConfig(
   val name: String? = null,
   val watch: Boolean = true,
   val os: String? = null,
+  val instanceId: String? = null,
 )
