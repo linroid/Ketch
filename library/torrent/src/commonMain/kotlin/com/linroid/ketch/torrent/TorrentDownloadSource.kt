@@ -264,7 +264,7 @@ class TorrentDownloadSource(
     override val seedGoalsReached: Flow<String> get() = source.seedGoalsReached
 
     override suspend fun isSequential(taskId: String, sourceState: SourceState?) =
-      source.isSequential(taskId, source.savedSequential(sourceState))
+      source.isSequential(taskId) { source.savedSequential(sourceState) }
 
     override suspend fun setSequential(taskId: String, sequential: Boolean) =
       source.setSequential(taskId, sequential)
@@ -337,9 +337,9 @@ class TorrentDownloadSource(
     runCatching { decodeState(state) }.getOrNull()?.sequential == true
 
   /** Whether [taskId]'s pieces download in order: what it was told, else what its run says. */
-  internal suspend fun isSequential(taskId: String, saved: Boolean): Boolean =
+  internal suspend fun isSequential(taskId: String, saved: () -> Boolean): Boolean =
     sequentialChoices.value[taskId]
-      ?: stateMutex.withLock { states[taskId]?.sequential } ?: saved
+      ?: stateMutex.withLock { states[taskId]?.sequential } ?: saved()
 
   /** Downloads [taskId]'s pieces in order or not, at once if it runs and whenever it next does. */
   internal suspend fun setSequential(taskId: String, sequential: Boolean) {

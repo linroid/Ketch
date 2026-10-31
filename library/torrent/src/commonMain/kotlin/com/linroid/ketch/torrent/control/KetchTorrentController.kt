@@ -555,7 +555,9 @@ internal class KetchTorrentController(
       // A session the source has not reported seeding yet still seeds.
       seeding = content.seeding || content.activity == TorrentActivity.SEEDING,
       stall = content.stall,
-      sequential = source.isSequential(task.taskId, recordOf(task).sourceState),
+      // Nothing is left to order, and the saved state is costly to read for every snapshot.
+      sequential = task.state.value !is DownloadState.Completed &&
+        source.isSequential(task.taskId, recordOf(task).sourceState),
     )
   }
 
