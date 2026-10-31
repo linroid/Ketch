@@ -85,6 +85,10 @@ class TorrentPublicV2WorkflowTest {
     magnet(hybrid = true, selectLast = true)
   }
 
+  @Test fun pureV2MagnetDownloadsTheFilesItPicks() = runTest { magnetPicking(hybrid = false) }
+
+  @Test fun hybridMagnetDownloadsTheFilesItPicks() = runTest { magnetPicking(hybrid = true) }
+
   @Test fun hybridMagnetRetainsBothExactTopics() = runTest {
     magnet(hybrid = true)
   }
@@ -336,6 +340,31 @@ class TorrentPublicV2WorkflowTest {
         torrentFileSystem.deleteRecursively(root)
       }
     }
+  }
+
+  /** A magnet naming its last file (BEP 53), added without a selection, downloads only that. */
+  private suspend fun magnetPicking(hybrid: Boolean) = fixture(hybrid) { peer ->
+    peer.remaining.complete(Unit)
+    val source = TorrentDownloadSource(TorrentConfig(encryption = TorrentEncryption.DISABLED,
+      dhtEnabled = false), peer.http)
+    val ketch = Ketch(peer.http, additionalSources = listOf(source))
+    val root = temporaryDirectory()
+    try {
+      val last = if (hybrid) 2 else 1
+      val uri = MagnetUri(peer.document.identity, trackers = listOf("http://fixture/announce"),
+        selectOnly = setOf(last)).toUri()
+      val resolved = source.resolve(uri, TorrentDiscoveryPrivacy.TRACKER_ONLY)
+      assertEquals(setOf(last.toString()), resolved.defaultFileIds)
+      assertEquals(1, resolved.totalBytes)
+      ketch.start()
+      val task = ketch.download(DownloadRequest(uri, destination = Destination((root / "out")
+        .toString()), resolvedSource = resolved))
+      task.await().getOrThrow()
+      assertContentEquals(byteArrayOf(7), torrentFileSystem.read(root / "out" / "b") {
+        readByteArray()
+      })
+      assertFalse(torrentFileSystem.exists(root / "out" / "a"))
+    } finally { ketch.close(); torrentFileSystem.deleteRecursively(root) }
   }
 
   private suspend fun magnet(
