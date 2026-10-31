@@ -1242,6 +1242,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Sequential download: `TorrentController.setSequential` (REST `PUT .../sequential`, capability
+  `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
+  by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
+  `SequentialControl` switches it. It orders pieces, not per-file priorities
 - Seed goals: `TorrentEngineSettings.seedRatioPercent` and `seedTimeMinutes` (`[torrent]`, 0 for
   none; capability `seed-goals`). A seeder's watcher (`watchSeeder`) checks `seedGoalReached` every
   10 s while it seeds, against all it uploaded (saved counters included) and the time since this

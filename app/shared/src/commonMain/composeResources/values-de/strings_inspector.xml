@@ -207,6 +207,7 @@
   <string name="inspector_files_hint">Markierte Dateien werden heruntergeladen, nicht markierte bleiben, wo sie sind.</string>
   <string name="inspector_seeding_status">Seedet · ↑ %1$s · %2$s hochgeladen</string>
   <string name="inspector_seeding_stop">Seeden beenden</string>
+  <string name="inspector_sequential">Der Reihe nach laden</string>
   <string name="inspector_seeding_start">Seeden</string>
   <string name="inspector_seeding_waiting">Wartet aufs Seeden</string>
   <plurals name="inspector_stall_missing">

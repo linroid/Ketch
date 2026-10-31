@@ -61,6 +61,8 @@ data class TorrentCounters(
  *   report it.
  * @property stall why the download has made no progress for a while; `null` while it progresses,
  *   is not downloading, or from backends that do not report it.
+ * @property sequential whether pieces download in order, for playing the file meanwhile; `null`
+ *   from older backends
  */
 @Serializable
 data class TorrentSnapshot(
@@ -72,6 +74,7 @@ data class TorrentSnapshot(
   val counters: TorrentCounters? = null,
   val seeding: Boolean? = null,
   val stall: TorrentStall? = null,
+  val sequential: Boolean? = null,
 ) {
   init {
     require(taskId.isNotBlank() && taskId.length <= 128)

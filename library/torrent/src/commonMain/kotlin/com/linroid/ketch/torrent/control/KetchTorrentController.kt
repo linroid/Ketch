@@ -321,6 +321,13 @@ internal class KetchTorrentController(
     return result(taskId, outcome, seeding = null)
   }
 
+  override suspend fun setSequential(taskId: String, sequential: Boolean) {
+    val task = torrentTask(taskId) ?: throw notFound()
+    requireCapability(TorrentCapability.SEQUENTIAL, TorrentCommandError.UNSUPPORTED)
+    source.setSequential(task.taskId, sequential)
+    controlChanged()
+  }
+
   override suspend fun setSeeding(
     taskId: String,
     seeding: Boolean,
@@ -548,6 +555,7 @@ internal class KetchTorrentController(
       // A session the source has not reported seeding yet still seeds.
       seeding = content.seeding || content.activity == TorrentActivity.SEEDING,
       stall = content.stall,
+      sequential = source.isSequential(task.taskId, recordOf(task).sourceState),
     )
   }
 

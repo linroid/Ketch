@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
 import com.linroid.ketch.endpoints.torrent.Torrents
 import com.linroid.ketch.torrent.api.TorrentCommandError
@@ -111,6 +112,14 @@ internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController)
     val body = call.receiveJson<TorrentSeedingRequest>()
     log.d { "PUT /api/torrents/$taskId/seeding seeding=${body.seeding}" }
     call.respond(controller.setSeeding(taskId, body.seeding, body.context))
+  }
+
+  put<Torrents.ById.Sequential> { resource ->
+    val taskId = resource.parent.id
+    val body = call.receiveJson<TorrentSequentialRequest>()
+    log.d { "PUT /api/torrents/$taskId/sequential sequential=${body.sequential}" }
+    controller.setSequential(taskId, body.sequential)
+    call.respond(body)
   }
 
   sse("/api/torrents/{id}/events") {

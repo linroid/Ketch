@@ -207,6 +207,7 @@
   <string name="inspector_files_hint">Los archivos marcados se descargan; los desmarcados se quedan donde están.</string>
   <string name="inspector_seeding_status">Sembrando · ↑ %1$s · %2$s subidos</string>
   <string name="inspector_seeding_stop">Dejar de sembrar</string>
+  <string name="inspector_sequential">Descargar en orden</string>
   <string name="inspector_seeding_start">Sembrar</string>
   <string name="inspector_seeding_waiting">Esperando para sembrar</string>
   <plurals name="inspector_stall_missing">

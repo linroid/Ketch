@@ -6,6 +6,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapabilities
@@ -139,6 +140,12 @@ class TorrentRoutesTest {
       context: TorrentCommandContext,
     ): TorrentCommandResult =
       throw TorrentCommandException(TorrentCommandError.POLICY_DENIED, "Seeding is switched off")
+
+    var sequential: Boolean? = null
+
+    override suspend fun setSequential(taskId: String, sequential: Boolean) {
+      this.sequential = sequential
+    }
   }
 
   private class ControlledKetch(
@@ -342,6 +349,20 @@ class TorrentRoutesTest {
       assertEquals("invalid_input", response.error().error)
     }
     assertTrue(controller.pages.isEmpty())
+  }
+
+  @Test
+  fun sequential_reachesTheController() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val response = client.put("/api/torrents/t1/sequential") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(TorrentSequentialRequest(true)))
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(true, controller.sequential)
   }
 
   @Test

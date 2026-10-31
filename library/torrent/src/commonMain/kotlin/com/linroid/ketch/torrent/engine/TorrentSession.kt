@@ -49,6 +49,9 @@ internal interface TorrentSession {
   /** Why the download makes no progress, while it does not; sessions that cannot tell, null. */
   val stall: StateFlow<TorrentStall?> get() = NO_STALL
 
+  /** Opens pieces in order from now on, or rarest first; applies to a running transfer. */
+  fun setSequential(sequential: Boolean) {}
+
   /** Sets per-torrent download rate limit (bytes/sec, 0=unlimited). */
   fun setDownloadRateLimit(bytesPerSecond: Long)
 

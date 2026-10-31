@@ -231,6 +231,9 @@ internal class TorrentV2DownloadSession private constructor(
   /** Follows [changeSelection]. */
   override val totalBytes: Long get() = store.totalSelectedBytes
   override val downloadSpeed: Long get() = 0
+  private val sequential = AtomicBoolean(false)
+
+  override fun setSequential(sequential: Boolean) = this.sequential.store(sequential)
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
@@ -725,6 +728,7 @@ internal class TorrentV2DownloadSession private constructor(
                 swarm = TorrentV2Swarm(document, runtime, restricted, waitForPeers, discovered,
                   dial, failures, loopControls, connectionLimit::value, generation::load,
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
+                  sequential = sequential::load,
                   uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
                   onRoom = room::store, onIncomplete = ::incomplete,
                   incomingFailures = incomingFailures, webSeeds = webSeeds,

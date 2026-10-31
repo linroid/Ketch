@@ -298,6 +298,7 @@ private fun Overview(
   StallNotice(state, row, pending)
   if (row.state.hasControls) InspectorControls(state, listOf(row), runner, pending)
   SeedingControl(state, row, runner, pending)
+  SequentialControl(state, row)
   TaskDetails(state, row, device, runner, copier)
 }
 

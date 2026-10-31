@@ -24,6 +24,7 @@ import com.linroid.ketch.torrent.tracker.TrackerRevisionConflict
 import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.v1.TorrentSwarm
 import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
@@ -109,6 +110,10 @@ internal class KotlinTorrentSession(
   private val webSeedHttp: TorrentHttp? = null,
 ) : TorrentSession {
   init { require(connections in 1..512) }
+
+  private val sequential = AtomicBoolean(false)
+
+  override fun setSequential(sequential: Boolean) = this.sequential.store(sequential)
 
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (${logHash(store.metadata.infoHash.hex)})"
@@ -459,6 +464,7 @@ internal class KotlinTorrentSession(
           }
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
+              sequential = sequential::load,
               connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
               peerBudget = peerBudget, stall = _stall, reannounce = { reannounceTrackers() },
               uploadPolicy = uploadPolicy,

@@ -73,6 +73,18 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     return current.bits[index / 8].toInt() and (128 ushr (index % 8)) != 0
   }
 
+  /** The lowest piece [peer] has that is [eligible], for a transfer that runs in order. */
+  fun lowest(peer: P, eligible: (Int) -> Boolean): Int? {
+    check(!closed)
+    val current = peers[peer] ?: return null
+    for (index in 0 until pieceCount) {
+      if (current.bits[index / 8].toInt() and (128 ushr (index % 8)) != 0 && eligible(index)) {
+        return index
+      }
+    }
+    return null
+  }
+
   /** Eligibility is an actor-local lookup; no I/O or allocation should run in this callback. */
   fun pick(peer: P, eligible: (Int) -> Boolean): Int? {
     check(!closed)

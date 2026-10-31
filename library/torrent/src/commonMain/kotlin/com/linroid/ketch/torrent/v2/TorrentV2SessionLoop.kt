@@ -120,6 +120,8 @@ internal class TorrentV2Swarm(
    * and the loop's while a peer's request waits. Null keeps the loop's own, on its clock.
    */
   val throttle: ThrottleClock? = null,
+  /** Whether pieces begin in order rather than rarest first, read live. */
+  val sequential: () -> Boolean = { false },
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
@@ -389,7 +391,9 @@ internal object TorrentV2SessionLoop {
           val lateAfter = TorrentV2PieceScheduler.lateAfterMs(window, view.rate)
           var plan = pieces.planNext(peer.blocks, lateAfter, eligible)
           if (plan == null) {
-            val index = rarity.pick(peer) { pieces.canBegin(it) && eligible(it) }
+            val startable = { index: Int -> pieces.canBegin(index) && eligible(index) }
+            val index = if (swarm?.sequential?.invoke() == true) rarity.lowest(peer, startable)
+              else rarity.pick(peer, startable)
             if (index != null) {
               if (pieces.begin(index)) plan = pieces.planNext(peer.blocks, lateAfter, eligible)
               else {

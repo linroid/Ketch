@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
 import com.linroid.ketch.endpoints.torrent.Torrents
 import com.linroid.ketch.torrent.api.TorrentCapabilities
@@ -314,6 +315,16 @@ internal class RemoteTorrentController(
       httpClient.put(Torrents.ById.Seeding(parent = Torrents.ById(id = taskId))) {
         contentType(ContentType.Application.Json)
         setBody(TorrentSeedingRequest(seeding, context))
+      }
+    } ?: throw IllegalStateException("Empty response")
+  }
+
+  override suspend fun setSequential(taskId: String, sequential: Boolean) {
+    requireCapability(TorrentCapability.SEQUENTIAL)
+    call<TorrentSequentialRequest>(notFoundIsNull = false) {
+      httpClient.put(Torrents.ById.Sequential(parent = Torrents.ById(id = taskId))) {
+        contentType(ContentType.Application.Json)
+        setBody(TorrentSequentialRequest(sequential))
       }
     } ?: throw IllegalStateException("Empty response")
   }

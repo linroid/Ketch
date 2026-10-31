@@ -83,6 +83,17 @@ interface TorrentController {
   )
 
   /**
+   * Downloads the task's pieces in order ([sequential] `true`), so a file can be played while it
+   * downloads, or rarest first; applies at once and is kept with the task. Advertised as
+   * [TorrentCapability.SEQUENTIAL].
+   */
+  suspend fun setSequential(taskId: String, sequential: Boolean): Unit =
+    throw TorrentCommandException(
+      error = TorrentCommandError.UNSUPPORTED,
+      message = "Sequential download is unavailable",
+    )
+
+  /**
    * Whether peers can connect to the backend's torrent engine, through how many NAT layers its
    * port is forwarded, and whether it punches through NATs; advertised as
    * [TorrentCapability.REACHABILITY].

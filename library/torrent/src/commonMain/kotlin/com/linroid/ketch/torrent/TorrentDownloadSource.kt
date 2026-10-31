@@ -262,6 +262,12 @@ class TorrentDownloadSource(
     override val seedingTaskIds: StateFlow<Set<String>> get() = source.seedingTaskIds
 
     override val seedGoalsReached: Flow<String> get() = source.seedGoalsReached
+
+    override suspend fun isSequential(taskId: String, sourceState: SourceState?) =
+      source.isSequential(taskId, source.savedSequential(sourceState))
+
+    override suspend fun setSequential(taskId: String, sequential: Boolean) =
+      source.setSequential(taskId, sequential)
     override val restoresSeeding: Boolean get() = source.restoresSeeding
     override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
 
@@ -315,12 +321,34 @@ class TorrentDownloadSource(
       add(TorrentCapability.REACHABILITY.wireName)
       add(TorrentCapability.SETTINGS.wireName)
       add(TorrentCapability.SEED_GOALS.wireName)
+      add(TorrentCapability.SEQUENTIAL.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
         add(TorrentCapability.SEEDING.wireName)
       }
     }
+
+  /** What tasks were last told by [setSequential], in this process. */
+  private val sequentialChoices = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+  /** Whether [state], as a task saved it, downloads its pieces in order. */
+  internal fun savedSequential(state: SourceState?): Boolean = state != null &&
+    runCatching { decodeState(state) }.getOrNull()?.sequential == true
+
+  /** Whether [taskId]'s pieces download in order: what it was told, else what its run says. */
+  internal suspend fun isSequential(taskId: String, saved: Boolean): Boolean =
+    sequentialChoices.value[taskId]
+      ?: stateMutex.withLock { states[taskId]?.sequential } ?: saved
+
+  /** Downloads [taskId]'s pieces in order or not, at once if it runs and whenever it next does. */
+  internal suspend fun setSequential(taskId: String, sequential: Boolean) {
+    sequentialChoices.update { it + (taskId to sequential) }
+    stateMutex.withLock {
+      states[taskId]?.let { states[taskId] = it.copy(sequential = sequential) }
+    }
+    tasks.session(taskId)?.setSequential(sequential)
+  }
 
   /** What [TorrentControlSource.seedGoalsReached] reports. */
   internal val seedGoalsReached = MutableSharedFlow<String>(extraBufferCapacity = 64)
@@ -1548,7 +1576,8 @@ class TorrentDownloadSource(
     val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
     // The metainfo is Ketch's to keep; only states older builds saved carry it.
     val state = TorrentSourceState(hash, total, previous?.resumeData ?: "", selected, output,
-      previous?.metainfo.orEmpty(), version = 2, privacy = privacy)
+      previous?.metainfo.orEmpty(), version = 2, privacy = privacy,
+      sequential = previous?.sequential == true)
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1583,7 +1612,8 @@ class TorrentDownloadSource(
     val hash = document.info.hash.hex
     val total = table.totalOf(selected)
     val state = TorrentSourceState(hash, total, previous?.resumeData.orEmpty(), selected, output,
-      previous?.metainfo.orEmpty(), version = 3, privacy = privacy)
+      previous?.metainfo.orEmpty(), version = 3, privacy = privacy,
+      sequential = previous?.sequential == true)
     log.i {
       "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1657,13 +1687,15 @@ class TorrentDownloadSource(
       var keepSeeding = false
       var lent = false
       try {
-        rememberState(taskId, state)
+        val sequential = sequentialChoices.value[taskId] ?: state.sequential
+        rememberState(taskId, state.copy(sequential = sequential))
         val running = adopted ?: open().also { created ->
           session = created
           tasks.attach(taskId, created)
           // The new session runs the selection read at the start of this run.
           context.acknowledgeSelection(initialRevision)
         }
+        running.setSequential(sequential)
         // Payload pays this run's task limits, also on a session an earlier run opened.
         running.setTaskThrottle(context.throttle)
         // An adopted session applies the current selection first, whatever it ran with.

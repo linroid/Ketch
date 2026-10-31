@@ -66,6 +66,11 @@ data class Torrents(val parent: Api = Api()) {
     @Resource("seeding")
     data class Seeding(val parent: ById)
 
+    /** Downloads the task's pieces in order or not; takes a `TorrentSequentialRequest`. */
+    @Serializable
+    @Resource("sequential")
+    data class Sequential(val parent: ById)
+
     /** SSE stream: `snapshot` events, then `removed` or `error` before it closes. */
     @Serializable
     @Resource("events")

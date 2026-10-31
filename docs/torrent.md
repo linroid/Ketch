@@ -177,6 +177,14 @@ natural order ("Episode 2" before "Episode 10"), size, type, or selected files f
 reversible. The apps' Kind order groups files by kind (video, audio, subtitles, ...), while the
 server and the CLI sort by the plain file extension.
 
+### Downloading in order
+
+Turn on **Download in order** in a running torrent's inspector to fetch pieces from the start of
+the torrent, so a video can be played while it downloads. It applies at once and stays with the
+task, also after a restart. Pieces that are rarest first help the swarm more and usually finish
+faster, so leave it off unless you want to play the file. REST: `PUT
+/api/torrents/{id}/sequential`.
+
 ## Seeding and uploading
 
 By default Ketch uploads verified pieces to peers while a torrent downloads, and stops once it

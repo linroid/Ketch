@@ -57,6 +57,12 @@ internal interface TorrentControlSource {
    */
   suspend fun takeDeferredSharing(taskId: String): Boolean = false
 
+  /** Whether [taskId]'s pieces download in order; [sourceState] is what its task saved. */
+  suspend fun isSequential(taskId: String, sourceState: SourceState?): Boolean = false
+
+  /** Downloads [taskId]'s pieces in order or not. */
+  suspend fun setSequential(taskId: String, sequential: Boolean) {}
+
   /** Tasks that reached a seed goal, as they do; they keep seeding until told to stop. */
   val seedGoalsReached: Flow<String> get() = emptyFlow()
 

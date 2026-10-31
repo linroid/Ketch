@@ -192,6 +192,7 @@
   <string name="inspector_files_hint">勾選的檔案會下載，未勾選的檔案保留在原處。</string>
   <string name="inspector_seeding_status">做種中 · ↑ %1$s · 已上傳 %2$s</string>
   <string name="inspector_seeding_stop">停止做種</string>
+  <string name="inspector_sequential">依序下載</string>
   <string name="inspector_seeding_start">做種</string>
   <string name="inspector_seeding_waiting">等待做種</string>
   <plurals name="inspector_stall_missing">
