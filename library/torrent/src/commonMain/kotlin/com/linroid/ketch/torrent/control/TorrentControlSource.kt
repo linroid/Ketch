@@ -13,8 +13,10 @@ import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Torrent controls a download source offers beyond downloading, which [KetchTorrentController]
@@ -54,6 +56,9 @@ internal interface TorrentControlSource {
    * count, never a completed task Ketch restored.
    */
   suspend fun takeDeferredSharing(taskId: String): Boolean = false
+
+  /** Tasks that reached a seed goal, as they do; they keep seeding until told to stop. */
+  val seedGoalsReached: Flow<String> get() = emptyFlow()
 
   /**
    * Every content file of a task in metainfo order, from the resolution the task kept, else the

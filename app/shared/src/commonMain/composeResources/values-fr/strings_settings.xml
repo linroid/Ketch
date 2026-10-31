@@ -562,6 +562,15 @@
   <string name="settings_torrent_upload_off_hint">Les pairs ne peuvent rien télécharger depuis cet appareil.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Pendant le téléchargement de vos torrents, les pairs peuvent télécharger les morceaux que vous avez déjà.</string>
   <string name="settings_torrent_upload_seed_hint">Les torrents terminés continuent l'envoi jusqu'à ce que vous les arrêtiez ou désactiviez cette option, même après un redémarrage de Ketch.</string>
+  <string name="settings_torrent_seed_ratio">Arrêter le partage au ratio</string>
+  <string name="settings_torrent_seed_ratio_hint">S'arrête quand un torrent a envoyé cette part de sa taille.</string>
+  <string name="settings_torrent_seed_time">Arrêter le partage après</string>
+  <string name="settings_torrent_seed_time_hint">S'arrête quand un torrent a été partagé pendant cette durée.</string>
+  <string name="settings_torrent_seed_off">Sans limite</string>
+  <string name="settings_torrent_seed_percent">%1$d %%</string>
+  <string name="settings_torrent_seed_hours">%1$d h</string>
+  <string name="settings_torrent_seed_fewer">Moins</string>
+  <string name="settings_torrent_seed_more">Plus</string>
   <string name="settings_torrent_upload_wifi_only">Uniquement en Wi-Fi</string>
   <string name="settings_torrent_upload_wifi_only_hint">Met l'envoi en pause sur les données mobiles et les autres réseaux facturés à l'usage.</string>
   <string name="settings_torrent_upload_limit">Limite d'envoi</string>

@@ -199,7 +199,7 @@ class TorrentV2PexTest {
         val peer = Raw.answer(listener.accept(), restricted)
         val ours = assertIs<PeerMessage.Extended>(peer.wire.read())
         // Neither peer exchange nor the info dictionary is offered (BEP 27).
-        assertEquals(emptySet(), offered(ours))
+        assertEquals(setOf("lt_donthave"), offered(ours))
         // Peer exchange sent anyway breaks the rules: the owner hangs up.
         peer.wire.send(PeerMessage.Extended(0, Bencode.encode(mapOf(
           "m" to mapOf("ut_pex" to 5L)))))
@@ -231,7 +231,7 @@ class TorrentV2PexTest {
         val peer = Raw.answer(listener.accept(), fixture)
         val ours = assertIs<PeerMessage.Extended>(peer.wire.read())
         // Public metainfo still shares its info dictionary while uploading; never its peers.
-        assertEquals(setOf("ut_metadata"), offered(ours))
+        assertEquals(setOf("lt_donthave", "ut_metadata"), offered(ours))
         peer.close()
         owner.removeTorrent(fixture.document.info.hash.hex)
       } finally {

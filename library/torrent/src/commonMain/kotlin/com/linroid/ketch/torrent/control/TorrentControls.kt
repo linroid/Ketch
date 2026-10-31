@@ -86,6 +86,16 @@ internal class TorrentControls(
       // walks the tasks meant to seed again.
       source.sharingResumes.collect { restoreSeeding() }
     }
+    host.scope.launch { source.seedGoalsReached.collect(::finishSeeding) }
+  }
+
+  /** A task reached a seed goal: as a Stop command does, it stops seeding and stays stopped. */
+  private suspend fun finishSeeding(taskId: String) {
+    val task = host.tasks.value.firstOrNull { it.taskId == taskId } ?: return
+    host.saveSharingIntent(task, false)
+    source.stopSeeding(taskId)
+    stops.update { it + (taskId to (it[taskId] ?: 0) + 1) }
+    controller.controlChanged()
   }
 
   override suspend fun taskCompleted(task: DownloadTask) {

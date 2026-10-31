@@ -5,6 +5,7 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.publicTorrentAddress
+import com.linroid.ketch.torrent.peer.DONTHAVE_EXTENSION
 import com.linroid.ketch.torrent.peer.HOLEPUNCH_EXTENSION
 import com.linroid.ketch.torrent.peer.HolepunchMessage
 import com.linroid.ketch.torrent.peer.HolepunchType
@@ -54,12 +55,13 @@ internal class TorrentV2Extensions(
 
   /**
    * Our extension handshake, queued before anything else; false when it could not be. [id] names
-   * the peer among the swarm's holepunch members.
+   * the peer among the swarm's holepunch members; [uploadOnly] says we want nothing more (BEP 21).
    */
-  suspend fun ready(view: TorrentV2PeerView, id: Int): Boolean {
+  suspend fun ready(view: TorrentV2PeerView, id: Int, uploadOnly: Boolean = false): Boolean {
     val info = view.info ?: return true
     if (!info.extensions) return true
     view.holepunchId = id
+    view.uploadOnly = uploadOnly
     holepunch.join(id, info.link.remote, info.link.utp, view.holepunchOut)
     val handshake = PeerExtensions.handshake(
       utMetadata = servesMetadata(privateTorrent, runtime.uploadPolicy()),
@@ -69,6 +71,7 @@ internal class TorrentV2Extensions(
       requestQueue = MAX_QUEUED_UPLOADS,
       remote = info.link.remote,
       holepunch = holepunchOn(),
+      uploadOnly = uploadOnly,
     )
     return view.commands.trySend(PeerV2DownloadActor.Command.Send(handshake)).isSuccess
   }
@@ -248,6 +251,27 @@ internal class TorrentV2Extensions(
         view.commands.trySend(PeerV2DownloadActor.Command.Send(
           PeerMessage.Extended(remoteId, message.encode())))
       }
+    }
+  }
+
+  /** Tells peers that heard otherwise whether we want nothing more (BEP 21). */
+  fun uploadOnly(peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>, complete: Boolean) {
+    for (view in peers.values) {
+      if (view.uploadOnly == complete || view.info?.extensions != true) continue
+      val message = PeerExtensions.uploadOnlyChanged(complete)
+      if (view.commands.trySend(PeerV2DownloadActor.Command.Send(message)).isSuccess) {
+        view.uploadOnly = complete
+      }
+    }
+  }
+
+  /** Tells peers we lost piece [index] (BEP 54); a peer whose queue is full finds out on asking. */
+  fun donthave(peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>, index: Int) {
+    for (view in peers.values) {
+      val remoteId = view.extensions.id(DONTHAVE_EXTENSION)
+      if (remoteId == 0) continue
+      view.commands.trySend(PeerV2DownloadActor.Command.Send(
+        PeerExtensions.donthave(remoteId, index)))
     }
   }
 

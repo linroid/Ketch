@@ -550,6 +550,15 @@
   <string name="settings_torrent_upload_off_hint">피어가 이 기기에서 아무것도 다운로드할 수 없습니다.</string>
   <string name="settings_torrent_upload_while_downloading_hint">토렌트를 다운로드하는 동안 피어가 이미 받은 조각을 다운로드할 수 있습니다.</string>
   <string name="settings_torrent_upload_seed_hint">완료된 토렌트는 중지하거나 이 설정을 끌 때까지 계속 업로드하며, Ketch를 다시 시작한 후에도 마찬가지입니다.</string>
+  <string name="settings_torrent_seed_ratio">시드 중지 비율</string>
+  <string name="settings_torrent_seed_ratio_hint">토렌트 크기의 이 비율만큼 업로드하면 중지합니다.</string>
+  <string name="settings_torrent_seed_time">시드 중지 시간</string>
+  <string name="settings_torrent_seed_time_hint">시작 후 이 시간만큼 시드하면 중지합니다.</string>
+  <string name="settings_torrent_seed_off">제한 없음</string>
+  <string name="settings_torrent_seed_percent">%1$d%%</string>
+  <string name="settings_torrent_seed_hours">%1$d시간</string>
+  <string name="settings_torrent_seed_fewer">줄이기</string>
+  <string name="settings_torrent_seed_more">늘리기</string>
   <string name="settings_torrent_upload_wifi_only">Wi-Fi에서만</string>
   <string name="settings_torrent_upload_wifi_only_hint">모바일 데이터 및 기타 종량제 네트워크에서는 업로드를 일시정지합니다.</string>
   <string name="settings_torrent_upload_limit">업로드 속도 제한</string>

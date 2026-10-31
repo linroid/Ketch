@@ -96,4 +96,21 @@ class PeerExtensionsTest {
     assertEquals(6881, extensions.listenPort)
     assertEquals(2048, extensions.requestQueue)
   }
+
+  @Test
+  fun uploadOnly_followsTheLatestHandshake() {
+    val extensions = PeerExtensions()
+    extensions.receive(PeerExtensions.uploadOnlyChanged(true).payload, 1024)
+    assertTrue(extensions.uploadOnly)
+    extensions.receive(PeerExtensions.uploadOnlyChanged(false).payload, 1024)
+    assertFalse(extensions.uploadOnly)
+  }
+
+  @Test
+  fun donthave_roundTripsItsIndex_andIgnoresAMalformedOne() {
+    val message = PeerExtensions.donthave(9, 70_000)
+    assertEquals(9, message.id)
+    assertEquals(70_000, PeerExtensions.donthaveIndex(message.payload))
+    assertNull(PeerExtensions.donthaveIndex(byteArrayOf(1, 2)))
+  }
 }

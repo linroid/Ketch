@@ -35,6 +35,10 @@ data class TorrentConfig(
    * the TCP listen port, and outgoing to peers that TCP cannot reach.
    */
   val utpEnabled: Boolean = true,
+  /** A finished torrent stops seeding at this percentage of its size uploaded; 0 for no goal. */
+  val seedRatioPercent: Int = 0,
+  /** A finished torrent stops seeding after this many minutes of it; 0 for no goal. */
+  val seedTimeMinutes: Int = 0,
   /**
    * Whether public torrents are announced on the LAN, and peers other clients announce there
    * dialed (Local Service Discovery, BEP 14, over IPv4 and IPv6 multicast), so devices at home

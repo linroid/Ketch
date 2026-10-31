@@ -27,6 +27,7 @@ import com.linroid.ketch.torrent.net.connectPeer
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.publicTorrentAddress
 import com.linroid.ketch.torrent.peer.FAST_REJECT_GRACE_MS
+import com.linroid.ketch.torrent.peer.DONTHAVE_EXTENSION
 import com.linroid.ketch.torrent.peer.HOLEPUNCH_EXTENSION
 import com.linroid.ketch.torrent.peer.HolepunchMessage
 import com.linroid.ketch.torrent.peer.HolepunchType
@@ -887,6 +888,8 @@ internal class TorrentSwarm(
     private val extensions = PeerExtensions()
     /** Holepunch messages for this peer from the swarm (BEP 55), sent on the next pass. */
     private val holepunchOut = Channel<HolepunchMessage>(16)
+    /** What this peer last heard of whether we want more (BEP 21). */
+    private var uploadOnly = false
     /** When this peer's current minute of CONNECTs began, and how many came in it. */
     /** Created once the handshake tells whether the Fast extension is negotiated. */
     private lateinit var state: PeerProtocolState
@@ -1033,13 +1036,14 @@ internal class TorrentSwarm(
       publishContact()
       holepunch.join(id, connection.remote, connection.utp, holepunchOut)
       extensionsNegotiated = handshake.extensions
+      uploadOnly = store.completedNow()
       metadataWindow = TimeSource.Monotonic.markNow()
       if (extensionsNegotiated) {
         wire.send(PeerExtensions.handshake(
           utMetadata = servesMetadata(store.metadata.isPrivate, uploadPolicy()),
           metadataSize = store.metadata.infoBytes.size, pex = !trackerRestricted,
           listenPort = listenPortFor(connection.remote), requestQueue = REQUEST_QUEUE,
-          holepunch = holepunchOn(), remote = connection.remote,
+          holepunch = holepunchOn(), uploadOnly = uploadOnly, remote = connection.remote,
         ))
       }
       // Taken before the bitfield, so no piece verified meanwhile goes unannounced.
@@ -1400,6 +1404,8 @@ internal class TorrentSwarm(
         // Never offered for tracker-restricted torrents; a malformed message is ignored.
         if (trackerRestricted) return
         receiveHolepunch(HolepunchMessage.decode(message.payload) ?: return)
+      } else if (message.id == PeerExtensions.DONTHAVE) {
+        PeerExtensions.donthaveIndex(message.payload)?.let { scheduler.withdraw(id, listOf(it)) }
       } else if (message.id == PeerExtensions.METADATA) {
         val header = Bencode.parse(message.payload, PeerWire.MAX_FRAME_SIZE, lenient = true)
         if (header["msg_type"]?.integer == 0L) {
@@ -1582,7 +1588,12 @@ internal class TorrentSwarm(
       val poll = scheduler.poll(id, haveCursor)
       haveCursor = poll.haveCursor
       // A piece the peer heard of that we lost is announced again once it verifies again.
-      poll.revoked?.forEach { advertised[it] = false }
+      poll.revoked?.forEach {
+        val told = advertised[it]
+        advertised[it] = false
+        val remoteId = extensions.id(DONTHAVE_EXTENSION)
+        if (told && remoteId != 0) wire.send(PeerExtensions.donthave(remoteId, it))
+      }
       poll.haves?.let { verified ->
         val haves = verified.filter { !advertised[it] }
         for (index in haves) advertised[index] = true
@@ -1601,10 +1612,15 @@ internal class TorrentSwarm(
       // The selection grew while seeding: a peer has 90 s from now, not from its last block.
       if (sawComplete && !completed) lastUsefulPayload = nowMs()
       sawComplete = completed
+      if (extensionsNegotiated && completed != uploadOnly) {
+        uploadOnly = completed
+        wire.send(PeerExtensions.uploadOnlyChanged(completed))
+      }
       if (!completed && nowMs() - lastUsefulPayload >= 90_000) {
         throw IOException("Peer made no useful download progress")
       }
-      if (completed && poll.bothSeeds) {
+      // A partial seed (BEP 21) wants nothing of what we hold beyond its own selection either.
+      if (completed && (poll.bothSeeds || extensions.uploadOnly)) {
         log.v { "Peer $endpoint of $logLabel is a seed, as we are: closing" }
         redundant = true
         return

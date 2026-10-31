@@ -28,6 +28,8 @@ import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -67,6 +69,8 @@ class SeedingWatcherTest {
     var restores = true
     override val restoresSeeding: Boolean get() = restores
     override val torrentCapabilities: Set<String> = emptySet()
+    val goals = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    override val seedGoalsReached: Flow<String> = goals
     val resumes = MutableStateFlow(0L)
     override val sharingResumes: StateFlow<Long> = resumes
 
@@ -211,6 +215,27 @@ class SeedingWatcherTest {
 
       assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
       assertEquals(true, store.load("done")?.control?.sharing)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun seedGoalReached_stopsSeedingAndClearsTheIntent() = runTest {
+    val source = SeedingSource().apply { restores = false }
+    val store = RecordingTaskStore()
+    store.save(completed("done", 1_000))
+    val ketch = ketch(source, store)
+    try {
+      ketch.start()
+      runCurrent()
+      source.ids.value = setOf("done")
+      runCurrent()
+      assertTrue(source.goals.tryEmit("done"))
+      runCurrent()
+      assertEquals(emptySet(), source.ids.value)
+      assertEquals(false, store.load("done")?.control?.sharing)
+      assertFalse(assertIs<DownloadState.Completed>(ketch.tasks.value.single().state.value).sharing)
     } finally {
       ketch.close()
     }

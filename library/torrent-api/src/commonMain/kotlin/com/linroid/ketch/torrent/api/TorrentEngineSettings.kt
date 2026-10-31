@@ -56,6 +56,10 @@ enum class TorrentEncryptionSetting(val wireName: String) {
  * @property trackers extra announce URLs public torrents announce to, besides their own
  * @property trackerList whether the lists at [trackerListUrls] are subscribed to
  * @property trackerListUrls addresses of tracker lists, kept while [trackerList] is off
+ * @property seedRatioPercent a finished torrent stops seeding once it uploaded this percentage of
+ *   its size, in all; 0 sets no such goal
+ * @property seedTimeMinutes a finished torrent stops seeding after this many minutes of seeding
+ *   since it last started; 0 sets no such goal
  */
 @Serializable
 data class TorrentEngineSettings(
@@ -68,6 +72,8 @@ data class TorrentEngineSettings(
   val trackers: List<String> = emptyList(),
   val trackerList: Boolean = true,
   val trackerListUrls: List<String> = emptyList(),
+  val seedRatioPercent: Int = 0,
+  val seedTimeMinutes: Int = 0,
 )
 
 /**
@@ -85,6 +91,8 @@ data class TorrentSettingsChange(
   val trackers: List<String>? = null,
   val trackerList: Boolean? = null,
   val trackerListUrls: List<String>? = null,
+  val seedRatioPercent: Int? = null,
+  val seedTimeMinutes: Int? = null,
 ) {
   /** Whether it changes nothing. */
   val isEmpty: Boolean get() = this == TorrentSettingsChange()
@@ -100,6 +108,8 @@ data class TorrentSettingsChange(
     trackers = trackers ?: settings.trackers,
     trackerList = trackerList ?: settings.trackerList,
     trackerListUrls = trackerListUrls ?: settings.trackerListUrls,
+    seedRatioPercent = seedRatioPercent ?: settings.seedRatioPercent,
+    seedTimeMinutes = seedTimeMinutes ?: settings.seedTimeMinutes,
   )
 
   companion object {
@@ -114,6 +124,8 @@ data class TorrentSettingsChange(
       trackers = to.trackers.takeIf { it != from.trackers },
       trackerList = to.trackerList.takeIf { it != from.trackerList },
       trackerListUrls = to.trackerListUrls.takeIf { it != from.trackerListUrls },
+      seedRatioPercent = to.seedRatioPercent.takeIf { it != from.seedRatioPercent },
+      seedTimeMinutes = to.seedTimeMinutes.takeIf { it != from.seedTimeMinutes },
     )
   }
 }

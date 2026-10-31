@@ -49,6 +49,17 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     return true
   }
 
+  /** [peer] no longer has piece [index] (BEP 54), if it had it. */
+  fun drop(peer: P, index: Int) {
+    check(!closed)
+    require(index in 0 until pieceCount)
+    val current = peers[peer] ?: return
+    val mask = 128 ushr (index % 8)
+    if (current.bits[index / 8].toInt() and mask == 0) return
+    current.bits[index / 8] = (current.bits[index / 8].toInt() and mask.inv()).toByte()
+    counts[index]--
+  }
+
   fun hasAny(index: Int): Boolean {
     check(!closed)
     require(index in 0 until pieceCount)

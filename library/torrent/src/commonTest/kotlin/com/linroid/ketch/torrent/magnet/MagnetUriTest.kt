@@ -111,4 +111,22 @@ class MagnetUriTest {
       decoded.toList(),
     )
   }
+
+  @Test
+  fun selectOnly_readsIndexesAndRanges_skippingWhatItCannotRead() {
+    val uri = "magnet:?xt=urn:btih:${"a".repeat(40)}&so=0,2,4-6,x,9-7,-1"
+    assertEquals(setOf(0, 2, 4, 5, 6), MagnetUri.parse(uri).selectOnly)
+  }
+
+  @Test
+  fun selectOnly_hugeRange_staysBounded() {
+    val uri = "magnet:?xt=urn:btih:${"a".repeat(40)}&so=0-2147483647"
+    assertEquals(10_000, MagnetUri.parse(uri).selectOnly.size)
+  }
+
+  @Test
+  fun selectOnly_survivesToUri() {
+    val uri = "magnet:?xt=urn:btih:${"a".repeat(40)}&so=1,3"
+    assertEquals(setOf(1, 3), MagnetUri.parse(MagnetUri.parse(uri).toUri()).selectOnly)
+  }
 }

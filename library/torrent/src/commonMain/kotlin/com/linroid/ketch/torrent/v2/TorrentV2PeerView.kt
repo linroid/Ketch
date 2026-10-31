@@ -61,6 +61,9 @@ internal class TorrentV2PeerView(
   /** This peer among the swarm's holepunch members, once it joined. */
   var holepunchId = NOT_PUNCHING
 
+  /** What this peer last heard of whether we want more (BEP 21). */
+  var uploadOnly = false
+
   /** Holepunch messages for this peer from the swarm (BEP 55), sent on the loop's next pass. */
   val holepunchOut = Channel<HolepunchMessage>(16)
 

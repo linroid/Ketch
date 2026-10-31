@@ -19,6 +19,8 @@ fun TorrentConfig.withSettings(settings: TorrentEngineSettings): TorrentConfig =
   additionalTrackers = settings.trackers,
   trackerListUrls = settings.trackerListUrls,
   trackerListsEnabled = settings.trackerList,
+  seedRatioPercent = settings.seedRatioPercent,
+  seedTimeMinutes = settings.seedTimeMinutes,
 )
 
 /** The settings this config runs torrents with; what [withSettings] sets. */
@@ -32,7 +34,18 @@ internal fun TorrentConfig.engineSettings(): TorrentEngineSettings = TorrentEngi
   trackers = additionalTrackers,
   trackerList = trackerListsEnabled,
   trackerListUrls = trackerListUrls,
+  seedRatioPercent = seedRatioPercent,
+  seedTimeMinutes = seedTimeMinutes,
 )
+
+/** Whether a torrent that [uploaded] that much of its [total] and seeded [seededMs] is done. */
+internal fun TorrentEngineSettings.seedGoalReached(
+  uploaded: Long,
+  total: Long,
+  seededMs: Long,
+): Boolean = seedRatioPercent > 0 && total > 0 &&
+  uploaded.toDouble() * 100 >= total.toDouble() * seedRatioPercent ||
+  seedTimeMinutes > 0 && seededMs >= seedTimeMinutes * 60_000L
 
 /** The tracker lists subscribed to: none while [TorrentEngineSettings.trackerList] is off. */
 internal val TorrentEngineSettings.subscribedTrackerLists: List<String>

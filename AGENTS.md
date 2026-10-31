@@ -1242,6 +1242,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Seed goals: `TorrentEngineSettings.seedRatioPercent` and `seedTimeMinutes` (`[torrent]`, 0 for
+  none; capability `seed-goals`). A seeder's watcher (`watchSeeder`) checks `seedGoalReached` every
+  10 s while it seeds, against all it uploaded (saved counters included) and the time since this
+  session began seeding, and `TorrentControls.finishSeeding` then clears the intent and stops it
+- Wire courtesies on v1 and v2: BEP 21 `upload_only` (in the handshake and, as it changes, a later
+  extension handshake; a complete swarm closes such peers as it does seeds), BEP 54 `lt_donthave`
+  (a piece revoked is taken back, `TorrentPieceScheduler.withdraw`, `TorrentV2RarityPicker.drop`).
+  A magnet's `so` (BEP 53, `MagnetUri.selectOnly`) becomes `ResolvedSource.defaultFileIds`, what
+  `defaultSelection()` and a run without a selection use
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
   `TorrentSnapshot.seeding` whether the task is meant to seed (`KetchTorrentController`: the
   saved intent, a seeding session or the `SEEDING` activity), and `TorrentController.setSeeding`

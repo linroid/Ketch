@@ -7,6 +7,10 @@ import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.numericHost
+import okio.Buffer
+
+/** The BEP 10 name of the extension that takes a piece back (BEP 54). */
+internal const val DONTHAVE_EXTENSION = "lt_donthave"
 
 /** BEP 10 IDs belong to the receiving peer. Repeated handshakes update the existing mapping. */
 internal class PeerExtensions {
@@ -24,6 +28,10 @@ internal class PeerExtensions {
 
   /** The peer's client as it names itself (BEP 10 `v`), cleaned up for display. */
   var client: String? = null
+    private set
+
+  /** The peer wants nothing more of this torrent (BEP 21), as it told us last. */
+  var uploadOnly: Boolean = false
     private set
 
   fun id(name: String): Int = ids[name] ?: 0
@@ -57,19 +65,22 @@ internal class PeerExtensions {
     root["p"]?.integer?.takeIf { it in 1..65_535 }?.let { listenPort = it.toInt() }
     root["reqq"]?.integer?.takeIf { it in 1..MAX_REQUEST_QUEUE }?.let { requestQueue = it.toInt() }
     root["v"]?.bytes?.let(PeerClients::fromVersion)?.let { client = it }
+    root["upload_only"]?.integer?.let { uploadOnly = it != 0L }
   }
 
   companion object {
     const val METADATA = 1
     const val PEX = 2
     const val HOLEPUNCH = 3
+    const val DONTHAVE = 4
     private const val MAX_REQUEST_QUEUE = 2048L
 
     /**
      * Our handshake for a peer of a torrent we hold: [utMetadata] offers the info dictionary of
      * [metadataSize] bytes, [pex] offers peer exchange, [listenPort] is where peers can reach us
      * (0 leaves `p` out) and [requestQueue] how many requests we queue. [holepunch] offers to
-     * relay and take part in hole punching (BEP 55). Every handshake names our client (`v`) and,
+     * relay and take part in hole punching (BEP 55) and [uploadOnly] says we want nothing more
+     * (BEP 21). Peers may always tell us a piece is gone (BEP 54). Every handshake names our client (`v`) and,
      * when [remote] is an address, tells the peer where we see it (`yourip`).
      */
     fun handshake(
@@ -79,6 +90,7 @@ internal class PeerExtensions {
       listenPort: Int,
       requestQueue: Int,
       holepunch: Boolean = false,
+      uploadOnly: Boolean = false,
       remote: PeerEndpoint? = null,
     ): PeerMessage.Extended {
       require(listenPort in 0..65_535 && requestQueue in 1..MAX_REQUEST_QUEUE)
@@ -86,11 +98,25 @@ internal class PeerExtensions {
       if (utMetadata) mapping["ut_metadata"] = METADATA.toLong()
       if (pex) mapping["ut_pex"] = PEX.toLong()
       if (holepunch) mapping[HOLEPUNCH_EXTENSION] = HOLEPUNCH.toLong()
+      mapping[DONTHAVE_EXTENSION] = DONTHAVE.toLong()
       val values = identify(remote, mapping, requestQueue.toLong())
+      if (uploadOnly) values["upload_only"] = 1L
       if (utMetadata && metadataSize != null) values["metadata_size"] = metadataSize.toLong()
       if (listenPort != 0) values["p"] = listenPort.toLong()
       return PeerMessage.Extended(0, Bencode.encode(values))
     }
+
+    /** Tells a peer that [uploadOnly] changed (BEP 21), as a later extension handshake. */
+    fun uploadOnlyChanged(uploadOnly: Boolean): PeerMessage.Extended = PeerMessage.Extended(0,
+      Bencode.encode(mapOf("upload_only" to if (uploadOnly) 1L else 0L)))
+
+    /** Tells a peer, under its [remoteId] for it, that we lost piece [index] (BEP 54). */
+    fun donthave(remoteId: Int, index: Int): PeerMessage.Extended = PeerMessage.Extended(remoteId,
+      Buffer().writeInt(index).readByteArray())
+
+    /** The piece a `lt_donthave` message names; `null` for a malformed one, which is ignored. */
+    fun donthaveIndex(payload: ByteArray): Int? =
+      if (payload.size == 4) Buffer().write(payload).readInt() else null
 
     /** A metadata fetcher's handshake: it asks for `ut_metadata` and has nothing to serve. */
     fun handshake(

@@ -36,6 +36,7 @@ import okio.FileSystem
 import okio.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.concurrent.atomics.AtomicReference
@@ -191,6 +192,24 @@ class TorrentSwarmHolepunchTest {
       swarm.cancelAndJoin()
       server.cancelAndJoin()
       target.close()
+    }
+  }
+
+  @Test
+  fun uploadOnlyPeer_ofACompleteSwarm_isClosed() = swarmTest(complete = true) { store, network ->
+    val incoming = Channel<TorrentConnection>(1)
+    val budget = TorrentBufferBudget(2 * 1024 * 1024)
+    val swarm = launch {
+      TorrentSwarm(store, network, budget, allowLocalPeers = true,
+        uploadPolicy = { TorrentUploadPolicy.SEED_AFTER_COMPLETION },
+      ).run(Channel(), incoming)
+    }
+    try {
+      val peer = joinedPeer(network, incoming, listenPort = 6001)
+      peer.send(PeerExtensions.uploadOnlyChanged(true))
+      assertFailsWith<Exception> { while (true) peer.read() }
+    } finally {
+      swarm.cancelAndJoin()
     }
   }
 

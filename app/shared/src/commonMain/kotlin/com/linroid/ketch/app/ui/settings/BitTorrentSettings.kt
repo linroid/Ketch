@@ -94,6 +94,15 @@ import ketch.app.shared.generated.resources.settings_torrent_trackers
 import ketch.app.shared.generated.resources.settings_torrent_unused
 import ketch.app.shared.generated.resources.settings_torrent_upload
 import ketch.app.shared.generated.resources.settings_torrent_upload_footer
+import ketch.app.shared.generated.resources.settings_torrent_seed_fewer
+import ketch.app.shared.generated.resources.settings_torrent_seed_hours
+import ketch.app.shared.generated.resources.settings_torrent_seed_more
+import ketch.app.shared.generated.resources.settings_torrent_seed_off
+import ketch.app.shared.generated.resources.settings_torrent_seed_percent
+import ketch.app.shared.generated.resources.settings_torrent_seed_ratio
+import ketch.app.shared.generated.resources.settings_torrent_seed_ratio_hint
+import ketch.app.shared.generated.resources.settings_torrent_seed_time
+import ketch.app.shared.generated.resources.settings_torrent_seed_time_hint
 import ketch.app.shared.generated.resources.settings_torrent_upload_limit
 import ketch.app.shared.generated.resources.settings_torrent_upload_limit_hint
 import ketch.app.shared.generated.resources.settings_torrent_upload_mode
@@ -150,6 +159,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
     settings = torrent,
     // Only the embedded device's uploads wait for Wi-Fi; a remote one's host decides.
     followsNetwork = state.instanceManager.followsUploadNetwork && !controller.isRemote,
+    seedGoals = controller.seedGoalsSupported,
     onChange = controller::updateTorrent,
   )
   ConnectionsGroup(
@@ -258,6 +268,7 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
 private fun UploadGroup(
   settings: TorrentSettings,
   followsNetwork: Boolean,
+  seedGoals: Boolean,
   onChange: (TorrentSettings) -> Unit,
 ) {
   val uploads = settings.upload != TorrentUploadMode.Off
@@ -300,8 +311,48 @@ private fun UploadGroup(
         enabled = uploads,
       )
     }
+    if (seedGoals && settings.upload == TorrentUploadMode.Seed) {
+      SeedGoals(settings, onChange)
+    }
   }
 }
+
+/** When finished torrents stop seeding: at a share of their size uploaded, or after a time. */
+@Composable
+private fun SeedGoals(settings: TorrentSettings, onChange: (TorrentSettings) -> Unit) {
+  val noGoal = stringResource(Res.string.settings_torrent_seed_off)
+  val ratio = settings.seedRatioPercent.coerceAtLeast(0)
+  val ratioLabel = if (ratio == 0) noGoal
+    else stringResource(Res.string.settings_torrent_seed_percent, ratio)
+  SettingsStepperRow(
+    title = stringResource(Res.string.settings_torrent_seed_ratio),
+    description = stringResource(Res.string.settings_torrent_seed_ratio_hint),
+    value = ratio,
+    values = (SeedRatioChoices + ratio).distinct().sorted(),
+    label = ratioLabel,
+    state = ratioLabel,
+    fewer = stringResource(Res.string.settings_torrent_seed_fewer),
+    more = stringResource(Res.string.settings_torrent_seed_more),
+    onChange = { onChange(settings.copy(seedRatioPercent = it)) },
+  )
+  val minutes = settings.seedTimeMinutes.coerceAtLeast(0)
+  val timeLabel = if (minutes == 0) noGoal
+    else stringResource(Res.string.settings_torrent_seed_hours, minutes / 60)
+  SettingsStepperRow(
+    title = stringResource(Res.string.settings_torrent_seed_time),
+    description = stringResource(Res.string.settings_torrent_seed_time_hint),
+    value = minutes,
+    values = (SeedTimeChoices + minutes).distinct().sorted(),
+    label = timeLabel,
+    state = timeLabel,
+    fewer = stringResource(Res.string.settings_torrent_seed_fewer),
+    more = stringResource(Res.string.settings_torrent_seed_more),
+    onChange = { onChange(settings.copy(seedTimeMinutes = it)) },
+  )
+}
+
+private val SeedRatioChoices = listOf(0, 50, 100, 150, 200, 300, 500, 1000)
+private val SeedTimeChoices = listOf(0, 1, 6, 12, 24, 48, 72, 168, 336, 720).map { it * 60 }
 
 /**
  * How the device reaches peers: protocol encryption, uTP, asking the router to forward its

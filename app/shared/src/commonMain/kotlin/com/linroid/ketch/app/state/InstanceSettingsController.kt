@@ -109,6 +109,8 @@ class InstanceSettingsController(
 
   /** Whether the instance can find peers on its local network, so its switch shows. */
   var localDiscoverySupported by mutableStateOf(local != null && localPeerDiscoverySupported)
+  /** Whether the device stops seeding at a goal; older remote devices keep seeding. */
+  var seedGoalsSupported by mutableStateOf(local != null)
     private set
 
   /**
@@ -384,6 +386,7 @@ class InstanceSettingsController(
     val settings = controller.settings()
     torrentUnsupported = false
     localDiscoverySupported = capabilities.supports(TorrentCapability.LOCAL_DISCOVERY)
+    seedGoalsSupported = capabilities.supports(TorrentCapability.SEED_GOALS)
     confirmedTorrent = settings
     remoteTorrent = pendingTorrent.applyTo(settings).asSettings()
   }
@@ -413,6 +416,8 @@ class InstanceSettingsController(
     trackers = next.trackers ?: trackers,
     trackerList = next.trackerList ?: trackerList,
     trackerListUrls = next.trackerListUrls ?: trackerListUrls,
+    seedRatioPercent = next.seedRatioPercent ?: seedRatioPercent,
+    seedTimeMinutes = next.seedTimeMinutes ?: seedTimeMinutes,
   )
 
   private suspend fun attempt(onError: (UiText) -> Unit, block: suspend () -> Unit) {

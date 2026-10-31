@@ -150,6 +150,10 @@ What happens next depends on the task's state:
   that file again, or any other, downloads those pieces again: a file you chose is filled in, and
   one still removed keeps its part in the task's hidden sidecar and stays as you left it.
 
+A magnet can pick its own files with `so` (BEP 53), such as `&so=0,2,4-6`, the files' positions in
+the torrent. The Add sheet then starts with those ticked, and the magnet downloads only them when
+added directly, unless you choose others. Positions the torrent does not have are ignored.
+
 Choosing the current files again does nothing, and an empty selection is refused. Ketch checks the
 IDs against the torrent's metadata it saved for the task, never against sizes a client sent.
 
@@ -213,6 +217,9 @@ oldest completion first, into free engine slots only, each after a recheck finds
 complete. Seeding stops when:
 
 - you stop it or remove the task;
+- it reaches a seed goal, set under Settings → BitTorrent → Uploading (`[torrent] seedRatioPercent`
+  and `seedTimeMinutes`, both off by default): it has uploaded that percentage of its size in all,
+  or seeded that many minutes since it last started;
 - the upload mode leaves `seed`;
 - uploads pause because the phone left Wi-Fi;
 - a download waits for one of the engine's slots (`maxActiveTorrents`, 5 by default) and takes the
@@ -221,7 +228,7 @@ complete. Seeding stops when:
 - Ketch quits.
 
 A seeder stopped by the mode, by paused uploads, by a waiting download or by quitting seeds again
-later; one you stop, or whose chosen files changed on disk, does not. In a v1 torrent, a file
+later; one you stop, that reached a goal, or whose chosen files changed on disk, does not. In a v1 torrent, a file
 you removed that changed only sets aside the pieces it shares with the others (see
 [Choosing files](#choosing-files)).
 
@@ -284,6 +291,8 @@ The apps, the CLI and `ketch server` read the `[torrent]` table:
 upload = "seed"               # "while-downloading" (default), "off" or "seed"
 uploadLimit = "1m"            # all torrents together; "unlimited" by default
 uploadWifiOnly = true         # default; read by the Android and iOS apps only
+seedRatioPercent = 200        # stop seeding at twice the size uploaded; 0 (default) never
+seedTimeMinutes = 1440        # stop seeding after a day of it; 0 (default) never
 encryption = "preferred"      # "preferred" (default), "required" or "off"
 utp = true                    # default
 portMapping = true            # default
@@ -297,6 +306,8 @@ listenPort = 16881            # read by `ketch server` only; 0 (default) picks a
 | --- | --- | --- |
 | `upload` | `while-downloading` | What this device uploads; see [seeding](#seeding-and-uploading). An unknown value loads as `off`. |
 | `uploadLimit` | unlimited | Upload cap shared by all torrents. |
+| `seedRatioPercent` | 0 | A finished torrent stops seeding once it uploaded this percentage of its size, in all; 0 sets no goal. |
+| `seedTimeMinutes` | 0 | A finished torrent stops seeding after this many minutes since it last began; 0 sets no goal. |
 | `uploadWifiOnly` | `true` | Pause uploads off Wi-Fi; read by the Android and iOS apps only. See [only on Wi-Fi](#only-on-wi-fi). |
 | `encryption` | `preferred` | Protocol encryption; see [encryption](#encryption). An unknown value loads as `preferred`. |
 | `utp` | `true` | Also reach peers over uTP; see [uTP](#utp). |
@@ -466,7 +477,7 @@ tracker's staff to allow Ketch if it is refused.
   with an error that says so, when it is resolved or previewed, as a link or a file's content, and
   a link added directly fails as soon as it starts. Many
   peers or large pieces use more memory. A torrent or magnet keeps its first 128 trackers.
-- Ketch does not create torrents and has no ratio management.
+- Ketch does not create torrents.
 
 ## For developers
 
@@ -945,6 +956,14 @@ it announces the piece again, sends some of it or a minute passes. A v1 torrent 
 it lost and verified again, such as one of a file you edited, so its peers ask for it again; v2
 and hybrid torrents announce each piece once. A torrent at its peer limit closes peers that dial
 it before answering their handshake.
+
+### Peers that want nothing more
+
+Once a torrent has every file it selected, Ketch tells peers it wants nothing more (`upload_only`,
+BEP 21), and says so again if a selection gives it pieces to fetch. A swarm with nothing left to
+fetch closes peers that say the same, as it closes seeds, since neither has anything for the other.
+A piece Ketch can no longer read is taken back from peers that heard it had it (`lt_donthave`, BEP
+54), and a peer's own `lt_donthave` leaves that piece to other peers.
 
 ### Partial selections
 

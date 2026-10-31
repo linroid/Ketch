@@ -12,6 +12,7 @@ import com.linroid.ketch.torrent.peer.PEX_FLAG_HOLEPUNCH
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
+import com.linroid.ketch.torrent.peer.pieceBitfield
 import com.linroid.ketch.torrent.v2.peer.PeerV2Dialer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -35,7 +36,7 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalAtomicApi::class)
 class TorrentV2HolepunchTest {
-  private val fixture = TorrentV2Fixture.build(listOf("a" to 100_000))
+  private val fixture = TorrentV2Fixture.build(listOf("a" to 200_000))
   private val target = PeerEndpoint("127.0.0.3", 6883)
 
   private fun TorrentV2RemotePeer.greet(listenPort: Int? = null) {
@@ -137,16 +138,46 @@ class TorrentV2HolepunchTest {
     assertEquals(HolepunchMessage(HolepunchType.RENDEZVOUS, target), relay.nextPunch())
   }
 
+  @Test
+  fun donthave_isNeverAskedForThePiece() = swarm {
+    val peer = connect(1, host = "127.0.0.1", extensions = true)
+    peer.greet()
+    peer.send(PeerMessage.Bitfield(pieceBitfield(BooleanArray(pieceCount) { true })))
+    // Piece 0 is verified; of the others it keeps only piece 1.
+    for (index in 2 until pieceCount) {
+      peer.send(PeerMessage.Extended(PeerExtensions.DONTHAVE,
+        PeerExtensions.donthave(PeerExtensions.DONTHAVE, index).payload))
+    }
+    peer.send(PeerMessage.Control(PeerMessage.Signal.UNCHOKE))
+    assertEquals(1, assertIs<PeerMessage.Request>(peer.next { it is PeerMessage.Request }).index)
+    val other = withTimeoutOrNull(300) {
+      peer.next { it is PeerMessage.Request && it.index != 1 }
+    }
+    assertNull(other)
+  }
+
+  @Test
+  fun uploadOnlyPeer_isClosedOnceWeComplete() = swarm(complete = true) {
+    val peer = connect(1, host = "127.0.0.1", extensions = true)
+    peer.send(PeerExtensions.uploadOnlyChanged(true))
+    peer.closed.await()
+  }
+
   /** Runs [test] in a loop that uploads while it downloads its last piece, which never comes. */
-  private fun swarm(utp: Boolean = true, test: suspend TorrentV2SwarmRig.() -> Unit) = runTest {
+  private fun swarm(
+    utp: Boolean = true,
+    complete: Boolean = false,
+    test: suspend TorrentV2SwarmRig.() -> Unit,
+  ) = runTest {
     withContext(Dispatchers.Default) {
       withTimeout(20_000) {
-        val rig = TorrentV2SwarmRig(fixture, onCompleted = { error("Never completes") },
+        val rig = TorrentV2SwarmRig(fixture, onCompleted = { complete },
           utpEnabled = utp, allowLocalPeers = true)
         try {
           rig.store.initialize()
-          fixture.seed(rig.store, listOf(0))
-          rig.policy.store(TorrentUploadPolicy.WHILE_DOWNLOADING)
+          fixture.seed(rig.store, if (complete) (0 until rig.pieceCount).toList() else listOf(0))
+          rig.policy.store(if (complete) TorrentUploadPolicy.SEED_AFTER_COMPLETION
+            else TorrentUploadPolicy.WHILE_DOWNLOADING)
           rig.run { rig.test() }
           rig.checkReleased()
         } finally {

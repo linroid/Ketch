@@ -17,6 +17,7 @@ import okio.Buffer
  * @property displayName optional human-readable name (`dn` parameter)
  * @property trackers list of tracker announce URLs (`tr` parameters)
  * @property webSeeds http and https web seeds (`ws` parameters, BEP 19)
+ * @property selectOnly indexes of the files to download (`so` parameter, BEP 53); empty for all
  */
 internal data class MagnetUri(
   val identity: TorrentIdentity,
@@ -24,6 +25,7 @@ internal data class MagnetUri(
   val trackers: List<String> = emptyList(),
   val explicitPeers: List<String> = emptyList(),
   val webSeeds: List<String> = emptyList(),
+  val selectOnly: Set<Int> = emptySet(),
 ) {
 
   constructor(
@@ -63,6 +65,7 @@ internal data class MagnetUri(
       append(urlEncode(tracker))
     }
     for (seed in webSeeds) append("&ws=${urlEncode(seed)}")
+    if (selectOnly.isNotEmpty()) append("&so=${selectOnly.joinToString(",")}")
   }
 
   companion object {
@@ -86,6 +89,7 @@ internal data class MagnetUri(
       val trackers = mutableListOf<String>()
       val peers = mutableListOf<String>()
       val webSeeds = mutableListOf<String>()
+      val selectOnly = LinkedHashSet<Int>()
 
       for (param in params) {
         val (key, value) = param.split('=', limit = 2)
@@ -108,6 +112,7 @@ internal data class MagnetUri(
           }
           "x.pe" -> peers.add(urlDecode(value))
           "dn" -> displayName = urlDecode(value)
+          "so" -> selectOnly += parseSelectOnly(urlDecode(value))
           "tr" -> trackers.add(urlDecode(value))
           // Only http and https; other schemes are skipped, never a reason to refuse the magnet.
           "ws" -> urlDecode(value).trim().takeIf(::isWebSeedUrl)?.let(webSeeds::add)
@@ -125,8 +130,20 @@ internal data class MagnetUri(
         trackers = trackers.distinct().take(MAX_TRACKERS),
         explicitPeers = peers.distinct().take(MAX_EXPLICIT_PEERS),
         webSeeds = webSeeds.distinct().take(MAX_WEB_SEEDS),
+        selectOnly = selectOnly.take(MAX_SELECT_ONLY).toSet(),
       )
     }
+
+    /** `0,2,4-6` as indexes; what it cannot read is skipped, never a reason to refuse the link. */
+    private fun parseSelectOnly(value: String): List<Int> = value.split(',').flatMap { part ->
+      val first = part.substringBefore('-').trim().toIntOrNull()
+      val last = part.substringAfter('-').trim().toIntOrNull()
+      if (first == null || last == null || first < 0 || last < first) emptyList()
+      else (first..minOf(last, first + MAX_SELECT_ONLY - 1)).toList()
+    }.take(MAX_SELECT_ONLY)
+
+    /** The most `so` indexes a magnet keeps: a torrent's most files. */
+    private const val MAX_SELECT_ONLY = 10_000
 
     /** The most `x.pe` peers a magnet keeps. */
     private const val MAX_EXPLICIT_PEERS = 128
