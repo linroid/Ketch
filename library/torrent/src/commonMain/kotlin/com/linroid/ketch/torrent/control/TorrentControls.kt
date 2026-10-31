@@ -19,8 +19,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Duration
 import okio.ByteString.Companion.toByteString
+import kotlin.time.Duration
 
 /**
  * What a torrent source adds to the Ketch that runs it ([SourceExtension]): the
