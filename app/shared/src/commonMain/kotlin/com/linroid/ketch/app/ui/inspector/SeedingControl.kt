@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchSwitch
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.i18n.UiText
@@ -45,7 +47,9 @@ import ketch.app.shared.generated.resources.inspector_seeding_start
 import ketch.app.shared.generated.resources.inspector_seeding_status
 import ketch.app.shared.generated.resources.inspector_seeding_stop
 import ketch.app.shared.generated.resources.inspector_seeding_waiting
+import ketch.app.shared.generated.resources.inspector_sequential
 import org.jetbrains.compose.resources.stringResource
+import kotlinx.coroutines.launch
 
 private val log = KetchLogger("Seeding")
 
@@ -167,3 +171,45 @@ internal fun seedingStatus(counters: TorrentCounters?): UiText {
 }
 
 private const val UNKNOWN = "–"
+
+/**
+ * Downloads a running torrent's pieces in order, so a file can be played meanwhile, on devices
+ * that can. It follows what the device reports, showing the choice while it is sent.
+ */
+@Composable
+internal fun SequentialControl(state: AppState, row: TaskRow) {
+  val running = row.state is DownloadState.Downloading || row.state is DownloadState.Paused
+  if (!running || !row.isTorrent) return
+  val features = rememberFeatures(state, row)
+  val controller = remember(features, row.key) { state.torrentControllerOf(row.key.deviceId) }
+    ?: return
+  var supported by remember(row.key, controller) { mutableStateOf(false) }
+  var sequential by remember(row.key, controller) { mutableStateOf<Boolean?>(null) }
+  LaunchedEffect(row.key, controller) {
+    supported = catchingUnlessCancelled {
+      controller.capabilities().supports(TorrentCapability.SEQUENTIAL)
+    }.getOrDefault(false)
+    val snapshots = state.torrentSnapshotsOf(row.key) ?: return@LaunchedEffect
+    catchingUnlessCancelled { snapshots.collect { sequential = it?.sequential } }
+      .onFailure { e ->
+        log.d { "Stopped following taskId=${row.key.taskId}: ${e.describeCauses()}" }
+      }
+  }
+  val current = sequential
+  if (!supported || current == null) return
+  val scope = rememberCoroutineScope()
+  KetchSwitch(
+    checked = current,
+    onCheckedChange = { on ->
+      sequential = on
+      scope.launch {
+        catchingUnlessCancelled { controller.setSequential(row.key.taskId, on) }
+          .onFailure { e ->
+            sequential = !on
+            log.d { "Could not change taskId=${row.key.taskId}: ${e.describeCauses()}" }
+          }
+      }
+    },
+    label = stringResource(Res.string.inspector_sequential),
+  )
+}

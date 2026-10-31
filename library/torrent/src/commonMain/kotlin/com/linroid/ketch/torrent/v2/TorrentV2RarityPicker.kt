@@ -49,6 +49,17 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     return true
   }
 
+  /** [peer] no longer has piece [index] (BEP 54), if it had it. */
+  fun drop(peer: P, index: Int) {
+    check(!closed)
+    require(index in 0 until pieceCount)
+    val current = peers[peer] ?: return
+    val mask = 128 ushr (index % 8)
+    if (current.bits[index / 8].toInt() and mask == 0) return
+    current.bits[index / 8] = (current.bits[index / 8].toInt() and mask.inv()).toByte()
+    counts[index]--
+  }
+
   fun hasAny(index: Int): Boolean {
     check(!closed)
     require(index in 0 until pieceCount)
@@ -60,6 +71,18 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     require(index in 0 until pieceCount)
     val current = peers[peer] ?: return false
     return current.bits[index / 8].toInt() and (128 ushr (index % 8)) != 0
+  }
+
+  /** The lowest piece [peer] has that is [eligible], for a transfer that runs in order. */
+  fun lowest(peer: P, eligible: (Int) -> Boolean): Int? {
+    check(!closed)
+    val current = peers[peer] ?: return null
+    for (index in 0 until pieceCount) {
+      if (current.bits[index / 8].toInt() and (128 ushr (index % 8)) != 0 && eligible(index)) {
+        return index
+      }
+    }
+    return null
   }
 
   /** Eligibility is an actor-local lookup; no I/O or allocation should run in this callback. */

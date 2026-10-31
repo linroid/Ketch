@@ -749,6 +749,15 @@
   <string name="settings_torrent_upload_off_hint">Peers can't download anything from this device.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Peers can download the pieces you have while your torrents download.</string>
   <string name="settings_torrent_upload_seed_hint">Finished torrents keep uploading until you stop them or turn this off, also after Ketch restarts.</string>
+  <string name="settings_torrent_seed_ratio">Stop seeding at ratio</string>
+  <string name="settings_torrent_seed_ratio_hint">Stops once a torrent has uploaded this much of its size.</string>
+  <string name="settings_torrent_seed_time">Stop seeding after</string>
+  <string name="settings_torrent_seed_time_hint">Stops once a torrent has seeded this long since it started.</string>
+  <string name="settings_torrent_seed_off">No limit</string>
+  <string name="settings_torrent_seed_percent">%1$d%%</string>
+  <string name="settings_torrent_seed_hours">%1$d h</string>
+  <string name="settings_torrent_seed_fewer">Less</string>
+  <string name="settings_torrent_seed_more">More</string>
   <string name="settings_torrent_upload_wifi_only">Only on Wi-Fi</string>
   <!-- Under Only on Wi-Fi: uploading resumes by itself on Wi-Fi or another unmetered network. -->
   <string name="settings_torrent_upload_wifi_only_hint">Pauses uploading on mobile data and other metered networks.</string>

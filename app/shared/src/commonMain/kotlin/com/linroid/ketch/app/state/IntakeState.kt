@@ -1497,8 +1497,9 @@ class IntakeSession internal constructor(
     val selectedIds = when {
       // The first variant is the source's default, so a request names only another.
       variant != null -> if (variant == entry.variants.first()) emptySet() else setOf(variant.id)
-      entry.files.isEmpty() || selection == null || selection.size == entry.files.size ->
-        emptySet()
+      // Every file is only the default of a link that picks none.
+      entry.files.isEmpty() || selection == null ||
+        selection.size == entry.files.size && resolved?.defaultFileIds.isNullOrEmpty() -> emptySet()
       else -> selection
     }
     // A link added anyway before its files were known, such as a magnet still looking for its
@@ -1848,7 +1849,9 @@ class IntakeSession internal constructor(
         entry.selectedVariant = boundRequest?.selectedFileIds?.singleOrNull()
       }
       if (entry.files.isNotEmpty() && entry.selectedFiles == null) {
-        entry.selectedFiles = defaultTorrentSelection(resolved.files)
+        entry.selectedFiles = resolved.defaultFileIds.ifEmpty {
+          defaultTorrentSelection(resolved.files)
+        }
         // A torrent on its own goes straight to its files.
         if (entries.singleOrNull() === entry && torrentStage == null) torrentStage = entry
       }

@@ -266,10 +266,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `com.linroid.ketch.torrent.peer` -- the peer wire v1 and v2 share: `PeerWire`,
   `PeerProtocolState`, `PeerExtensions` (BEP 10), `PeerFastExtension` (BEP 6), `PeerExchange`
   (BEP 11), `HolepunchMessage` (BEP 55), `PeerIdentityHandshake`, `PeerTraffic`, `PeerClients`,
-  `PeerDiagnostics`, `PeerRedial` (when swarms dial an endpoint again), `PeerIdentity` and
-  `keepsOutgoing` (duplicate connections) and `TorrentChoker`
-- `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `SwarmHolepunch`,
-  `TorrentPieceScheduler`, `TorrentPeerDownloader`, `TorrentUploadCache`
+  `PeerDiagnostics`, `PeerRedial` (when swarms dial an endpoint again), `SwarmHolepunch`,
+  `PeerIdentity` and `keepsOutgoing` (duplicate connections) and `TorrentChoker`
+- `com.linroid.ketch.torrent.v1` -- the v1 swarm: `TorrentSwarm`, `TorrentPieceScheduler`,
+  `TorrentPeerDownloader`, `TorrentUploadCache`
 - `com.linroid.ketch.torrent.v2` -- v2 and hybrid sessions: `TorrentV2DownloadSession`,
   `TorrentV2SessionLoop` (`TorrentV2Swarm`), `TorrentV2PieceScheduler`, `TorrentV2Candidates`,
   `TorrentV2Uploader`, `TorrentV2Extensions`, `TorrentV2ServeWorker` and their peers' views,
@@ -1242,6 +1242,19 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Sequential download: `TorrentController.setSequential` (REST `PUT .../sequential`, capability
+  `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
+  by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
+  `SequentialControl` switches it. It orders pieces, not per-file priorities
+- Seed goals: `TorrentEngineSettings.seedRatioPercent` and `seedTimeMinutes` (`[torrent]`, 0 for
+  none; capability `seed-goals`). A seeder's watcher (`watchSeeder`) checks `seedGoalReached` every
+  10 s while it seeds, against all it uploaded (saved counters included) and the time since this
+  session began seeding, and `TorrentControls.finishSeeding` then clears the intent and stops it
+- Wire courtesies on v1 and v2: BEP 21 `upload_only` (in the handshake and, as it changes, a later
+  extension handshake; a complete swarm closes such peers as it does seeds), BEP 54 `lt_donthave`
+  (a piece revoked is taken back, `TorrentPieceScheduler.withdraw`, `TorrentV2RarityPicker.drop`).
+  A magnet's `so` (BEP 53, `MagnetUri.selectOnly`) becomes `ResolvedSource.defaultFileIds`, what
+  `defaultSelection()` and a run without a selection use
 - Seeding control: `Completed.sharing` and the controller's `SEEDING` activity show it,
   `TorrentSnapshot.seeding` whether the task is meant to seed (`KetchTorrentController`: the
   saved intent, a seeding session or the `SEEDING` activity), and `TorrentController.setSeeding`
@@ -1443,8 +1456,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   forgotten when it fails. Peers reached over uTP carry the BEP 11 uTP flag in PEX, and the
   swarm summary counts uTP connections. Private and tracker-only torrents use uTP too: tests
   count DHT and UDP tracker datagrams (`countingPublicDiscovery`), not UDP binds
-- Hole punching (BEP 55, `ut_holepunch`) in v1 swarms of public torrents while uTP is on
-  (`TorrentSwarm.utpEnabled`, the engine's live setting), so peers behind NATs,
+- Hole punching (BEP 55, `ut_holepunch`) in swarms of public torrents while uTP is on, v1
+  (`TorrentSwarm.utpEnabled`) and v2 or hybrid (`TorrentV2Extensions`, across a hybrid's routes;
+  `TorrentV2Runtime.utpEnabled`), both the engine's live setting, so peers behind NATs,
   however many layers, reach each other: two peers a third is connected to dial each other over
   uTP at the same moment, and each NAT lets the other's packets in. `SwarmHolepunch` knows the
   connected peers that offered the extension and which peer introduced each endpoint by PEX.
@@ -1457,7 +1471,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   while its own uTP
   connection arrives as an incoming peer (a duplicate of a peer being dialed is closed). Peers
   that take part carry the BEP 11 flag `0x08`, and the swarm summary counts relays, requests
-  and connects. V2 and hybrid sessions do not punch yet
+  and connects
 - Incoming connections still in their handshake (`dispatchIncoming`, 15 s) pass
   `TorrentHandshakeGate`: a quarter of the connection budget (8 to 64, at most half) at once
   and 4 per host

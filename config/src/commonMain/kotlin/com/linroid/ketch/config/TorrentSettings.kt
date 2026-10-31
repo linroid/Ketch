@@ -148,6 +148,10 @@ internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
  *   listen port, so peers behind other routers can connect; on by default.
  * @property localDiscovery whether public torrents are announced on the local network, and
  *   devices there that announce them are used as peers (BEP 14); on by default.
+ * @property seedRatioPercent a finished torrent stops seeding once it uploaded this percentage of
+ *   its size; 0 or less sets no such goal, the default.
+ * @property seedTimeMinutes a finished torrent stops seeding after this many minutes of it; 0 or
+ *   less sets no such goal, the default.
  */
 @Serializable
 data class TorrentSettings(
@@ -164,6 +168,8 @@ data class TorrentSettings(
   val utp: Boolean = true,
   val portMapping: Boolean = true,
   val localDiscovery: Boolean = true,
+  val seedRatioPercent: Int = 0,
+  val seedTimeMinutes: Int = 0,
 ) {
   init {
     require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }
@@ -212,6 +218,8 @@ data class TorrentSettings(
       trackers = trackers,
       trackerList = trackerList,
       trackerListUrls = trackerListAddresses,
+      seedRatioPercent = seedRatioPercent,
+      seedTimeMinutes = seedTimeMinutes,
     )
 
   /**
@@ -241,6 +249,8 @@ data class TorrentSettings(
       utp = settings.utp,
       portMapping = settings.portMapping,
       localDiscovery = settings.localDiscovery,
+      seedRatioPercent = settings.seedRatioPercent,
+      seedTimeMinutes = settings.seedTimeMinutes,
     )
   }
 

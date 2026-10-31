@@ -20,6 +20,7 @@ import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.peer.PeerAttempt
 import com.linroid.ketch.torrent.peer.PeerAttemptFailure
 import com.linroid.ketch.torrent.peer.PeerDiagnostics
+import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerIdentity
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
@@ -119,6 +120,8 @@ internal class TorrentV2Swarm(
    * and the loop's while a peer's request waits. Null keeps the loop's own, on its clock.
    */
   val throttle: ThrottleClock? = null,
+  /** Whether pieces begin in order rather than rarest first, read live. */
+  val sequential: () -> Boolean = { false },
 )
 
 /** Serializes session decisions while peer actors and the storage worker perform their own I/O. */
@@ -388,7 +391,9 @@ internal object TorrentV2SessionLoop {
           val lateAfter = TorrentV2PieceScheduler.lateAfterMs(window, view.rate)
           var plan = pieces.planNext(peer.blocks, lateAfter, eligible)
           if (plan == null) {
-            val index = rarity.pick(peer) { pieces.canBegin(it) && eligible(it) }
+            val startable = { index: Int -> pieces.canBegin(index) && eligible(index) }
+            val index = if (swarm?.sequential?.invoke() == true) rarity.lowest(peer, startable)
+              else rarity.pick(peer, startable)
             if (index != null) {
               if (pieces.begin(index)) plan = pieces.planNext(peer.blocks, lateAfter, eligible)
               else {
@@ -465,9 +470,10 @@ internal object TorrentV2SessionLoop {
           }
         }
         if (swarm != null && uploads != null) {
-          // Two seeds have nothing for each other.
+          // Two seeds have nothing for each other, nor have we for a partial seed (BEP 21).
           if (complete) for ((peer, view) in peers) {
-            if (view.remoteHaveCount == pieceCount && peer !in stopping) {
+            if ((view.remoteHaveCount == pieceCount || view.extensions.uploadOnly) &&
+              peer !in stopping) {
               log.v { "V2 peer of $label closed: a seed, and so are we" }
               stop(peer)
             }
@@ -481,6 +487,8 @@ internal object TorrentV2SessionLoop {
           if (extensions != null) live.values.forEach(extensions::flush)
           uploads.pump(live, allowed, seeding)
           extensions?.pump(live) { members[it]?.listen }
+          extensions?.punch(live)
+          extensions?.uploadOnly(live, complete)
         }
         // What this pass and the events before it changed of each peer's state.
         for (view in peers.values) view.reportState()
@@ -579,10 +587,18 @@ internal object TorrentV2SessionLoop {
             is PeerMessage.Port -> if (swarm != null && !swarm.restricted) {
               view.info?.let { swarm.runtime.onDhtNode(PeerEndpoint(it.host, update.port)) }
             }
-            is PeerMessage.Extended -> if (extensions != null) {
+            is PeerMessage.Extended -> if (update.id == PeerExtensions.DONTHAVE) {
+              val index = PeerExtensions.donthaveIndex(update.payload)
+              if (index != null && index in 0 until pieceCount && rarity.has(peer, index)) {
+                rarity.drop(peer, index)
+                view.remoteHaveCount--
+                if (pieces.isNeeded(index)) view.needed--
+              }
+            } else if (extensions != null) {
               verdict(peer, extensions.receive(view, update), "a bad extension message")
               if (update.id == 0) {
                 learnListen(peer, view)
+                extensions.handshaken(view, members[peer]?.listen)
                 // An incoming peer shows where it listens rather than its source port.
                 if (view.info?.origin is PeerV2Origin.Incoming) {
                   view.extensions.listenPort?.let { view.traffic?.listenPort(it) }
@@ -984,7 +1000,8 @@ internal object TorrentV2SessionLoop {
               val fast = members.keys.count { it.info?.fast == true }
               " (in=$incoming, v1=$legacy, fast=$fast) ${uploads?.summary().orEmpty()}" +
                 " hashServed=${hashes?.served ?: 0} hashRejected=${hashes?.rejected ?: 0}" +
-                " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers"
+                " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers" +
+                extensions?.let { " ${it.holepunchSummary()}" }.orEmpty()
             }
             val outcomes = diagnostics?.let { "; ${it.summary()}" }.orEmpty()
             val webSeedPart = mirrors?.let {
@@ -1137,6 +1154,11 @@ internal object TorrentV2SessionLoop {
               if (target.generation == checkNotNull(swarm).generation()) {
                 diagnostics?.record(target.endpoint, target.attempt, failure.cause,
                   incoming = false, flags = target.pexFlags)
+                // Not reached at all: the peer that introduced it may punch a way through.
+                if (target.attempt.stage == PeerStage.DIALING && !complete &&
+                  extensions?.rendezvous(target.endpoint) == true) {
+                  log.v { "V2 swarm $label: asked the introducer of a peer to punch through" }
+                }
               }
               checkNotNull(book).failed(failure.endpoint, failure.cause, complete)
             }
@@ -1155,6 +1177,7 @@ internal object TorrentV2SessionLoop {
               // and the session carries on. A wanted piece fails it below.
               pieces.revoke(result.index)
               checkNotNull(uploads).revoked(result.index, peers)
+              extensions?.donthave(peers, result.index)
               log.d { "V2 swarm $label: revoked piece ${result.index} outside the selection" }
             } else checkNotNull(uploads).result(result, peers)
             is TorrentV2ServeWorker.Result.Hashes -> verdict(result.peer,
@@ -1213,7 +1236,8 @@ internal object TorrentV2SessionLoop {
                   peers[peerEvent.peer] = view
                   if (uploads != null) {
                     // Our extension handshake comes first, then what we have.
-                    val greeted = extensions?.ready(view) ?: true
+                    val id = members[peerEvent.peer]?.order?.toInt() ?: NOT_PUNCHING
+                    val greeted = extensions?.ready(view, id, complete) ?: true
                     val verified = if (pieces.anyVerified()) pieces.verifiedBits() else null
                     val ready = uploads.ready(peerEvent.peer, view, verified)
                     verdict(peerEvent.peer, if (greeted) ready else TorrentV2Uploader.Verdict.STOP,
@@ -1235,7 +1259,10 @@ internal object TorrentV2SessionLoop {
                   "V2 peer of $label closed: " +
                     (peerEvent.cause?.describeWithoutUrls() ?: "without error")
                 }
-                peers.remove(peerEvent.peer)?.close()
+                peers.remove(peerEvent.peer)?.let { view ->
+                  extensions?.left(view)
+                  view.close()
+                }
                 uploads?.closed(peerEvent.peer)
                 rarity.remove(peerEvent.peer)
                 pieces.detachPeer(peerEvent.peer.blocks)

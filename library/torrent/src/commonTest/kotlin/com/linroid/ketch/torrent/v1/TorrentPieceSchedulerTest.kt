@@ -68,6 +68,20 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun sequential_opensLowestPieceThoughALaterOneIsRarer() = runTest {
+    suspend fun firstPiece(sequential: Boolean): Int {
+      val scheduler = TorrentPieceScheduler(BooleanArray(3) { true }, BooleanArray(3), { piece },
+        TorrentBufferBudget(4 * piece), { 0 }, sequential = { sequential })
+      scheduler.availability(1, all(3))
+      // Peer 2 lacks piece 2, which makes it the rarest.
+      scheduler.availability(2, booleanArrayOf(true, true, false))
+      return scheduler.request(1, max = 1).requests.single().index.also { scheduler.close() }
+    }
+    assertEquals(2, firstPiece(sequential = false))
+    assertEquals(0, firstPiece(sequential = true))
+  }
+
+  @Test
   fun discardedPayload_countsWhatNoVerifiedPieceKeeps() = runTest {
     val budget = TorrentBufferBudget(2 * piece)
     var discarded = 0L

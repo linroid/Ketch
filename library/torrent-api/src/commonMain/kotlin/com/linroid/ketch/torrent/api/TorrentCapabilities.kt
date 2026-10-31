@@ -26,6 +26,8 @@ enum class TorrentCapability(val wireName: String) {
   REACHABILITY("reachability"),
   SETTINGS("settings"),
   LOCAL_DISCOVERY("local-discovery"),
+  SEED_GOALS("seed-goals"),
+  SEQUENTIAL("sequential"),
 }
 
 /**

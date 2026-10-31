@@ -106,6 +106,13 @@ internal class TorrentV2Runtime(
   val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
   /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
   val webSeedHttp: TorrentHttp? = null,
+  /**
+   * Whether uTP is on, read live: hole punching (BEP 55) dials over uTP, so it is offered and
+   * acted on only while it is.
+   */
+  val utpEnabled: () -> Boolean = { false },
+  /** Endpoints known to speak uTP, or to be punched through, which are dialed over it first. */
+  val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
 )
 
 /** Per-owner limits and the discovery it runs while transferring. */
@@ -224,6 +231,9 @@ internal class TorrentV2DownloadSession private constructor(
   /** Follows [changeSelection]. */
   override val totalBytes: Long get() = store.totalSelectedBytes
   override val downloadSpeed: Long get() = 0
+  private val sequential = AtomicBoolean(false)
+
+  override fun setSequential(sequential: Boolean) = this.sequential.store(sequential)
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
@@ -718,6 +728,7 @@ internal class TorrentV2DownloadSession private constructor(
                 swarm = TorrentV2Swarm(document, runtime, restricted, waitForPeers, discovered,
                   dial, failures, loopControls, connectionLimit::value, generation::load,
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
+                  sequential = sequential::load,
                   uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
                   onRoom = room::store, onIncomplete = ::incomplete,
                   incomingFailures = incomingFailures, webSeeds = webSeeds,

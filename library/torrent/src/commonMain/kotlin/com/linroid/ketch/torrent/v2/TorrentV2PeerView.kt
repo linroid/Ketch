@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent.v2
 import com.linroid.ketch.torrent.engine.TorrentBufferBudget
 import com.linroid.ketch.torrent.metainfo.MAX_PIECE_LENGTH
 import com.linroid.ketch.torrent.monotonicClock
+import com.linroid.ketch.torrent.peer.HolepunchMessage
 import com.linroid.ketch.torrent.peer.PeerExchange
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerMessage
@@ -12,7 +13,11 @@ import com.linroid.ketch.torrent.peer.PeerTraffic
 import com.linroid.ketch.torrent.peer.PexIntroductions
 import com.linroid.ketch.torrent.v2.peer.PeerInfo
 import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
+
+/** [TorrentV2PeerView.holepunchId] of a peer that takes no part in hole punching. */
+internal const val NOT_PUNCHING = -1
 
 /** Session-state charge for one ready peer's loop view on a swarm session. */
 internal const val PEER_VIEW_BYTES = 16 * 1024
@@ -53,6 +58,15 @@ internal class TorrentV2PeerView(
   /** The swarm's piece length, which sizes [serveCredit]; the largest a piece may be. */
   pieceLength: Long = MAX_PIECE_LENGTH,
 ) {
+  /** This peer among the swarm's holepunch members, once it joined. */
+  var holepunchId = NOT_PUNCHING
+
+  /** What this peer last heard of whether we want more (BEP 21). */
+  var uploadOnly = false
+
+  /** Holepunch messages for this peer from the swarm (BEP 55), sent on the loop's next pass. */
+  val holepunchOut = Channel<HolepunchMessage>(16)
+
   /** Pieces read back and hashes folded for this peer, beyond what it takes of them. */
   val serveCredit = PeerServeCredit(PeerServeCredit.capacityFor(pieceLength), nowMs)
 
@@ -205,6 +219,7 @@ internal class TorrentV2PeerView(
   fun close() {
     try {
       traffic?.close()
+      holepunchOut.cancel()
       while (hashAnswers.isNotEmpty()) hashAnswers.removeFirst().close()
     } finally { lease?.close() }
   }

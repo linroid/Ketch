@@ -1186,12 +1186,14 @@ final class com.linroid.ketch.api/ProxyAddress { // com.linroid.ketch.api/ProxyA
 }
 
 final class com.linroid.ketch.api/ResolvedSource { // com.linroid.ketch.api/ResolvedSource|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/Long, kotlin/Boolean, kotlin/String?, kotlin/Int, kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/SourceFile> = ..., com.linroid.ketch.api/FileSelectionMode = ..., kotlin/String? = ..., com.linroid.ketch.api/Checksum? = ...) // com.linroid.ketch.api/ResolvedSource.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long;kotlin.Boolean;kotlin.String?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.SourceFile>;com.linroid.ketch.api.FileSelectionMode;kotlin.String?;com.linroid.ketch.api.Checksum?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Long, kotlin/Boolean, kotlin/String?, kotlin/Int, kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/SourceFile> = ..., com.linroid.ketch.api/FileSelectionMode = ..., kotlin/String? = ..., com.linroid.ketch.api/Checksum? = ..., kotlin.collections/Set<kotlin/String> = ...) // com.linroid.ketch.api/ResolvedSource.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long;kotlin.Boolean;kotlin.String?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.SourceFile>;com.linroid.ketch.api.FileSelectionMode;kotlin.String?;com.linroid.ketch.api.Checksum?;kotlin.collections.Set<kotlin.String>){}[0]
 
     final val checksum // com.linroid.ketch.api/ResolvedSource.checksum|{}checksum[0]
         final fun <get-checksum>(): com.linroid.ketch.api/Checksum? // com.linroid.ketch.api/ResolvedSource.checksum.<get-checksum>|<get-checksum>(){}[0]
     final val contentType // com.linroid.ketch.api/ResolvedSource.contentType|{}contentType[0]
         final fun <get-contentType>(): kotlin/String? // com.linroid.ketch.api/ResolvedSource.contentType.<get-contentType>|<get-contentType>(){}[0]
+    final val defaultFileIds // com.linroid.ketch.api/ResolvedSource.defaultFileIds|{}defaultFileIds[0]
+        final fun <get-defaultFileIds>(): kotlin.collections/Set<kotlin/String> // com.linroid.ketch.api/ResolvedSource.defaultFileIds.<get-defaultFileIds>|<get-defaultFileIds>(){}[0]
     final val files // com.linroid.ketch.api/ResolvedSource.files|{}files[0]
         final fun <get-files>(): kotlin.collections/List<com.linroid.ketch.api/SourceFile> // com.linroid.ketch.api/ResolvedSource.files.<get-files>|<get-files>(){}[0]
     final val maxSegments // com.linroid.ketch.api/ResolvedSource.maxSegments|{}maxSegments[0]
@@ -1214,6 +1216,7 @@ final class com.linroid.ketch.api/ResolvedSource { // com.linroid.ketch.api/Reso
     final fun component1(): kotlin/String // com.linroid.ketch.api/ResolvedSource.component1|component1(){}[0]
     final fun component10(): kotlin/String? // com.linroid.ketch.api/ResolvedSource.component10|component10(){}[0]
     final fun component11(): com.linroid.ketch.api/Checksum? // com.linroid.ketch.api/ResolvedSource.component11|component11(){}[0]
+    final fun component12(): kotlin.collections/Set<kotlin/String> // com.linroid.ketch.api/ResolvedSource.component12|component12(){}[0]
     final fun component2(): kotlin/String // com.linroid.ketch.api/ResolvedSource.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.linroid.ketch.api/ResolvedSource.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.linroid.ketch.api/ResolvedSource.component4|component4(){}[0]
@@ -1222,7 +1225,7 @@ final class com.linroid.ketch.api/ResolvedSource { // com.linroid.ketch.api/Reso
     final fun component7(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.linroid.ketch.api/ResolvedSource.component7|component7(){}[0]
     final fun component8(): kotlin.collections/List<com.linroid.ketch.api/SourceFile> // com.linroid.ketch.api/ResolvedSource.component8|component8(){}[0]
     final fun component9(): com.linroid.ketch.api/FileSelectionMode // com.linroid.ketch.api/ResolvedSource.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/SourceFile> = ..., com.linroid.ketch.api/FileSelectionMode = ..., kotlin/String? = ..., com.linroid.ketch.api/Checksum? = ...): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/ResolvedSource.copy|copy(kotlin.String;kotlin.String;kotlin.Long;kotlin.Boolean;kotlin.String?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.SourceFile>;com.linroid.ketch.api.FileSelectionMode;kotlin.String?;com.linroid.ketch.api.Checksum?){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/SourceFile> = ..., com.linroid.ketch.api/FileSelectionMode = ..., kotlin/String? = ..., com.linroid.ketch.api/Checksum? = ..., kotlin.collections/Set<kotlin/String> = ...): com.linroid.ketch.api/ResolvedSource // com.linroid.ketch.api/ResolvedSource.copy|copy(kotlin.String;kotlin.String;kotlin.Long;kotlin.Boolean;kotlin.String?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.SourceFile>;com.linroid.ketch.api.FileSelectionMode;kotlin.String?;com.linroid.ketch.api.Checksum?;kotlin.collections.Set<kotlin.String>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/ResolvedSource.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/ResolvedSource.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/ResolvedSource.toString|toString(){}[0]

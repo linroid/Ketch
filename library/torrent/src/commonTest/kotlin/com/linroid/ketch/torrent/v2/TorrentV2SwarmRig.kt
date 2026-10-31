@@ -116,7 +116,11 @@ internal class TorrentV2SwarmRig(
   uploadBytes: Int? = null,
   private val listenPort: Int = 0,
   private val stall: MutableStateFlow<TorrentStall?>? = null,
+  private val utpEnabled: Boolean = false,
+  private val allowLocalPeers: Boolean = false,
 ) {
+  /** Endpoints the loop asked to dial over uTP first. */
+  val utpPeers = Channel<PeerEndpoint>(Channel.UNLIMITED)
   val layout = fixture.layout
   val pieceCount = layout.pieceCount.toInt()
   val buffers = TorrentBufferBudget(4 * 1024 * 1024)
@@ -233,7 +237,9 @@ internal class TorrentV2SwarmRig(
         TorrentV2Runtime(network, ByteArray(20) { 9 }.toByteString(), buffers, state,
           uploadRate = global, uploadPolicy = { policy.load() },
           listenPortFor = { listenPort }, uploadBuffers = uploads,
-          dhtPortFor = { dhtPort }, onDhtNode = { dhtNodes.trySend(it) }),
+          dhtPortFor = { dhtPort }, onDhtNode = { dhtNodes.trySend(it) },
+          allowLocalPeers = allowLocalPeers, utpEnabled = { utpEnabled },
+          onUtpPeers = { peers -> peers.forEach { utpPeers.trySend(it) } }),
         restricted = false, waitForPeers = true, discovered = discovered, dial = dial,
         dialFailures = failures, controls = controls, connectionLimit = { 8 },
         generation = { 0 }, serve = serve, sessionUploadRate = session,

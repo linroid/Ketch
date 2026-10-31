@@ -1,10 +1,7 @@
-package com.linroid.ketch.torrent.v1
+package com.linroid.ketch.torrent.peer
 
 import com.linroid.ketch.torrent.monotonicClock
 import com.linroid.ketch.torrent.net.PeerEndpoint
-import com.linroid.ketch.torrent.peer.HolepunchError
-import com.linroid.ketch.torrent.peer.HolepunchMessage
-import com.linroid.ketch.torrent.peer.HolepunchType
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -16,8 +13,8 @@ import kotlinx.coroutines.sync.withLock
  * As a relay it answers a peer's rendezvous by sending both it and the peer it names a CONNECT
  * with the other's endpoint, so each dials the other over uTP at once and their NATs let the
  * other's packets in. When we cannot dial a peer ourselves, [rendezvous] asks the peer that
- * introduced it to do the same for us. Each worker hands in the messages for its peer through
- * its own outbox and sends them on its next pass.
+ * introduced it to do the same for us. Each peer's messages wait in its own outbox until its
+ * worker, or a v2 session's loop, sends them on its next pass.
  */
 internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) {
   private class Member(
@@ -28,6 +25,8 @@ internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) 
   ) {
     var listen: PeerEndpoint? = null
     var supports = false
+    var connectWindow = 0L
+    var connectsInWindow = 0
   }
 
   private val mutex = Mutex()
@@ -49,7 +48,9 @@ internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) 
     utp: Boolean,
     outbox: SendChannel<HolepunchMessage>,
   ) {
-    mutex.withLock { members[id] = Member(outbox, remote, utp) }
+    mutex.withLock {
+      members[id] = Member(outbox, remote, utp).also { it.connectWindow = nowMs() }
+    }
   }
 
   /** What the peer's extension handshake said: where it listens and whether it takes part. */
@@ -114,9 +115,20 @@ internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) 
     true
   }
 
-  /** A relay told us to dial a peer. */
-  suspend fun connected() {
-    mutex.withLock { connects++ }
+  /**
+   * Peer [id] told us to dial a peer: whether we may now, as each CONNECT is a host we dial. A
+   * peer gets at most [MAX_CONNECTS_PER_MINUTE] a minute.
+   */
+  suspend fun admitConnect(id: Int): Boolean = mutex.withLock {
+    val member = members[id] ?: return@withLock false
+    val now = nowMs()
+    if (now - member.connectWindow >= 60_000) {
+      member.connectWindow = now
+      member.connectsInWindow = 0
+    }
+    if (++member.connectsInWindow > MAX_CONNECTS_PER_MINUTE) return@withLock false
+    connects++
+    true
   }
 
   /** A relay could not introduce us, for BEP 55 error [code]. */
@@ -160,5 +172,6 @@ internal class SwarmHolepunch(private val nowMs: () -> Long = monotonicClock()) 
     const val MAX_TRACKED = 4096
     /** A target is asked for again only after this long. */
     const val RETRY_MS = 5 * 60_000L
+    const val MAX_CONNECTS_PER_MINUTE = 8
   }
 }

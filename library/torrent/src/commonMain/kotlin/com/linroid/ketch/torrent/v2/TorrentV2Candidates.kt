@@ -140,6 +140,25 @@ internal class TorrentV2Candidates(
   }
 
   /**
+   * A relay introduced us to [endpoint] and the peer there dials us now (BEP 55): it is dialed
+   * first, whatever it was waiting for, keeping its count of dials. Returns false for one banned
+   * or that the book has no room for, and one connected or being dialed already, as a seed
+   * answers too: that is how leechers behind NATs reach it.
+   */
+  fun punch(endpoint: PeerEndpoint, topic: PeerTopic): Boolean {
+    if (restricted || endpoint.port == 0 || endpoint in bannedEndpoints) return false
+    if (endpoint !in entries && entries.size >= MAX_CANDIDATES) prune()
+    if (endpoint !in entries && entries.size >= MAX_CANDIDATES) return false
+    val entry = entries.getOrPut(endpoint) { Entry(endpoint) }
+    if (topic == PeerTopic.V2) entry.v2 = true
+    if (entry.status == Status.CONNECTED || entry.status == Status.DIALING) return false
+    queue.remove(endpoint)
+    move(entry, Status.QUEUED)
+    queue.addFirst(endpoint)
+    return true
+  }
+
+  /**
    * The generation this book belongs to, from its last [reset]. Targets carry it, so a target
    * chosen before the loop applied a reset is stale even if the session already counts the next.
    */

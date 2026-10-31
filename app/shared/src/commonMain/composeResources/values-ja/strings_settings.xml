@@ -550,6 +550,15 @@
   <string name="settings_torrent_upload_off_hint">ピアはこのデバイスから何もダウンロードできません。</string>
   <string name="settings_torrent_upload_while_downloading_hint">トレントのダウンロード中は、取得済みのピースをピアがダウンロードできます。</string>
   <string name="settings_torrent_upload_seed_hint">完了したトレントは、Ketchの再起動後も、停止するかこの設定をオフにするまでアップロードを続けます。</string>
+  <string name="settings_torrent_seed_ratio">シードを停止する比率</string>
+  <string name="settings_torrent_seed_ratio_hint">トレントのサイズに対してこの割合をアップロードすると停止します。</string>
+  <string name="settings_torrent_seed_time">シードを停止するまでの時間</string>
+  <string name="settings_torrent_seed_time_hint">開始からこの時間シードすると停止します。</string>
+  <string name="settings_torrent_seed_off">制限なし</string>
+  <string name="settings_torrent_seed_percent">%1$d%%</string>
+  <string name="settings_torrent_seed_hours">%1$d時間</string>
+  <string name="settings_torrent_seed_fewer">減らす</string>
+  <string name="settings_torrent_seed_more">増やす</string>
   <string name="settings_torrent_upload_wifi_only">Wi-Fi接続時のみ</string>
   <string name="settings_torrent_upload_wifi_only_hint">モバイルデータ通信や従量制ネットワークではアップロードを一時停止します。</string>
   <string name="settings_torrent_upload_limit">アップロード速度制限</string>

@@ -562,6 +562,15 @@
   <string name="settings_torrent_upload_off_hint">Os peers não podem baixar nada deste dispositivo.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Enquanto seus torrents baixam, os peers podem baixar as partes que você já tem.</string>
   <string name="settings_torrent_upload_seed_hint">Torrents concluídos continuam enviando até você pará-los ou desativar isto, inclusive depois que o Ketch reinicia.</string>
+  <string name="settings_torrent_seed_ratio">Parar de semear na proporção</string>
+  <string name="settings_torrent_seed_ratio_hint">Para quando um torrent enviar esta parte do seu tamanho.</string>
+  <string name="settings_torrent_seed_time">Parar de semear após</string>
+  <string name="settings_torrent_seed_time_hint">Para quando um torrent semear por este tempo.</string>
+  <string name="settings_torrent_seed_off">Sem limite</string>
+  <string name="settings_torrent_seed_percent">%1$d%%</string>
+  <string name="settings_torrent_seed_hours">%1$d h</string>
+  <string name="settings_torrent_seed_fewer">Menos</string>
+  <string name="settings_torrent_seed_more">Mais</string>
   <string name="settings_torrent_upload_wifi_only">Somente no Wi-Fi</string>
   <string name="settings_torrent_upload_wifi_only_hint">Pausa o envio em dados móveis e outras redes limitadas.</string>
   <string name="settings_torrent_upload_limit">Limite de envio</string>

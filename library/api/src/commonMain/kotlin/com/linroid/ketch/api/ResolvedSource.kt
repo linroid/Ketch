@@ -17,6 +17,8 @@ import kotlinx.serialization.Serializable
  * @property contentType the media type the source reports, such as `video/mp4`
  * @property checksum the digest the source publishes, which downloads without their own
  *   [DownloadRequest.checksum] are verified against
+ * @property defaultFileIds the [files] the link itself picks for [FileSelectionMode.MULTIPLE],
+ *   downloaded when none are chosen, as a magnet's `so` does; empty for every file
  */
 @Serializable
 data class ResolvedSource(
@@ -31,6 +33,7 @@ data class ResolvedSource(
   val selectionMode: FileSelectionMode = FileSelectionMode.MULTIPLE,
   val contentType: String? = null,
   val checksum: Checksum? = null,
+  val defaultFileIds: Set<String> = emptySet(),
 ) {
   companion object {
     /**
@@ -56,8 +59,12 @@ fun ResolvedSource.withoutBulkMetadata(): ResolvedSource {
   return if (kept.size == metadata.size) this else copy(metadata = kept)
 }
 
-/** The files downloaded when none are chosen: all of them, or the first for a single choice. */
+/**
+ * The files downloaded when none are chosen: those the link picks, else all of them, or the first
+ * for a single choice.
+ */
 fun ResolvedSource.defaultSelection(): Set<String> = when (selectionMode) {
-  FileSelectionMode.MULTIPLE -> files.mapTo(LinkedHashSet()) { it.id }
+  FileSelectionMode.MULTIPLE ->
+    defaultFileIds.ifEmpty { files.mapTo(LinkedHashSet()) { it.id } }
   FileSelectionMode.SINGLE -> files.firstOrNull()?.let { setOf(it.id) }.orEmpty()
 }

@@ -207,6 +207,7 @@
   <string name="inspector_files_hint">Les fichiers cochés sont téléchargés ; les fichiers décochés restent où ils sont.</string>
   <string name="inspector_seeding_status">En partage · ↑ %1$s · %2$s envoyés</string>
   <string name="inspector_seeding_stop">Arrêter le partage</string>
+  <string name="inspector_sequential">Télécharger dans l'ordre</string>
   <string name="inspector_seeding_start">Partager</string>
   <string name="inspector_seeding_waiting">En attente de partage</string>
   <plurals name="inspector_stall_missing">

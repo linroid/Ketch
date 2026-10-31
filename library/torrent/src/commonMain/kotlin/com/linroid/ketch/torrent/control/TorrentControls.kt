@@ -9,13 +9,17 @@ import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.engine.SourceExtension
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.task.TaskState
+import com.linroid.ketch.torrent.api.TorrentCommandContext
+import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentInterest
+import com.linroid.ketch.torrent.crypto.torrentRandomBytes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okio.ByteString.Companion.toByteString
 import kotlin.time.Duration
 
 /**
@@ -86,6 +90,25 @@ internal class TorrentControls(
       // walks the tasks meant to seed again.
       source.sharingResumes.collect { restoreSeeding() }
     }
+    host.scope.launch { source.seedGoalsReached.collect(::finishSeeding) }
+  }
+
+  /**
+   * A task reached a seed goal: a Stop command stops it, so a save the watcher has queued cannot
+   * bring the intent back. Asked again while another command moves the task's revision on.
+   */
+  private suspend fun finishSeeding(taskId: String) {
+    repeat(GOAL_STOP_ATTEMPTS) {
+      val revision = controller.snapshot(taskId)?.revision ?: return
+      val key = "seed-goal-" + torrentRandomBytes(16).toByteString().hex()
+      try {
+        controller.setSeeding(taskId, false, TorrentCommandContext(key, revision))
+        return
+      } catch (e: TorrentCommandException) {
+        log.d { "Could not stop taskId=$taskId at its seed goal: ${e.describeCauses()}" }
+      }
+    }
+    log.w { "Gave up stopping taskId=$taskId at its seed goal" }
   }
 
   override suspend fun taskCompleted(task: DownloadTask) {
@@ -229,3 +252,6 @@ internal class TorrentControls(
     return outcome
   }
 }
+
+/** How many times a task that reached a seed goal is told to stop. */
+private const val GOAL_STOP_ATTEMPTS = 3

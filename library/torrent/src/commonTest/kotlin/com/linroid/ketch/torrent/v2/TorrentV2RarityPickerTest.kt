@@ -31,6 +31,20 @@ class TorrentV2RarityPickerTest {
   }
 
   @Test
+  fun lowest_takesTheFirstEligiblePieceWhateverItsRarity() {
+    val budget = TorrentBufferBudget(4096)
+    val picker = assertNotNull(TorrentV2RarityPicker.create<String>(3, budget, maxPeers = 3))
+    try {
+      assertTrue(picker.update("a", byteArrayOf(224.toByte())))
+      assertTrue(picker.update("b", byteArrayOf(192.toByte())))
+      assertEquals(2, picker.pick("a") { true })
+      assertEquals(0, picker.lowest("a") { true })
+      assertEquals(1, picker.lowest("a") { it != 0 })
+      assertNull(picker.lowest("unknown") { true })
+    } finally { picker.close() }
+  }
+
+  @Test
   fun replacementAndRemovalUpdateRarityWithoutAliasingInputsOrCountingDuplicateHaves() {
     val budget = TorrentBufferBudget(4096)
     val picker = assertNotNull(TorrentV2RarityPicker.create<String>(2, budget, maxPeers = 3))

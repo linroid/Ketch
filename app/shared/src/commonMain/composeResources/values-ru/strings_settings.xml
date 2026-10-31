@@ -586,6 +586,15 @@
   <string name="settings_torrent_upload_off_hint">Пиры не могут ничего скачать с этого устройства.</string>
   <string name="settings_torrent_upload_while_downloading_hint">Пока торренты загружаются, пиры могут скачивать уже полученные вами части.</string>
   <string name="settings_torrent_upload_seed_hint">Готовые торренты продолжают отдачу, пока вы их не остановите или не отключите этот параметр, в том числе после перезапуска Ketch.</string>
+  <string name="settings_torrent_seed_ratio">Остановить раздачу при рейтинге</string>
+  <string name="settings_torrent_seed_ratio_hint">Останавливается, когда торрент отдал эту долю своего размера.</string>
+  <string name="settings_torrent_seed_time">Остановить раздачу через</string>
+  <string name="settings_torrent_seed_time_hint">Останавливается, когда торрент раздавался столько времени.</string>
+  <string name="settings_torrent_seed_off">Без ограничений</string>
+  <string name="settings_torrent_seed_percent">%1$d %%</string>
+  <string name="settings_torrent_seed_hours">%1$d ч</string>
+  <string name="settings_torrent_seed_fewer">Меньше</string>
+  <string name="settings_torrent_seed_more">Больше</string>
   <string name="settings_torrent_upload_wifi_only">Только по Wi-Fi</string>
   <string name="settings_torrent_upload_wifi_only_hint">Приостанавливает отдачу в мобильной сети и других лимитных сетях.</string>
   <string name="settings_torrent_upload_limit">Ограничение отдачи</string>

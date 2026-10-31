@@ -81,6 +81,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -177,6 +179,9 @@ class TorrentDownloadSource(
   /** Test hook: how often a seeding session saves its state into its task's record. */
   internal var seedingSaveIntervalMs: Long = SEEDING_SAVE_INTERVAL_MS
 
+  /** Test hook: how often a seeder is checked against the seed goals. */
+  internal var seedGoalCheckMs: Long = SEED_GOAL_CHECK_MS
+
   /** Creates the engine from [engineConfig], under [engineMutex]. */
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
     // May map ports and join the LAN's discovery group; TorrentConfig.portMapping and
@@ -255,6 +260,14 @@ class TorrentDownloadSource(
   private class SourceControls(private val source: TorrentDownloadSource) : TorrentControlSource {
     override val torrentCapabilities: Set<String> get() = source.torrentCapabilities
     override val seedingTaskIds: StateFlow<Set<String>> get() = source.seedingTaskIds
+
+    override val seedGoalsReached: Flow<String> get() = source.seedGoalsReached
+
+    override suspend fun isSequential(taskId: String, sourceState: SourceState?) =
+      source.isSequential(taskId) { source.savedSequential(sourceState) }
+
+    override suspend fun setSequential(taskId: String, sequential: Boolean) =
+      source.setSequential(taskId, sequential)
     override val restoresSeeding: Boolean get() = source.restoresSeeding
     override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
 
@@ -307,12 +320,38 @@ class TorrentDownloadSource(
       add(TorrentCapability.ENCRYPTION.wireName)
       add(TorrentCapability.REACHABILITY.wireName)
       add(TorrentCapability.SETTINGS.wireName)
+      add(TorrentCapability.SEED_GOALS.wireName)
+      add(TorrentCapability.SEQUENTIAL.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
         add(TorrentCapability.SEEDING.wireName)
       }
     }
+
+  /** What tasks were last told by [setSequential], in this process. */
+  private val sequentialChoices = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+  /** Whether [state], as a task saved it, downloads its pieces in order. */
+  internal fun savedSequential(state: SourceState?): Boolean = state != null &&
+    runCatching { decodeState(state) }.getOrNull()?.sequential == true
+
+  /** Whether [taskId]'s pieces download in order: what it was told, else what its run says. */
+  internal suspend fun isSequential(taskId: String, saved: () -> Boolean): Boolean =
+    sequentialChoices.value[taskId]
+      ?: stateMutex.withLock { states[taskId]?.sequential } ?: saved()
+
+  /** Downloads [taskId]'s pieces in order or not, at once if it runs and whenever it next does. */
+  internal suspend fun setSequential(taskId: String, sequential: Boolean) {
+    sequentialChoices.update { it + (taskId to sequential) }
+    stateMutex.withLock {
+      states[taskId]?.let { states[taskId] = it.copy(sequential = sequential) }
+    }
+    tasks.session(taskId)?.setSequential(sequential)
+  }
+
+  /** What [TorrentControlSource.seedGoalsReached] reports. */
+  internal val seedGoalsReached = MutableSharedFlow<String>(extraBufferCapacity = 64)
 
   /** What [TorrentControlSource.seedingTaskIds] reports. */
   internal val seedingTaskIds: StateFlow<Set<String>> = seeding.asStateFlow()
@@ -1339,6 +1378,7 @@ class TorrentDownloadSource(
           log.i { "Waiting for one of $MAX_PENDING_METADATA magnet metadata lookups to finish" }
         }
         return@reportingFailures metadataFetches.withPermit { resolveMagnet(url, privacy) }
+          .pickingFilesOf(MagnetUri.parse(url))
           .logged("magnet")
       }
       val bytes = if (url.startsWith("https://", true) || url.startsWith("http://", true)) {
@@ -1519,7 +1559,7 @@ class TorrentDownloadSource(
       newInput = false)
     if (v2 != null) {
       require(v2.metadata[META_INFO_HASH] == hash) { "Resolved torrent hash mismatch" }
-      executeV2(context, v2, previous)
+      executeV2(context, v2.copy(defaultFileIds = resolved.defaultFileIds), previous)
       return
     }
     require(previous?.version != 3) { "Cannot downgrade a v2 task" }
@@ -1528,7 +1568,7 @@ class TorrentDownloadSource(
     val table = fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     // Read once: a later revision reaches the running session through the collector.
     val initial = context.selection.value
-    val selected = selectionOf(table, initial.fileIds, previous)
+    val selected = selectionOf(table, initial.fileIds, previous, resolved.defaultFileIds)
     val output = context.outputPath ?: previous?.savePath?.takeIf { it.isNotEmpty() }
       ?: error("Torrent output path has not been resolved")
     require(!output.contains("://")) { "Torrent output requires a filesystem path" }
@@ -1536,7 +1576,8 @@ class TorrentDownloadSource(
     val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
     // The metainfo is Ketch's to keep; only states older builds saved carry it.
     val state = TorrentSourceState(hash, total, previous?.resumeData ?: "", selected, output,
-      previous?.metainfo.orEmpty(), version = 2, privacy = privacy)
+      previous?.metainfo.orEmpty(), version = 2, privacy = privacy,
+      sequential = previous?.sequential == true)
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1563,7 +1604,7 @@ class TorrentDownloadSource(
     val table = fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     // Read once: a later revision reaches the running owner through the collector.
     val initial = context.selection.value
-    val selected = selectionOf(table, initial.fileIds, previous)
+    val selected = selectionOf(table, initial.fileIds, previous, resolved.defaultFileIds)
     val output = context.outputPath ?: previous?.savePath?.takeIf { it.isNotEmpty() }
       ?: error("Torrent output path has not been resolved")
     require("://" !in output) { "Torrent output requires a filesystem path" }
@@ -1571,7 +1612,8 @@ class TorrentDownloadSource(
     val hash = document.info.hash.hex
     val total = table.totalOf(selected)
     val state = TorrentSourceState(hash, total, previous?.resumeData.orEmpty(), selected, output,
-      previous?.metainfo.orEmpty(), version = 3, privacy = privacy)
+      previous?.metainfo.orEmpty(), version = 3, privacy = privacy,
+      sequential = previous?.sequential == true)
     log.i {
       "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1594,15 +1636,17 @@ class TorrentDownloadSource(
 
   /**
    * The files a run starts with, in metainfo order: [requested], the selection Ketch saved, else
-   * the one [previous] mirrors (records older than selection changes), else every file.
+   * the one [previous] mirrors (records older than selection changes), else [linkDefault], the
+   * files the link picks, else every file.
    */
   private fun selectionOf(
     table: TorrentFileTable,
     requested: Set<String>,
     previous: TorrentSourceState?,
+    linkDefault: Set<String> = emptySet(),
   ): Set<String> {
     // Selections of older builds may name padding files, which tables no longer list.
-    val ids = requested.ifEmpty { previous?.selectedFileIds.orEmpty() }
+    val ids = requested.ifEmpty { previous?.selectedFileIds.orEmpty() }.ifEmpty { linkDefault }
       .filterNotTo(LinkedHashSet()) { it in table.padding }.ifEmpty { table.ids }
     require(ids.all { table[it] != null }) { "Invalid file selection" }
     return table.ordered(ids)
@@ -1643,13 +1687,15 @@ class TorrentDownloadSource(
       var keepSeeding = false
       var lent = false
       try {
-        rememberState(taskId, state)
+        val sequential = sequentialChoices.value[taskId] ?: state.sequential
+        rememberState(taskId, state.copy(sequential = sequential))
         val running = adopted ?: open().also { created ->
           session = created
           tasks.attach(taskId, created)
           // The new session runs the selection read at the start of this run.
           context.acknowledgeSelection(initialRevision)
         }
+        running.setSequential(sequential)
         // Payload pays this run's task limits, also on a session an earlier run opened.
         running.setTaskThrottle(context.throttle)
         // An adopted session applies the current selection first, whatever it ran with.
@@ -1771,6 +1817,21 @@ class TorrentDownloadSource(
           seedStates.value[taskId]?.let { saveSeedingState(taskId, session, it) }
         }
       }
+      // A goal changed while it seeds counts from then on, as seeding only stops at a check.
+      val goals = launch {
+        var seededMs = 0L
+        while (true) {
+          delay(seedGoalCheckMs)
+          if (session.state.value != TorrentSessionState.SEEDING) continue
+          seededMs += seedGoalCheckMs
+          val uploaded = session.payloadCounters().uploaded
+          if (settingsState.value.seedGoalReached(uploaded, session.totalBytes, seededMs)) {
+            log.i { "Torrent taskId=$taskId reached its seed goal" }
+            seedGoalsReached.emit(taskId)
+            return@launch
+          }
+        }
+      }
       try {
         session.state.takeWhile {
           it != TorrentSessionState.STOPPED && it != TorrentSessionState.FINISHED
@@ -1782,6 +1843,7 @@ class TorrentDownloadSource(
         }
       } finally {
         saver.cancel()
+        goals.cancel()
       }
       // Once it reclaimed the slot, it stops the seeder and returns the slot, whatever happens.
       withContext(NonCancellable) {
@@ -2239,8 +2301,21 @@ internal expect fun createTorrentEngine(
 internal const val MAX_V1_PEERS = 512
 internal const val MAX_V2_PEERS = 500
 
+/** This resolution with the files [magnet] picks as its default (BEP 53), those it lists. */
+internal fun ResolvedSource.pickingFilesOf(magnet: MagnetUri): ResolvedSource {
+  val picked = files.filterTo(ArrayList()) { it.id.toIntOrNull() in magnet.selectOnly }
+  if (picked.isEmpty()) return this
+  return copy(
+    totalBytes = picked.sumOf { it.size },
+    defaultFileIds = picked.mapTo(LinkedHashSet()) { it.id },
+  )
+}
+
 /** A magnet's metadata lookup ended without finding it. */
 private class MetadataNotFoundException : Exception("Torrent metadata resolution timed out")
+
+/** How often a seeder is checked against the seed goals. */
+private const val SEED_GOAL_CHECK_MS = 10_000L
 
 /** Pause between a task's magnet lookups, so one that ends at once cannot spin. */
 private const val MAGNET_LOOKUP_PAUSE_MS = 1_000L
