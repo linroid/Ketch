@@ -1531,7 +1531,7 @@ class TorrentDownloadSource(
       newInput = false)
     if (v2 != null) {
       require(v2.metadata[META_INFO_HASH] == hash) { "Resolved torrent hash mismatch" }
-      executeV2(context, v2, previous)
+      executeV2(context, v2.copy(defaultFileIds = resolved.defaultFileIds), previous)
       return
     }
     require(previous?.version != 3) { "Cannot downgrade a v2 task" }
