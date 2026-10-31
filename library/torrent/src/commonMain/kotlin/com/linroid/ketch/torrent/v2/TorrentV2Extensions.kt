@@ -5,11 +5,17 @@ import com.linroid.ketch.torrent.metainfo.Bencode
 import com.linroid.ketch.torrent.net.PeerEndpoint
 import com.linroid.ketch.torrent.net.numericAddress
 import com.linroid.ketch.torrent.net.publicTorrentAddress
+import com.linroid.ketch.torrent.peer.HOLEPUNCH_EXTENSION
+import com.linroid.ketch.torrent.peer.HolepunchMessage
+import com.linroid.ketch.torrent.peer.HolepunchType
+import com.linroid.ketch.torrent.peer.PEX_FLAG_HOLEPUNCH
+import com.linroid.ketch.torrent.peer.PEX_FLAG_UTP
 import com.linroid.ketch.torrent.peer.PeerExtensions
 import com.linroid.ketch.torrent.peer.PeerIdentityHandshake
 import com.linroid.ketch.torrent.peer.PeerMessage
 import com.linroid.ketch.torrent.peer.PeerOrigin
 import com.linroid.ketch.torrent.peer.PeerWire
+import com.linroid.ketch.torrent.peer.SwarmHolepunch
 import com.linroid.ketch.torrent.peer.pexFlags
 import com.linroid.ketch.torrent.peer.servesMetadata
 import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
@@ -18,8 +24,8 @@ import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
 
 /**
  * The swarm loop's side of BEP 10 on v2 and hybrid connections, v1 routes included: our extension
- * handshake, the info dictionary for `ut_metadata` (BEP 9) and peer exchange both ways (BEP 11).
- * Owned and called by the loop only, for peers that negotiated extensions.
+ * handshake, the info dictionary for `ut_metadata` (BEP 9), peer exchange both ways (BEP 11) and
+ * hole punching (BEP 55). Owned and called by the loop only, for peers that negotiated extensions.
  *
  * The info dictionary is offered and served only while [servesMetadata] allows it, read again for
  * every answer, so switching uploads off withholds it at once. Answers wait in the peer's view
@@ -27,7 +33,9 @@ import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
  * torrents (private metainfo or tracker-only privacy) never offer peer exchange, and a peer that
  * sends it anyway is banned (BEP 27). Peer exchange shares only listen endpoints, each with the
  * flags [pexFlags] gives it, and only public addresses unless the runtime allows local peers; a
- * message counts as sent only once its actor took it and wrote it.
+ * message counts as sent only once its actor took it and wrote it. Hole punching runs for
+ * unrestricted torrents while uTP is on, across a hybrid's v1 and v2 routes: a relay's peers need
+ * not share one, as both know the torrent.
  */
 internal class TorrentV2Extensions(
   private val swarm: TorrentV2Swarm,
@@ -40,11 +48,19 @@ internal class TorrentV2Extensions(
   private val pex = !swarm.restricted
   // Peer exchange is looked at again from then on; zero means at the next pass.
   private var pexCheckAt = 0L
+  private val holepunch = SwarmHolepunch(nowMs)
 
-  /** Our extension handshake, queued before anything else; false when it could not be. */
-  fun ready(view: TorrentV2PeerView): Boolean {
+  private fun holepunchOn(): Boolean = !swarm.restricted && runtime.utpEnabled()
+
+  /**
+   * Our extension handshake, queued before anything else; false when it could not be. [id] names
+   * the peer among the swarm's holepunch members.
+   */
+  suspend fun ready(view: TorrentV2PeerView, id: Int): Boolean {
     val info = view.info ?: return true
     if (!info.extensions) return true
+    view.holepunchId = id
+    holepunch.join(id, info.link.remote, info.link.utp, view.holepunchOut)
     val handshake = PeerExtensions.handshake(
       utMetadata = servesMetadata(privateTorrent, runtime.uploadPolicy()),
       metadataSize = document.info.rawInfo.size,
@@ -52,12 +68,16 @@ internal class TorrentV2Extensions(
       listenPort = runtime.listenPortFor(info.link.remote),
       requestQueue = MAX_QUEUED_UPLOADS,
       remote = info.link.remote,
+      holepunch = holepunchOn(),
     )
     return view.commands.trySend(PeerV2DownloadActor.Command.Send(handshake)).isSuccess
   }
 
   /** One extension message from [view]'s peer; malformed or forbidden ones ban it. */
-  fun receive(view: TorrentV2PeerView, message: PeerMessage.Extended): TorrentV2Uploader.Verdict {
+  suspend fun receive(
+    view: TorrentV2PeerView,
+    message: PeerMessage.Extended,
+  ): TorrentV2Uploader.Verdict {
     val info = view.info
     // Extension messages need both sides to have set the BEP 10 bit.
     if (info == null || !info.extensions) return TorrentV2Uploader.Verdict.BAN
@@ -71,6 +91,7 @@ internal class TorrentV2Extensions(
         }
         PeerExtensions.METADATA -> metadata(view, message.payload)
         PeerExtensions.PEX -> exchange(view, message.payload)
+        PeerExtensions.HOLEPUNCH -> punched(view, message.payload)
         // Extensions we never offered are ignored, as BEP 10 asks.
         else -> TorrentV2Uploader.Verdict.KEEP
       }
@@ -150,20 +171,88 @@ internal class TorrentV2Extensions(
     view.metadataRetryAt = retryAt
   }
 
-  private fun exchange(view: TorrentV2PeerView, payload: ByteArray): TorrentV2Uploader.Verdict {
+  private suspend fun exchange(
+    view: TorrentV2PeerView,
+    payload: ByteArray,
+  ): TorrentV2Uploader.Verdict {
     // We never offered it: peer exchange would leak the swarm of a restricted torrent.
     if (!pex) return TorrentV2Uploader.Verdict.BAN
     val update = view.exchange.receive(payload)
-    val topic = if (view.info?.mode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1 else PeerTopic.V2
+    val topic = topicOf(view)
     // One endpoint per host from each peer, and a bounded number of them over its connection,
     // so no peer can point us at many ports of one host or flood the candidates. Peers it drops
     // stay counted: the candidates keep them, so dropping must not make room.
-    for (endpoint in update.added) {
-      if (!shareable(endpoint) || !view.pexIntroductions.admit(endpoint)) continue
+    val added = update.added.filter { shareable(it) && view.pexIntroductions.admit(it) }
+    for (endpoint in added) {
       candidates.offer(endpoint, topic, PeerOrigin.PEX, update.flags[endpoint] ?: 0)
+    }
+    holepunch.introduced(view.holepunchId, added)
+    // A peer that punches holes speaks uTP (BEP 55), and a connection to it over uTP shows it our
+    // uTP mapping, the port it must hand out when it introduces us.
+    val utpPeers = PEX_FLAG_UTP or PEX_FLAG_HOLEPUNCH
+    runtime.onUtpPeers(added.filter { (update.flags[it] ?: 0) and utpPeers != 0 })
+    return TorrentV2Uploader.Verdict.KEEP
+  }
+
+  /** The peer's extension handshake arrived: it [listen]s there, when known. */
+  suspend fun handshaken(view: TorrentV2PeerView, listen: PeerEndpoint?) {
+    holepunch.update(view.holepunchId, listen, view.extensions.id(HOLEPUNCH_EXTENSION) != 0)
+  }
+
+  /** [view]'s peer closed. */
+  suspend fun left(view: TorrentV2PeerView) = holepunch.leave(view.holepunchId)
+
+  /**
+   * One BEP 55 message; a malformed one is ignored. A rendezvous is relayed to the peer it names,
+   * a CONNECT dials that peer at once, unless it is not a public address (outside tests), and an
+   * error is only logged.
+   */
+  private suspend fun punched(
+    view: TorrentV2PeerView,
+    payload: ByteArray,
+  ): TorrentV2Uploader.Verdict {
+    // Never offered to restricted torrents.
+    if (swarm.restricted) return TorrentV2Uploader.Verdict.KEEP
+    val message = HolepunchMessage.decode(payload) ?: return TorrentV2Uploader.Verdict.KEEP
+    val target = message.endpoint
+    when (message.type) {
+      HolepunchType.RENDEZVOUS -> holepunch.relay(view.holepunchId, target)
+      HolepunchType.CONNECT -> {
+        if (shareable(target) && view.extensions.id(HOLEPUNCH_EXTENSION) != 0 && holepunchOn() &&
+          holepunch.admitConnect(view.holepunchId)) {
+          runtime.onUtpPeers(listOf(target))
+          candidates.punch(target, topicOf(view))
+        }
+      }
+      HolepunchType.ERROR -> holepunch.failed(message.error)
     }
     return TorrentV2Uploader.Verdict.KEEP
   }
+
+  /** Asks the peer that introduced [target], which we could not reach, to punch through. */
+  suspend fun rendezvous(target: PeerEndpoint): Boolean =
+    holepunchOn() && holepunch.rendezvous(target)
+
+  /**
+   * Sends what the swarm queued for each peer: rendezvous, CONNECTs and errors. One that finds its
+   * actor's queue full is dropped: a punch is only of use at once, and the dial it was for is
+   * retried anyway.
+   */
+  fun punch(peers: Map<PeerV2Pool.Peer, TorrentV2PeerView>) {
+    for (view in peers.values) {
+      val remoteId = view.extensions.id(HOLEPUNCH_EXTENSION)
+      while (true) {
+        val message = view.holepunchOut.tryReceive().getOrNull() ?: break
+        // Peers we reached by name have no address to hand out.
+        if (remoteId == 0 || numericAddress(message.endpoint.host) == null) continue
+        view.commands.trySend(PeerV2DownloadActor.Command.Send(
+          PeerMessage.Extended(remoteId, message.encode())))
+      }
+    }
+  }
+
+  /** "holepunch peers=3 relayed=1 ...", counting since the last one. */
+  suspend fun holepunchSummary(): String = holepunch.summary()
 
   /**
    * Sends the peer exchange messages that are due: each peer hears of the other peers' listen
@@ -214,6 +303,9 @@ internal class TorrentV2Extensions(
       else (pexCheckAt - now).coerceAtLeast(0)
     return listOfNotNull(answers, exchange).minOrNull()
   }
+
+  private fun topicOf(view: TorrentV2PeerView): PeerTopic =
+    if (view.info?.mode == PeerIdentityHandshake.Mode.V1) PeerTopic.V1 else PeerTopic.V2
 
   private fun shareable(endpoint: PeerEndpoint): Boolean = runtime.allowLocalPeers ||
     numericAddress(endpoint.host)?.let(::publicTorrentAddress) == true

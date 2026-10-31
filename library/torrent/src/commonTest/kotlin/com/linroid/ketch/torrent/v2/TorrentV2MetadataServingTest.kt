@@ -133,7 +133,7 @@ class TorrentV2MetadataServingTest {
           assertEquals(0, ours.id)
           val handshake = Bencode.parse(ours.payload)
           val offered = checkNotNull(handshake["m"]?.dictionary).keys.map { it.utf8() }.toSet()
-          assertEquals(setOf("ut_pex"), offered)
+          assertEquals(setOf("ut_holepunch", "ut_pex"), offered)
           assertNull(handshake["metadata_size"])
           assertEquals(engine.listenPort.toLong(), handshake["p"]?.integer)
           assertEquals(MAX_QUEUED_UPLOADS.toLong(), handshake["reqq"]?.integer)

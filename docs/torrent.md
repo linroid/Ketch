@@ -682,12 +682,12 @@ This section describes the engine's protocol behavior for people who debug swarm
   reaches it on (BEP 10 `p`), its listen port to peers on its own networks and the port its router
   forwards to others, and dials the port a peer announced, never an incoming peer's source port.
   Peers reached over uTP or with encryption are advertised with the matching BEP 11 flags.
-- **Hole punching** (BEP 55) for v1 public torrents. When two peers cannot reach each other,
+- **Hole punching** (BEP 55) for public torrents, v1, v2 and hybrid. When two peers cannot reach each other,
   because both are behind routers or carrier-grade NAT, however many layers, a peer connected to
   both introduces them and they dial each other over uTP at the same moment. Ketch relays for
   its peers, asks the peer that told it about an unreachable one to introduce it, and dials at
   once when introduced. This works through NATs that keep one external port per local port,
-  which most home routers do; it needs uTP on. V2 and hybrid torrents do not punch yet.
+  which most home routers do; it needs uTP on.
 - **Magnet metadata** (BEP 9) is asked of up to sixteen peers at once. A peer only takes the shared
   metadata buffer once it answers, and a failed one is asked again after 5, 15 and 30 seconds.
   Lookups run in two-minute rounds, each asking again the peers the last one gave up on, and ask

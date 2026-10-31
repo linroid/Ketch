@@ -31,6 +31,51 @@ class TorrentV2CandidatesTest {
   }.toByteString()
 
   @Test
+  fun punch_dialsAnEndpointGivenUpOnFirstAndKeepsItsDials() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    repeat(4) {
+      val target = assertNotNull(book.next())
+      book.failed(target, Exception("refused"))
+      now += 300_000
+    }
+    assertNull(book.next())
+    book.offer(b, PeerTopic.V2, PeerOrigin.TRACKER)
+    assertTrue(book.punch(a, PeerTopic.V2))
+    val target = assertNotNull(book.next())
+    assertEquals(a, target.endpoint)
+    // A fifth failed dial spends its count at once, as a revive's does.
+    book.failed(target, Exception("refused"))
+    assertEquals(b, book.next()?.endpoint)
+    assertNull(book.next())
+  }
+
+  @Test
+  fun punch_onANewEndpointQueuedOnce_isDialedOnce() {
+    val book = book()
+    book.offer(b, PeerTopic.V2, PeerOrigin.TRACKER)
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    assertTrue(book.punch(a, PeerTopic.V2))
+    assertEquals(2, book.pendingCount)
+    assertEquals(a, book.next()?.endpoint)
+    assertEquals(b, book.next()?.endpoint)
+    assertNull(book.next())
+  }
+
+  @Test
+  fun punch_connectedDialingBannedOrRestricted_isRefused() {
+    val book = book()
+    book.offer(a, PeerTopic.V2, PeerOrigin.TRACKER)
+    assertNotNull(book.next())
+    assertFalse(book.punch(a, PeerTopic.V2))
+    book.connected(a)
+    assertFalse(book.punch(a, PeerTopic.V2))
+    book.ban(b)
+    assertFalse(book.punch(b, PeerTopic.V2))
+    assertFalse(book(restricted = true).punch(a, PeerTopic.V2))
+  }
+
+  @Test
   fun ownAddress_isNeverDialed() {
     // Our public address became known after the tracker named a's port there.
     var own: String? = null

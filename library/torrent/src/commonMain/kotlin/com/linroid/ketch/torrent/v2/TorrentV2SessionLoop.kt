@@ -481,6 +481,7 @@ internal object TorrentV2SessionLoop {
           if (extensions != null) live.values.forEach(extensions::flush)
           uploads.pump(live, allowed, seeding)
           extensions?.pump(live) { members[it]?.listen }
+          extensions?.punch(live)
         }
         // What this pass and the events before it changed of each peer's state.
         for (view in peers.values) view.reportState()
@@ -583,6 +584,7 @@ internal object TorrentV2SessionLoop {
               verdict(peer, extensions.receive(view, update), "a bad extension message")
               if (update.id == 0) {
                 learnListen(peer, view)
+                extensions.handshaken(view, members[peer]?.listen)
                 // An incoming peer shows where it listens rather than its source port.
                 if (view.info?.origin is PeerV2Origin.Incoming) {
                   view.extensions.listenPort?.let { view.traffic?.listenPort(it) }
@@ -984,7 +986,8 @@ internal object TorrentV2SessionLoop {
               val fast = members.keys.count { it.info?.fast == true }
               " (in=$incoming, v1=$legacy, fast=$fast) ${uploads?.summary().orEmpty()}" +
                 " hashServed=${hashes?.served ?: 0} hashRejected=${hashes?.rejected ?: 0}" +
-                " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers"
+                " candidates=${book.pendingCount} dialing=$dialing lsd=$localPeers" +
+                extensions?.let { " ${it.holepunchSummary()}" }.orEmpty()
             }
             val outcomes = diagnostics?.let { "; ${it.summary()}" }.orEmpty()
             val webSeedPart = mirrors?.let {
@@ -1137,6 +1140,11 @@ internal object TorrentV2SessionLoop {
               if (target.generation == checkNotNull(swarm).generation()) {
                 diagnostics?.record(target.endpoint, target.attempt, failure.cause,
                   incoming = false, flags = target.pexFlags)
+                // Not reached at all: the peer that introduced it may punch a way through.
+                if (target.attempt.stage == PeerStage.DIALING && !complete &&
+                  extensions?.rendezvous(target.endpoint) == true) {
+                  log.v { "V2 swarm $label: asked the introducer of a peer to punch through" }
+                }
               }
               checkNotNull(book).failed(failure.endpoint, failure.cause, complete)
             }
@@ -1213,7 +1221,8 @@ internal object TorrentV2SessionLoop {
                   peers[peerEvent.peer] = view
                   if (uploads != null) {
                     // Our extension handshake comes first, then what we have.
-                    val greeted = extensions?.ready(view) ?: true
+                    val id = members[peerEvent.peer]?.order?.toInt() ?: NOT_PUNCHING
+                    val greeted = extensions?.ready(view, id) ?: true
                     val verified = if (pieces.anyVerified()) pieces.verifiedBits() else null
                     val ready = uploads.ready(peerEvent.peer, view, verified)
                     verdict(peerEvent.peer, if (greeted) ready else TorrentV2Uploader.Verdict.STOP,
@@ -1235,7 +1244,10 @@ internal object TorrentV2SessionLoop {
                   "V2 peer of $label closed: " +
                     (peerEvent.cause?.describeWithoutUrls() ?: "without error")
                 }
-                peers.remove(peerEvent.peer)?.close()
+                peers.remove(peerEvent.peer)?.let { view ->
+                  extensions?.left(view)
+                  view.close()
+                }
                 uploads?.closed(peerEvent.peer)
                 rarity.remove(peerEvent.peer)
                 pieces.detachPeer(peerEvent.peer.blocks)

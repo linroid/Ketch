@@ -106,6 +106,13 @@ internal class TorrentV2Runtime(
   val peerOutcomes: (PeerOutcomeReport) -> Unit = {},
   /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
   val webSeedHttp: TorrentHttp? = null,
+  /**
+   * Whether uTP is on, read live: hole punching (BEP 55) dials over uTP, so it is offered and
+   * acted on only while it is.
+   */
+  val utpEnabled: () -> Boolean = { false },
+  /** Endpoints known to speak uTP, or to be punched through, which are dialed over it first. */
+  val onUtpPeers: (Collection<PeerEndpoint>) -> Unit = {},
 )
 
 /** Per-owner limits and the discovery it runs while transferring. */

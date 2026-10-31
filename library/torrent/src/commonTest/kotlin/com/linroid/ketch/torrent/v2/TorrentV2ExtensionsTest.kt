@@ -27,6 +27,7 @@ import com.linroid.ketch.torrent.v2.peer.PeerV2DownloadActor
 import com.linroid.ketch.torrent.v2.peer.PeerV2Origin
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.test.runTest
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
 import kotlin.test.AfterTest
@@ -88,7 +89,7 @@ class TorrentV2ExtensionsTest {
      * Its extension handshake: our messages to it use its IDs 3 (`ut_metadata`) and, unless it
      * leaves [pex] out, 4.
      */
-    fun greet(pex: Boolean = true) {
+    suspend fun greet(pex: Boolean = true) {
       val ids = if (pex) mapOf("ut_metadata" to 3L, "ut_pex" to 4L) else mapOf("ut_metadata" to 3L)
       assertEquals(keep, extensions.receive(view, PeerMessage.Extended(0, Bencode.encode(mapOf(
         "m" to ids)))))
@@ -125,7 +126,7 @@ class TorrentV2ExtensionsTest {
   }
 
   @Test
-  fun metadataRequestOnAFullQueueWaitsForRoom() {
+  fun metadataRequestOnAFullQueueWaitsForRoom() = runTest {
     val remote = Remote(PeerEndpoint("10.0.0.1", 6881))
     remote.greet(pex = false)
     remote.fill()
@@ -147,7 +148,7 @@ class TorrentV2ExtensionsTest {
   }
 
   @Test
-  fun waitingMetadataAnswersAreBounded() {
+  fun waitingMetadataAnswersAreBounded() = runTest {
     val remote = Remote(PeerEndpoint("10.0.0.1", 6881))
     remote.greet()
     remote.fill()
@@ -160,7 +161,7 @@ class TorrentV2ExtensionsTest {
   }
 
   @Test
-  fun metadataAnswerDroppedUnsentGoesOutAgain() {
+  fun metadataAnswerDroppedUnsentGoesOutAgain() = runTest {
     val remote = Remote(PeerEndpoint("10.0.0.1", 6881), capacity = 4)
     remote.greet(pex = false)
     assertEquals(keep, extensions.receive(remote.view, metadataRequest(0)))
@@ -182,7 +183,7 @@ class TorrentV2ExtensionsTest {
   }
 
   @Test
-  fun peerExchangeRefusedByAFullQueueIsSentLater() {
+  fun peerExchangeRefusedByAFullQueueIsSentLater() = runTest {
     val target = Remote(PeerEndpoint("10.0.0.1", 6881))
     val other = Remote(PeerEndpoint("10.0.0.2", 6881))
     target.greet()
@@ -200,7 +201,7 @@ class TorrentV2ExtensionsTest {
   }
 
   @Test
-  fun peerExchangeDroppedUnsentIsSentAgain() {
+  fun peerExchangeDroppedUnsentIsSentAgain() = runTest {
     val target = Remote(PeerEndpoint("10.0.0.1", 6881))
     val other = Remote(PeerEndpoint("10.0.0.2", 6881))
     target.greet()
@@ -224,7 +225,7 @@ class TorrentV2ExtensionsTest {
   }
 
   @Test
-  fun droppedPeerExchangeEntriesMakeNoRoomForMore() {
+  fun droppedPeerExchangeEntriesMakeNoRoomForMore() = runTest {
     val remote = Remote(PeerEndpoint("10.0.0.1", 6881))
     remote.greet()
     fun hosts(from: Int) = List(MAX_PEX_INTRODUCTIONS) { PeerEndpoint("10.9.${from + it}.1", 6881) }

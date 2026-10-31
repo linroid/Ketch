@@ -52,6 +52,7 @@ import com.linroid.ketch.torrent.peer.PeerWire
 import com.linroid.ketch.torrent.peer.PexIntroductions
 import com.linroid.ketch.torrent.peer.PexUpdate
 import com.linroid.ketch.torrent.peer.SWARM_SUMMARY_INTERVAL_MS
+import com.linroid.ketch.torrent.peer.SwarmHolepunch
 import com.linroid.ketch.torrent.peer.TorrentChoker
 import com.linroid.ketch.torrent.peer.TorrentPeerDirectory
 import com.linroid.ketch.torrent.peer.UPLOAD_SLOTS
@@ -887,8 +888,6 @@ internal class TorrentSwarm(
     /** Holepunch messages for this peer from the swarm (BEP 55), sent on the next pass. */
     private val holepunchOut = Channel<HolepunchMessage>(16)
     /** When this peer's current minute of CONNECTs began, and how many came in it. */
-    private var connectWindow = nowMs()
-    private var connectsInWindow = 0
     /** Created once the handshake tells whether the Fast extension is negotiated. */
     private lateinit var state: PeerProtocolState
     private var extensionsNegotiated = false
@@ -1452,8 +1451,7 @@ internal class TorrentSwarm(
           val dialable = allowLocalPeers ||
             numericAddress(target.host)?.let(::publicTorrentAddress) == true
           if (dialable && extensions.id(HOLEPUNCH_EXTENSION) != 0 && holepunchOn() &&
-            admitConnect()) {
-            holepunch.connected()
+            holepunch.admitConnect(id)) {
             log.v { "Peer $endpoint of $logLabel relays a connection to $target" }
             punches.trySend(target)
           }
@@ -1466,19 +1464,6 @@ internal class TorrentSwarm(
           }
         }
       }
-    }
-
-    /**
-     * Whether this peer may send another CONNECT now: at most [MAX_CONNECTS_PER_MINUTE] a minute,
-     * as each one is a host we dial.
-     */
-    private fun admitConnect(): Boolean {
-      val now = nowMs()
-      if (now - connectWindow >= 60_000) {
-        connectWindow = now
-        connectsInWindow = 0
-      }
-      return ++connectsInWindow <= MAX_CONNECTS_PER_MINUTE
     }
 
     /** Sends what the swarm queued for this peer: rendezvous, CONNECTs and errors (BEP 55). */
@@ -1659,7 +1644,6 @@ private const val MAX_CANDIDATES = 4096
 private const val GIVEN_UP_MS = 300_000L
 
 /** CONNECTs (BEP 55) one peer may send a minute; each names a host we dial. */
-private const val MAX_CONNECTS_PER_MINUTE = 8
 
 /** Requests a v1 peer may queue with us (BEP 10 `reqq`); each is a few bytes until served. */
 private const val REQUEST_QUEUE = 500

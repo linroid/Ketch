@@ -1,9 +1,6 @@
-package com.linroid.ketch.torrent.v1
+package com.linroid.ketch.torrent.peer
 
 import com.linroid.ketch.torrent.net.PeerEndpoint
-import com.linroid.ketch.torrent.peer.HolepunchError
-import com.linroid.ketch.torrent.peer.HolepunchMessage
-import com.linroid.ketch.torrent.peer.HolepunchType
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -27,6 +24,16 @@ class SwarmHolepunchTest {
     holepunch.update(1, aListen, supports = true)
     holepunch.join(2, b, utp = false, outbox = outB)
     holepunch.update(2, bListen, supports = supportsB)
+  }
+
+  @Test
+  fun admitConnect_takesEightAMinuteFromEachPeer() = runTest {
+    connect()
+    repeat(8) { assertTrue(holepunch.admitConnect(1)) }
+    assertFalse(holepunch.admitConnect(1))
+    assertTrue(holepunch.admitConnect(2))
+    now = 60_000
+    assertTrue(holepunch.admitConnect(1))
   }
 
   @Test
