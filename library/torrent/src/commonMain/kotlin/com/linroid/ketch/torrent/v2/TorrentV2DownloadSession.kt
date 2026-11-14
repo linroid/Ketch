@@ -60,7 +60,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
@@ -253,11 +252,11 @@ internal class TorrentV2DownloadSession private constructor(
   /** Why the running download makes no progress, while it does not; null once it stops. */
   override val stall: StateFlow<TorrentStall?> get() = mutableStall
 
+  // By announcer, each updated from its own coroutine; merged only when read.
   private val trackerStatuses = MutableStateFlow<Map<String, List<TrackerStatus>>>(emptyMap())
-  private val mergedTrackers = MutableStateFlow<List<TrackerStatus>>(emptyList())
 
   /** The trackers of every topic the transfer announces under, one status per tracker. */
-  override val trackers: StateFlow<List<TrackerStatus>> get() = mergedTrackers
+  override fun trackers(): List<TrackerStatus> = mergeTrackerStatuses(trackerStatuses.value.values)
 
   /** Raised each time a stalled transfer asks its trackers for peers; see [Sink]. */
   private val reannounces = AtomicLong(0)
@@ -630,10 +629,7 @@ internal class TorrentV2DownloadSession private constructor(
     override fun reannounceRequests(): Long = reannounces.load()
 
     override fun trackerStatus(key: String, statuses: List<TrackerStatus>) {
-      val all = trackerStatuses.updateAndGet {
-        if (statuses.isEmpty()) it - key else it + (key to statuses)
-      }
-      mergedTrackers.value = mergeTrackerStatuses(all.values)
+      trackerStatuses.update { if (statuses.isEmpty()) it - key else it + (key to statuses) }
     }
   }
 

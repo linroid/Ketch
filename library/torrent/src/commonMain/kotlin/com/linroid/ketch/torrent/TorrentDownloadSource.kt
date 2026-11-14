@@ -994,7 +994,7 @@ class TorrentDownloadSource(
     sourceState: SourceState?,
     resolved: ResolvedSource?,
   ): List<TorrentTracker>? {
-    val live = tasks.session(taskId)?.trackers?.value.orEmpty()
+    val live = tasks.session(taskId)?.trackers().orEmpty()
     if (live.isNotEmpty()) return trackerViews(live)
     val bytes = metainfoBytes(sourceState?.let { decodeState(it) }, resolved)
     return withContext(TorrentDispatchers.engine) {

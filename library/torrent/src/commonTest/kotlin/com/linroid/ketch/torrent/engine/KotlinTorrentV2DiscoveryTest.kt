@@ -163,14 +163,15 @@ class KotlinTorrentV2DiscoveryTest {
     val network = Recording(createTorrentNetwork())
     owner(fixture, http, network,
       tiers = listOf(listOf("http://a/announce"), listOf("http://b/announce"))) { session ->
-      val trackers = session.trackers.first { trackers ->
-        trackers.size == 2 && trackers.all { it.outcome == TrackerStatus.Outcome.SUCCEEDED }
+      while (session.trackers().count { it.outcome == TrackerStatus.Outcome.SUCCEEDED } < 2) {
+        delay(20)
       }
+      val trackers = session.trackers()
       assertEquals(listOf("http://a:80", "http://b:80"), trackers.map { it.label })
       assertEquals(listOf(0, 1), trackers.map { it.tier })
       session.pause()
       // A session that announces to no tracker lists none.
-      session.trackers.first { it.isEmpty() }
+      while (session.trackers().isNotEmpty()) delay(20)
     }
   }
 
