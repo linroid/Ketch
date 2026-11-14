@@ -2484,7 +2484,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SingleInstance`, opening it if needed, for a loopback-only `KetchServer` on a free port with a
   per-run token, separate from the Settings server, over the app's engine or, while a
   `ketch server` runs the downloads instead, a client of it; the `ketch` CLI asks for the same
-  server (`CLI_CONNECT_REQUEST`), which then does not count as an extension connection. The app
+  server (`CLI_CONNECT_REQUEST`), which then does not count as an extension connection.
+  `SingleInstance`'s sockets, and the CLI's, are opened with `Proxy.NO_PROXY`: the launcher sets
+  `java.net.useSystemProxies`, which would otherwise send them, loopback or not, to a SOCKS
+  proxy the system names; a host that cannot reach an app that left its address answers
+  `unreachable` with the cause. The app
   registers the host with installed browsers on every launch. A `pick-folder` request has the app
   show `AwtFilePicker`'s folder dialog (`PICK_FOLDER_REQUEST`, `pickFolderReply`) for the
   download dialog's Browse…, which starts in the folder last sent to each device
