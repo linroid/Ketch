@@ -264,6 +264,9 @@
   <string name="intake_conflict_overwrite">Перезаписать</string>
   <string name="intake_conflict_rename_caption">Сохраняет рядом под новым именем.</string>
   <string name="intake_conflict_overwrite_caption">Заменяет файл, когда загрузка завершится.</string>
+  <string name="intake_existing_files">Уже имеющиеся файлы торрента</string>
+  <string name="intake_existing_files_use">Использовать</string>
+  <string name="intake_existing_files_caption">Проверяет файлы с именем торрента в папке и скачивает только недостающее или отличающееся. Если выключено, торрент сохраняется рядом.</string>
   <string name="intake_option_overwrite">Перезаписывает существующие файлы</string>
   <string name="intake_option_rename">Сохраняет существующие файлы</string>
   <string name="intake_exists_rename">Файл %1$s уже есть в этой папке. Эта загрузка будет сохранена как %2$s.</string>

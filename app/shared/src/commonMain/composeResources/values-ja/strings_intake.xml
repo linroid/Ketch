@@ -204,6 +204,9 @@
   <string name="intake_conflict_overwrite">上書き</string>
   <string name="intake_conflict_rename_caption">別の名前で保存します。</string>
   <string name="intake_conflict_overwrite_caption">ダウンロードの完了後に置き換えます。</string>
+  <string name="intake_existing_files">既にあるトレントのファイル</string>
+  <string name="intake_existing_files_use">そのまま使う</string>
+  <string name="intake_existing_files_caption">フォルダ内のトレントと同じ名前のファイルを確認し、不足分や異なる部分だけをダウンロードします。オフの場合は隣に保存します。</string>
   <string name="intake_option_overwrite">既存のファイルを上書き</string>
   <string name="intake_option_rename">既存のファイルを残す</string>
   <string name="intake_exists_rename">%1$s はすでにこのフォルダにあります。このダウンロードは %2$s として保存されます。</string>

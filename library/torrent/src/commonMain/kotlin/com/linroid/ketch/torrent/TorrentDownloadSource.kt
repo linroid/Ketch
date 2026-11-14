@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent
 
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.KetchFeatures
@@ -248,7 +249,7 @@ class TorrentDownloadSource(
     TorrentSourceState.serializer()
   override val managesOwnFileIo: Boolean = true
   override val features: Set<String> = setOf(KetchFeatures.FILE_SELECTION,
-    KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL)
+    KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL, TorrentFeatures.EXISTING_FILES)
 
   /**
    * The torrent controls of the Ketch that runs this source: the [TorrentController] that
@@ -348,6 +349,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.EXPORT.wireName)
       add(TorrentCapability.TRACKERS.wireName)
       add(TorrentCapability.RECHECK.wireName)
+      add(TorrentCapability.IMPORT.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -1709,8 +1711,10 @@ class TorrentDownloadSource(
         legacySelections = listOfNotNull(previous?.selectedFileIds?.takeIf { it.isNotEmpty() }),
         // Task-scoped: a session that keeps seeding after this run returns still reports.
         connections = context.connections,
-        // A check of the task's files takes them as they are now, replaced or gone.
-        adoptExisting = context.taskId in rechecks.value,
+        // A check of the task's files takes them as they are now, replaced or gone, and Ketch
+        // gave the run a path that may hold files only because the request asked for it.
+        adoptExisting = context.taskId in rechecks.value ||
+          context.request.fileConflict == FileConflict.OVERWRITE,
       ))
     }
   }
@@ -1782,8 +1786,7 @@ class TorrentDownloadSource(
         // An adopted session applies the current selection first, whatever it ran with.
         keepSeeding = track(context, running, table, state.selectedFileIds, initialRevision,
           adopted = adopted != null)
-        // The check a recheck asked for is done; a task not meant to seed stops here.
-        rechecks.update { it - taskId }
+        // A rechecked task that was not meant to seed stops here.
         if (taskId in checkOnly.value) {
           checkOnly.update { it - taskId }
           keepSeeding = false
@@ -1795,6 +1798,9 @@ class TorrentDownloadSource(
         keepSeeding = false
         throw e
       } finally {
+        // The run a recheck asked for opened its files, however it ends: a later run of the
+        // task takes no files it does not own.
+        rechecks.update { it - taskId }
         val owned = session
         withContext(NonCancellable) {
           try {

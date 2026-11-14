@@ -236,6 +236,29 @@ See the [CLI](../cli/README.md#create-a-torrent) for every option. In the SDK,
 hashes and the magnet link, and reports progress as it hashes. The torrents are checked against
 libtorrent, which opens them and finds the files complete.
 
+### Using files you already have
+
+A torrent normally saves into a folder of its own: when a file or folder of its name exists,
+Ketch saves beside it as `name (1)`. To use what is there instead, such as the content of a
+torrent you just created or files another client downloaded, switch on **Torrent files already
+there → Use them** under Options in the Add sheet, or add the torrent with `--overwrite` into the
+folder that holds them:
+
+```bash
+ketch add --overwrite holiday.torrent ~/Videos/
+```
+
+Ketch checks every file against the torrent's hashes, keeps the pieces that match, downloads the
+rest over what differs, and completes, at once when everything matches. With uploading set to
+Keep seeding it then seeds them. Only a download that asks for it does this, never the "When a
+file already exists" setting, as the files are written in place from the first piece on. The
+files become the task's: removing it with its files deletes them. A symbolic link at one of the
+paths is never used, and a folder that holds another unfinished download is left alone: the
+torrent then saves beside it as usual. A v2 or hybrid torrent keeps its files inside a folder of
+its name even when it has one file, so a single file is used as it is only by a v1 torrent; for
+a v2 one, put the file in a folder of the same name first. In the SDK, set `DownloadRequest.fileConflict = FileConflict.OVERWRITE`;
+devices that can do this list the `import` capability.
+
 ## Seeding and uploading
 
 By default Ketch uploads verified pieces to peers while a torrent downloads, and stops once it
@@ -548,7 +571,8 @@ tracker's staff to allow Ketch if it is refused.
   a link added directly fails as soon as it starts. Many
   peers or large pieces use more memory. A torrent or magnet keeps its first 128 trackers.
 - Ketch creates torrents from the CLI and the SDK (see [creating a torrent](#creating-a-torrent));
-  the apps have no screen for it yet, and Ketch cannot yet seed files it did not download itself.
+  the apps have no screen for that yet. Files already on disk can be used and seeded from the
+  apps and the CLI (see [using files you already have](#using-files-you-already-have)).
 
 ## For developers
 

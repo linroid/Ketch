@@ -204,6 +204,9 @@
   <string name="intake_conflict_overwrite">覆盖</string>
   <string name="intake_conflict_rename_caption">以新名称保存在旁边。</string>
   <string name="intake_conflict_overwrite_caption">下载完成后替换它。</string>
+  <string name="intake_existing_files">已存在的种子文件</string>
+  <string name="intake_existing_files_use">直接使用</string>
+  <string name="intake_existing_files_caption">校验文件夹中与种子同名的文件，只下载缺失或不同的部分。关闭时，种子会另存在旁边。</string>
   <string name="intake_option_overwrite">覆盖已有文件</string>
   <string name="intake_option_rename">保留已有文件</string>
   <string name="intake_exists_rename">此文件夹中已有 %1$s。本次下载将保存为 %2$s。</string>

@@ -204,6 +204,9 @@
   <string name="intake_conflict_overwrite">덮어쓰기</string>
   <string name="intake_conflict_rename_caption">새 이름으로 함께 저장합니다.</string>
   <string name="intake_conflict_overwrite_caption">다운로드가 끝나면 대체합니다.</string>
+  <string name="intake_existing_files">이미 있는 토렌트 파일</string>
+  <string name="intake_existing_files_use">그대로 사용</string>
+  <string name="intake_existing_files_caption">폴더에 있는 토렌트 이름의 파일을 검사하고 없거나 다른 부분만 다운로드합니다. 끄면 토렌트를 옆에 저장합니다.</string>
   <string name="intake_option_overwrite">기존 파일 덮어쓰기</string>
   <string name="intake_option_rename">기존 파일 유지</string>
   <string name="intake_exists_rename">%1$s 파일이 이미 이 폴더에 있습니다. 이 다운로드는 %2$s(으)로 저장됩니다.</string>
