@@ -28,6 +28,7 @@ import okio.ByteString.Companion.toByteString
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import okio.use
 
 /** Which BitTorrent versions a created torrent speaks. */
 enum class TorrentFormat {
