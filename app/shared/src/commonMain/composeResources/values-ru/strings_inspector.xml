@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">Подключения</string>
   <string name="inspector_tab_files">Файлы</string>
   <string name="inspector_tab_activity">Активность</string>
+  <string name="inspector_tab_trackers">Трекеры</string>
+  <string name="inspector_tracker_idle">Ещё не опрошен</string>
+  <string name="inspector_tracker_announcing">Опрос…</string>
+  <string name="inspector_tracker_working">Работает</string>
+  <string name="inspector_tracker_failed">Ошибка</string>
+  <string name="inspector_tracker_timed_out">Нет ответа</string>
+  <string name="inspector_tracker_peers">Пиры: %1$d</string>
+  <string name="inspector_tracker_seeders">Раздают: %1$d</string>
+  <string name="inspector_tracker_leechers">Скачивают: %1$d</string>
+  <string name="inspector_trackers_empty">У этого торрента нет своих трекеров.</string>
 
   <string name="inspector_stalled_seconds">Простой %1$d с</string>
   <string name="inspector_stalled_minutes">Простой %1$d мин</string>

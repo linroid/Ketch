@@ -51,6 +51,7 @@ import com.linroid.ketch.app.ui.downloads.actions.rememberRowActionRunner
 import com.linroid.ketch.app.ui.inspector.tabs.ActivityTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTab
+import com.linroid.ketch.app.ui.inspector.tabs.TrackersTab
 import com.linroid.ketch.app.ui.inspector.tabs.InspectorTab
 import com.linroid.ketch.app.ui.inspector.tabs.count
 import com.linroid.ketch.app.ui.inspector.tabs.rememberFeatures
@@ -274,6 +275,7 @@ private fun TaskView(
     InspectorTab.Overview -> Overview(state, row, device, runner, pending, copier)
     InspectorTab.Connections -> ConnectionsTab(state, row, onHighlight = { highlight = it })
     InspectorTab.Files -> FilesTab(state, row, tabFill.modifier, maxHeight = tabFill.height)
+    InspectorTab.Trackers -> TrackersTab(state, row)
     InspectorTab.Activity -> ActivityTab(state, row)
   }
 }

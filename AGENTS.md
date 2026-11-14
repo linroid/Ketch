@@ -135,7 +135,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   from older backends; `stall`: why a download makes no progress), `TorrentStall`
   (`TorrentStallReason`: `missing-pieces`, `no-peers`, `choked`, `slow-peers` or `unknown`, which
   unknown wire values decode as; the missing pieces and their files, the peers), `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
-  `TorrentExport` (`TorrentController.export`),
+  `TorrentExport` (`TorrentController.export`), `TorrentTracker` and `TorrentTrackerState`
+  (`TorrentController.trackers`),
   `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
   `TorrentCommandException`, `TorrentPageRequest`, `TorrentFilePage`, `TorrentFileEntry`,
   `TorrentFileOrder` (wire names, each naming a `FileOrder`)
@@ -288,7 +289,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`TorrentWebSeed`), `TorrentV2WebSeeds`
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
   `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
-  `exportOf`,
+  `exportOf`, `trackerViews` and `idleTrackers`,
   `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)
 
 ### `library:endpoints`
@@ -1278,6 +1279,19 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Trackers: `TorrentController.trackers(taskId)` (REST `GET /api/torrents/{id}/trackers`;
+  capability `trackers`) lists a task's own trackers as `TorrentTracker`s in tier order:
+  `endpoint` (`trackerLabel`: scheme, host and port, never a path or passkey), `tier`,
+  `TorrentTrackerState` (`idle`, `announcing`, `working`, `failed`, `timed-out`; unknown wire
+  values decode as `idle`), the peers the last answer named, the scrape's seeders and leechers,
+  failures in a row and the tracker's cleaned message. `TrackerStatus` carries `label` and
+  `tier`, and `TorrentSession.trackers` publishes them: a v1 session's tracker control, and a v2
+  or hybrid session's announcers through `TorrentV2DiscoverySink.trackerStatus`, one status per
+  tracker (`mergeTrackerStatuses`: answered over asking over failed over idle), a private
+  hybrid's current tracker only. Without a session that announces, `idleTrackers` lists the
+  metainfo's usable trackers, else a magnet's. Trackers Ketch adds to public torrents are never
+  listed. The inspector's Trackers tab (`TrackersTab`, `trackerView`), offered for torrents on
+  devices with the capability, asks again every 3 s while it shows
 - Export: `TorrentController.export(taskId, metainfo)` (REST `GET /api/torrents/{id}/export`,
   `?metainfo=true`; capability `export`) answers a `TorrentExport`: the v1 and v2 info hashes,
   the name, the magnet link and, when asked for, the `.torrent` file as Base64

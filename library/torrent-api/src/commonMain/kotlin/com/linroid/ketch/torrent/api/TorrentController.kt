@@ -106,6 +106,19 @@ interface TorrentController {
     )
 
   /**
+   * The task's own trackers in tier order and how each answers, or `null` for unknown and
+   * non-torrent tasks: live while the torrent runs or seeds, and [TorrentTrackerState.IDLE]
+   * otherwise. The trackers the backend adds to public torrents are not listed. Fails with
+   * [TorrentCommandError.METADATA_UNAVAILABLE] while the torrent's trackers are not known yet.
+   * Advertised as [TorrentCapability.TRACKERS].
+   */
+  suspend fun trackers(taskId: String): List<TorrentTracker>? =
+    throw TorrentCommandException(
+      error = TorrentCommandError.UNSUPPORTED,
+      message = "Tracker status is unavailable",
+    )
+
+  /**
    * Whether peers can connect to the backend's torrent engine, through how many NAT layers its
    * port is forwarded, and whether it punches through NATs; advertised as
    * [TorrentCapability.REACHABILITY].

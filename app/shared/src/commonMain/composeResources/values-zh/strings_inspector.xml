@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">连接</string>
   <string name="inspector_tab_files">文件</string>
   <string name="inspector_tab_activity">动态</string>
+  <string name="inspector_tab_trackers">Tracker</string>
+  <string name="inspector_tracker_idle">尚未询问</string>
+  <string name="inspector_tracker_announcing">正在询问…</string>
+  <string name="inspector_tracker_working">正常</string>
+  <string name="inspector_tracker_failed">失败</string>
+  <string name="inspector_tracker_timed_out">无响应</string>
+  <string name="inspector_tracker_peers">节点：%1$d</string>
+  <string name="inspector_tracker_seeders">做种：%1$d</string>
+  <string name="inspector_tracker_leechers">下载中：%1$d</string>
+  <string name="inspector_trackers_empty">此种子没有自带的 Tracker。</string>
 
   <string name="inspector_stalled_seconds">停滞%1$d秒</string>
   <string name="inspector_stalled_minutes">停滞%1$d分钟</string>

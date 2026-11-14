@@ -1284,7 +1284,12 @@ internal class KotlinTorrentEngine(
     if (tiers.isNotEmpty() && document.info.privateTorrent && topics.size > 1) launch {
       // BEP 27: both hashes of a private hybrid use one tracker at a time, and move together.
       val group = PrivateTrackerGroup(topics, PrivateTrackerGroup.order(tiers),
-        { topic, url -> discovery(topic, listOf(listOf(url))) {} }, sink::reset)
+        { topic, url ->
+          discovery(topic, listOf(listOf(url))) {}.also { announcer ->
+            // One tracker serves both topics at a time; the last one asked is the one shown.
+            announcer.observeStatus { sink.trackerStatus(topic.toString(), it) }
+          }
+        }, sink::reset)
       awaitGoodbyes(topics)
       try {
         while (isActive) {
@@ -1295,6 +1300,7 @@ internal class KotlinTorrentEngine(
           delay(1000)
         }
       } finally {
+        topics.forEach { sink.trackerStatus(it.toString(), emptyList()) }
         val last = withContext(NonCancellable) { attempt { announceState() } }
         if (last != null) sayGoodbye(topics) {
           attempt { group.stop(last.verified, last.received, last.uploaded) }
@@ -1304,6 +1310,7 @@ internal class KotlinTorrentEngine(
       val discovery = discovery(topic, tiers, onChanged = sink::reset)
       var reannounced = sink.reannounceRequests()
       awaitGoodbyes(listOf(topic))
+      discovery.observeStatus { sink.trackerStatus(topic.toString(), it) }
       try {
         while (isActive) {
           // A stalled transfer asks for peers now, sooner than the trackers said (as soon as
@@ -1317,6 +1324,8 @@ internal class KotlinTorrentEngine(
           delay(1000)
         }
       } finally {
+        discovery.observeStatus {}
+        sink.trackerStatus(topic.toString(), emptyList())
         val last = withContext(NonCancellable) { attempt { announceState() } }
         if (last != null) sayGoodbye(listOf(topic)) {
           attempt { last.poll(discovery) }

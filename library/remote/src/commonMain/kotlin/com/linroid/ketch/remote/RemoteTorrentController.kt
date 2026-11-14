@@ -25,6 +25,7 @@ import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentRevisionDecision
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.api.compareIncoming
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -339,6 +340,13 @@ internal class RemoteTorrentController(
           metainfo = metainfo.takeIf { it },
         )
       )
+    }
+  }
+
+  override suspend fun trackers(taskId: String): List<TorrentTracker>? {
+    requireCapability(TorrentCapability.TRACKERS)
+    return call(notFoundIsNull = true) {
+      httpClient.get(Torrents.ById.Trackers(parent = Torrents.ById(id = taskId)))
     }
   }
 

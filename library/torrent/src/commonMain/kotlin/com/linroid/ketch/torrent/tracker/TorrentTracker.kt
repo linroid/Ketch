@@ -327,8 +327,8 @@ internal class TrackerTiers(
   private var added = false
 
   private val statuses = linkedMapOf<String, TrackerStatus>().apply {
-    for (tier in tiers) for (url in tier) {
-      if (url !in this) put(url, TrackerStatus(size))
+    for ((index, tier) in tiers.withIndex()) for (url in tier) {
+      if (url !in this) put(url, TrackerStatus(size, label = trackerLabel(url), tier = index))
     }
   }
   private var tiers = tiers.map { it.distinct().shuffled().toMutableList() }
@@ -379,8 +379,11 @@ internal class TrackerTiers(
     ids.clear()
     scrapeRetryAt.clear()
     statuses.clear()
-    for (tier in configuration.tiers) for (url in tier) {
-      if (url !in statuses) statuses[url] = TrackerStatus(statuses.size, configurationRevision)
+    for ((index, tier) in configuration.tiers.withIndex()) for (url in tier) {
+      if (url !in statuses) {
+        statuses[url] = TrackerStatus(statuses.size, configurationRevision,
+          label = trackerLabel(url), tier = index)
+      }
     }
     current = null
     oldPeersClosed = false

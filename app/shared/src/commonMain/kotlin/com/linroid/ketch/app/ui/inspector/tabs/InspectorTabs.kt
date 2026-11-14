@@ -3,6 +3,7 @@ package com.linroid.ketch.app.ui.inspector.tabs
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.app.i18n.UiText
@@ -12,12 +13,15 @@ import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.awaitsFileSelection
+import com.linroid.ketch.app.state.catchingUnlessCancelled
+import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentFeatures
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_tab_activity
 import ketch.app.shared.generated.resources.inspector_tab_connections
 import ketch.app.shared.generated.resources.inspector_tab_files
 import ketch.app.shared.generated.resources.inspector_tab_overview
+import ketch.app.shared.generated.resources.inspector_tab_trackers
 import org.jetbrains.compose.resources.StringResource
 
 /** A tab of the task inspector. */
@@ -31,6 +35,9 @@ enum class InspectorTab(private val resource: StringResource) {
   /** Each file or variant of a task with several, such as a torrent; see [FilesTab]. */
   Files(Res.string.inspector_tab_files),
 
+  /** A torrent's own trackers and how each answers; see [TrackersTab]. */
+  Trackers(Res.string.inspector_tab_trackers),
+
   /** Speed over the last five minutes and the session's events; see [ActivityTab]. */
   Activity(Res.string.inspector_tab_activity);
 
@@ -43,7 +50,8 @@ enum class InspectorTab(private val resource: StringResource) {
  * Overview; for a torrent, Files once its files are known, or while it waits for them to be
  * chosen on a device that lists them ([TorrentFeatures.CONTROL] among its [features]);
  * for other tasks, Connections while an HTTP or FTP task has unfinished segments, and Files when
- * the source lists files or variants; and Activity once the task has a speed [history] or a
+ * the source lists files or variants; for a torrent on a device that lists its [trackers],
+ * Trackers; and Activity once the task has a speed [history] or a
  * [timeline].
  */
 fun inspectorTabs(
@@ -51,6 +59,7 @@ fun inspectorTabs(
   history: SpeedHistory?,
   timeline: List<TimelineEntry>,
   features: Set<String> = emptySet(),
+  trackers: Boolean = false,
 ): List<InspectorTab> = buildList {
   add(InspectorTab.Overview)
   if (row.isTorrent) {
@@ -62,6 +71,7 @@ fun inspectorTabs(
     if (connectionsCount(row) > 0) add(InspectorTab.Connections)
     if (taskFileCount(row, filesSelectable(row, features)) > 0) add(InspectorTab.Files)
   }
+  if (row.isTorrent && trackers) add(InspectorTab.Trackers)
   if (history != null || timeline.isNotEmpty()) add(InspectorTab.Activity)
 }
 
@@ -73,7 +83,7 @@ fun inspectorTabs(
 fun InspectorTab.count(row: TaskRow, features: Set<String> = emptySet()): Int? = when (this) {
   InspectorTab.Connections -> connectionsCount(row)
   InspectorTab.Files -> taskFileCount(row, filesSelectable(row, features)).takeIf { it > 0 }
-  InspectorTab.Overview, InspectorTab.Activity -> null
+  InspectorTab.Overview, InspectorTab.Trackers, InspectorTab.Activity -> null
 }
 
 /** What the device of [row] reports in its features, as it changes. */
@@ -94,7 +104,24 @@ fun rememberInspectorTabs(state: AppState, row: TaskRow): List<InspectorTab> {
   val history = histories[row.key]
   val timeline = timelines[row.key].orEmpty()
   val hasActivity = history != null || timeline.isNotEmpty()
-  return remember(row, hasActivity, features) { inspectorTabs(row, history, timeline, features) }
+  val trackers = rememberListsTrackers(state, row, features)
+  return remember(row, hasActivity, features, trackers) {
+    inspectorTabs(row, history, timeline, features, trackers)
+  }
+}
+
+/** Whether the device of the torrent [row] lists a torrent's trackers; false until it says so. */
+@Composable
+private fun rememberListsTrackers(state: AppState, row: TaskRow, features: Set<String>): Boolean {
+  if (!row.isTorrent) return false
+  val deviceId = row.key.deviceId
+  val controller = remember(features, deviceId) { state.torrentControllerOf(deviceId) }
+  val lists by produceState(false, controller) {
+    value = controller != null && catchingUnlessCancelled {
+      controller.capabilities().supports(TorrentCapability.TRACKERS)
+    }.getOrDefault(false)
+  }
+  return lists
 }
 
 /** Unfinished segments of an HTTP or FTP task that has not completed or been canceled. */

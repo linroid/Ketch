@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.storage.torrentFileSystem
+import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.v2.TorrentV2DownloadSession
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -148,6 +149,28 @@ class KotlinTorrentV2DiscoveryTest {
       }
       assertEquals(0, engine.admittedSessionBytes)
       assertEquals(0, engine.allocatedExchangeBytes)
+    }
+  }
+
+  @Test
+  fun hybridListsEachTrackerOnceWithTheStatusThatSaysMost() = runTest {
+    val fixture = TorrentV2Fixture.build(listOf("a" to 40_000, "b" to 5), hybrid = true)
+    // The first tier's tracker refuses the v2 swarm, which falls back to the second.
+    val http = Trackers(fixture) { tracker, topic ->
+      tracker == "http://a/announce" && topic == "v2"
+    }
+    http.release.complete(Unit)
+    val network = Recording(createTorrentNetwork())
+    owner(fixture, http, network,
+      tiers = listOf(listOf("http://a/announce"), listOf("http://b/announce"))) { session ->
+      val trackers = session.trackers.first { trackers ->
+        trackers.size == 2 && trackers.all { it.outcome == TrackerStatus.Outcome.SUCCEEDED }
+      }
+      assertEquals(listOf("http://a:80", "http://b:80"), trackers.map { it.label })
+      assertEquals(listOf(0, 1), trackers.map { it.tier })
+      session.pause()
+      // A session that announces to no tracker lists none.
+      session.trackers.first { it.isEmpty() }
     }
   }
 

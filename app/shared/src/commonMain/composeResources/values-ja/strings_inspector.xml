@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">接続</string>
   <string name="inspector_tab_files">ファイル</string>
   <string name="inspector_tab_activity">アクティビティ</string>
+  <string name="inspector_tab_trackers">トラッカー</string>
+  <string name="inspector_tracker_idle">未問い合わせ</string>
+  <string name="inspector_tracker_announcing">問い合わせ中…</string>
+  <string name="inspector_tracker_working">動作中</string>
+  <string name="inspector_tracker_failed">失敗</string>
+  <string name="inspector_tracker_timed_out">応答なし</string>
+  <string name="inspector_tracker_peers">ピア：%1$d</string>
+  <string name="inspector_tracker_seeders">シード中：%1$d</string>
+  <string name="inspector_tracker_leechers">ダウンロード中：%1$d</string>
+  <string name="inspector_trackers_empty">このトレントには独自のトラッカーがありません。</string>
 
   <string name="inspector_stalled_seconds">停滞%1$d秒</string>
   <string name="inspector_stalled_minutes">停滞%1$d分</string>

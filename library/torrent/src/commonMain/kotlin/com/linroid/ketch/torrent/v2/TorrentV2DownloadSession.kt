@@ -29,7 +29,9 @@ import com.linroid.ketch.torrent.peer.PeerOutcomeReport
 import com.linroid.ketch.torrent.storage.TorrentOutputMapping
 import com.linroid.ketch.torrent.storage.TorrentV2Checkpoint
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
+import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.tracker.TrackerTopic
+import com.linroid.ketch.torrent.tracker.mergeTrackerStatuses
 import com.linroid.ketch.torrent.v2.peer.PeerV2Connector
 import com.linroid.ketch.torrent.v2.peer.PeerV2Dialer
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
@@ -58,6 +60,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
@@ -168,6 +171,12 @@ internal interface TorrentV2DiscoverySink {
    * discovery announces again, sooner than the trackers asked, whenever it grows.
    */
   fun reannounceRequests(): Long = 0
+
+  /**
+   * How the trackers of one announcer answer now: [key] names the announcer, such as a topic,
+   * and an empty list ends it.
+   */
+  fun trackerStatus(key: String, statuses: List<TrackerStatus>) {}
 }
 
 /**
@@ -243,6 +252,12 @@ internal class TorrentV2DownloadSession private constructor(
 
   /** Why the running download makes no progress, while it does not; null once it stops. */
   override val stall: StateFlow<TorrentStall?> get() = mutableStall
+
+  private val trackerStatuses = MutableStateFlow<Map<String, List<TrackerStatus>>>(emptyMap())
+  private val mergedTrackers = MutableStateFlow<List<TrackerStatus>>(emptyList())
+
+  /** The trackers of every topic the transfer announces under, one status per tracker. */
+  override val trackers: StateFlow<List<TrackerStatus>> get() = mergedTrackers
 
   /** Raised each time a stalled transfer asks its trackers for peers; see [Sink]. */
   private val reannounces = AtomicLong(0)
@@ -613,6 +628,13 @@ internal class TorrentV2DownloadSession private constructor(
     override fun receivedBytes(): Long = store.receivedBytes()
 
     override fun reannounceRequests(): Long = reannounces.load()
+
+    override fun trackerStatus(key: String, statuses: List<TrackerStatus>) {
+      val all = trackerStatuses.updateAndGet {
+        if (statuses.isEmpty()) it - key else it + (key to statuses)
+      }
+      mergedTrackers.value = mergeTrackerStatuses(all.values)
+    }
   }
 
   private suspend fun transfer() = coroutineScope {

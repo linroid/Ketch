@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">연결</string>
   <string name="inspector_tab_files">파일</string>
   <string name="inspector_tab_activity">활동</string>
+  <string name="inspector_tab_trackers">트래커</string>
+  <string name="inspector_tracker_idle">아직 요청 안 함</string>
+  <string name="inspector_tracker_announcing">요청 중…</string>
+  <string name="inspector_tracker_working">작동 중</string>
+  <string name="inspector_tracker_failed">실패</string>
+  <string name="inspector_tracker_timed_out">응답 없음</string>
+  <string name="inspector_tracker_peers">피어: %1$d</string>
+  <string name="inspector_tracker_seeders">시딩: %1$d</string>
+  <string name="inspector_tracker_leechers">다운로드 중: %1$d</string>
+  <string name="inspector_trackers_empty">이 토렌트에는 자체 트래커가 없습니다.</string>
 
   <string name="inspector_stalled_seconds">%1$d초째 멈춤</string>
   <string name="inspector_stalled_minutes">%1$d분째 멈춤</string>

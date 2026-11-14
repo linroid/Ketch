@@ -29,12 +29,15 @@ import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentFeatures
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
+import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.control.LiveTorrent
 import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
 import com.linroid.ketch.torrent.control.TorrentControlSource
 import com.linroid.ketch.torrent.control.TorrentControls
 import com.linroid.ketch.torrent.control.exportOf
+import com.linroid.ketch.torrent.control.idleTrackers
+import com.linroid.ketch.torrent.control.trackerViews
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.IncompleteSeedException
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
@@ -286,6 +289,13 @@ class TorrentDownloadSource(
       includeMetainfo: Boolean,
     ) = source.torrentExport(taskId, url, sourceState, resolved, includeMetainfo)
 
+    override suspend fun torrentTrackers(
+      taskId: String,
+      url: String,
+      sourceState: SourceState?,
+      resolved: ResolvedSource?,
+    ) = source.torrentTrackers(taskId, url, sourceState, resolved)
+
     override suspend fun liveTorrent(taskId: String) = source.liveTorrent(taskId)
 
     override suspend fun savedPayload(sourceState: SourceState?) =
@@ -333,6 +343,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.SEED_GOALS.wireName)
       add(TorrentCapability.SEQUENTIAL.wireName)
       add(TorrentCapability.EXPORT.wireName)
+      add(TorrentCapability.TRACKERS.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -970,6 +981,24 @@ class TorrentDownloadSource(
     val bytes = metainfoBytes(sourceState?.let { decodeState(it) }, resolved)
     return withContext(TorrentDispatchers.engine) {
       exportOf(taskId, url, bytes, includeMetainfo, config)
+    }
+  }
+
+  /**
+   * What [TorrentControlSource.torrentTrackers] answers: the live statuses of the task's
+   * session while it announces to its trackers, else [idleTrackers].
+   */
+  internal suspend fun torrentTrackers(
+    taskId: String,
+    url: String,
+    sourceState: SourceState?,
+    resolved: ResolvedSource?,
+  ): List<TorrentTracker>? {
+    val live = tasks.session(taskId)?.trackers?.value.orEmpty()
+    if (live.isNotEmpty()) return trackerViews(live)
+    val bytes = metainfoBytes(sourceState?.let { decodeState(it) }, resolved)
+    return withContext(TorrentDispatchers.engine) {
+      idleTrackers(url, bytes, config.maxMetadataBytes)
     }
   }
 

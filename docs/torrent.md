@@ -433,6 +433,17 @@ trackers. Private torrents and tracker-only lookups never contact them.
 Ketch uses at most 128 extra trackers in all, the ones you added first. New lists apply to torrents
 started or resumed afterwards.
 
+### Seeing how a torrent's trackers answer
+
+A torrent's inspector has a **Trackers** tab: each of the torrent's own trackers by address
+(scheme, host and port; never its path, which may hold a passkey), whether it is working, failed
+or gave no answer, how many peers its last answer named, the seeders and downloaders it counts,
+and what it said when it refused, such as "torrent not registered". While the torrent is not
+running its trackers show as not asked yet. A hybrid torrent announces to each tracker for both
+of its swarms and lists each once, with the answer that says most. The trackers Ketch adds from
+the settings above are not listed. REST: `GET /api/torrents/{id}/trackers`, on devices listing the
+`trackers` capability.
+
 ### How download settings apply to torrents
 
 Torrent tasks follow the same download settings as HTTP and FTP tasks, with these differences:
@@ -669,7 +680,8 @@ It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp
 which describe the backend, not its current settings, and `seeding` while the configured policy is
 `SEED_AFTER_COMPLETION`, also while uploads are paused), `snapshot(taskId)`, sorted file
 pages (`files`), `select` and `setSeeding` commands guarded by a revision and an idempotency
-key, `export(taskId, metainfo)` (`TorrentExport`: the info hashes, the magnet link and, when
+key, `trackers(taskId)` (`TorrentTracker`: each own tracker's endpoint, tier, state, peers,
+swarm counts and message; the `trackers` capability), `export(taskId, metainfo)` (`TorrentExport`: the info hashes, the magnet link and, when
 asked for, the `.torrent` file; the `export` capability), and `settings()` and
 `updateSettings(change)` (`TorrentEngineSettings`, `TorrentSettingsChange`; the `settings`
 capability). In process, `updateSettings` runs

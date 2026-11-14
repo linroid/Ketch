@@ -210,6 +210,23 @@ class FilesTabTest {
   }
 
   @Test
+  fun inspectorTabs_torrentOnADeviceListingTrackers_offersTrackers() {
+    val row = torrent(files = listOf(SourceFile("0", "a.mkv", 1000)))
+
+    assertEquals(
+      listOf(InspectorTab.Overview, InspectorTab.Files, InspectorTab.Trackers),
+      inspectorTabs(row, history = null, timeline = emptyList(), trackers = true),
+    )
+    assertNull(InspectorTab.Trackers.count(row))
+    // Never for other downloads, whatever their device lists.
+    val http = row("a", downloading(500, total = 2000))
+    assertFalse(
+      InspectorTab.Trackers in
+        inspectorTabs(http, history = null, timeline = emptyList(), trackers = true)
+    )
+  }
+
+  @Test
   fun filesSelectable_httpTaskWithoutFiles_isFalse() {
     val row = row("a", downloading(500, total = 2000))
 

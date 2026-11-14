@@ -25,6 +25,8 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentExport
+import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
@@ -92,6 +94,16 @@ class KetchTorrentControllerTest {
     }
 
     override suspend fun liveTorrent(taskId: String): LiveTorrent? = live[taskId]
+
+    /** What [torrentTrackers] answers. */
+    var trackers: List<TorrentTracker>? = null
+
+    override suspend fun torrentTrackers(
+      taskId: String,
+      url: String,
+      sourceState: SourceState?,
+      resolved: ResolvedSource?,
+    ): List<TorrentTracker>? = trackers
 
     /** What [torrentExport] answers, or an error it throws. */
     var export: (taskId: String, url: String, includeMetainfo: Boolean) -> TorrentExport? =
@@ -1075,6 +1087,30 @@ class KetchTorrentControllerTest {
       assertEquals(TorrentCommandError.METADATA_UNAVAILABLE, unreadable.error)
       ketch.close()
     }
+
+  @Test
+  fun `trackers lists what the source reports and fails while they are unknown`() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    val task = pausedTask(ketch)
+
+    val unsupported = assertFailsWith<TorrentCommandException> {
+      ketch.torrents.trackers(task.taskId)
+    }
+    assertEquals(TorrentCommandError.UNSUPPORTED, unsupported.error)
+
+    source.capabilities += TorrentCapability.TRACKERS.wireName
+    val unknown = assertFailsWith<TorrentCommandException> {
+      ketch.torrents.trackers(task.taskId)
+    }
+    assertEquals(TorrentCommandError.METADATA_UNAVAILABLE, unknown.error)
+
+    val listed = listOf(TorrentTracker("udp://a.example:1337", state = TorrentTrackerState.WORKING))
+    source.trackers = listed
+    assertEquals(listed, ketch.torrents.trackers(task.taskId))
+    assertNull(ketch.torrents.trackers("missing"))
+    ketch.close()
+  }
 
   @Test
   fun `export is unsupported for a source without the capability`() = runTest {

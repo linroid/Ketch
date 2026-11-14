@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.engine
 
 import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.tracker.TrackerStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -48,6 +49,12 @@ internal interface TorrentSession {
 
   /** Why the download makes no progress, while it does not; sessions that cannot tell, null. */
   val stall: StateFlow<TorrentStall?> get() = NO_STALL
+
+  /**
+   * How the session's own trackers answer, in tier order; empty while it announces to none. The
+   * trackers Ketch adds to public torrents are not listed.
+   */
+  val trackers: StateFlow<List<TrackerStatus>> get() = NO_TRACKERS
 
   /** Opens pieces in order from now on, or rarest first; applies to a running transfer. */
   fun setSequential(sequential: Boolean) {}
@@ -132,3 +139,5 @@ internal enum class TorrentSessionState {
 }
 
 private val NO_STALL: StateFlow<TorrentStall?> = MutableStateFlow(null)
+
+private val NO_TRACKERS: StateFlow<List<TrackerStatus>> = MutableStateFlow(emptyList())

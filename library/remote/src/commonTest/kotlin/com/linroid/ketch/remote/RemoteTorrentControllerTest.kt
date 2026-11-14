@@ -18,6 +18,8 @@ import com.linroid.ketch.torrent.api.TorrentReachabilityStatus
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -176,6 +178,43 @@ class RemoteTorrentControllerTest {
       failure(TorrentCommandError.METADATA_UNAVAILABLE) { fixture.controller.export("magnet") }
       // A server without the capability is never asked.
       failure(TorrentCommandError.UNSUPPORTED) { older.controller.export("t1") }
+      assertEquals(listOf("/api/torrents/capabilities"), older.paths)
+    } finally {
+      fixture.client.close()
+      older.client.close()
+    }
+  }
+
+  @Test
+  fun trackers_readTheServers_decodingUnknownStatesAsIdle() = runTest {
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "trackers")))
+        ?: when (request.url.encodedPath) {
+          "/api/torrents/t1/trackers" -> json(
+            """[{"endpoint":"udp://a.example:1337","state":"working","peers":3},""" +
+              """{"endpoint":"http://b.example:80","tier":1,"state":"backing-off"}]"""
+          )
+          "/api/torrents/gone/trackers" -> json(
+            json.encodeToString(ErrorResponse("not_found", "No torrent download gone")),
+            HttpStatusCode.NotFound,
+          )
+          else -> error("Unexpected request")
+        }
+    }
+    val older = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect")))
+        ?: error("Unexpected request")
+    }
+    try {
+      assertEquals(
+        listOf(
+          TorrentTracker("udp://a.example:1337", 0, TorrentTrackerState.WORKING, peers = 3),
+          TorrentTracker("http://b.example:80", 1, TorrentTrackerState.IDLE),
+        ),
+        fixture.controller.trackers("t1"),
+      )
+      assertNull(fixture.controller.trackers("gone"))
+      failure(TorrentCommandError.UNSUPPORTED) { older.controller.trackers("t1") }
       assertEquals(listOf("/api/torrents/capabilities"), older.paths)
     } finally {
       fixture.client.close()
