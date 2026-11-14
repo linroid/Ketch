@@ -1,5 +1,8 @@
 package com.linroid.ketch.app.desktop
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -154,6 +157,23 @@ class NativeMessagingHostTest {
     assertEquals(
       """{"error":"not_started","message":"Ketch didn't start in time"}""",
       host.handle("""{"type":"connect"}"""),
+    )
+  }
+
+  @Test
+  fun connect_appUnreachable_saysWhy() {
+    val host = NativeMessagingHost(
+      requestApp = { null },
+      launchApp = { },
+      startTimeout = 50.milliseconds,
+      pollInterval = 10.milliseconds,
+      lastFailure = { "ConnectException: Connection refused" },
+    )
+    val reply = Json.parseToJsonElement(host.handle("""{"type":"connect"}""")).jsonObject
+    assertEquals("unreachable", reply["error"]?.jsonPrimitive?.content)
+    assertEquals(
+      "Couldn't reach Ketch on this computer: ConnectException: Connection refused",
+      reply["message"]?.jsonPrimitive?.content,
     )
   }
 

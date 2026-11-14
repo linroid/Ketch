@@ -6,6 +6,7 @@ import java.io.File
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.Socket
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -50,7 +51,7 @@ internal object DesktopApp {
     val port = endpoint?.getOrNull(0)?.trim()?.toIntOrNull() ?: return Reply.NotRunning
     val token = endpoint.getOrNull(1)?.trim() ?: return Reply.NotRunning
     return try {
-      Socket().use { socket ->
+      Socket(Proxy.NO_PROXY).use { socket ->
         val address = InetSocketAddress(InetAddress.getLoopbackAddress(), port)
         socket.connect(address, CONNECT_TIMEOUT_MS)
         socket.soTimeout = timeout.inWholeMilliseconds.toInt()

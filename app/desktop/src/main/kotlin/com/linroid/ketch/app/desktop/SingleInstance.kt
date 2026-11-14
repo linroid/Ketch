@@ -6,6 +6,7 @@ import java.io.File
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.channels.FileChannel
@@ -133,15 +134,22 @@ internal class SingleInstance private constructor(
     /**
      * Sends [message] to the running instance and returns its reply, or null when no instance
      * is running, it did not answer within [replyTimeout], or it had no reply.
+     *
+     * The connection never goes through a proxy: the launcher has the JVM follow the system's
+     * proxy settings, which would otherwise send it, loopback or not, to a SOCKS proxy set there.
+     *
+     * @param onFailure hears why an instance that left an endpoint could not be reached or did
+     *   not answer
      */
     fun request(
       dir: File,
       message: String,
       replyTimeout: Duration = REPLY_TIMEOUT,
+      onFailure: (IOException) -> Unit = {},
     ): String? {
       val (port, token) = readEndpoint(dir) ?: return null
       return try {
-        Socket().use { socket ->
+        Socket(Proxy.NO_PROXY).use { socket ->
           socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MS)
           socket.soTimeout = replyTimeout.inWholeMilliseconds.toInt()
           val output = DataOutputStream(socket.getOutputStream().buffered())
@@ -151,7 +159,8 @@ internal class SingleInstance private constructor(
           output.flush()
           DataInputStream(socket.getInputStream().buffered()).readUTF().ifEmpty { null }
         }
-      } catch (_: IOException) {
+      } catch (e: IOException) {
+        onFailure(e)
         null
       }
     }
@@ -203,7 +212,7 @@ internal class SingleInstance private constructor(
         if (endpoint != null) {
           val (port, token) = endpoint
           try {
-            Socket().use { socket ->
+            Socket(Proxy.NO_PROXY).use { socket ->
               socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), TIMEOUT_MS)
               val output = DataOutputStream(socket.getOutputStream().buffered())
               output.writeUTF(token)

@@ -1,6 +1,13 @@
 package com.linroid.ketch.app.desktop
 
 import java.io.File
+import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.ProxySelector
+import java.net.ServerSocket
+import java.net.SocketAddress
+import java.net.URI
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -97,5 +104,33 @@ class SingleInstanceTest {
     // An app that exited leaves its endpoint file behind.
     SingleInstance.acquire(dir, emptyList(), onRequest = { "reply" }) { }!!.close()
     assertNull(SingleInstance.request(dir, "connect"))
+  }
+
+  @Test
+  fun request_withSystemSocksProxy_connectsDirectly() {
+    // What the JVM's selector answers for the system's proxy when the launcher sets
+    // java.net.useSystemProxies: every plain socket would go through it, loopback included.
+    val deadPort = ServerSocket(0).use { it.localPort }
+    val previous = ProxySelector.getDefault()
+    ProxySelector.setDefault(object : ProxySelector() {
+      override fun select(uri: URI): List<Proxy> =
+        listOf(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", deadPort)))
+
+      override fun connectFailed(uri: URI, address: SocketAddress, error: IOException) = Unit
+    })
+    try {
+      val received = LinkedBlockingQueue<List<String>>()
+      SingleInstance.acquire(
+        dir,
+        emptyList(),
+        onRequest = { "reply" },
+      ) { received.put(it) }!!.use {
+        assertEquals("reply", SingleInstance.request(dir, "connect"))
+        assertNull(SingleInstance.acquire(dir, listOf("a.torrent")) { error("Must not run") })
+        assertEquals(listOf("a.torrent"), received.poll(5, TimeUnit.SECONDS))
+      }
+    } finally {
+      ProxySelector.setDefault(previous)
+    }
   }
 }

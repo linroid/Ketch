@@ -1,5 +1,6 @@
 package com.linroid.ketch.app.desktop
 
+import com.linroid.ketch.api.log.describeCauses
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -34,11 +35,15 @@ import kotlin.time.TimeSource
  * `{"url":…,"token":…}`, and `{"type":"pick-folder","initialFolder":…}`, which starts the app
  * like `connect` and has it show the system's folder dialog, answered with `{"folder":…}` or
  * `{"canceled":true}`. Either fails with `{"error":…,"message":…}`.
+ *
+ * @param lastFailure why the last [requestApp] could not reach an app that left its address, if
+ *   that is why it returned null; the reply says so when the app never answers
  */
 internal class NativeMessagingHost(
   private val requestApp: () -> String?,
   private val launchApp: () -> Unit,
   private val pickFolder: (initialFolder: String?) -> String? = { null },
+  private val lastFailure: () -> String? = { null },
   private val startTimeout: Duration = 30.seconds,
   private val pollInterval: Duration = 250.milliseconds,
 ) {
@@ -80,7 +85,10 @@ internal class NativeMessagingHost(
       if (!reply.isNotReady()) return reply
       last = reply
     }
-    return last ?: errorReply("not_started", "Ketch didn't start in time")
+    if (last != null) return last
+    // An app that runs but cannot be reached looks like one that never started.
+    val failure = lastFailure() ?: return errorReply("not_started", "Ketch didn't start in time")
+    return errorReply("unreachable", "Couldn't reach Ketch on this computer: $failure")
   }
 
   private fun pickFolder(initialFolder: String?): String {
@@ -173,8 +181,17 @@ internal fun runNativeMessagingHost(configDir: File) {
   val stdout = FileOutputStream(FileDescriptor.out)
   System.setOut(System.err)
   System.setProperty("java.awt.headless", "true")
+  var failure: String? = null
   val host = NativeMessagingHost(
-    requestApp = { SingleInstance.request(configDir, NativeMessagingHost.CONNECT_REQUEST) },
+    requestApp = {
+      failure = null
+      SingleInstance.request(
+        configDir,
+        NativeMessagingHost.CONNECT_REQUEST,
+        onFailure = { failure = it.describeCauses() },
+      )
+    },
+    lastFailure = { failure },
     launchApp = { AppCommand.current().launchDetached() },
     pickFolder = { initialFolder ->
       SingleInstance.request(
