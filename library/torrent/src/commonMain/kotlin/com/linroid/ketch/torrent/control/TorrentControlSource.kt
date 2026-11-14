@@ -74,6 +74,25 @@ internal interface TorrentControlSource {
   /** [state], as a task saved it, with [fileIds] as the files to download first. */
   fun withPriorityFiles(state: SourceState, fileIds: Set<String>): SourceState = state
 
+  /**
+   * Changes the own trackers of the task [taskId], which downloads [url], without those at the
+   * endpoints [remove] names and with the announce URLs [add]: what its next session announces
+   * to. Returns the trackers it then has, or `null` when the torrent's are not known.
+   *
+   * @throws IllegalArgumentException for a URL the engine cannot announce to, or too many
+   */
+  suspend fun editTrackers(
+    taskId: String,
+    url: String,
+    sourceState: SourceState?,
+    resolved: ResolvedSource?,
+    add: List<String>,
+    remove: List<String>,
+  ): List<List<String>>? = null
+
+  /** [state], as a task saved it, announcing to [tiers] in place of the torrent's trackers. */
+  fun withTrackers(state: SourceState, tiers: List<List<String>>): SourceState = state
+
   /** [state], as a task saved it, downloading its pieces in order or not. */
   fun withSequential(state: SourceState, sequential: Boolean): SourceState = state
 

@@ -57,6 +57,20 @@ data class TorrentTracker(
   val message: String? = null,
 )
 
+/**
+ * A change to a torrent's own trackers; see [TorrentController.editTrackers].
+ *
+ * @property add announce URLs (`http`, `https` or `udp`) to announce to as well, each a tier of
+ *   its own after the torrent's; one the torrent already has is left where it is
+ * @property remove the [TorrentTracker.endpoint]s of the trackers to stop announcing to: every
+ *   tracker at that scheme, host and port, whatever its path
+ */
+@Serializable
+data class TorrentTrackerEdit(
+  val add: List<String> = emptyList(),
+  val remove: List<String> = emptyList(),
+)
+
 internal object TorrentTrackerStateSerializer : KSerializer<TorrentTrackerState> {
   override val descriptor: SerialDescriptor =
     PrimitiveSerialDescriptor("TorrentTrackerState", PrimitiveKind.STRING)

@@ -30,6 +30,7 @@ enum class TorrentCapability(val wireName: String) {
   SEQUENTIAL("sequential"),
   FILE_PRIORITY("file-priority"),
   IP_FILTER("ip-filter"),
+  TRACKER_EDIT("tracker-edit"),
 }
 
 /**

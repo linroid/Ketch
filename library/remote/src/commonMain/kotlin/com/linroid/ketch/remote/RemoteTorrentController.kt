@@ -27,6 +27,7 @@ import com.linroid.ketch.torrent.api.TorrentRevisionDecision
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import com.linroid.ketch.torrent.api.compareIncoming
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -375,6 +376,19 @@ internal class RemoteTorrentController(
     return call(notFoundIsNull = true) {
       httpClient.get(Torrents.ById.Trackers(parent = Torrents.ById(id = taskId)))
     }
+  }
+
+  override suspend fun editTrackers(
+    taskId: String,
+    edit: TorrentTrackerEdit,
+  ): List<TorrentTracker> {
+    requireCapability(TorrentCapability.TRACKER_EDIT)
+    return call<List<TorrentTracker>>(notFoundIsNull = false) {
+      httpClient.put(Torrents.ById.Trackers(parent = Torrents.ById(id = taskId))) {
+        contentType(ContentType.Application.Json)
+        setBody(edit)
+      }
+    } ?: throw IllegalStateException("Empty response")
   }
 
   /** Fails with [TorrentCommandError.UNSUPPORTED], sending nothing, unless the server has it. */

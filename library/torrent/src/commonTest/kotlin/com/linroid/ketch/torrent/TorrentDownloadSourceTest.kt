@@ -233,6 +233,16 @@ class TorrentDownloadSourceTest {
   }
 
   @Test
+  fun editTrackers_magnetWithoutMetadata_hasNoneToEdit() = runTest {
+    // Its lookup announces to what the link names, which an edit would not change.
+    val magnet = "magnet:?xt=urn:btih:" + "a".repeat(40) + "&tr=http%3A%2F%2Fa.example%2Fannounce"
+    assertNull(source.editTrackers("waiting", magnet, null, null,
+      add = listOf("udp://b.example:1337"), remove = emptyList()))
+    assertEquals(listOf("http://a.example:80"),
+      source.torrentTrackers("waiting", magnet, null, null)?.map { it.endpoint })
+  }
+
+  @Test
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.FILE_SELECTION,
       KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL,
@@ -240,7 +250,7 @@ class TorrentDownloadSourceTest {
     val engine = setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability",
       "settings", "seed-goals", "sequential", "export", "trackers",
       "recheck", "import", "file-priority",
-      "ip-filter")
+      "ip-filter", "tracker-edit")
     // Local discovery only where the platform can join the LAN group.
     assertEquals(if (lsdSupported) engine + "local-discovery" else engine,
       source.torrentCapabilities)

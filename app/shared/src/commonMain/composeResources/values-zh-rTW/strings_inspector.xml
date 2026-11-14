@@ -14,6 +14,11 @@
   <string name="inspector_tracker_seeders">做種：%1$d</string>
   <string name="inspector_tracker_leechers">下載中：%1$d</string>
   <string name="inspector_trackers_empty">此種子沒有自帶的 Tracker。</string>
+  <string name="inspector_trackers_add">新增 Tracker</string>
+  <string name="inspector_trackers_add_placeholder">udp://tracker.example:6969/announce</string>
+  <string name="inspector_trackers_add_hint">Announce 網址，以空格或換行分隔。執行中的種子會重新啟動以使用它們。</string>
+  <string name="inspector_trackers_invalid">請輸入 http、https 或 udp 的 Announce 網址。</string>
+  <string name="inspector_trackers_failed">無法變更 Tracker。</string>
 
   <string name="inspector_stalled_seconds">已停滯 %1$d 秒</string>
   <string name="inspector_stalled_minutes">已停滯 %1$d 分鐘</string>

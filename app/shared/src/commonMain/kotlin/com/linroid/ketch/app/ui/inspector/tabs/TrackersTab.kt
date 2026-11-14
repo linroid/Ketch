@@ -2,28 +2,43 @@ package com.linroid.ketch.app.ui.inspector.tabs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.app.components.KetchButton
+import com.linroid.ketch.app.components.KetchButtonSize
+import com.linroid.ketch.app.components.KetchButtonVariant
+import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchTextField
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.icons.KetchIcon
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
 import com.linroid.ketch.app.theme.KetchTheme
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import com.linroid.ketch.torrent.api.TorrentTrackerState
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_add
 import ketch.app.shared.generated.resources.inspector_tracker_announcing
 import ketch.app.shared.generated.resources.inspector_tracker_failed
 import ketch.app.shared.generated.resources.inspector_tracker_idle
@@ -32,9 +47,17 @@ import ketch.app.shared.generated.resources.inspector_tracker_peers
 import ketch.app.shared.generated.resources.inspector_tracker_seeders
 import ketch.app.shared.generated.resources.inspector_tracker_timed_out
 import ketch.app.shared.generated.resources.inspector_tracker_working
+import ketch.app.shared.generated.resources.inspector_trackers_add
+import ketch.app.shared.generated.resources.inspector_trackers_add_hint
+import ketch.app.shared.generated.resources.inspector_trackers_add_placeholder
 import ketch.app.shared.generated.resources.inspector_trackers_empty
+import ketch.app.shared.generated.resources.inspector_trackers_failed
+import ketch.app.shared.generated.resources.inspector_trackers_invalid
+import ketch.app.shared.generated.resources.settings_torrent_remove
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 private val log = KetchLogger("Inspector")
@@ -52,6 +75,33 @@ fun TrackersTab(state: AppState, row: TaskRow, modifier: Modifier = Modifier) {
   val features = rememberFeatures(state, row)
   val controller = remember(features, row.key) { state.torrentControllerOf(row.key.deviceId) }
   var trackers by remember(row.key, controller) { mutableStateOf<List<TorrentTracker>?>(null) }
+  val editable by produceState(false, controller) {
+    value = controller != null && catchingUnlessCancelled {
+      controller.capabilities().supports(TorrentCapability.TRACKER_EDIT)
+    }.getOrDefault(false)
+  }
+  var draft by remember(row.key) { mutableStateOf("") }
+  var problem by remember(row.key) { mutableStateOf<StringResource?>(null) }
+  val scope = rememberCoroutineScope()
+  val edit: (TorrentTrackerEdit, Boolean) -> Unit = { change, fromDraft ->
+    scope.launch {
+      catchingUnlessCancelled { controller?.editTrackers(row.key.taskId, change) }
+        .onSuccess {
+          if (it != null) trackers = it
+          if (fromDraft) draft = ""
+          problem = null
+        }
+        .onFailure { e ->
+          log.w { "Trackers of taskId=${row.key.taskId} not changed: ${e.describeCauses()}" }
+          val invalid = (e as? TorrentCommandException)?.error == TorrentCommandError.INVALID_INPUT
+          problem = if (invalid) {
+            Res.string.inspector_trackers_invalid
+          } else {
+            Res.string.inspector_trackers_failed
+          }
+        }
+    }
+  }
   LaunchedEffect(row.key, controller) {
     if (controller == null) return@LaunchedEffect
     while (true) {
@@ -63,12 +113,47 @@ fun TrackersTab(state: AppState, row: TaskRow, modifier: Modifier = Modifier) {
       delay(REFRESH)
     }
   }
-  TrackersTabContent(trackers, modifier)
+  val editing = if (!editable) null else TrackerEditing(
+    draft = draft,
+    problem = problem,
+    onDraftChange = {
+      draft = it
+      problem = null
+    },
+    onAdd = { edit(TorrentTrackerEdit(add = trackerUrls(draft)), true) },
+    onRemove = { edit(TorrentTrackerEdit(remove = listOf(it.endpoint)), false) },
+  )
+  TrackersTabContent(trackers, modifier, editing)
 }
 
-/** [TrackersTab] for [trackers], `null` until the device answered. */
+/** The announce URLs typed into the tab's field: separated by spaces, commas or new lines. */
+internal fun trackerUrls(text: String): List<String> =
+  text.split(' ', ',', '\n', '\r', '\t').filter { it.isNotEmpty() }.distinct()
+
+/**
+ * What lets the tab change a torrent's trackers, on devices that can.
+ *
+ * @property draft the announce URLs typed so far
+ * @property problem why the last change did not happen, until the draft changes
+ */
+internal class TrackerEditing(
+  val draft: String,
+  val problem: StringResource?,
+  val onDraftChange: (String) -> Unit,
+  val onAdd: () -> Unit,
+  val onRemove: (TorrentTracker) -> Unit,
+)
+
+/**
+ * [TrackersTab] for [trackers], `null` until the device answered; with [editing], each tracker
+ * can be removed and new ones added below them.
+ */
 @Composable
-internal fun TrackersTabContent(trackers: List<TorrentTracker>?, modifier: Modifier = Modifier) {
+internal fun TrackersTabContent(
+  trackers: List<TorrentTracker>?,
+  modifier: Modifier = Modifier,
+  editing: TrackerEditing? = null,
+) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
   val type = KetchTheme.typography
@@ -87,13 +172,25 @@ internal fun TrackersTabContent(trackers: List<TorrentTracker>?, modifier: Modif
     for (tracker in trackers) {
       val view = trackerView(tracker)
       Column(verticalArrangement = Arrangement.spacedBy(spacing.s0_5)) {
-        Text(
-          text = tracker.endpoint,
-          style = type.monoS,
-          color = colors.textPrimary,
-          maxLines = 1,
-          overflow = TextOverflow.MiddleEllipsis,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+            text = tracker.endpoint,
+            modifier = Modifier.weight(1f),
+            style = type.monoS,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.MiddleEllipsis,
+          )
+          if (editing != null) {
+            KetchIconButton(
+              icon = KetchIcon.Close,
+              onClick = { editing.onRemove(tracker) },
+              size = KetchButtonSize.Small,
+              contentDescription =
+                stringResource(Res.string.settings_torrent_remove, tracker.endpoint),
+            )
+          }
+        }
         Text(
           text = view.summary.map { it.resolve() }.joinToString(" · "),
           style = type.caption,
@@ -107,6 +204,34 @@ internal fun TrackersTabContent(trackers: List<TorrentTracker>?, modifier: Modif
           Text(text = view.message, style = type.caption, color = colors.textTertiary)
         }
       }
+    }
+    if (editing != null) {
+      Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(spacing.s2),
+      ) {
+        KetchTextField(
+          value = editing.draft,
+          onValueChange = editing.onDraftChange,
+          modifier = Modifier.weight(1f),
+          placeholder = stringResource(Res.string.inspector_trackers_add_placeholder),
+          mono = true,
+          label = stringResource(Res.string.inspector_trackers_add),
+          error = editing.problem?.let { stringResource(it) },
+          maxLines = 4,
+        )
+        KetchButton(
+          text = stringResource(Res.string.action_add),
+          onClick = editing.onAdd,
+          variant = KetchButtonVariant.Secondary,
+          enabled = editing.draft.isNotBlank(),
+        )
+      }
+      Text(
+        text = stringResource(Res.string.inspector_trackers_add_hint),
+        style = type.caption,
+        color = colors.textTertiary,
+      )
     }
   }
 }

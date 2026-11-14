@@ -181,6 +181,7 @@ These exist on servers listing `torrent.control`:
 | `GET /api/torrents/{id}/priority`, `PUT` | The files it downloads before its others, as `{"fileIds": [...]}`; `PUT` sets them, an empty list for the usual order (`file-priority` capability) |
 | `POST /api/torrents/{id}/recheck` | Check its files against the torrent's hashes again and download what is missing; answers its snapshot (`recheck` capability) |
 | `GET /api/torrents/{id}/trackers` | Its own trackers in tier order: endpoint (never the path), state (`idle`, `announcing`, `working`, `failed`, `timed-out`), peers named, seeders, leechers and what the tracker said (`trackers` capability) |
+| `PUT /api/torrents/{id}/trackers` | Adds and removes its own trackers: `{"add": [announce URLs], "remove": [endpoints]}`, answering the new list; `invalid_input` for a URL that is not `http`, `https` or `udp` (`tracker-edit` capability) |
 | `GET /api/torrents/{id}/export?metainfo=true` | Its info hashes and magnet link (none for a private torrent), with its `.torrent` file as Base64 when `metainfo` is true (`export` capability) |
 | `GET /api/torrents/{id}/events` | Deprecated: SSE `snapshot` events of it; the event stream carries them |
 

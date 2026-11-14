@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
+import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.task.TaskControl
 import com.linroid.ketch.core.task.TaskRecord
@@ -17,6 +18,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandContext
 import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
@@ -67,6 +69,9 @@ class TorrentSeedingControlTest {
     /** Tracker announces sent through [http]. */
     val announces = AtomicInt(0)
 
+    /** Announces sent to [EXTRA_TRACKER], a tracker no torrent of the tests names. */
+    val extraAnnounces = AtomicInt(0)
+
     /** The seeder's engine, counting announces. */
     val http: HttpEngine = object : HttpEngine by seeder.http {
       override suspend fun download(
@@ -76,6 +81,7 @@ class TorrentSeedingControlTest {
         onData: suspend (ByteArray) -> Unit,
       ) {
         if (url.startsWith(GatedSeeder.ANNOUNCE)) announces.incrementAndFetch()
+        if (url.startsWith(EXTRA_TRACKER)) extraAnnounces.incrementAndFetch()
         seeder.http.download(url, range, headers, onData)
       }
     }
@@ -596,6 +602,52 @@ class TorrentSeedingControlTest {
   }
 
   @Test
+  fun editTrackers_seedingTask_announcesToTheNewTrackers_andSavesThem() = harness {
+    val store = MemoryTaskStore()
+    val source = source()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0))
+    task.awaitCompleted()
+    task.awaitSeeding(true)
+    val controller = assertNotNull(ketch.controller(TorrentController))
+    assertEquals(0, extraAnnounces.load())
+
+    // The seeder opens again and announces to the tracker it was given in place of its own.
+    val swapped = controller.editTrackers(task.taskId,
+      TorrentTrackerEdit(add = listOf(EXTRA_TRACKER), remove = listOf("http://fixture:80")))
+    assertEquals(listOf("http://extra.example:80"), swapped.map { it.endpoint })
+    awaitStage("an announce to the added tracker", task) {
+      while (extraAnnounces.load() == 0) delay(20)
+    }
+    task.awaitSeeding(true)
+
+    // A tracker added later is a tier after it, and one it has already is not added again.
+    val before = extraAnnounces.load()
+    val left = controller.editTrackers(task.taskId,
+      TorrentTrackerEdit(add = listOf(GatedSeeder.ANNOUNCE, EXTRA_TRACKER)))
+    assertEquals(listOf("http://extra.example:80", "http://fixture:80"), left.map { it.endpoint })
+    assertEquals(listOf(0, 1), left.map { it.tier })
+    awaitStage("the seeder to announce again", task) {
+      while (extraAnnounces.load() == before) delay(20)
+    }
+    task.awaitSeeding(true)
+    val saved = source.decodeState(assertNotNull(store.load(task.taskId)?.sourceState))
+    assertEquals(listOf(listOf(EXTRA_TRACKER), listOf(GatedSeeder.ANNOUNCE)), saved.trackerTiers)
+
+    // A URL Ketch cannot announce to changes nothing.
+    val refused = assertFailsWith<TorrentCommandException> {
+      controller.editTrackers(task.taskId, TorrentTrackerEdit(add = listOf("wss://w.example/a")))
+    }
+    assertEquals(TorrentCommandError.INVALID_INPUT, refused.error)
+    assertEquals(left.map { it.endpoint },
+      controller.trackers(task.taskId)?.map { it.endpoint })
+
+    source.stopSeeding(task.taskId)
+    source.assertNoLeaks()
+  }
+
+  @Test
   fun restore_disabled_neverStartsSessions() = harness {
     val store = MemoryTaskStore()
     store.save(v1Record("kept", MultiFileTorrent(listOf(40_000, 30_000)), root / "kept"))
@@ -891,5 +943,10 @@ class TorrentSeedingControlTest {
     assertNull(source.sessionOf(task.taskId))
     assertNull(store.intent(task.taskId))
     source.assertNoLeaks()
+  }
+
+  private companion object {
+    /** A tracker no torrent of these tests names. */
+    const val EXTRA_TRACKER = "http://extra.example/announce"
   }
 }

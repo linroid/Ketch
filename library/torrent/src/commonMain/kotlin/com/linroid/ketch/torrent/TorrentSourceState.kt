@@ -33,6 +33,11 @@ data class TorrentSourceState internal constructor(
   internal val sequential: Boolean = false,
   /** The files to download first; see [TorrentDownloadSource.setPriorityFiles]. */
   internal val priorityFileIds: Set<String> = emptySet(),
+  /**
+   * The trackers the task announces to in place of the torrent's own, once they were edited;
+   * see [TorrentDownloadSource.editTrackers]. `null` for the torrent's.
+   */
+  internal val trackerTiers: List<List<String>>? = null,
 ) {
   init {
     require(version in 1..3) { "Unsupported torrent resume version" }

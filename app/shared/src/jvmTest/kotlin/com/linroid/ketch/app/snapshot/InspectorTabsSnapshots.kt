@@ -29,11 +29,16 @@ import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.app.components.KetchEyebrow
 import com.linroid.ketch.app.i18n.verbatim
+import com.linroid.ketch.app.state.FileOrder
+import com.linroid.ketch.app.state.FileSelectionModel
+import com.linroid.ketch.app.state.FileSort
+import com.linroid.ketch.app.state.FileSortSurface
 import com.linroid.ketch.app.state.ListFixtures
 import com.linroid.ketch.app.state.SpeedHistory
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.TimelineEntry
 import com.linroid.ketch.app.state.TimelineKind
+import com.linroid.ketch.app.state.appliedSelection
 import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchElevationLevel
 import com.linroid.ketch.app.theme.KetchTheme
@@ -43,18 +48,14 @@ import com.linroid.ketch.app.ui.inspector.tabs.ActivityTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTabContent
-import com.linroid.ketch.app.ui.settings.BlockedAddressesGroup
+import com.linroid.ketch.app.ui.inspector.tabs.TrackerEditing
 import com.linroid.ketch.app.ui.inspector.tabs.TrackersTabContent
+import com.linroid.ketch.app.ui.settings.BlockedAddressesGroup
+import com.linroid.ketch.app.util.SegmentRate
 import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.api.TorrentTrackerState
-import com.linroid.ketch.app.state.FileOrder
-import com.linroid.ketch.app.state.FileSort
-import com.linroid.ketch.app.state.FileSortSurface
-import com.linroid.ketch.app.state.FileSelectionModel
-import com.linroid.ketch.app.state.appliedSelection
-import kotlinx.coroutines.Job
-import com.linroid.ketch.app.util.SegmentRate
-import kotlinx.datetime.TimeZone
+import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.inspector_trackers_invalid
 import kotlin.math.PI
 import kotlin.math.roundToLong
 import kotlin.math.sin
@@ -62,6 +63,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
+import kotlinx.datetime.TimeZone
 
 /**
  * The inspector's Connections, Files and Activity tabs in the docked width, its widest and on a
@@ -134,6 +137,32 @@ class InspectorTabsSnapshots {
       snapshot("inspector-trackers", size, theme) {
         Column(Modifier.padding(KetchTheme.spacing.s4)) {
           TabCard("Trackers", DockedWidth) { TrackersTabContent(trackers) }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun trackers_editable_offersRemovingAndAdding() {
+    val size = SnapshotSize(360.dp, 420.dp, KetchDensity.Compact)
+    val trackers = listOf(
+      TorrentTracker("udp://tracker.opentrackr.org:1337", 0, TorrentTrackerState.WORKING,
+        peers = 48, seeders = 1204, leechers = 87),
+      TorrentTracker("udp://open.stealth.si:80", 1, TorrentTrackerState.TIMED_OUT, failures = 1),
+    )
+    val drafts = mapOf(
+      "inspector-trackers-edit" to TrackerEditing("", null, {}, {}, {}),
+      "inspector-trackers-edit-invalid" to TrackerEditing("wss://web.example/announce",
+        Res.string.inspector_trackers_invalid, {}, {}, {}),
+    )
+    for ((name, editing) in drafts) {
+      for (theme in SnapshotTheme.entries) {
+        snapshot(name, size, theme) {
+          Column(Modifier.padding(KetchTheme.spacing.s4)) {
+            TabCard("Trackers", DockedWidth) {
+              TrackersTabContent(trackers, editing = editing)
+            }
+          }
         }
       }
     }

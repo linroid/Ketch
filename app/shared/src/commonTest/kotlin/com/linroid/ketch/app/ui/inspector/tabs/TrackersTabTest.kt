@@ -43,4 +43,13 @@ class TrackersTabTest {
     assertEquals(TrackerTone.Neutral, view.tone)
     assertNull(view.message)
   }
+
+  @Test
+  fun `typed trackers are split on spaces commas and new lines and listed once`() {
+    assertEquals(
+      listOf("udp://a.example:6969", "https://b.example/announce"),
+      trackerUrls("  udp://a.example:6969\nhttps://b.example/announce, udp://a.example:6969\r\n"),
+    )
+    assertEquals(emptyList(), trackerUrls(" \n "))
+  }
 }
