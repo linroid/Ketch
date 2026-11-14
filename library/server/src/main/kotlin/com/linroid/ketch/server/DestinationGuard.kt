@@ -164,6 +164,19 @@ internal class DestinationGuard(
   }
 
   /**
+   * Checks that a download's files may be moved into [directory], as a download may be saved
+   * there.
+   *
+   * @throws PathRejectedException if the folder lies outside the folders
+   */
+  suspend fun checkMove(directory: String) {
+    val status = ketch.status()
+    if (passesAsUri(directory) || !policy(status.system.downloadDirectory).contains(directory)) {
+      throw PathRejectedException(directory)
+    }
+  }
+
+  /**
    * Checks that removing [task] with its files deletes nothing outside the folders.
    *
    * @throws PathRejectedException if its files lie outside the folders

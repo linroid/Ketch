@@ -3,11 +3,13 @@ package com.linroid.ketch.server
 import com.linroid.ketch.api.ControlKey
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.torrent.TorrentRelocateRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
-import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
+import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapabilities
 import com.linroid.ketch.torrent.api.TorrentCommandContext
@@ -28,6 +30,7 @@ import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import io.ktor.client.request.get
@@ -163,6 +166,25 @@ class TorrentRoutesTest {
 
     override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
       first = fileIds
+    }
+
+    val moves = mutableListOf<Pair<String, String>>()
+
+    override suspend fun relocate(taskId: String, directory: String) {
+      moves += taskId to directory
+    }
+
+    val edits = mutableListOf<TorrentTrackerEdit>()
+
+    override suspend fun editTrackers(
+      taskId: String,
+      edit: TorrentTrackerEdit,
+    ): List<TorrentTracker> {
+      if (edit.add.any { it.startsWith("wss:") }) {
+        throw TorrentCommandException(TorrentCommandError.INVALID_INPUT, "Invalid trackers")
+      }
+      edits += edit
+      return edit.add.mapIndexed { index, _ -> TorrentTracker("udp://added.example:1", index) }
     }
 
     val rechecked = mutableListOf<String>()
@@ -431,6 +453,52 @@ class TorrentRoutesTest {
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(setOf("2", "5"), controller.first)
     assertEquals("""{"fileIds":["2","5"]}""", client.get("/api/torrents/t1/priority").bodyAsText())
+  }
+
+  @Test
+  fun location_movesInsideTheDownloadFolder_andRefusesOtherFolders() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+    val status = json.decodeFromString<KetchStatus>(client.get("/api/status").bodyAsText())
+    val inside = status.system.downloadDirectory.trimEnd('/', '\\') + "/moved"
+
+    val moved = client.put("/api/torrents/t1/location") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(TorrentRelocateRequest(inside)))
+    }
+    // Without a token, callers stay inside the download folder.
+    val outside = client.put("/api/torrents/t1/location") {
+      contentType(ContentType.Application.Json)
+      setBody(json.encodeToString(TorrentRelocateRequest("/somewhere/else/entirely")))
+    }
+
+    assertEquals(HttpStatusCode.OK, moved.status)
+    assertEquals("t1", json.decodeFromString<TorrentSnapshot>(moved.bodyAsText()).taskId)
+    assertEquals(HttpStatusCode.Forbidden, outside.status)
+    assertEquals(listOf("t1" to inside), controller.moves)
+  }
+
+  @Test
+  fun trackerEdit_reachesTheController_andNeverEchoesARefusedUrl() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val edited = client.put("/api/torrents/t1/trackers") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"add":["udp://t.example:6969/announce"],"remove":["udp://old.example:1"]}""")
+    }
+    val refused = client.put("/api/torrents/t1/trackers") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"add":["wss://t.example/announce?passkey=secret"]}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, edited.status)
+    assertEquals(listOf(TorrentTracker("udp://added.example:1", 0)),
+      json.decodeFromString<List<TorrentTracker>>(edited.bodyAsText()))
+    assertEquals(listOf(TorrentTrackerEdit(listOf("udp://t.example:6969/announce"),
+      listOf("udp://old.example:1"))), controller.edits)
+    assertEquals(HttpStatusCode.BadRequest, refused.status)
+    assertFalse("secret" in refused.bodyAsText())
   }
 
   @Test

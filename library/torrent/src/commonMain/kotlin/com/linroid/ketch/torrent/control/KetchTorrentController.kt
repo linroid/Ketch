@@ -44,6 +44,7 @@ import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import com.linroid.ketch.torrent.net.TorrentIpFilter
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -60,6 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -254,6 +256,49 @@ internal class KetchTorrentController(
       // Checked as it starts.
       else -> log.d { "taskId=$taskId is checked when it starts" }
     }
+    controlChanged()
+  }
+
+  override suspend fun relocate(taskId: String, directory: String) {
+    val task = torrentTask(taskId) ?: throw notFound()
+    requireCapability(TorrentCapability.RELOCATE, TorrentCommandError.UNSUPPORTED)
+    val state = task.state.value
+    if (state is DownloadState.Canceled) {
+      throw TorrentCommandException(
+        TorrentCommandError.INVALID_STATE,
+        "A canceled download has no files to move",
+      )
+    }
+    val running = state is DownloadState.Downloading || state is DownloadState.Queued
+    val completed = state is DownloadState.Completed
+    // Read before the seeder stops: a task its user stopped seeding stays stopped.
+    val meantToSeed = completed && seedingOf(task, recordOf(task).control ?: TaskControl())
+    var moved = false
+    try {
+      mapErrors {
+        if (running) task.pause()
+        if (completed) source.stopSeeding(taskId)
+        host.relocate(task, directory) { from, to, saved ->
+          source.relocate(taskId, from, to, saved)
+        }
+        moved = true
+      }
+    } finally {
+      withContext(NonCancellable) {
+        // Checked where they are now; a move that failed left them as they were.
+        if (moved) source.prepareRecheck(taskId, seedAfter = !completed || meantToSeed)
+        when {
+          running -> runCatching { task.resume() }.onFailure { e ->
+            log.w { "taskId=$taskId did not start again after its move: ${e.describeCauses()}" }
+          }
+          completed && moved -> if (!host.reopen(task)) {
+            log.w { "taskId=$taskId changed while it moved; it is checked when it next starts" }
+          }
+          completed && meantToSeed -> seed(task)
+        }
+      }
+    }
+    log.i { "Moved taskId=$taskId" }
     controlChanged()
   }
 

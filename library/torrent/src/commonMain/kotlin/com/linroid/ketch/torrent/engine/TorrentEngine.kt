@@ -135,4 +135,6 @@ internal data class TorrentTaskSpec(
   val seedOnly: Boolean = false,
   /** Reports the session's peers among the task's live connections. */
   val connections: ConnectionReporter = ConnectionReporter.None,
+  /** Takes the files already at the task's paths as its own; see [TorrentPieceStore]. */
+  val adoptExisting: Boolean = false,
 )

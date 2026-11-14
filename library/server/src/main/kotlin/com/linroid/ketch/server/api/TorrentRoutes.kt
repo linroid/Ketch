@@ -4,6 +4,7 @@ import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentPriorityRequest
+import com.linroid.ketch.endpoints.torrent.TorrentRelocateRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
@@ -16,6 +17,7 @@ import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentTrackerEdit
+import com.linroid.ketch.server.DestinationGuard
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -45,7 +47,11 @@ private const val MAX_CURSOR_LENGTH = 4096
  * The deprecated per-torrent event stream follows [TorrentInterest] on [ketch]; clients of the
  * event stream follow it there.
  */
-internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController) {
+internal fun Route.torrentRoutes(
+  ketch: KetchApi,
+  controller: TorrentController,
+  destinations: DestinationGuard,
+) {
   get<Torrents.Capabilities> {
     call.respond(controller.capabilities())
   }
@@ -149,6 +155,15 @@ internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController)
     val taskId = resource.parent.id
     log.d { "POST /api/torrents/$taskId/recheck" }
     controller.recheck(taskId)
+    call.respond(controller.snapshot(taskId) ?: throw notFound(taskId))
+  }
+
+  put<Torrents.ById.Location> { resource ->
+    val taskId = resource.parent.id
+    val body = call.receiveJson<TorrentRelocateRequest>()
+    log.d { "PUT /api/torrents/$taskId/location" }
+    destinations.checkMove(body.directory)
+    controller.relocate(taskId, body.directory)
     call.respond(controller.snapshot(taskId) ?: throw notFound(taskId))
   }
 

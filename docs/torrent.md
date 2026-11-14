@@ -547,6 +547,23 @@ trackers, and a magnet link's trackers can be edited only once its metadata is f
 `{"add": ["udp://tracker.example:6969/announce"], "remove": ["udp://old.example:1337"]}`, which
 answers the new list; SDK: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(...))`.
 
+### Moving a torrent's files
+
+A torrent's files can be moved to another folder without adding it again:
+`PUT /api/torrents/{id}/location` with `{"directory": "/absolute/folder"}`, on devices listing
+the `relocate` capability (SDK: `TorrentController.relocate(taskId, directory)`); the apps have
+no button for it yet. The files keep their name inside the new folder. A downloading torrent
+stops for the move and goes on after it; a finished one is checked at its new place and seeds
+again if it was seeding; a paused one is checked when it next starts. On the same volume the move
+is a rename; between volumes the files are copied and the originals deleted once the copy is
+complete, which takes as long as copying them does, and a copy that fails is removed again,
+leaving the files where they were. The move is refused for a folder that is not an absolute
+path, the folder the torrent is in already, a folder inside its own files, and a folder that
+already has something of the torrent's name. A server lets callers move files only into folders
+they may save to (see [the daemon's folders](developers.md)). After a move the torrent's upload
+and download totals start again, and the parts of skipped files it had kept are downloaded
+again if you choose those files later.
+
 ### How download settings apply to torrents
 
 Torrent tasks follow the same download settings as HTTP and FTP tasks, with these differences:

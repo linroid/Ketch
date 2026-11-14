@@ -145,6 +145,23 @@ interface TorrentController {
   )
 
   /**
+   * Moves the task's files into the folder [directory], an absolute path on the device that
+   * runs it, where they keep their name, and checks them there: a downloading task stops for
+   * the move and goes on after it, a completed one is checked and seeds again if it was meant
+   * to, and others are checked when they next start. Between volumes the files are copied, which
+   * takes as long as copying them does. Fails with [TorrentCommandError.NOT_FOUND] for unknown
+   * and non-torrent tasks, [TorrentCommandError.INVALID_STATE] for a task that was canceled or
+   * has saved nothing yet, [TorrentCommandError.INVALID_INPUT] for a folder that is not an
+   * absolute path, is where the files are, lies inside them or holds something of their name,
+   * and [TorrentCommandError.STORAGE_FAILURE] when the files cannot be moved, which leaves them
+   * where they were. Advertised as [TorrentCapability.RELOCATE].
+   */
+  suspend fun relocate(taskId: String, directory: String): Unit = throw TorrentCommandException(
+    error = TorrentCommandError.UNSUPPORTED,
+    message = "Moving files is unavailable",
+  )
+
+  /**
    * The task's own trackers in tier order and how each answers, or `null` for unknown and
    * non-torrent tasks: live while the torrent runs or seeds, and [TorrentTrackerState.IDLE]
    * otherwise. The trackers the backend adds to public torrents are not listed. Fails with

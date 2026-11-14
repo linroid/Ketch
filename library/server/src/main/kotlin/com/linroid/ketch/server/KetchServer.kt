@@ -606,7 +606,7 @@ private fun Route.apiRoutes(
 ) {
   serverRoutes(ketch, destinations, onConfigChanged)
   downloadRoutes(ketch, destinations)
-  ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it) }
+  ketch.controller(TorrentController)?.let { torrentRoutes(ketch, it, destinations) }
   ketch.controller(CountryDatabase)?.let { countryRoutes(it) }
   ketch.controller(SpeedModes)?.let { speedRoutes(it) }
   connectionRoutes(ketch, connectionStreams)
