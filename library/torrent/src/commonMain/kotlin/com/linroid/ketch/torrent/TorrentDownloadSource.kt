@@ -1786,8 +1786,7 @@ class TorrentDownloadSource(
         // An adopted session applies the current selection first, whatever it ran with.
         keepSeeding = track(context, running, table, state.selectedFileIds, initialRevision,
           adopted = adopted != null)
-        // The check a recheck asked for is done; a task not meant to seed stops here.
-        rechecks.update { it - taskId }
+        // A rechecked task that was not meant to seed stops here.
         if (taskId in checkOnly.value) {
           checkOnly.update { it - taskId }
           keepSeeding = false
@@ -1799,6 +1798,9 @@ class TorrentDownloadSource(
         keepSeeding = false
         throw e
       } finally {
+        // The run a recheck asked for opened its files, however it ends: a later run of the
+        // task takes no files it does not own.
+        rechecks.update { it - taskId }
         val owned = session
         withContext(NonCancellable) {
           try {
