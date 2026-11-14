@@ -6,10 +6,12 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import android.webkit.MimeTypeMap
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.AndroidContext
 import okio.Path.Companion.toPath
+import java.util.Locale
 
 /** Held while a folder is looked up and created, so two downloads never both create it. */
 private val folderLock = Any()
@@ -24,7 +26,7 @@ internal actual fun resolveChildPath(
     val docUri = DocumentsContract.createDocument(
       AndroidContext.get().contentResolver,
       parentDocument(uri),
-      "application/octet-stream",
+      mimeTypeFor(fileName),
       fileName,
     ) ?: throw IllegalStateException(
       "Failed to create document '$fileName' in $directory"
@@ -66,7 +68,7 @@ internal actual fun createPartialDocument(directory: String, fileName: String): 
   val document = DocumentsContract.createDocument(
     resolver,
     parentDocument(Uri.parse(directory)),
-    "application/octet-stream",
+    mimeTypeFor(fileName),
     fileName,
   ) ?: throw IllegalStateException("Failed to create document '$fileName' in $directory")
   val finalName = displayName(resolver, document)
@@ -111,6 +113,14 @@ internal actual fun finishPartialDocument(partial: String): String? {
 }
 
 private val log = KetchLogger("FileAccessor")
+
+/**
+ * The type to create a document named [fileName] with ([documentMimeType]), looked up as the
+ * platform's providers do: the extension in lower case by the default locale's rules.
+ */
+private fun mimeTypeFor(fileName: String): String = documentMimeType(fileName) { extension ->
+  MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase(Locale.getDefault()))
+}
 
 private fun flags(resolver: ContentResolver, document: Uri): Int =
   resolver.query(document, arrayOf(Document.COLUMN_FLAGS), null, null, null)?.use { cursor ->

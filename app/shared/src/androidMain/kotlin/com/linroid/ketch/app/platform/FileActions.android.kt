@@ -107,7 +107,8 @@ private class DownloadFile(val uri: Uri, val name: String, val mimeType: String?
         } catch (e: Exception) {
           throw FileActionException("${fileName(path)} was moved or deleted", e)
         } ?: throw FileActionException("${fileName(path)} was moved or deleted")
-        // Ketch creates documents as application/octet-stream, so the name says more.
+        // Older versions created every document as application/octet-stream, and providers
+        // may report a type of their own, so the name says more.
         val type = mimeTypeOf(name) ?: context.contentResolver.getType(uri)
         return DownloadFile(uri, name, type)
       }
