@@ -37,7 +37,9 @@ import com.linroid.ketch.torrent.control.SeedingTask
 import com.linroid.ketch.torrent.control.TorrentControlSource
 import com.linroid.ketch.torrent.control.TorrentControls
 import com.linroid.ketch.torrent.control.exportOf
+import com.linroid.ketch.torrent.control.editedTrackerTiers
 import com.linroid.ketch.torrent.control.idleTrackers
+import com.linroid.ketch.torrent.control.torrentTrackerTiers
 import com.linroid.ketch.torrent.control.trackerViews
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.IncompleteSeedException
@@ -287,6 +289,18 @@ class TorrentDownloadSource(
 
     override fun withSequential(state: SourceState, sequential: Boolean) =
       source.withSequential(state, sequential)
+
+    override suspend fun editTrackers(
+      taskId: String,
+      url: String,
+      sourceState: SourceState?,
+      resolved: ResolvedSource?,
+      add: List<String>,
+      remove: List<String>,
+    ) = source.editTrackers(taskId, url, sourceState, resolved, add, remove)
+
+    override fun withTrackers(state: SourceState, tiers: List<List<String>>) =
+      source.withTrackers(state, tiers)
     override val restoresSeeding: Boolean get() = source.restoresSeeding
     override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
 
@@ -365,6 +379,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.IMPORT.wireName)
       add(TorrentCapability.FILE_PRIORITY.wireName)
       add(TorrentCapability.IP_FILTER.wireName)
+      add(TorrentCapability.TRACKER_EDIT.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -408,10 +423,20 @@ class TorrentDownloadSource(
    */
   internal suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
     priorityChoices.update { it + (taskId to fileIds) }
-    stateMutex.withLock {
-      states[taskId]?.let { states[taskId] = it.copy(priorityFileIds = fileIds) }
-    }
+    changeHeldState(taskId) { it.copy(priorityFileIds = fileIds) }
     tasks.session(taskId)?.setPriorityFiles(fileIds)
+  }
+
+  /**
+   * Applies [change] to the state a run of [taskId] saves from, and to the one its seeding
+   * session saves from, so neither saves over a setting changed meanwhile.
+   */
+  private suspend fun changeHeldState(
+    taskId: String,
+    change: (TorrentSourceState) -> TorrentSourceState,
+  ) {
+    stateMutex.withLock { states[taskId]?.let { states[taskId] = change(it) } }
+    seedStates.update { seeds -> seeds[taskId]?.let { seeds + (taskId to change(it)) } ?: seeds }
   }
 
   /** The saved [state] as [change] makes it, or as it is when it cannot be read. */
@@ -428,6 +453,59 @@ class TorrentDownloadSource(
   internal fun withSequential(state: SourceState, sequential: Boolean): SourceState =
     changed(state) { it.copy(sequential = sequential) }
 
+  /** What [TorrentControlSource.withTrackers] answers. */
+  internal fun withTrackers(state: SourceState, tiers: List<List<String>>): SourceState =
+    changed(state) { it.copy(trackerTiers = tiers) }
+
+  /** The trackers tasks were last given by [editTrackers], in this process. */
+  private val trackerChoices = MutableStateFlow<Map<String, List<List<String>>>>(emptyMap())
+
+  /**
+   * The trackers [taskId] announces to in place of its torrent's: what it was last given, else
+   * what its run or its saved [state] says; `null` for the torrent's own.
+   */
+  private suspend fun editedTrackers(
+    taskId: String,
+    state: TorrentSourceState?,
+  ): List<List<String>>? = trackerChoices.value[taskId]
+    ?: stateMutex.withLock { states[taskId]?.trackerTiers } ?: state?.trackerTiers
+
+  /** What [taskId] announces to: its [editedTrackers], else the torrent's; `null` if unknown. */
+  private suspend fun trackerTiers(
+    taskId: String,
+    url: String,
+    state: TorrentSourceState?,
+    resolved: ResolvedSource?,
+  ): List<List<String>>? = editedTrackers(taskId, state)
+    ?: withContext(TorrentDispatchers.engine) {
+      torrentTrackerTiers(url, metainfoBytes(state, resolved), config.maxMetadataBytes)
+    }
+
+  /**
+   * What [TorrentControlSource.editTrackers] does: the sessions of [taskId] that open from now
+   * on announce to the edited trackers, which its run saves with its state.
+   */
+  internal suspend fun editTrackers(
+    taskId: String,
+    url: String,
+    sourceState: SourceState?,
+    resolved: ResolvedSource?,
+    add: List<String>,
+    remove: List<String>,
+  ): List<List<String>>? = trackerEdits.withLock {
+    val state = sourceState?.let { runCatching { decodeState(it) }.getOrNull() }
+    val current = trackerTiers(taskId, url, state, resolved) ?: return@withLock null
+    val edited = editedTrackerTiers(current, add, remove)
+    trackerChoices.update { it + (taskId to edited) }
+    changeHeldState(taskId) { it.copy(trackerTiers = edited) }
+    val count = edited.sumOf { it.size }
+    log.i { "Trackers of taskId=$taskId edited: $count in ${edited.size} tiers" }
+    edited
+  }
+
+  /** One [editTrackers] at a time, so none builds on trackers another is replacing. */
+  private val trackerEdits = Mutex()
+
   /** What tasks were last told by [setSequential], in this process. */
   private val sequentialChoices = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
@@ -443,9 +521,7 @@ class TorrentDownloadSource(
   /** Downloads [taskId]'s pieces in order or not, at once if it runs and whenever it next does. */
   internal suspend fun setSequential(taskId: String, sequential: Boolean) {
     sequentialChoices.update { it + (taskId to sequential) }
-    stateMutex.withLock {
-      states[taskId]?.let { states[taskId] = it.copy(sequential = sequential) }
-    }
+    changeHeldState(taskId) { it.copy(sequential = sequential) }
     tasks.session(taskId)?.setSequential(sequential)
   }
 
@@ -1089,10 +1165,8 @@ class TorrentDownloadSource(
   ): List<TorrentTracker>? {
     val live = tasks.session(taskId)?.trackers().orEmpty()
     if (live.isNotEmpty()) return trackerViews(live)
-    val bytes = metainfoBytes(sourceState?.let { decodeState(it) }, resolved)
-    return withContext(TorrentDispatchers.engine) {
-      idleTrackers(url, bytes, config.maxMetadataBytes)
-    }
+    val state = sourceState?.let { decodeState(it) }
+    return trackerTiers(taskId, url, state, resolved)?.let(::idleTrackers)
   }
 
   /**
@@ -1384,6 +1458,7 @@ class TorrentDownloadSource(
     }
     val selected = selectionOf(table, selection, state)
     val magnet = task.url.takeIf { it.startsWith("magnet:", true) }
+    val trackers = editedTrackers(task.taskId, state)
     val resumeData = state.resumeData.takeIf { it.isNotEmpty() }
     if (table.v2) {
       require(state.version == 3) { "Invalid v2 resume state" }
@@ -1394,7 +1469,7 @@ class TorrentDownloadSource(
       return SeedPlan(hash, state) {
         (getEngine() as KotlinTorrentEngine).addV2Task(TorrentV2TaskSpec(task.taskId, document,
           output, selected, checkpointEncoded = resumeData,
-          trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
+          trackerTiers = trackers ?: sourceTrackerTiers(bytes, config.maxMetadataBytes),
           magnetUri = magnet, privacy = privacy, recoverCreations = true,
           legacySelections = listOfNotNull(state.selectedFileIds.takeIf { it.isNotEmpty() }),
           seedOnly = true, connections = task.connections))
@@ -1402,6 +1477,7 @@ class TorrentDownloadSource(
     }
     require(state.version != 3) { "Cannot downgrade a v2 task" }
     val metadata = TorrentMetadata.fromBencode(bytes, config.maxMetadataBytes)
+      .announcingTo(trackers)
     val hash = metadata.infoHash.hex
     require(hash == state.infoHash) { "Saved torrent changed" }
     return SeedPlan(hash, state) {
@@ -1724,18 +1800,19 @@ class TorrentDownloadSource(
     require(!output.contains("://")) { "Torrent output requires a filesystem path" }
     val total = table.totalOf(selected)
     val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
+    val trackers = editedTrackers(context.taskId, previous)
     // The metainfo is Ketch's to keep; only states older builds saved carry it.
     val state = TorrentSourceState(hash, total, previous?.resumeData ?: "", selected, output,
       previous?.metainfo.orEmpty(), version = 2, privacy = privacy,
       sequential = previous?.sequential == true,
-      priorityFileIds = previous?.priorityFileIds.orEmpty())
+      priorityFileIds = previous?.priorityFileIds.orEmpty(), trackerTiers = trackers)
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
         "resume=${previous != null}"
     }
     runSession(context, hash, table, state, initial.revision) {
-      getEngine().addTask(TorrentTaskSpec(context.taskId, metadata, output,
+      getEngine().addTask(TorrentTaskSpec(context.taskId, metadata.announcingTo(trackers), output,
         selected.mapTo(LinkedHashSet()) { it.toInt() },
         context.url.takeIf { it.startsWith("magnet:", true) },
         previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle,
@@ -1760,12 +1837,13 @@ class TorrentDownloadSource(
       ?: error("Torrent output path has not been resolved")
     require("://" !in output) { "Torrent output requires a filesystem path" }
     val privacy = previous?.privacy ?: resolvedPrivacy(resolved)
+    val trackers = editedTrackers(context.taskId, previous)
     val hash = document.info.hash.hex
     val total = table.totalOf(selected)
     val state = TorrentSourceState(hash, total, previous?.resumeData.orEmpty(), selected, output,
       previous?.metainfo.orEmpty(), version = 3, privacy = privacy,
       sequential = previous?.sequential == true,
-      priorityFileIds = previous?.priorityFileIds.orEmpty())
+      priorityFileIds = previous?.priorityFileIds.orEmpty(), trackerTiers = trackers)
     log.i {
       "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1775,7 +1853,7 @@ class TorrentDownloadSource(
       (getEngine() as KotlinTorrentEngine).addV2Task(TorrentV2TaskSpec(context.taskId, document,
         output, selected,
         checkpointEncoded = previous?.resumeData?.takeIf { it.isNotEmpty() },
-        trackerTiers = sourceTrackerTiers(bytes, config.maxMetadataBytes),
+        trackerTiers = trackers ?: sourceTrackerTiers(bytes, config.maxMetadataBytes),
         magnetUri = context.url.takeIf { it.startsWith("magnet:", true) },
         privacy = privacy, throttle = context.throttle, recoverCreations = true,
         // The creation log may still be bound to the selection the task last ran with.
@@ -1845,7 +1923,8 @@ class TorrentDownloadSource(
       try {
         val sequential = sequentialChoices.value[taskId] ?: state.sequential
         val first = priorityChoices.value[taskId] ?: state.priorityFileIds
-        rememberState(taskId, state.copy(sequential = sequential, priorityFileIds = first))
+        rememberState(taskId, state.copy(sequential = sequential, priorityFileIds = first,
+          trackerTiers = trackerChoices.value[taskId] ?: state.trackerTiers))
         val running = adopted ?: open().also { created ->
           session = created
           tasks.attach(taskId, created)

@@ -15,6 +15,7 @@ import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
@@ -155,6 +156,18 @@ internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController)
     val taskId = resource.parent.id
     log.d { "GET /api/torrents/$taskId/trackers" }
     call.respond(controller.trackers(taskId) ?: throw notFound(taskId))
+  }
+
+  put<Torrents.ById.Trackers> { resource ->
+    val taskId = resource.parent.id
+    // Never echoed or logged: announce URLs may carry passkeys.
+    val body = try {
+      call.receiveJson<TorrentTrackerEdit>()
+    } catch (_: IllegalArgumentException) {
+      throw invalidInput("Invalid tracker edit")
+    }
+    log.d { "PUT /api/torrents/$taskId/trackers add=${body.add.size} remove=${body.remove.size}" }
+    call.respond(controller.editTrackers(taskId, body))
   }
 
   sse("/api/torrents/{id}/events") {

@@ -536,6 +536,16 @@ of its swarms and lists each once, with the answer that says most. The trackers 
 the settings above are not listed. REST: `GET /api/torrents/{id}/trackers`, on devices listing the
 `trackers` capability.
 
+On devices listing the `tracker-edit` capability the tab also changes them: the × beside a
+tracker removes it, and **Add trackers** takes `http`, `https` or `udp` announce URLs, separated
+by spaces or new lines, each added after the torrent's own as a tier of its own, so it is asked
+when those before it fail. A torrent that is downloading or seeding starts again to use the new
+list; the change stays with the task, also after a restart, while a `.torrent` file or magnet
+link exported from it still names the trackers it was added with. A torrent may have at most 128
+trackers. REST: `PUT /api/torrents/{id}/trackers` with
+`{"add": ["udp://tracker.example:6969/announce"], "remove": ["udp://old.example:1337"]}`, which
+answers the new list; SDK: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(...))`.
+
 ### How download settings apply to torrents
 
 Torrent tasks follow the same download settings as HTTP and FTP tasks, with these differences:
@@ -775,7 +785,8 @@ which describe the backend, not its current settings, and `seeding` while the co
 `SEED_AFTER_COMPLETION`, also while uploads are paused), `snapshot(taskId)`, sorted file
 pages (`files`), `select` and `setSeeding` commands guarded by a revision and an idempotency
 key, `trackers(taskId)` (`TorrentTracker`: each own tracker's endpoint, tier, state, peers,
-swarm counts and message; the `trackers` capability), `export(taskId, metainfo)` (`TorrentExport`: the info hashes, the magnet link and, when
+swarm counts and message; the `trackers` capability), `editTrackers(taskId, edit)` (adds and
+removes a task's own trackers; the `tracker-edit` capability), `export(taskId, metainfo)` (`TorrentExport`: the info hashes, the magnet link and, when
 asked for, the `.torrent` file; the `export` capability), and `settings()` and
 `updateSettings(change)` (`TorrentEngineSettings`, `TorrentSettingsChange`; the `settings`
 capability). In process, `updateSettings` runs

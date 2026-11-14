@@ -1362,6 +1362,19 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   metainfo's usable trackers, else a magnet's. Trackers Ketch adds to public torrents are never
   listed. The inspector's Trackers tab (`TrackersTab`, `trackerView`), offered for torrents on
   devices with the capability, asks again every 3 s while it shows
+- Editing trackers: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(add, remove))`
+  (REST `PUT /api/torrents/{id}/trackers`, answering the list; capability `tracker-edit`) removes
+  the trackers at the endpoints `remove` names and appends each announce URL of `add` as a tier
+  of its own (`editedTrackerTiers`, checked by `TrackerConfiguration.prepare`, at most
+  `MAX_TRACKERS`; a refusal is `INVALID_INPUT` and never repeats a URL). The result is the
+  task's `TorrentSourceState.trackerTiers`, which replaces the torrent's own trackers whenever a
+  session of it opens (v1 through `TorrentMetadata.announcingTo`, v2 and hybrid as the spec's
+  `trackerTiers`), written into the saved state (`SourceHost.changeSourceState`,
+  `withTrackers`) and into the states a run or a seeder saves from (`changeHeldState`). A
+  session announces to what it opened with, so a downloading task is paused and resumed and a
+  seeding one stopped and seeded again. A task that never ran keeps the edit for the process
+  only. Exports still describe the torrent as it was added. The Trackers tab shows a remove
+  button per tracker and an Add trackers field (`TrackerEditing`, `trackerUrls`)
 - Export: `TorrentController.export(taskId, metainfo)` (REST `GET /api/torrents/{id}/export`,
   `?metainfo=true`; capability `export`) answers a `TorrentExport`: the v1 and v2 info hashes,
   the name, the magnet link and, when asked for, the `.torrent` file as Base64

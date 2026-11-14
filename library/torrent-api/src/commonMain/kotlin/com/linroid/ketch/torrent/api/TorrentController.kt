@@ -158,6 +158,20 @@ interface TorrentController {
     )
 
   /**
+   * Changes the task's own trackers as [edit] says and answers them as [trackers] does. The
+   * change stays with the task, and a torrent that downloads or seeds starts again to announce
+   * to them. Fails with [TorrentCommandError.NOT_FOUND] for unknown and non-torrent tasks, with
+   * [TorrentCommandError.INVALID_INPUT] for a URL the backend cannot announce to or more
+   * trackers than a torrent may have, and with [TorrentCommandError.METADATA_UNAVAILABLE] while
+   * the torrent's trackers are not known yet. Advertised as [TorrentCapability.TRACKER_EDIT].
+   */
+  suspend fun editTrackers(taskId: String, edit: TorrentTrackerEdit): List<TorrentTracker> =
+    throw TorrentCommandException(
+      error = TorrentCommandError.UNSUPPORTED,
+      message = "Editing trackers is unavailable",
+    )
+
+  /**
    * Whether peers can connect to the backend's torrent engine, through how many NAT layers its
    * port is forwarded, and whether it punches through NATs; advertised as
    * [TorrentCapability.REACHABILITY].

@@ -14,6 +14,11 @@
   <string name="inspector_tracker_seeders">Раздают: %1$d</string>
   <string name="inspector_tracker_leechers">Скачивают: %1$d</string>
   <string name="inspector_trackers_empty">У этого торрента нет своих трекеров.</string>
+  <string name="inspector_trackers_add">Добавить трекеры</string>
+  <string name="inspector_trackers_add_placeholder">udp://tracker.example:6969/announce</string>
+  <string name="inspector_trackers_add_hint">Адреса анонса через пробел или с новой строки. Работающий торрент перезапустится, чтобы использовать их.</string>
+  <string name="inspector_trackers_invalid">Введите адреса анонса http, https или udp.</string>
+  <string name="inspector_trackers_failed">Не удалось изменить трекеры.</string>
 
   <string name="inspector_stalled_seconds">Простой %1$d с</string>
   <string name="inspector_stalled_minutes">Простой %1$d мин</string>

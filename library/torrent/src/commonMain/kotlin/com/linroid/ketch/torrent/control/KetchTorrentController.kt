@@ -39,6 +39,7 @@ import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import com.linroid.ketch.torrent.net.TorrentIpFilter
 import kotlin.time.Duration.Companion.seconds
@@ -275,6 +276,52 @@ internal class KetchTorrentController(
       TorrentCommandError.METADATA_UNAVAILABLE,
       "The torrent is not known yet",
     )
+  }
+
+  override suspend fun editTrackers(
+    taskId: String,
+    edit: TorrentTrackerEdit,
+  ): List<TorrentTracker> {
+    val task = torrentTask(taskId) ?: throw notFound()
+    requireCapability(TorrentCapability.TRACKER_EDIT, TorrentCommandError.UNSUPPORTED)
+    if (edit.add.size > MAX_TRACKERS || edit.remove.size > MAX_TRACKERS) {
+      throw TorrentCommandException(TorrentCommandError.INVALID_INPUT, "Too many trackers")
+    }
+    val record = recordOf(task)
+    val tiers = try {
+      source.editTrackers(
+        taskId = taskId,
+        url = record.request.url,
+        sourceState = record.sourceState,
+        resolved = record.resolvedSource ?: record.request.resolvedSource,
+        add = edit.add,
+        remove = edit.remove,
+      )
+    } catch (_: IllegalArgumentException) {
+      // Never the URL itself, which may hold a passkey.
+      throw TorrentCommandException(
+        TorrentCommandError.INVALID_INPUT,
+        "Trackers must be http, https or udp announce URLs, and no more than a torrent may have",
+      )
+    } ?: throw TorrentCommandException(
+      TorrentCommandError.METADATA_UNAVAILABLE,
+      "The torrent is not known yet",
+    )
+    // A task that is not running saves no state of its own until it next runs.
+    host.changeSourceState(task) { source.withTrackers(it, tiers) }
+    // A session announces to the trackers it opened with: one that runs opens again.
+    val state = task.state.value
+    if (state is DownloadState.Downloading && source.liveTorrent(taskId) != null) {
+      mapErrors {
+        task.pause()
+        task.resume()
+      }
+    } else if (state is DownloadState.Completed && taskId in source.seedingTaskIds.value) {
+      source.stopSeeding(taskId)
+      seed(task)
+    }
+    controlChanged()
+    return trackers(taskId) ?: throw notFound()
   }
 
   /**

@@ -14,6 +14,11 @@
   <string name="inspector_tracker_seeders">Semeando: %1$d</string>
   <string name="inspector_tracker_leechers">Baixando: %1$d</string>
   <string name="inspector_trackers_empty">Este torrent não indica nenhum tracker próprio.</string>
+  <string name="inspector_trackers_add">Adicionar trackers</string>
+  <string name="inspector_trackers_add_placeholder">udp://tracker.example:6969/announce</string>
+  <string name="inspector_trackers_add_hint">URLs de anúncio, separados por espaços ou quebras de linha. Um torrent em andamento reinicia para usá-los.</string>
+  <string name="inspector_trackers_invalid">Digite URLs de anúncio http, https ou udp.</string>
+  <string name="inspector_trackers_failed">Não foi possível alterar os trackers.</string>
 
   <string name="inspector_stalled_seconds">Parada há %1$d s</string>
   <string name="inspector_stalled_minutes">Parada há %1$d min</string>

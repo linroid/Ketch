@@ -73,6 +73,10 @@ internal fun sourceTrackerTiers(bytes: ByteArray, maxBytes: Int): List<List<Stri
   return TrackerConfiguration.usable(tiers).tiers
 }
 
+/** This torrent announcing to [tiers] in place of its own trackers; itself for `null`. */
+internal fun TorrentMetadata.announcingTo(tiers: List<List<String>>?): TorrentMetadata =
+  if (tiers == null) this else copy(trackers = tiers.flatten(), trackerTiers = tiers)
+
 /**
  * Refuses a torrent that could never find a peer: one that finds peers only through its
  * trackers, as a private torrent or one resolved [TorrentDiscoveryPrivacy.TRACKER_ONLY] does,

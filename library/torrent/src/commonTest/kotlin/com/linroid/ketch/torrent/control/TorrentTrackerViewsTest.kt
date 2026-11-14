@@ -4,10 +4,12 @@ import com.linroid.ketch.torrent.MultiFileTorrent
 import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.MAX_TRACKERS
 import com.linroid.ketch.torrent.tracker.TrackerScrape
 import com.linroid.ketch.torrent.tracker.TrackerStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 /** What a torrent's trackers list as, live and while it is not running. */
@@ -76,5 +78,45 @@ class TorrentTrackerViewsTest {
     )
     assertEquals(emptyList(), idleTrackers("magnet:?xt=urn:btih:" + "a".repeat(40), null, maxBytes))
     assertNull(idleTrackers("https://example.com/pack.torrent", null, maxBytes))
+  }
+
+  @Test
+  fun `an edit removes trackers by endpoint and adds new ones as tiers of their own`() {
+    val tiers = listOf(
+      listOf("http://a.example/announce?passkey=secret", "udp://b.example:1337"),
+      listOf("https://c.example/announce"),
+    )
+
+    val edited = editedTrackerTiers(tiers,
+      add = listOf(" udp://d.example:6969 ", "https://c.example/announce", "",
+        "udp://d.example:6969"),
+      remove = listOf("http://a.example:80", "udp://missing.example:1"))
+
+    assertEquals(
+      listOf(
+        listOf("udp://b.example:1337"),
+        listOf("https://c.example/announce"),
+        listOf("udp://d.example:6969"),
+      ),
+      edited,
+    )
+    // Removing a whole tier removes the tier.
+    assertEquals(listOf(listOf("udp://b.example:1337")),
+      editedTrackerTiers(edited, emptyList(),
+        listOf("https://c.example:443", "udp://d.example:6969")))
+    assertEquals(emptyList(), editedTrackerTiers(emptyList(), emptyList(), emptyList()))
+  }
+
+  @Test
+  fun `an edit refuses trackers Ketch cannot announce to and more than a torrent may have`() {
+    assertFailsWith<IllegalArgumentException> {
+      editedTrackerTiers(emptyList(), listOf("wss://web.example/announce"), emptyList())
+    }
+    assertFailsWith<IllegalArgumentException> {
+      editedTrackerTiers(emptyList(), listOf("not a url"), emptyList())
+    }
+    val many = (1..MAX_TRACKERS + 1).map { "udp://t$it.example:6969" }
+    assertFailsWith<IllegalArgumentException> { editedTrackerTiers(emptyList(), many, emptyList()) }
+    assertEquals(MAX_TRACKERS, editedTrackerTiers(emptyList(), many.dropLast(1), emptyList()).size)
   }
 }

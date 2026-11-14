@@ -20,6 +20,11 @@
   <string name="inspector_tracker_seeders">Seeding: %1$d</string>
   <string name="inspector_tracker_leechers">Downloading: %1$d</string>
   <string name="inspector_trackers_empty">This torrent names no trackers of its own.</string>
+  <string name="inspector_trackers_add">Add trackers</string>
+  <string name="inspector_trackers_add_placeholder">udp://tracker.example:6969/announce</string>
+  <string name="inspector_trackers_add_hint">Announce URLs, separated by spaces or new lines. A running torrent starts again to use them.</string>
+  <string name="inspector_trackers_invalid">Enter http, https or udp announce URLs.</string>
+  <string name="inspector_trackers_failed">Couldn't change the trackers.</string>
 
   <!-- How long a connection has received nothing. %1$d is a number of seconds or minutes. -->
   <string name="inspector_stalled_seconds">Stalled %1$d s</string>

@@ -26,6 +26,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerEdit
 import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentInterest
@@ -105,6 +106,24 @@ class KetchTorrentControllerTest {
 
     override fun withPriorityFiles(state: SourceState, fileIds: Set<String>) =
       state.copy(data = state.data.substringBefore(" first=") + " first=" + fileIds.sorted())
+
+    /** The tiers [editTrackers] answers, or `null` for a torrent that is not known. */
+    var tiers: List<List<String>>? = null
+
+    override suspend fun editTrackers(
+      taskId: String,
+      url: String,
+      sourceState: SourceState?,
+      resolved: ResolvedSource?,
+      add: List<String>,
+      remove: List<String>,
+    ): List<List<String>>? {
+      require(add.none { it.startsWith("wss:") })
+      return tiers?.let { it + add.map(::listOf) }.also { tiers = it }
+    }
+
+    override fun withTrackers(state: SourceState, tiers: List<List<String>>) =
+      state.copy(data = state.data.substringBefore(" tiers=") + " tiers=" + tiers.size)
 
     override fun withSequential(state: SourceState, sequential: Boolean) =
       state.copy(data = state.data.substringBefore(" ordered=") + " ordered=" + sequential)
@@ -1241,6 +1260,50 @@ class KetchTorrentControllerTest {
       assertEquals("seeded first=[]", task.saved.sourceState?.data)
       ketch.torrents.setSequential(task.taskId, true)
       assertEquals("seeded first=[] ordered=true", task.saved.sourceState?.data)
+    } finally {
+      ketch.close()
+    }
+  }
+
+  @Test
+  fun `editing trackers is saved with the task and refused when it cannot be done`() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    try {
+      val task = completedTask(ketch, source)
+      assertNotNull(source.saveState)(task.taskId, SourceState(source.type, "seeded"))
+      val edit = TorrentTrackerEdit(add = listOf("udp://t.example:6969"))
+
+      val unsupported = assertFailsWith<TorrentCommandException> {
+        ketch.torrents.editTrackers(task.taskId, edit)
+      }
+      assertEquals(TorrentCommandError.UNSUPPORTED, unsupported.error)
+      source.capabilities += TorrentCapability.TRACKER_EDIT.wireName
+      source.capabilities += TorrentCapability.TRACKERS.wireName
+
+      // A torrent whose trackers are not known has none to edit.
+      val unknown = assertFailsWith<TorrentCommandException> {
+        ketch.torrents.editTrackers(task.taskId, edit)
+      }
+      assertEquals(TorrentCommandError.METADATA_UNAVAILABLE, unknown.error)
+
+      source.tiers = emptyList()
+      source.trackers = listOf(TorrentTracker("udp://t.example:6969"))
+      assertEquals(source.trackers, ketch.torrents.editTrackers(task.taskId, edit))
+      assertEquals("seeded tiers=1", task.saved.sourceState?.data)
+
+      // The refusal never repeats the URL, which may hold a passkey.
+      val refused = assertFailsWith<TorrentCommandException> {
+        ketch.torrents.editTrackers(task.taskId,
+          TorrentTrackerEdit(add = listOf("wss://t.example/announce?passkey=secret")))
+      }
+      assertEquals(TorrentCommandError.INVALID_INPUT, refused.error)
+      assertFalse("secret" in refused.message.orEmpty())
+      assertEquals("seeded tiers=1", task.saved.sourceState?.data)
+      val missing = assertFailsWith<TorrentCommandException> {
+        ketch.torrents.editTrackers("missing", edit)
+      }
+      assertEquals(TorrentCommandError.NOT_FOUND, missing.error)
     } finally {
       ketch.close()
     }
