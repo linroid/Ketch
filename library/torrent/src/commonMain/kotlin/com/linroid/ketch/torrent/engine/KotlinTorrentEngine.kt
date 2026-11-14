@@ -51,6 +51,7 @@ import com.linroid.ketch.torrent.net.TorrentConnection
 import com.linroid.ketch.torrent.net.TorrentDatagramSocket
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.net.TorrentListener
+import com.linroid.ketch.torrent.net.TorrentIpFilter
 import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.TorrentUdpPort
 import com.linroid.ketch.torrent.net.createTorrentNetwork
@@ -274,6 +275,13 @@ internal class KotlinTorrentEngine(
   }
   private val connectionBudget = TorrentConnectionBudget(utpFallback, config.maxConnections)
   private val network = TorrentPeerEncryption(connectionBudget, config.encryption)
+  private val ipFilter = AtomicReference(TorrentIpFilter.NONE)
+
+  init {
+    ipFilter.store(ipFilterOf(config.blockedAddresses))
+    // Every dial of a peer, over TCP or uTP, for payload or metadata, goes through this network.
+    network.blocked = { host -> ipFilter.load().blocks(host) }
+  }
   // Handshakes still to name their torrent: a quarter of the budget (8 to 64), never more than
   // half, so dials always find slots, even under a budget of one.
   private val handshakes = TorrentHandshakeGate({
@@ -490,6 +498,11 @@ internal class KotlinTorrentEngine(
     var handedOff = false
     val attempt = PeerAttempt(incoming = true).apply { utp = connection.utp }
     val host = connection.remote.host
+    if (ipFilter.load().blocks(host)) {
+      log.v { "Refused incoming peer: its address is blocked" }
+      connection.close()
+      return
+    }
     if (!handshakes.enter(host)) {
       log.v { "Refused incoming peer ${connection.remote}: too many handshakes in progress" }
       connection.close()
@@ -1766,6 +1779,21 @@ internal class KotlinTorrentEngine(
   override suspend fun setEncryption(encryption: TorrentEncryption) {
     network.policy = encryption
     log.i { "Encryption: $encryption" }
+  }
+
+  override suspend fun setBlockedAddresses(addresses: List<String>) {
+    val filter = ipFilterOf(addresses)
+    ipFilter.store(filter)
+    log.i { "IP filter: ${addresses.count { it.isNotBlank() }} entries" }
+  }
+
+  /** The filter of [addresses], warning once about entries that are none. */
+  private fun ipFilterOf(addresses: List<String>): TorrentIpFilter {
+    var invalid = 0
+    val filter = TorrentIpFilter.lenient(addresses) { invalid++ }
+    // Never the entries themselves: they are what the user typed, not ours to log.
+    if (invalid > 0) log.w { "Ignored $invalid blocked address entries that are no address" }
+    return filter
   }
 
   override suspend fun setUtpEnabled(enabled: Boolean) {

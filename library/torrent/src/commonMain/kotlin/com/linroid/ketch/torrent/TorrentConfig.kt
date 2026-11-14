@@ -40,6 +40,13 @@ data class TorrentConfig(
   /** A finished torrent stops seeding after this many minutes of it; 0 for no goal. */
   val seedTimeMinutes: Int = 0,
   /**
+   * Peers never connected to and never accepted: addresses (`203.0.113.7`), CIDR blocks
+   * (`203.0.113.0/24`, `2001:db8::/32`) and ranges (`203.0.113.1-203.0.113.99`), IPv4 or IPv6.
+   * Entries that are none of these are ignored with a warning. Trackers and DHT nodes are not
+   * peers and are not filtered.
+   */
+  val blockedAddresses: List<String> = emptyList(),
+  /**
    * Whether public torrents are announced on the LAN, and peers other clients announce there
    * dialed (Local Service Discovery, BEP 14, over IPv4 and IPv6 multicast), so devices at home
    * share pieces directly. Private and tracker-only torrents never take part. Android, JVM only.

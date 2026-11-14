@@ -491,6 +491,21 @@ public magnet can also get its file list from another device at home this way.
   wants the network, and again whenever you switch the setting on; the system stops asking after
   two denials. Without it, Ketch retries every minute.
 
+### Blocking peers by address
+
+Under Settings → BitTorrent → Blocked addresses (`[torrent] blocklist`), list addresses Ketch
+should never exchange data with: single addresses (`203.0.113.7`), CIDR blocks
+(`203.0.113.0/24`, `2001:db8::/32`) and ranges (`203.0.113.1-203.0.113.99`), IPv4 or IPv6, up to
+10,000 entries. Ketch never dials a peer at one of them, for payload or for a magnet's metadata,
+over TCP or uTP, and turns away one that connects. It applies at once to new connections;
+connections already open keep running. Trackers and DHT nodes are not peers and are not
+filtered. Devices that can do this list the `ip-filter` capability.
+
+```toml
+[torrent]
+blocklist = ["203.0.113.0/24", "198.51.100.7"]
+```
+
 ### Trackers and tracker lists
 
 Extra trackers help where a network blocks a torrent's own trackers, or where a magnet has no

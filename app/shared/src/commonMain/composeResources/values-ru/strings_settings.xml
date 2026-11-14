@@ -631,6 +631,12 @@
   <string name="settings_torrent_connections_footer">Шифрование скрывает, что это за трафик, но не то, с кем вы соединяетесь.</string>
   <string name="settings_torrent_trackers">Дополнительные трекеры</string>
   <string name="settings_torrent_no_trackers">Нет дополнительных трекеров</string>
+  <string name="settings_torrent_blocked">Заблокированные адреса</string>
+  <string name="settings_torrent_blocked_footer">Ketch никогда не подключается к пирам с этих адресов и отклоняет их подключения.</string>
+  <string name="settings_torrent_blocked_add">Заблокировать адреса</string>
+  <string name="settings_torrent_blocked_add_hint">Адреса, блоки вроде 203.0.113.0/24 или диапазоны вроде 203.0.113.1-203.0.113.99.</string>
+  <string name="settings_torrent_blocked_none">Нет заблокированных адресов</string>
+  <string name="settings_torrent_blocked_invalid">Не адрес, не блок и не диапазон: %1$s</string>
   <string name="settings_torrent_remote">Обновите Ketch на устройстве «%1$s», чтобы менять эти настройки здесь.</string>
   <string name="settings_torrent_reach_reachable">Пиры могут подключиться к %1$s через порт %2$d.</string>
   <plurals name="settings_torrent_reach_forwarded">

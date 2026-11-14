@@ -21,6 +21,7 @@ fun TorrentConfig.withSettings(settings: TorrentEngineSettings): TorrentConfig =
   trackerListsEnabled = settings.trackerList,
   seedRatioPercent = settings.seedRatioPercent,
   seedTimeMinutes = settings.seedTimeMinutes,
+  blockedAddresses = settings.blockedAddresses,
 )
 
 /** The settings this config runs torrents with; what [withSettings] sets. */
@@ -36,6 +37,7 @@ internal fun TorrentConfig.engineSettings(): TorrentEngineSettings = TorrentEngi
   trackerListUrls = trackerListUrls,
   seedRatioPercent = seedRatioPercent,
   seedTimeMinutes = seedTimeMinutes,
+  blockedAddresses = blockedAddresses,
 )
 
 /** Whether a torrent that [uploaded] that much of its [total] and seeded [seededMs] is done. */

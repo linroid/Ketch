@@ -40,6 +40,7 @@ import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
 import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
+import com.linroid.ketch.torrent.net.TorrentIpFilter
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancelChildren
@@ -137,6 +138,15 @@ internal class KetchTorrentController(
     requireSettings()
     change.trackers?.let { checkUrls(it, MAX_TRACKERS, "extra trackers") }
     change.trackerListUrls?.let { checkUrls(it, MAX_TRACKER_LISTS, "tracker lists") }
+    change.blockedAddresses?.let { entries ->
+      if (entries.size > TorrentIpFilter.MAX_ENTRIES || !entries.all(TorrentIpFilter::isValid)) {
+        throw TorrentCommandException(
+          TorrentCommandError.INVALID_INPUT,
+          "Blocked addresses must be at most ${TorrentIpFilter.MAX_ENTRIES} addresses, CIDR " +
+            "blocks or ranges",
+        )
+      }
+    }
     if (change.isEmpty) return source.torrentSettings()
     return source.updateTorrentSettings(change).also {
       log.i { "Torrent settings changed: ${change.names()}" }
@@ -179,6 +189,7 @@ internal class KetchTorrentController(
     "trackers".takeIf { trackers != null },
     "trackerList".takeIf { trackerList != null },
     "trackerListUrls".takeIf { trackerListUrls != null },
+    "blockedAddresses".takeIf { blockedAddresses != null },
   ).joinToString()
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {

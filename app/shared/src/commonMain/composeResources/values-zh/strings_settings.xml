@@ -595,6 +595,12 @@
   <string name="settings_torrent_connections_footer">加密隐藏的是流量类型，而不是连接的对象。</string>
   <string name="settings_torrent_trackers">额外的 Tracker</string>
   <string name="settings_torrent_no_trackers">没有额外的 Tracker</string>
+  <string name="settings_torrent_blocked">已屏蔽的地址</string>
+  <string name="settings_torrent_blocked_footer">Ketch 不会连接这些地址上的节点，也会拒绝它们的连接。</string>
+  <string name="settings_torrent_blocked_add">屏蔽地址</string>
+  <string name="settings_torrent_blocked_add_hint">地址、地址块（如 203.0.113.0/24）或范围（如 203.0.113.1-203.0.113.99）。</string>
+  <string name="settings_torrent_blocked_none">没有已屏蔽的地址</string>
+  <string name="settings_torrent_blocked_invalid">不是地址、地址块或范围：%1$s</string>
   <string name="settings_torrent_remote">请更新 %1$s 上的 Ketch，以便在这里修改这些设置。</string>
   <string name="settings_torrent_reach_reachable">节点可以通过端口 %2$d 连接到 %1$s。</string>
   <plurals name="settings_torrent_reach_forwarded">

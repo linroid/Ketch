@@ -38,6 +38,9 @@ internal class TorrentPeerEncryption(
   var policy: TorrentEncryption
     get() = current.load()
     set(value) = current.store(value)
+  /** Whether a host is one no peer is dialed at, read as each dial starts. */
+  @Volatile var blocked: (String) -> Boolean = { false }
+
   private val mutex = Mutex()
   private val plaintextPeers = LinkedHashSet<PeerEndpoint>()
 
@@ -47,6 +50,7 @@ internal class TorrentPeerEncryption(
     tag: ByteArray,
     connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
   ): TorrentConnection {
+    if (blocked(remote.host)) throw IOException("The peer's address is blocked")
     // Each connect has its own deadline, so a plaintext retry still has time after MSE failed.
     suspend fun connect() = delegate.connectWithin(remote, connectTimeoutMs)
     val policy = policy

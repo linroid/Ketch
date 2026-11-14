@@ -595,6 +595,12 @@
   <string name="settings_torrent_connections_footer">암호화는 트래픽의 종류를 숨길 뿐, 누구와 연결하는지는 숨기지 않습니다.</string>
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>
+  <string name="settings_torrent_blocked">차단된 주소</string>
+  <string name="settings_torrent_blocked_footer">Ketch는 이 주소의 피어에 연결하지 않으며, 연결해 오면 거부합니다.</string>
+  <string name="settings_torrent_blocked_add">주소 차단</string>
+  <string name="settings_torrent_blocked_add_hint">주소, 203.0.113.0/24 같은 블록 또는 203.0.113.1-203.0.113.99 같은 범위.</string>
+  <string name="settings_torrent_blocked_none">차단된 주소 없음</string>
+  <string name="settings_torrent_blocked_invalid">주소, 블록, 범위가 아닙니다: %1$s</string>
   <string name="settings_torrent_remote">여기에서 이 설정을 변경하려면 %1$s의 Ketch를 업데이트하세요.</string>
   <string name="settings_torrent_reach_reachable">피어가 포트 %2$d로 %1$s에 연결할 수 있습니다.</string>
   <plurals name="settings_torrent_reach_forwarded">

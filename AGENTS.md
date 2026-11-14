@@ -1375,6 +1375,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
   by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
   `SequentialControl` switches it. It orders pieces; file priorities choose which files first
+- IP filter (capability `ip-filter`): `TorrentConfig.blockedAddresses` / `[torrent] blocklist`
+  / `TorrentEngineSettings.blockedAddresses` (live through `setBlockedAddresses` and
+  `updateSettings`, which refuses entries that are none with `INVALID_INPUT`) lists addresses,
+  CIDR blocks and ranges, IPv4 or IPv6, at most 10,000 (`TorrentIpFilter`; an IPv4-mapped
+  address is its IPv4 one; config entries that are none are ignored with a counted warning,
+  never logged). The engine refuses dials at `TorrentPeerEncryption.blocked`, which every peer
+  and metadata dial passes, TCP or uTP, and closes blocked incoming connections in
+  `dispatchIncoming` before their handshake; trackers and DHT nodes are not filtered. Settings
+  → BitTorrent → Blocked addresses (`BlockedAddressesGroup`, `addBlockedAddresses`,
+  `isBlockedAddress`) shows for devices with the capability. Tests: `TorrentIpFilterTest`,
+  `TorrentBlockedPeersTest` (a blocked seeder is never dialed, then completes once unblocked)
 - Seed queue: tasks meant to seed that found no free slot (`SeedingOutcome.NO_SLOT`, their
   intent kept) start, oldest completion first, as soon as a seeder is told to stop or reaches a
   seed goal (`TorrentControls.seedWaiting`, from the Stop command's `seedingStopped`), not only
@@ -1845,7 +1856,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - `AppearanceConfig`: accent palette, light/dark `ThemeMode`, the language chosen in
   Settings and the desktop app's `zoom` (percent, 50 to 300, read leniently: out of range loads
   as the nearest, anything else as 100) (app-only; CLI and server ignore it)
-- `TorrentSettings`: `listenPort` (read by `ketch server` only), extra trackers for public
+- `TorrentSettings`: `listenPort` (read by `ketch server` only), `blocklist` (peers blocked by
+  address, applied live), extra trackers for public
   torrents (`TorrentConfig.additionalTrackers`) and
   tracker list subscriptions, on by default (`trackerList`, `trackerListUrls`, default ngosang's
   and XIU2's best lists; `TorrentConfig.trackerListUrls` and `trackerListsEnabled`; a 0.3.0

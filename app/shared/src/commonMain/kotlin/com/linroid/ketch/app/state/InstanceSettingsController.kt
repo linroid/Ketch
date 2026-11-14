@@ -112,6 +112,9 @@ class InstanceSettingsController(
   /** Whether the device stops seeding at a goal; older remote devices keep seeding. */
   var seedGoalsSupported by mutableStateOf(local != null)
     private set
+  /** Whether the device blocks peers by address; older remote devices would ignore the list. */
+  var ipFilterSupported by mutableStateOf(local != null)
+    private set
 
   /**
    * What each subscribed tracker list holds, or `null` for a remote instance or one without
@@ -387,6 +390,7 @@ class InstanceSettingsController(
     torrentUnsupported = false
     localDiscoverySupported = capabilities.supports(TorrentCapability.LOCAL_DISCOVERY)
     seedGoalsSupported = capabilities.supports(TorrentCapability.SEED_GOALS)
+    ipFilterSupported = capabilities.supports(TorrentCapability.IP_FILTER)
     confirmedTorrent = settings
     remoteTorrent = pendingTorrent.applyTo(settings).asSettings()
   }
@@ -418,6 +422,7 @@ class InstanceSettingsController(
     trackerListUrls = next.trackerListUrls ?: trackerListUrls,
     seedRatioPercent = next.seedRatioPercent ?: seedRatioPercent,
     seedTimeMinutes = next.seedTimeMinutes ?: seedTimeMinutes,
+    blockedAddresses = next.blockedAddresses ?: blockedAddresses,
   )
 
   private suspend fun attempt(onError: (UiText) -> Unit, block: suspend () -> Unit) {

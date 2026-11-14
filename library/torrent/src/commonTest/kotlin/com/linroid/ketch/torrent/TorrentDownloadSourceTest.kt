@@ -239,7 +239,8 @@ class TorrentDownloadSourceTest {
       TorrentFeatures.EXISTING_FILES), source.features)
     val engine = setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability",
       "settings", "seed-goals", "sequential", "export", "trackers",
-      "recheck", "import", "file-priority")
+      "recheck", "import", "file-priority",
+      "ip-filter")
     // Local discovery only where the platform can join the LAN group.
     assertEquals(if (lsdSupported) engine + "local-discovery" else engine,
       source.torrentCapabilities)
