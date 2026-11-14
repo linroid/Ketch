@@ -542,7 +542,8 @@ by spaces or new lines, each added after the torrent's own as a tier of its own,
 when those before it fail. A torrent that is downloading or seeding starts again to use the new
 list; the change stays with the task, also after a restart, while a `.torrent` file or magnet
 link exported from it still names the trackers it was added with. A torrent may have at most 128
-trackers. REST: `PUT /api/torrents/{id}/trackers` with
+trackers, and a magnet link's trackers can be edited only once its metadata is found. REST:
+`PUT /api/torrents/{id}/trackers` with
 `{"add": ["udp://tracker.example:6969/announce"], "remove": ["udp://old.example:1337"]}`, which
 answers the new list; SDK: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(...))`.
 

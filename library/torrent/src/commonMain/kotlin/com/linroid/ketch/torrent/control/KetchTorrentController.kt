@@ -316,7 +316,8 @@ internal class KetchTorrentController(
         task.pause()
         task.resume()
       }
-    } else if (state is DownloadState.Completed && taskId in source.seedingTaskIds.value) {
+    } else if (state is DownloadState.Completed && source.liveTorrent(taskId) != null) {
+      // Seeding, or still checking its files before it seeds.
       source.stopSeeding(taskId)
       seed(task)
     }

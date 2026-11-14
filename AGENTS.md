@@ -1372,8 +1372,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `trackerTiers`), written into the saved state (`SourceHost.changeSourceState`,
   `withTrackers`) and into the states a run or a seeder saves from (`changeHeldState`). A
   session announces to what it opened with, so a downloading task is paused and resumed and a
-  seeding one stopped and seeded again. A task that never ran keeps the edit for the process
-  only. Exports still describe the torrent as it was added. The Trackers tab shows a remove
+  seeding one, also one still checking its files, stopped and seeded again. A magnet without
+  metadata yet refuses the edit (`METADATA_UNAVAILABLE`), as its lookup announces to what its
+  link names. A task that never ran keeps the edit for the process only. Exports still describe the torrent as it was added. The Trackers tab shows a remove
   button per tracker and an Add trackers field (`TrackerEditing`, `trackerUrls`)
 - Export: `TorrentController.export(taskId, metainfo)` (REST `GET /api/torrents/{id}/export`,
   `?metainfo=true`; capability `export`) answers a `TorrentExport`: the v1 and v2 info hashes,

@@ -163,7 +163,8 @@ interface TorrentController {
    * to them. Fails with [TorrentCommandError.NOT_FOUND] for unknown and non-torrent tasks, with
    * [TorrentCommandError.INVALID_INPUT] for a URL the backend cannot announce to or more
    * trackers than a torrent may have, and with [TorrentCommandError.METADATA_UNAVAILABLE] while
-   * the torrent's trackers are not known yet. Advertised as [TorrentCapability.TRACKER_EDIT].
+   * the torrent is not known yet, as for a magnet link still looking for its metadata, which
+   * announces to the trackers its link names. Advertised as [TorrentCapability.TRACKER_EDIT].
    */
   suspend fun editTrackers(taskId: String, edit: TorrentTrackerEdit): List<TorrentTracker> =
     throw TorrentCommandException(

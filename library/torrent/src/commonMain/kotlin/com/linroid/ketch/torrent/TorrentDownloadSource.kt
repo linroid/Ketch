@@ -494,6 +494,11 @@ class TorrentDownloadSource(
     remove: List<String>,
   ): List<List<String>>? = trackerEdits.withLock {
     val state = sourceState?.let { runCatching { decodeState(it) }.getOrNull() }
+    // A magnet still looking for its metadata announces to what its link names: an edit would
+    // change nothing there, so there is none until the torrent is known.
+    if (editedTrackers(taskId, state) == null && metainfoBytes(state, resolved) == null) {
+      return@withLock null
+    }
     val current = trackerTiers(taskId, url, state, resolved) ?: return@withLock null
     val edited = editedTrackerTiers(current, add, remove)
     trackerChoices.update { it + (taskId to edited) }
@@ -1351,7 +1356,13 @@ class TorrentDownloadSource(
         val state = if (seeded == task.selectedFileIds) plan.state else {
           plan.state.copy(selectedFileIds = seeded, totalBytes = session.totalBytes)
         }
-        seedStates.update { it + (taskId to state) }
+        // With what the task was told while it checked, which found no state here to change.
+        val held = state.copy(
+          sequential = sequentialChoices.value[taskId] ?: state.sequential,
+          priorityFileIds = priorityChoices.value[taskId] ?: state.priorityFileIds,
+          trackerTiers = trackerChoices.value[taskId] ?: state.trackerTiers,
+        )
+        seedStates.update { it + (taskId to held) }
         markSeeding(taskId)
         checkingSeeders.update { it - taskId }
         watchSeeder(taskId, session)
