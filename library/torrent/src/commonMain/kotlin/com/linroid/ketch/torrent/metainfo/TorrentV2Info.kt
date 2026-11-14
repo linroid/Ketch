@@ -26,7 +26,7 @@ internal data class TorrentV2Info(
       rawInfo: ByteArray,
       maxBytes: Int = 4 * 1024 * 1024,
       maxFiles: Int = 10_000,
-      maxNodes: Int = 100_000,
+      maxNodes: Int = MAX_METAINFO_NODES,
       expectedIdentity: TorrentIdentity? = null,
     ): TorrentV2Info {
       require(maxBytes in 1..32 * 1024 * 1024)

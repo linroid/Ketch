@@ -75,7 +75,7 @@ internal data class TorrentMetadata(
       allowHybrid: Boolean = false,
     ): TorrentMetadata {
       // Every value is a node: a file costs about one per path component, plus five.
-      val root = Bencode.parse(data, maxBytes, maxNodes = 1_000_000)
+      val root = Bencode.parse(data, maxBytes, MAX_METAINFO_NODES)
       requireNotNull(root.dictionary) { "Torrent root must be a dictionary" }
       val info = requireNotNull(root["info"]) { "Missing info dictionary" }
       requireNotNull(info.dictionary) { "Info must be a dictionary" }
@@ -219,6 +219,13 @@ internal const val MAX_FILES = 10_000
 
 /** The largest piece a torrent may have, v1, v2 or hybrid: each is assembled in memory. */
 internal const val MAX_PIECE_LENGTH = 16L * 1024 * 1024
+
+/**
+ * The most bencode values a `.torrent` file may hold, for every reader of metainfo: a file costs
+ * about one per path component plus five in v1, four in a v2 file tree, and both in a hybrid, so
+ * a torrent at the file limit in deep folders holds several hundred thousand.
+ */
+internal const val MAX_METAINFO_NODES = 1_000_000
 
 /** Refuses a torrent whose pieces of [pieceLength] bytes are larger than [MAX_PIECE_LENGTH]. */
 internal fun requireSupportedPieceLength(pieceLength: Long) {
