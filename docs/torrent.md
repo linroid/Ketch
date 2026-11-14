@@ -191,8 +191,10 @@ Ketch checks a torrent's files against its hashes every time the torrent starts,
 resuming a download already proves what is on disk. A finished torrent is not checked again by
 itself. If its files were edited, moved back from a backup or damaged, choose **Check files** in
 the finished torrent's menu: Ketch reads every file again, downloads the pieces that are missing
-or wrong, and completes once more. A torrent that was seeding stops while it is checked and seeds
-again afterwards. On a running torrent the command starts its check over.
+or wrong, and completes once more. A file that was deleted is made again, and one that was
+replaced, as when restored from a backup, is checked like the original. A torrent that was
+seeding stops while it is checked and seeds again afterwards; one you had stopped seeding stays
+stopped. On a running torrent the command starts its check over.
 
 REST: `POST /api/torrents/{id}/recheck`, on devices listing the `recheck` capability; SDK:
 `TorrentController.recheck(taskId)`.

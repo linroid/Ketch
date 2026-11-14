@@ -296,6 +296,9 @@ class TorrentDownloadSource(
       resolved: ResolvedSource?,
     ) = source.torrentTrackers(taskId, url, sourceState, resolved)
 
+    override fun prepareRecheck(taskId: String, seedAfter: Boolean) =
+      source.prepareRecheck(taskId, seedAfter)
+
     override suspend fun liveTorrent(taskId: String) = source.liveTorrent(taskId)
 
     override suspend fun savedPayload(sourceState: SourceState?) =
@@ -351,6 +354,24 @@ class TorrentDownloadSource(
         add(TorrentCapability.SEEDING.wireName)
       }
     }
+
+  /** Tasks whose next run checks their files as they are now; see [prepareRecheck]. */
+  private val rechecks = MutableStateFlow<Set<String>>(emptySet())
+
+  /** Tasks whose next run ends without seeding; see [prepareRecheck]. */
+  private val checkOnly = MutableStateFlow<Set<String>>(emptySet())
+
+  /**
+   * Has the next run of [taskId] check its files as they are now: a v2 or hybrid task makes
+   * again a file that is gone and takes one that was replaced, where a run otherwise fails, as
+   * the files are no longer the ones it wrote. Unless [seedAfter], the run does not go on to
+   * seed once it completes, whatever the upload setting: a task its user stopped seeding stays
+   * stopped.
+   */
+  internal fun prepareRecheck(taskId: String, seedAfter: Boolean) {
+    rechecks.update { it + taskId }
+    checkOnly.update { if (seedAfter) it - taskId else it + taskId }
+  }
 
   /** What tasks were last told by [setSequential], in this process. */
   private val sequentialChoices = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -1688,6 +1709,8 @@ class TorrentDownloadSource(
         legacySelections = listOfNotNull(previous?.selectedFileIds?.takeIf { it.isNotEmpty() }),
         // Task-scoped: a session that keeps seeding after this run returns still reports.
         connections = context.connections,
+        // A check of the task's files takes them as they are now, replaced or gone.
+        adoptExisting = context.taskId in rechecks.value,
       ))
     }
   }
@@ -1759,6 +1782,12 @@ class TorrentDownloadSource(
         // An adopted session applies the current selection first, whatever it ran with.
         keepSeeding = track(context, running, table, state.selectedFileIds, initialRevision,
           adopted = adopted != null)
+        // The check a recheck asked for is done; a task not meant to seed stops here.
+        rechecks.update { it - taskId }
+        if (taskId in checkOnly.value) {
+          checkOnly.update { it - taskId }
+          keepSeeding = false
+        }
         // Paused uploads finish a completed session that would have seeded.
         if (!keepSeeding) deferSharing(taskId, seeded = false)
         onTransferEnd(taskId)

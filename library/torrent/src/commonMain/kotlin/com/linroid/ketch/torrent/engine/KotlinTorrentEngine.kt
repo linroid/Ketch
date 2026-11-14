@@ -175,6 +175,8 @@ internal data class TorrentV2TaskSpec(
   val seedOnly: Boolean = false,
   /** Reports the owner's peers among the task's live connections. */
   val connections: ConnectionReporter = ConnectionReporter.None,
+  /** Uses the files at the output as they are now; see [TorrentV2PieceStore]. */
+  val adoptExisting: Boolean = false,
 )
 
 /** Source-owned Kotlin runtime. Task jobs borrow its bounded transports and discovery services. */
@@ -1159,7 +1161,8 @@ internal class KotlinTorrentEngine(
       val store = TorrentV2PieceStore(document, output, selection, spec.taskId, budget,
         storageSlots, creationLogPath = if (spec.recoverCreations) {
           v2CreationLog(output, spec.taskId)
-        } else null, legacySelections = spec.legacySelections)
+        } else null, legacySelections = spec.legacySelections,
+        adoptExisting = spec.adoptExisting)
       val custom = spec.discover
       // Discovery runs as long as the owner, seeding included: it keeps what it reads, not the
       // spec, whose throttle belongs to the run that opened the owner.

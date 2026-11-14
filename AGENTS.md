@@ -1287,7 +1287,13 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   queues a completed task as a resume under its control lock, clearing `completedAt`, so the
   source proves what is on disk, downloads what is missing and completes anew, seeding again if
   meant to; a downloading task is paused and resumed; paused, queued and failed ones are left to
-  their next start; a canceled one is `INVALID_STATE`. The apps offer Check files
+  their next start; a canceled one is `INVALID_STATE`. The controller first tells the source
+  (`TorrentControlSource.prepareRecheck`): the next run of a v2 or hybrid task takes its files
+  as they are now (`TorrentV2PieceStore(adoptExisting)`: a claimed file that is gone is made
+  again and one that was replaced, as from a backup, is taken and checked, where a run
+  otherwise fails with "Checkpoint ownership changed"; never a symbolic link), and a task that
+  was not meant to seed, as after Stop seeding, ends its run without seeding whatever the
+  upload setting. The apps offer Check files
   (`RowAction.CheckFiles`, `TaskCommand.CheckFiles`) in a finished torrent's menu. Tests:
   `TorrentSeedingControlTest` (a corrupted and a deleted file download again),
   `KetchTorrentControllerTest`

@@ -214,6 +214,9 @@ internal class KetchTorrentController(
     requireCapability(TorrentCapability.RECHECK, TorrentCommandError.UNSUPPORTED)
     when (task.state.value) {
       is DownloadState.Completed -> {
+        // Read before the seeder stops: a task its user stopped seeding stays stopped.
+        val meantToSeed = seedingOf(task, recordOf(task).control ?: TaskControl())
+        source.prepareRecheck(taskId, seedAfter = meantToSeed)
         // A seeding session would be taken over as it is, unchecked: the run opens a new one,
         // and seeds again once it completes if the task is meant to.
         source.stopSeeding(taskId)
@@ -226,6 +229,7 @@ internal class KetchTorrentController(
         log.i { "Rechecking completed taskId=$taskId" }
       }
       is DownloadState.Downloading -> mapErrors {
+        source.prepareRecheck(taskId, seedAfter = true)
         // Every start checks the files before it transfers.
         task.pause()
         task.resume()
