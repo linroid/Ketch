@@ -144,6 +144,7 @@
   <string name="action_row_download_all_files">Baixar todos os arquivos</string>
   <string name="action_row_stop_seeding">Parar de semear</string>
   <string name="action_row_check_files">Verificar arquivos</string>
+  <string name="action_row_move_files">Mover arquivos…</string>
   <string name="action_row_seed">Semear</string>
   <plurals name="batch_pause">
     <item quantity="one">Pausar %1$d download</item>

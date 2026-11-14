@@ -144,6 +144,7 @@
   <string name="action_row_download_all_files">Télécharger tous les fichiers</string>
   <string name="action_row_stop_seeding">Arrêter le partage</string>
   <string name="action_row_check_files">Vérifier les fichiers</string>
+  <string name="action_row_move_files">Déplacer les fichiers…</string>
   <string name="action_row_seed">Partager</string>
   <plurals name="batch_pause">
     <item quantity="one">Mettre en pause %1$d téléchargement</item>

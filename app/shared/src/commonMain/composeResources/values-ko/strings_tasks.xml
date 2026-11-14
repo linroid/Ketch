@@ -141,6 +141,7 @@
   <string name="action_row_download_all_files">모든 파일 다운로드</string>
   <string name="action_row_stop_seeding">시딩 중지</string>
   <string name="action_row_check_files">파일 검사</string>
+  <string name="action_row_move_files">파일 이동…</string>
   <string name="action_row_seed">시드</string>
   <plurals name="batch_pause">
     <item quantity="other">다운로드 %1$d개 일시정지</item>

@@ -308,6 +308,7 @@
   <string name="downloads_failed_files">Couldn't change files for %1$s on %2$s</string>
   <string name="downloads_failed_seeding">Couldn't change seeding for %1$s on %2$s</string>
   <string name="downloads_failed_check_files">Couldn't check the files of %1$s on %2$s</string>
+  <string name="downloads_failed_move_files">Couldn't move the files of %1$s on %2$s</string>
 
   <!-- What a command did to several downloads, parts joined by " · ". %1$d is how many. -->
   <plurals name="downloads_batch_paused">

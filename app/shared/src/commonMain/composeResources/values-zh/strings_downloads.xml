@@ -228,6 +228,7 @@
   <string name="downloads_failed_files">无法在 %2$s 上更改 %1$s 的文件</string>
   <string name="downloads_failed_seeding">无法在 %2$s 上更改 %1$s 的做种</string>
   <string name="downloads_failed_check_files">无法在 %2$s 上校验 %1$s 的文件</string>
+  <string name="downloads_failed_move_files">无法在 %2$s 上移动 %1$s 的文件</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">已暂停 %1$d 个下载</item>
