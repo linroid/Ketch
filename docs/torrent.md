@@ -191,7 +191,8 @@ In a downloading torrent's Files tab, the bolt button on a file (or a folder) ha
 pieces before the rest: the episode you want to watch tonight, or the small files of a large
 pack. Click it again to go back to the normal order. It changes the order only; it never adds a
 file you unticked, and it combines with downloading in order, which then applies within the files
-that come first. The choice stays with the task, also after a restart. REST:
+that come first. Web seeds start with those files too. The choice stays with the task, also
+after a restart, whether it was running when you made it or not. REST:
 `GET` and `PUT /api/torrents/{id}/priority` with `{"fileIds": [...]}`, on devices listing the
 `file-priority` capability; SDK: `TorrentController.setPriorityFiles(taskId, fileIds)`.
 

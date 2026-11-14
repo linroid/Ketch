@@ -732,6 +732,27 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun webSeedRun_startsAtThePiecesToDownloadFirst_andEndsWhereTheyEnd() = runTest {
+    val budget = TorrentBufferBudget(16 * piece)
+    val first = BooleanArray(8) { it in 4..5 }
+    val scheduler = TorrentPieceScheduler(BooleanArray(8) { true }, BooleanArray(8), { piece },
+      budget, { 0 }, priority = { first })
+    scheduler.availability(-1, all(8))
+
+    // The run takes the two pieces of the file to download first, not the lowest ones.
+    val urgent = scheduler.claimRun(-1, maxPieces = 16, maxBytes = 16 * piece)
+    assertEquals(listOf(4, 5), urgent.map { it.index })
+    for (claim in urgent) {
+      scheduler.verified(claim.index)
+      scheduler.release(-1, claim.index)
+    }
+    // With none of them left, runs follow the files as usual.
+    val rest = scheduler.claimRun(-1, maxPieces = 16, maxBytes = 16 * piece)
+    assertEquals(listOf(0, 1, 2, 3), rest.map { it.index })
+    scheduler.close()
+  }
+
+  @Test
   fun webSeedRuns_andPeersNeverFetchTheSamePieceOutsideTheEndgame() = runTest {
     val budget = TorrentBufferBudget(8 * piece)
     val scheduler = scheduler(pieces = 8, budget)

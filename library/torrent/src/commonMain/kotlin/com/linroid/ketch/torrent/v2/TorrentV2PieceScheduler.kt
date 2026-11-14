@@ -197,9 +197,13 @@ internal class TorrentV2PieceScheduler private constructor(
    * A whole piece for a web seed, with its buffer reserved: the first wanted piece nobody fetches,
    * from where the last claim was, so its HTTP reads follow the files. In the endgame, when every
    * piece left is being fetched, a piece peers assemble that no web seed fetches yet; whichever
-   * verifies it first stores it. Null when there is none, or no buffer is free.
+   * verifies it first stores it, unless [duplicates] is off. Null when there is none, or no
+   * buffer is free.
    */
-  fun claimWebSeed(eligible: (Int) -> Boolean = { true }): WebSeedClaim? {
+  fun claimWebSeed(
+    eligible: (Int) -> Boolean = { true },
+    duplicates: Boolean = true,
+  ): WebSeedClaim? {
     check(!closed)
     var free = -1
     var anyFree = false
@@ -215,8 +219,8 @@ internal class TorrentV2PieceScheduler private constructor(
       }
       if (duplicate < 0 && index in assemblies && index !in webSeeds) duplicate = index
     }
-    val index = if (free >= 0) free else if (!anyFree && duplicate >= 0) duplicate else
-      return null
+    val index = if (free >= 0) free else if (duplicates && !anyFree && duplicate >= 0) duplicate
+      else return null
     val length = layout.v2Piece(index.toLong()).length.toInt()
     val lease = buffers.reserve(length + 512) ?: return null
     val claim = try { WebSeedClaim(index, ByteArray(length), lease) } catch (error: Throwable) {
@@ -238,15 +242,21 @@ internal class TorrentV2PieceScheduler private constructor(
    * free and active slots below the limit, so peers keep pieces to fetch and buffers to fetch them
    * with. An endgame duplicate is never extended, and the cursor stays on the run's first piece,
    * so pieces a failed run gives back are fetched next. Only pieces [eligible] accepts, those the
-   * seed can serve, are claimed. Empty when there is nothing to fetch.
+   * seed can serve, are claimed. Empty when there is nothing to fetch. While pieces of [urgent],
+   * those of the files to download first, are free, a run starts at one of them and ends where
+   * they end.
    */
   fun claimWebSeedRun(
     fetchers: Int,
     maxPieces: Int = WEB_SEED_RUN_PIECES,
     maxBytes: Int = WEB_SEED_RUN_BYTES,
+    urgent: BooleanArray? = null,
     eligible: (Int) -> Boolean = { true },
   ): List<WebSeedClaim> {
-    val first = claimWebSeed(eligible) ?: return emptyList()
+    val preferred = urgent?.let { first ->
+      claimWebSeed({ eligible(it) && first[it] }, duplicates = false)
+    }
+    val first = preferred ?: claimWebSeed(eligible) ?: return emptyList()
     // A duplicate of a piece peers assemble: the endgame.
     if (first.index in assemblies) return listOf(first)
     val run = mutableListOf(first)
@@ -256,7 +266,7 @@ internal class TorrentV2PieceScheduler private constructor(
     var index = first.index + 1
     while (run.size < minOf(maxPieces, share) && index < verified.size) {
       if (!wanted[index] || verified[index] || isBusy(index) || activeCount >= maxActive ||
-        !eligible(index)) break
+        !eligible(index) || preferred != null && urgent[index] != true) break
       val length = layout.v2Piece(index.toLong()).length.toInt()
       val reserved = length + 512
       if (bytes + length > maxBytes ||

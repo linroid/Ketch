@@ -1290,7 +1290,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `TorrentSession.setPriorityFiles`, which turns them into a piece bitmap: the v1 scheduler
   opens those pieces before any other (`TorrentPieceScheduler(priority)`, `orderToOpen`), and
   the v2 loop begins them first (`TorrentV2RarityPicker.next`), each in order or rarest first
-  as usual, falling back to the rest once a peer has none left. It orders, never selects. The
+  as usual, falling back to the rest once a peer has none left. Web seeds follow them too: a v1
+  run (`claimRun`) and a v2 run (`claimWebSeedRun(urgent)`) start at a free piece of those files
+  and end where they end. It orders, never selects. A change is also written into the state the
+  task saved (`SourceHost.changeSourceState`, `TorrentControlSource.withPriorityFiles` and
+  `withSequential` for the order setting), as a task that is not running saves none of its own;
+  a task that never ran has no state yet and keeps the choice for the process only. The
   Files tab shows a bolt button on unfinished, selected files and folders of a downloading
   torrent (`FileSelectionModel.first`, `toggleFirst`, `loadFirst`)
 - Files already in place (capability `import`): a torrent request with

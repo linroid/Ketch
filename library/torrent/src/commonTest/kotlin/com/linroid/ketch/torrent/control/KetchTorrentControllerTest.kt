@@ -103,6 +103,12 @@ class KetchTorrentControllerTest {
       first = fileIds
     }
 
+    override fun withPriorityFiles(state: SourceState, fileIds: Set<String>) =
+      state.copy(data = state.data.substringBefore(" first=") + " first=" + fileIds.sorted())
+
+    override fun withSequential(state: SourceState, sequential: Boolean) =
+      state.copy(data = state.data.substringBefore(" ordered=") + " ordered=" + sequential)
+
     /** What [torrentTrackers] answers. */
     var trackers: List<TorrentTracker>? = null
 
@@ -1216,6 +1222,28 @@ class KetchTorrentControllerTest {
     ketch.torrents.setPriorityFiles(task.taskId, emptySet())
     assertTrue(source.first.isEmpty())
     ketch.close()
+  }
+
+  @Test
+  fun `priority files and the order are saved for a task that is not running`() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.FILE_PRIORITY.wireName
+    source.capabilities += TorrentCapability.SEQUENTIAL.wireName
+    val ketch = ketch(source)
+    try {
+      val task = completedTask(ketch, source)
+      assertNotNull(source.saveState)(task.taskId, SourceState(source.type, "seeded"))
+
+      // No run of the task saves its state, so the controller changes the saved one.
+      ketch.torrents.setPriorityFiles(task.taskId, setOf("1"))
+      assertEquals("seeded first=[1]", task.saved.sourceState?.data)
+      ketch.torrents.setPriorityFiles(task.taskId, emptySet())
+      assertEquals("seeded first=[]", task.saved.sourceState?.data)
+      ketch.torrents.setSequential(task.taskId, true)
+      assertEquals("seeded first=[] ordered=true", task.saved.sourceState?.data)
+    } finally {
+      ketch.close()
+    }
   }
 
   @Test

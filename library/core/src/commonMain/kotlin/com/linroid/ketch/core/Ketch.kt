@@ -667,6 +667,18 @@ class Ketch(
       }
     }
 
+    override suspend fun changeSourceState(
+      task: DownloadTask,
+      change: (SourceState) -> SourceState,
+    ) {
+      val handle = handleOf(task) ?: return
+      handle.record.update { record ->
+        val saved = record.sourceState ?: return@update record
+        val changed = change(saved)
+        if (changed == saved) record else record.copy(sourceState = changed)
+      }
+    }
+
     override suspend fun reopen(task: DownloadTask): Boolean {
       val handle = handleOf(task) ?: return false
       return reopenCompleted(handle)

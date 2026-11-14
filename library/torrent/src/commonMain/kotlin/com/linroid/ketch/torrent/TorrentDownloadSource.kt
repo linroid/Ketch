@@ -280,6 +280,12 @@ class TorrentDownloadSource(
 
     override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) =
       source.setPriorityFiles(taskId, fileIds)
+
+    override fun withPriorityFiles(state: SourceState, fileIds: Set<String>) =
+      source.withPriorityFiles(state, fileIds)
+
+    override fun withSequential(state: SourceState, sequential: Boolean) =
+      source.withSequential(state, sequential)
     override val restoresSeeding: Boolean get() = source.restoresSeeding
     override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
 
@@ -405,6 +411,20 @@ class TorrentDownloadSource(
     }
     tasks.session(taskId)?.setPriorityFiles(fileIds)
   }
+
+  /** The saved [state] as [change] makes it, or as it is when it cannot be read. */
+  private fun changed(
+    state: SourceState,
+    change: (TorrentSourceState) -> TorrentSourceState,
+  ): SourceState = runCatching { encodeState(change(decodeState(state))) }.getOrDefault(state)
+
+  /** What [TorrentControlSource.withPriorityFiles] answers. */
+  internal fun withPriorityFiles(state: SourceState, fileIds: Set<String>): SourceState =
+    changed(state) { it.copy(priorityFileIds = fileIds) }
+
+  /** What [TorrentControlSource.withSequential] answers. */
+  internal fun withSequential(state: SourceState, sequential: Boolean): SourceState =
+    changed(state) { it.copy(sequential = sequential) }
 
   /** What tasks were last told by [setSequential], in this process. */
   private val sequentialChoices = MutableStateFlow<Map<String, Boolean>>(emptyMap())

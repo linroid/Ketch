@@ -427,6 +427,8 @@ internal class KetchTorrentController(
       )
     }
     source.setPriorityFiles(task.taskId, fileIds)
+    // A task that is not running saves no state of its own until it next runs.
+    host.changeSourceState(task) { source.withPriorityFiles(it, fileIds) }
     controlChanged()
   }
 
@@ -434,6 +436,7 @@ internal class KetchTorrentController(
     val task = torrentTask(taskId) ?: throw notFound()
     requireCapability(TorrentCapability.SEQUENTIAL, TorrentCommandError.UNSUPPORTED)
     source.setSequential(task.taskId, sequential)
+    host.changeSourceState(task) { source.withSequential(it, sequential) }
     controlChanged()
   }
 

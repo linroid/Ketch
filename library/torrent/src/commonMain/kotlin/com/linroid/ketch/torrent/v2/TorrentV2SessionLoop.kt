@@ -454,7 +454,7 @@ internal object TorrentV2SessionLoop {
             // Runs leave their share of the free pieces to the peers and the other seeds, and
             // skip those this seed could not serve.
             val run = pieces.claimWebSeedRun(fetchers = peers.size + mirrorsRunning,
-              eligible = { mirrors.serves(seed, it) })
+              urgent = swarm.priority?.invoke(), eligible = { mirrors.serves(seed, it) })
             if (run.isEmpty()) continue
             idleMirrors.remove(seed)
             if (!mirrors.assign(seed, run)) for (claim in run) {
