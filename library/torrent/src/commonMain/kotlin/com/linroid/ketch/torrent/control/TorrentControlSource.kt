@@ -9,6 +9,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentStall
@@ -75,6 +76,20 @@ internal interface TorrentControlSource {
     sourceState: SourceState?,
     resolved: ResolvedSource?,
   ): List<SourceFile>?
+
+  /**
+   * The magnet link and info hashes of the task [taskId], which downloads [url], with its
+   * `.torrent` file when [includeMetainfo], from the metainfo the task kept ([resolved], or
+   * [sourceState] as older builds saved it), else from a magnet [url]; `null` while nothing
+   * identifies the torrent. For sources whose [torrentCapabilities] list `export`.
+   */
+  suspend fun torrentExport(
+    taskId: String,
+    url: String,
+    sourceState: SourceState?,
+    resolved: ResolvedSource?,
+    includeMetainfo: Boolean,
+  ): TorrentExport? = null
 
   /** What the task's session in this process is doing, or `null` when it has none. */
   suspend fun liveTorrent(taskId: String): LiveTorrent?

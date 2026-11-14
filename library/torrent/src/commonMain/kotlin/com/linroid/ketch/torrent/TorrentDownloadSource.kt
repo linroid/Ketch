@@ -25,6 +25,7 @@ import com.linroid.ketch.core.engine.unknownFilesMessage
 import com.linroid.ketch.torrent.api.TorrentActivity
 import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentFeatures
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
@@ -33,6 +34,7 @@ import com.linroid.ketch.torrent.control.SeedingOutcome
 import com.linroid.ketch.torrent.control.SeedingTask
 import com.linroid.ketch.torrent.control.TorrentControlSource
 import com.linroid.ketch.torrent.control.TorrentControls
+import com.linroid.ketch.torrent.control.exportOf
 import com.linroid.ketch.torrent.crypto.sha256Digest
 import com.linroid.ketch.torrent.engine.IncompleteSeedException
 import com.linroid.ketch.torrent.engine.KotlinTorrentEngine
@@ -276,6 +278,14 @@ class TorrentDownloadSource(
     override suspend fun torrentFiles(sourceState: SourceState?, resolved: ResolvedSource?) =
       source.torrentFiles(sourceState, resolved)
 
+    override suspend fun torrentExport(
+      taskId: String,
+      url: String,
+      sourceState: SourceState?,
+      resolved: ResolvedSource?,
+      includeMetainfo: Boolean,
+    ) = source.torrentExport(taskId, url, sourceState, resolved, includeMetainfo)
+
     override suspend fun liveTorrent(taskId: String) = source.liveTorrent(taskId)
 
     override suspend fun savedPayload(sourceState: SourceState?) =
@@ -322,6 +332,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.SETTINGS.wireName)
       add(TorrentCapability.SEED_GOALS.wireName)
       add(TorrentCapability.SEQUENTIAL.wireName)
+      add(TorrentCapability.EXPORT.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -918,18 +929,21 @@ class TorrentDownloadSource(
     (resolved?.metadata?.get(ResolvedSource.METAINFO_KEY)?.takeIf { it.isNotEmpty() }
       ?: state?.metainfo?.takeIf { it.isNotEmpty() })?.let(::decodeBase64)
 
+  /** The task's [metainfoOf], else a v1 checkpoint's; null when none holds any. */
+  private fun metainfoBytes(state: TorrentSourceState?, resolved: ResolvedSource?): ByteArray? =
+    metainfoOf(resolved, state)
+      ?: state?.takeIf { it.version != 3 && it.resumeData.isNotEmpty() }
+        ?.let { TorrentCheckpoint.decode(decodeBase64(it.resumeData))?.metadata?.metainfoBytes }
+
   /**
-   * The task's files from metadata the source holds: its [metainfoOf], else a v1 checkpoint's;
-   * null when none holds any.
+   * The task's files from metadata the source holds ([metainfoBytes]); null when none holds
+   * any.
    */
   private suspend fun fileTable(
     state: TorrentSourceState?,
     resolved: ResolvedSource?,
   ): TorrentFileTable? {
-    val bytes = metainfoOf(resolved, state)
-      ?: state?.takeIf { it.version != 3 && it.resumeData.isNotEmpty() }
-        ?.let { TorrentCheckpoint.decode(decodeBase64(it.resumeData))?.metadata?.metainfoBytes }
-      ?: return null
+    val bytes = metainfoBytes(state, resolved) ?: return null
     return withContext(TorrentDispatchers.engine) {
       fileTables.get(bytes) { TorrentFileTable.parse(bytes, config) }
     }
@@ -942,6 +956,20 @@ class TorrentDownloadSource(
     val table = fileTable(sourceState?.let { decodeState(it) }, resolved) ?: return null
     return table.files.map {
       SourceFile(it.id, it.path, it.size, metadata = mapOf("path" to it.path))
+    }
+  }
+
+  /** What [TorrentControlSource.torrentExport] answers; see [exportOf]. */
+  internal suspend fun torrentExport(
+    taskId: String,
+    url: String,
+    sourceState: SourceState?,
+    resolved: ResolvedSource?,
+    includeMetainfo: Boolean,
+  ): TorrentExport? {
+    val bytes = metainfoBytes(sourceState?.let { decodeState(it) }, resolved)
+    return withContext(TorrentDispatchers.engine) {
+      exportOf(taskId, url, bytes, includeMetainfo, config)
     }
   }
 

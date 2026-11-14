@@ -15,6 +15,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentInterest
@@ -327,6 +328,18 @@ internal class RemoteTorrentController(
         setBody(TorrentSequentialRequest(sequential))
       }
     } ?: throw IllegalStateException("Empty response")
+  }
+
+  override suspend fun export(taskId: String, metainfo: Boolean): TorrentExport? {
+    requireCapability(TorrentCapability.EXPORT)
+    return call(notFoundIsNull = true) {
+      httpClient.get(
+        Torrents.ById.Export(
+          parent = Torrents.ById(id = taskId),
+          metainfo = metainfo.takeIf { it },
+        )
+      )
+    }
   }
 
   /** Fails with [TorrentCommandError.UNSUPPORTED], sending nothing, unless the server has it. */

@@ -401,8 +401,9 @@ lists the routes.
   upstream per interest are encoded once for every stream, and a slow stream skips values rather
   than queueing them. See the [plan](plans/event-stream.md).
 - **Torrents**: on servers listing `torrent.control`, `/api/torrents` serves the instance's
-  `controller(TorrentController)`: capabilities, a task's snapshot, sorted pages of its files, and
-  the `selection` and `seeding` commands, guarded by a revision and an idempotency key. A server
+  `controller(TorrentController)`: capabilities, a task's snapshot, sorted pages of its files, its
+  `export` (magnet link and `.torrent` file), and the `selection` and `seeding` commands, guarded
+  by a revision and an idempotency key. A server
   whose instance has no torrent controller installs none of these routes.
 - **Live connections**: `GET /api/connections?limit=1..1024` answers one `Interest.Connections`
   snapshot. Hosts and peer addresses never go on the task events.

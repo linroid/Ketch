@@ -140,6 +140,9 @@
   <string name="inspector_detail_device">Device</string>
   <string name="inspector_detail_captured">Captured</string>
   <string name="inspector_detail_checksum">Checksum</string>
+  <!-- A torrent's info hash and magnet link. -->
+  <string name="inspector_detail_info_hash">Info hash</string>
+  <string name="inspector_detail_magnet">Magnet link</string>
   <!-- The checksum of a download. %1$s is the hash algorithm, such as "SHA-256": verified once the download finished, or to be checked when it finishes. -->
   <string name="inspector_checksum_verified">%1$s · verified</string>
   <string name="inspector_checksum_pending">%1$s · checked when done</string>
@@ -164,6 +167,8 @@
   <string name="inspector_copy_failed_device">Couldn't copy the device</string>
   <string name="inspector_copy_failed_captured">Couldn't copy the origin</string>
   <string name="inspector_copy_failed_checksum">Couldn't copy the checksum</string>
+  <string name="inspector_copy_failed_info_hash">Couldn't copy the info hash</string>
+  <string name="inspector_copy_failed_magnet">Couldn't copy the magnet link</string>
   <string name="inspector_copy_failed_task_id">Couldn't copy the task ID</string>
   <string name="inspector_copy_failed_headers">Couldn't copy the headers</string>
   <string name="inspector_copy_failed_property">Couldn't copy the property</string>

@@ -19,6 +19,12 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.remote.RemoteApiException
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentExport
+import com.linroid.ketch.torrent.api.TorrentSnapshot
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +39,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.PrintStream
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -222,6 +229,90 @@ class InstanceCommandsTest {
         PrintStream(ByteArrayOutputStream()), PrintStream(ByteArrayOutputStream()), "",
       )
     }
+  }
+
+  private class Exports(
+    private val names: Set<String> = setOf("inspect", "export"),
+    private val answer: (metainfo: Boolean) -> TorrentExport?,
+  ) : TorrentController {
+    override suspend fun capabilities() = TorrentCapabilities(names = names)
+    override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+    override suspend fun export(taskId: String, metainfo: Boolean) = answer(metainfo)
+  }
+
+  private class Printed(val status: Int, val out: String, val err: String)
+
+  private suspend fun export(
+    controller: TorrentController?,
+    output: String? = null,
+    json: Boolean = false,
+  ): Printed {
+    val out = ByteArrayOutputStream()
+    val err = ByteArrayOutputStream()
+    val status = exportTorrent(
+      taskId = "3f2a9c1e-0000",
+      controller = controller,
+      command = InstanceCommand.Export(Target(), "3f2a", output, json),
+      label = "Ketch",
+      out = PrintStream(out),
+      err = PrintStream(err),
+    )
+    return Printed(status, out.toString().trim(), err.toString().trim())
+  }
+
+  private val magnet = "magnet:?xt=urn:btih:" + "a".repeat(40)
+
+  @Test
+  fun `export prints the magnet link or its details as JSON`() = runTest {
+    val controller = Exports { TorrentExport("t", "pack", "a".repeat(40), magnet = magnet) }
+
+    assertEquals(magnet, export(controller).out)
+    val details = Json.parseToJsonElement(export(controller, json = true).out).jsonObject
+    assertEquals(magnet, details.getValue("magnet").jsonPrimitive.content)
+    assertEquals("a".repeat(40), details.getValue("infoHash").jsonPrimitive.content)
+  }
+
+  @Test
+  fun `export saves the torrent file and prints where`() = runTest {
+    val file = File(Files.createTempDirectory("ketch-export").toFile(), "sub/pack.torrent")
+    val asked = mutableListOf<Boolean>()
+    val controller = Exports { metainfo ->
+      asked += metainfo
+      TorrentExport("t", "pack", magnet = magnet, metainfo = "ZDRlOg==".takeIf { metainfo })
+    }
+
+    val printed = export(controller, output = file.path)
+
+    assertEquals(InstanceExit.OK, printed.status)
+    assertEquals(file.absolutePath, printed.out)
+    assertEquals("d4e:", file.readText())
+    assertEquals(listOf(true), asked)
+    file.parentFile.parentFile.deleteRecursively()
+  }
+
+  @Test
+  fun `export says why a torrent has nothing to print or save`() = runTest {
+    val private = Exports { TorrentExport("t", privateTorrent = true) }
+    assertTrue("private torrent" in assertFailsWith<CliFailure> { export(private) }.message!!)
+
+    val magnetOnly = Exports { TorrentExport("t", magnet = magnet) }
+    val noFile = assertFailsWith<CliFailure> { export(magnetOnly, output = "a.torrent") }
+    assertTrue("no .torrent file yet" in noFile.message!!)
+
+    val unknown = Exports {
+      throw TorrentCommandException(TorrentCommandError.METADATA_UNAVAILABLE, "Not known yet")
+    }
+    assertTrue("not known yet" in assertFailsWith<CliFailure> { export(unknown) }.message!!)
+
+    assertTrue("not a torrent" in assertFailsWith<CliFailure> { export(Exports { null }) }.message!!)
+  }
+
+  @Test
+  fun `export needs an instance that can export`() = runTest {
+    val older = Exports(names = setOf("inspect")) { error("Never asked") }
+
+    assertTrue("update it" in assertFailsWith<CliFailure> { export(older) }.message!!)
+    assertTrue("update it" in assertFailsWith<CliFailure> { export(null) }.message!!)
   }
 
   private fun connected() = MutableStateFlow<ConnectionState>(ConnectionState.Connected)

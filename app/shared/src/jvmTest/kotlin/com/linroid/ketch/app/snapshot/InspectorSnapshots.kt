@@ -51,7 +51,9 @@ import com.linroid.ketch.app.ui.inspector.TaskInspector
 import com.linroid.ketch.app.ui.inspector.rememberDeviceLabel
 import com.linroid.ketch.app.ui.list.RowCommands
 import com.linroid.ketch.torrent.api.TorrentActivity
+import com.linroid.ketch.torrent.api.TorrentCapabilities
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSnapshot
@@ -102,6 +104,15 @@ class InspectorSnapshots {
         embedded = { StalledTorrents(it, MISSING.copy(reason = TorrentStallReason.NO_PEERS)) }) {
         inspect(TORRENT)
       }
+    }
+  }
+
+  @Test
+  fun inspector_torrent_showsItsInfoHash() {
+    for (theme in SnapshotTheme.entries) {
+      // Before: "inspector-torrent-moving", whose details name no hash.
+      inspector("inspector-torrent-identity", Tall, theme,
+        embedded = { ExportingTorrents(it) }) { inspect(TORRENT) }
     }
   }
 
@@ -395,6 +406,29 @@ private fun remoteRow() = ListFixtures.row(
   device = DeviceInfo(verbatim("NAS-Basement"), RowCapabilities.remote()),
   now = SampleData.NOW,
 ).copy(segments = listOf(Segment(0, 0, 2_399_999_999, 900_000_000)))
+
+/** [SampleData]'s device with torrent controls that export every torrent's identity. */
+private class ExportingTorrents(
+  data: SampleData,
+  private val sample: SampleKetchApi = SampleKetchApi(data),
+) : KetchApi by sample {
+  private val controller = object : TorrentController {
+    override suspend fun capabilities() = TorrentCapabilities(names = setOf("inspect", "export"))
+
+    override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+
+    override suspend fun export(taskId: String, metainfo: Boolean) = TorrentExport(
+      taskId = taskId,
+      name = "archlinux-2026.10.01-x86_64.iso",
+      infoHash = "4c7f3e2b9d1a8f6e5c0b7a3d2e1f9c8b7a6d5e4f",
+      magnet = "magnet:?xt=urn:btih:4c7f3e2b9d1a8f6e5c0b7a3d2e1f9c8b7a6d5e4f",
+    )
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    if (key == TorrentController) controller as T else null
+}
 
 /** [SampleData]'s device with torrent controls, whose every torrent reports [stall]. */
 private class StalledTorrents(
