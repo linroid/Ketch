@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.torrent.control.UnusedHttpEngine
 import com.linroid.ketch.torrent.crypto.torrentRandomBytes
@@ -76,13 +77,18 @@ class TorrentAdoptFilesTest {
     }
   }
 
-  private suspend fun Harness.add(format: TorrentFormat, conflict: FileConflict?): DownloadTask {
-    val created = createTorrent(torrentSystemFileSystem, root / "pack",
+  private suspend fun Harness.add(
+    format: TorrentFormat,
+    conflict: FileConflict?,
+    content: Path = root / "pack",
+    into: Path = root,
+  ): DownloadTask {
+    val created = createTorrent(torrentSystemFileSystem, content,
       TorrentCreateOptions(format = format, pieceLength = 16_384, createdBy = null)) { _, _ -> }
     val resolved = ketch.resolve(ResolveInput.Content(created.metainfo, "pack.torrent"))
     return ketch.download(DownloadRequest(
       url = resolved.url,
-      destination = Destination("$root/"),
+      destination = Destination("$into/"),
       resolvedSource = resolved,
       fileConflict = conflict,
     ))
@@ -111,6 +117,47 @@ class TorrentAdoptFilesTest {
   @Test fun `a v2 torrent uses the files already in place`() = adopts(TorrentFormat.V2)
 
   @Test fun `a hybrid torrent uses the files already in place`() = adopts(TorrentFormat.HYBRID)
+
+  @Test
+  fun `a folder that holds another unfinished download is not taken`() = harness {
+    writeContent()
+    torrentFileSystem.createDirectories(root / "other")
+    torrentFileSystem.write(root / "other" / "x.bin") { write(payload(30_000)) }
+    // No peer has it, so it stays unfinished, inside the folder the next torrent names.
+    val inside = add(TorrentFormat.V1, conflict = null, content = root / "other",
+      into = root / "pack" / "sub")
+    inside.state.first { it is DownloadState.Downloading }
+    while (inside.outputPath == null) delay(20)
+
+    val task = add(TorrentFormat.V2, FileConflict.OVERWRITE)
+
+    task.state.first { it is DownloadState.Downloading }
+    while (task.outputPath == null) delay(20)
+    assertEquals((root / "pack (1)").toString(), task.outputPath)
+    task.cancel()
+    inside.cancel()
+  }
+
+  @Test
+  fun `a single file is used by a v1 torrent and left alone by a v2 one`() = harness {
+    val file = root / "movie.mkv"
+    torrentFileSystem.write(file) { write(payload(70_000)) }
+
+    val v1 = add(TorrentFormat.V1, FileConflict.OVERWRITE, content = file)
+    val completed = assertIs<DownloadState.Completed>(
+      v1.state.first { it is DownloadState.Completed || it is DownloadState.Failed }
+    )
+    assertEquals(file.toString(), completed.outputPath)
+    v1.remove(deleteFiles = false)
+
+    // A v2 torrent keeps its file inside a folder of its name, which a file is in the way of.
+    val v2 = add(TorrentFormat.V2, FileConflict.OVERWRITE, content = file)
+    val failed = assertIs<DownloadState.Failed>(
+      v2.state.first { it is DownloadState.Completed || it is DownloadState.Failed }
+    )
+    assertTrue("inside a folder" in failed.error.describeCauses(), failed.error.describeCauses())
+    assertContentEquals(payload(70_000), torrentFileSystem.read(file) { readByteArray() })
+  }
 
   @Test
   fun `without the request a torrent saves beside what is there`() = harness {

@@ -252,7 +252,10 @@ rest over what differs, and completes, at once when everything matches. With upl
 Keep seeding it then seeds them. Only a download that asks for it does this, never the "When a
 file already exists" setting, as the files are written in place from the first piece on. The
 files become the task's: removing it with its files deletes them. A symbolic link at one of the
-paths is never used. In the SDK, set `DownloadRequest.fileConflict = FileConflict.OVERWRITE`;
+paths is never used, and a folder that holds another unfinished download is left alone: the
+torrent then saves beside it as usual. A v2 or hybrid torrent keeps its files inside a folder of
+its name even when it has one file, so a single file is used as it is only by a v1 torrent; for
+a v2 one, put the file in a folder of the same name first. In the SDK, set `DownloadRequest.fileConflict = FileConflict.OVERWRITE`;
 devices that can do this list the `import` capability.
 
 ## Seeding and uploading

@@ -1286,7 +1286,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `fileConflict = OVERWRITE` (`ketch add --overwrite`, never the setting, as a source that
   writes its own files works in place) gets the name Ketch chose although a folder or file has
   it (`DownloadExecution.existingPath`, `OutputPathReservations.reserveExisting`; not while a
-  running download reserved it or another unfinished task saves there). The v1 store uses
+  running download reserved it or a path below it, or another unfinished task saves there,
+  above it or anywhere inside it). A file where a v2 or hybrid torrent's folder goes, as for a
+  single-file torrent, fails the run saying so (`FILE_FOR_FOLDER`); a v1 torrent uses it. The v1 store uses
   files it finds and checks them; the v2 store takes existing folders and regular files as its
   own (`TorrentV2PieceStore(adoptExisting)`, as a recheck does; never a
   symbolic link), so they are checked like owned ones, written over where they differ, and

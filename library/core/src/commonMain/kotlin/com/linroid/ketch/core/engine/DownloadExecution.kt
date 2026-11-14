@@ -1222,24 +1222,29 @@ internal class DownloadExecution(
    * Reserves and returns [outputPath] for a source that writes its own files and uses the ones
    * already there, as a request with [FileConflict.OVERWRITE] asks: the source proves what the
    * path holds and writes over what differs. `null`, reserving nothing, when a running download
-   * reserved the path or another unfinished task saves there or in a folder of that name, and
-   * the download gets a free name instead.
+   * reserved the path or one below it, or another unfinished task saves there, in a folder of
+   * that name or anywhere below it, as the source would write that task's files: the download
+   * gets a free name instead.
    */
   private fun existingPath(outputPath: String): String? {
-    if (takenByAnotherTask(outputPath)) {
+    if (takenByAnotherTask(outputPath, below = true)) {
       log.d { "Not using another task's output for taskId=$taskId" }
       return null
     }
     return OutputPathReservations.reserveExisting(outputPath)?.also { reservedPaths += it }
   }
 
-  /** Whether another unfinished task saves at [outputPath] or in a folder above it. */
-  private fun takenByAnotherTask(outputPath: String): Boolean {
+  /**
+   * Whether another unfinished task saves at [outputPath] or in a folder above it, and with
+   * [below] also anywhere inside it, for a path that is used as a folder.
+   */
+  private fun takenByAnotherTask(outputPath: String, below: Boolean = false): Boolean {
     val path = outputPath.toPath().normalized()
     return unfinishedOutputs().any { other ->
       if (other.contains("://")) return@any false
       val owned = other.toPath().normalized()
-      path == owned || generateSequence(path.parent) { it.parent }.any { it == owned }
+      path == owned || generateSequence(path.parent) { it.parent }.any { it == owned } ||
+        below && generateSequence(owned.parent) { it.parent }.any { it == path }
     }
   }
 

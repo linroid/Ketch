@@ -134,6 +134,11 @@ internal class TorrentV2PieceStore(
       // Also a restored root whose claim no longer held, which an adopting store dropped.
       if (root == null || destination !in owned) {
         if (!adoptable(destination, directory = true)) {
+          // A v2 torrent's files live inside its folder, also when it has one file: a file of
+          // the torrent's name is never that file, and stays where it is.
+          if (adoptExisting && fileSystem.metadataOrNull(destination)?.isRegularFile == true) {
+            throw IOException(FILE_FOR_FOLDER)
+          }
           fileSystem.createDirectory(destination, mustCreate = true)
         }
         root = destination
@@ -805,5 +810,7 @@ internal class TorrentV2PieceStore(
 
   private companion object {
     const val IN_THE_WAY = "A file Ketch does not own is in the way"
+    const val FILE_FOR_FOLDER = "This torrent saves its files inside a folder of its name, " +
+      "and a file has that name: move the file into a folder of the same name to use it"
   }
 }
