@@ -429,8 +429,11 @@ when it runs in a terminal.
 | `--overwrite` | Replace an existing `.torrent` file |
 | `--json` | Print `file`, `name`, `infoHash`, `infoHashV2`, `magnet`, `size`, `pieceLength` and `files` as JSON |
 
-It exits 0 on success, 1 when the content cannot be read or made into a torrent or the file
-exists, and 2 for invalid arguments.
+The file is never saved inside the folder it describes, where the next run would list it as
+content: with a folder as `<path>`, run the command from elsewhere or pass `--output`.
+
+It exits 0 on success, 1 when the content cannot be read or made into a torrent, the file
+exists or it would be saved inside `<path>`, and 2 for invalid arguments.
 
 ## Server
 

@@ -161,6 +161,18 @@ internal fun runCreate(
     err.println("Error: ${run.path} does not exist")
     return CreateExit.FAILED
   }
+  // A file written into the folder afterwards would not be the one hashed, and the next run
+  // would list it as content: the place is settled, and refused, before anything is hashed.
+  val named = run.output?.let { File(it).absoluteFile }
+  val inside = named?.let { if (it.isDirectory) it else it.parentFile }
+    ?: File("").absoluteFile
+  if (source.isDirectory && isInside(inside, source)) {
+    err.println(
+      "Error: the .torrent file would be saved inside ${run.path}, which it describes; " +
+        "save it elsewhere with --output"
+    )
+    return CreateExit.FAILED
+  }
   var shown = -1
   val created = try {
     runBlocking {
@@ -215,6 +227,13 @@ internal fun runCreate(
     created.magnet?.let(out::println)
   }
   return CreateExit.OK
+}
+
+/** Whether [file] is [folder] or below it, as far as both can be resolved. */
+internal fun isInside(file: File, folder: File): Boolean {
+  val root = runCatching { folder.canonicalFile }.getOrDefault(folder.absoluteFile).toPath()
+  val path = runCatching { file.canonicalFile }.getOrDefault(file.absoluteFile).toPath()
+  return path.startsWith(root)
 }
 
 /** Prints the usage of `ketch create` to [out]. */

@@ -125,6 +125,26 @@ class CreateTorrentTest {
     }
 
   @Test
+  fun `create never saves the torrent file into the folder it describes`() = inFolder { folder ->
+    File(folder, "pack/sub").mkdirs()
+    File(folder, "pack/a.bin").writeBytes(ByteArray(100) { it.toByte() })
+
+    val inside = run("-o", File(folder, "pack/pack.torrent").path, File(folder, "pack").path)
+    val below = run("-o", File(folder, "pack/sub").path, File(folder, "pack").path)
+
+    assertEquals(CreateExit.FAILED, inside.status)
+    assertTrue("inside" in inside.err)
+    assertEquals(CreateExit.FAILED, below.status)
+    assertEquals(listOf("a.bin", "sub"), File(folder, "pack").list()?.sorted())
+    // Beside the folder is fine, as is anywhere for a single file.
+    assertEquals(CreateExit.OK, run("-o", folder.path, File(folder, "pack").path).status)
+    assertEquals(
+      CreateExit.OK,
+      run("-o", File(folder, "pack/a.torrent").path, File(folder, "pack/a.bin").path).status,
+    )
+  }
+
+  @Test
   fun `create fails for content that is missing or cannot become a torrent`() = inFolder { folder ->
     val missing = run(File(folder, "none").path)
     assertEquals(CreateExit.FAILED, missing.status)

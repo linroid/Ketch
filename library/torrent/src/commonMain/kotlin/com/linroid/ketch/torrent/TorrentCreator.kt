@@ -306,6 +306,8 @@ private fun listEntries(fileSystem: FileSystem, root: Path): List<CreateEntry> {
       if (metadata.symlinkTarget != null) continue
       val path = components + child.name
       if (metadata.isDirectory) {
+        // A folder's name is part of the path of every file below it.
+        validateTorrentComponent(child.name)
         walk(child, path, depth + 1)
       } else if (metadata.isRegularFile) {
         validateTorrentComponent(child.name)

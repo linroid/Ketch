@@ -199,6 +199,9 @@ class TorrentCreatorTest {
         create(root / "a.bin", bare.copy(webSeeds = listOf("ftp://mirror.example/a.bin")))
       }
       assertFailsWith<IllegalArgumentException> { create(root / "a.bin", bare.copy(name = "a/b")) }
+      // A folder's name goes into the path of every file below it.
+      write(root / "odd" / "tab\there" / "a.bin", ByteArray(10))
+      assertFailsWith<IllegalArgumentException> { create(root / "odd", bare) }
     }
   }
 }
