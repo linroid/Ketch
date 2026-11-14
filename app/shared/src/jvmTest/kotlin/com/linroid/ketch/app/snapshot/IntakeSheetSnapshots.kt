@@ -220,6 +220,18 @@ class IntakeSheetSnapshots {
   }
 
   @Test
+  fun optionsPopover_torrent_offersTheFilesAlreadyThere() {
+    intakeSnapshots("intake-options-torrent", DESKTOP_ONLY, resolve = ::problemResolve) {
+      val session = state.intake.start(IntakeRequest(MAGNET))
+      session.useExistingFiles = true
+      state.intake.resume(session)
+      scene.settle()
+      // The Options pill sits lower in a torrent's sheet, under its file list.
+      scene.click(748.dp, 562.dp)
+    }
+  }
+
+  @Test
   fun existingFile_desktopAndPhone_warnsAndOffersTheChoice() {
     for (choice in FileConflict.entries) {
       intakeSnapshots("intake-exists-${choice.name.lowercase()}", DESKTOP_AND_PHONE) {

@@ -60,6 +60,7 @@ import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.RemoteConfig
 import com.linroid.ketch.config.ThemeMode
 import com.linroid.ketch.config.UiPreferences
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -469,7 +470,8 @@ internal class SampleKetchApi(
     // A device on this version, like the embedded one, whose features the app gets without
     // asking, shared through a server that saves the settings other devices change; one without
     // speed modes stands for an older Ketch.
-    features = KetchFeatures.ALL + KetchFeatures.CONFIG_PERSISTED -
+    features = KetchFeatures.ALL + KetchFeatures.CONFIG_PERSISTED +
+      TorrentFeatures.EXISTING_FILES -
       setOfNotNull(KetchFeatures.SPEED_MODES.takeIf { speedModes == null }),
   )
 

@@ -152,6 +152,10 @@ import ketch.app.shared.generated.resources.intake_conflict_rename
 import ketch.app.shared.generated.resources.intake_conflict_overwrite_caption
 import ketch.app.shared.generated.resources.intake_conflict_overwrite
 import ketch.app.shared.generated.resources.intake_conflict
+import ketch.app.shared.generated.resources.intake_existing_files
+import ketch.app.shared.generated.resources.intake_existing_files_caption
+import ketch.app.shared.generated.resources.intake_existing_files_use
+import com.linroid.ketch.app.components.KetchSwitch
 import androidx.compose.runtime.LaunchedEffect
 import com.linroid.ketch.api.FileConflict
 
@@ -374,6 +378,18 @@ internal fun OptionsPanel(session: IntakeSession, modifier: Modifier = Modifier)
       }
     }
     ConnectionsField(session)
+    if (session.offersExistingFiles) {
+      OptionField(
+        label = stringResource(Res.string.intake_existing_files),
+        caption = stringResource(Res.string.intake_existing_files_caption),
+      ) {
+        KetchSwitch(
+          checked = session.useExistingFiles,
+          onCheckedChange = { session.useExistingFiles = it },
+          label = stringResource(Res.string.intake_existing_files_use),
+        )
+      }
+    }
     if (session.offersFileConflict) {
       OptionField(
         label = stringResource(Res.string.intake_conflict),

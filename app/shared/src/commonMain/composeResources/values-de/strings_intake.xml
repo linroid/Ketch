@@ -224,6 +224,9 @@
   <string name="intake_conflict_overwrite">Überschreiben</string>
   <string name="intake_conflict_rename_caption">Speichert daneben unter neuem Namen.</string>
   <string name="intake_conflict_overwrite_caption">Ersetzt sie, sobald der Download fertig ist.</string>
+  <string name="intake_existing_files">Vorhandene Torrent-Dateien</string>
+  <string name="intake_existing_files_use">Verwenden</string>
+  <string name="intake_existing_files_caption">Prüft die Dateien mit dem Namen des Torrents im Ordner und lädt nur, was fehlt oder abweicht. Aus: Der Torrent wird daneben gespeichert.</string>
   <string name="intake_option_overwrite">Überschreibt vorhandene Dateien</string>
   <string name="intake_option_rename">Behält vorhandene Dateien</string>
   <string name="intake_exists_rename">%1$s ist schon in diesem Ordner. Dieser Download wird als %2$s gespeichert.</string>

@@ -1293,6 +1293,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   own (`TorrentV2PieceStore(adoptExisting)`, as a recheck does; never a
   symbolic link), so they are checked like owned ones, written over where they differ, and
   deleted with the task's files. Without the request torrents still save beside what is there.
+  The source lists `TorrentFeatures.EXISTING_FILES` (`torrent.existingFiles`) in
+  `KetchStatus.features`, which the add sheet reads to offer torrents a "Use them" switch under
+  Options (`IntakeSession.offersExistingFiles`, `useExistingFiles`); only that switch, never the
+  device's file conflict setting, puts `OVERWRITE` on a torrent's request.
   Tests: `TorrentAdoptFilesTest` (created v1, v2 and hybrid torrents complete from the files
   in place without a peer)
 - Creation: `TorrentCreator.create(path, TorrentCreateOptions, onProgress)` (public, in

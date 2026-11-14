@@ -12,6 +12,13 @@ object TorrentFeatures {
    */
   const val CONTROL: String = "torrent.control"
 
+  /**
+   * A torrent request that asks to overwrite ([com.linroid.ketch.api.FileConflict.OVERWRITE])
+   * uses the files of its name already in the folder: it checks them and downloads only what is
+   * missing or different. Without it, such a request saves beside them.
+   */
+  const val EXISTING_FILES: String = "torrent.existingFiles"
+
   /** Every torrent feature this version of Ketch supports. */
-  val ALL: Set<String> = setOf(CONTROL)
+  val ALL: Set<String> = setOf(CONTROL, EXISTING_FILES)
 }

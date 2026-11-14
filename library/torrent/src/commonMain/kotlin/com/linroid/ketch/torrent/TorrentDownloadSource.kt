@@ -249,7 +249,7 @@ class TorrentDownloadSource(
     TorrentSourceState.serializer()
   override val managesOwnFileIo: Boolean = true
   override val features: Set<String> = setOf(KetchFeatures.FILE_SELECTION,
-    KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL)
+    KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL, TorrentFeatures.EXISTING_FILES)
 
   /**
    * The torrent controls of the Ketch that runs this source: the [TorrentController] that

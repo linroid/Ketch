@@ -224,6 +224,9 @@
   <string name="intake_conflict_overwrite">Substituir</string>
   <string name="intake_conflict_rename_caption">Salva ao lado dele com outro nome.</string>
   <string name="intake_conflict_overwrite_caption">Substitui o arquivo quando o download termina.</string>
+  <string name="intake_existing_files">Arquivos do torrent já presentes</string>
+  <string name="intake_existing_files_use">Usá-los</string>
+  <string name="intake_existing_files_caption">Verifica os arquivos com o nome do torrent na pasta e baixa apenas o que falta ou difere. Desativado, o torrent é salvo ao lado deles.</string>
   <string name="intake_option_overwrite">Substitui arquivos existentes</string>
   <string name="intake_option_rename">Mantém arquivos existentes</string>
   <string name="intake_exists_rename">%1$s já está nesta pasta. Este download será salvo como %2$s.</string>

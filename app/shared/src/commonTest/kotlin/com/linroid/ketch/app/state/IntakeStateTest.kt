@@ -32,6 +32,7 @@ import com.linroid.ketch.app.util.extractFilename
 import com.linroid.ketch.config.IntakePreferences
 import com.linroid.ketch.config.KetchConfig
 import com.linroid.ketch.config.UiPreferences
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -1032,6 +1033,52 @@ class IntakeStateTest {
     val request = api.base.requests.single()
     assertEquals("/Volumes/Data/report.pdf", request.destination?.value)
     assertEquals(FileConflict.RENAME, request.fileConflict)
+  }
+
+  @Test
+  fun existingFiles_chosenForATorrent_asksItsRequestToOverwrite() = runTest {
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+    fun api() = IntakeTestApi(
+      features = KetchFeatures.ALL + TorrentFeatures.EXISTING_FILES,
+      // Never the device's setting: a torrent works in place from its first piece.
+      config = DownloadConfig(fileConflict = FileConflict.OVERWRITE),
+      check = { url, _ -> torrent(url) },
+    )
+    val unchosen = api()
+    val session = session(unchosen, IntakeRequest(magnet))
+    runCurrent()
+
+    assertTrue(session.offersExistingFiles)
+    assertFalse(session.useExistingFiles)
+    session.submit {}
+    runCurrent()
+    assertNull(unchosen.base.requests.single().fileConflict)
+
+    val chosen = api()
+    val again = session(chosen, IntakeRequest(magnet))
+    runCurrent()
+    again.useExistingFiles = true
+    again.submit {}
+    runCurrent()
+    assertEquals(FileConflict.OVERWRITE, chosen.base.requests.single().fileConflict)
+  }
+
+  @Test
+  fun existingFiles_withoutATorrentOrTheFeature_isNotOffered() = runTest {
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+    val older = IntakeTestApi(features = KetchFeatures.ALL, check = { url, _ -> torrent(url) })
+    val onOlder = session(older, IntakeRequest(magnet))
+    runCurrent()
+    onOlder.useExistingFiles = true
+    assertFalse(onOlder.offersExistingFiles)
+    onOlder.submit {}
+    runCurrent()
+    assertNull(older.base.requests.single().fileConflict)
+
+    val current = IntakeTestApi(features = KetchFeatures.ALL + TorrentFeatures.EXISTING_FILES)
+    val link = session(current, IntakeRequest(links.first()))
+    runCurrent()
+    assertFalse(link.offersExistingFiles)
   }
 
   @Test

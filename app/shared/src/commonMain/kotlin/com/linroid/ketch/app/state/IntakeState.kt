@@ -65,6 +65,7 @@ import com.linroid.ketch.app.util.urlHost
 import com.linroid.ketch.app.util.withCredentials
 import com.linroid.ketch.config.ClipboardMode
 import com.linroid.ketch.config.IntakePreferences
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_retry
 import ketch.app.shared.generated.resources.action_review
@@ -909,6 +910,27 @@ class IntakeSession internal constructor(
     }
 
   /**
+   * Whether the sheet offers torrents the files of their name already in the folder: when adding
+   * a torrent to a device that can use them ([TorrentFeatures.EXISTING_FILES]), unless the
+   * folder was picked through the system, where torrents never save.
+   */
+  val offersExistingFiles: Boolean
+    get() {
+      if (mode != IntakeMode.Add || TorrentFeatures.EXISTING_FILES !in targetFeatures()) {
+        return false
+      }
+      val saveTo = folder ?: defaultFolder
+      if (saveTo?.startsWith(CONTENT_SCHEME, ignoreCase = true) == true) return false
+      return entries.any { it.isTorrent }
+    }
+
+  /**
+   * Whether the torrents use files of their name that are already in the folder, checking them
+   * and downloading only what differs, rather than saving beside them; off until chosen.
+   */
+  var useExistingFiles: Boolean by mutableStateOf(false)
+
+  /**
    * What the downloads do when a file of their name exists: the device's setting until the sheet
    * chooses otherwise.
    */
@@ -1638,8 +1660,11 @@ class IntakeSession internal constructor(
     // A file path is replaced as it is unless its request says what to do, so the sheet says
     // whenever it names one; otherwise only a choice other than the device's setting is sent.
     val namesFile = folder != null && !isSystemFolder && !named.isNullOrBlank()
-    val conflict = fileConflict.takeIf {
-      offersFileConflict && !entry.isTorrent && (namesFile || fileConflictChanged)
+    val conflict = if (entry.isTorrent) {
+      // A torrent works in place, so only the choice made for it asks to use what is there.
+      FileConflict.OVERWRITE.takeIf { offersExistingFiles && useExistingFiles }
+    } else {
+      fileConflict.takeIf { offersFileConflict && (namesFile || fileConflictChanged) }
     }
     return urls.mapIndexedNotNull { index, url ->
       try {

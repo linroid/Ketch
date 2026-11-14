@@ -224,6 +224,9 @@
   <string name="intake_conflict_overwrite">Remplacer</string>
   <string name="intake_conflict_rename_caption">L'enregistre à côté sous un autre nom.</string>
   <string name="intake_conflict_overwrite_caption">Le remplace une fois le téléchargement terminé.</string>
+  <string name="intake_existing_files">Fichiers du torrent déjà présents</string>
+  <string name="intake_existing_files_use">Les utiliser</string>
+  <string name="intake_existing_files_caption">Vérifie les fichiers portant le nom du torrent dans le dossier et ne télécharge que ce qui manque ou diffère. Désactivé, le torrent est enregistré à côté.</string>
   <string name="intake_option_overwrite">Remplace les fichiers existants</string>
   <string name="intake_option_rename">Conserve les fichiers existants</string>
   <string name="intake_exists_rename">%1$s est déjà dans ce dossier. Ce téléchargement sera enregistré sous le nom %2$s.</string>

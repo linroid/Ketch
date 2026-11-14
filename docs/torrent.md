@@ -240,8 +240,9 @@ libtorrent, which opens them and finds the files complete.
 
 A torrent normally saves into a folder of its own: when a file or folder of its name exists,
 Ketch saves beside it as `name (1)`. To use what is there instead, such as the content of a
-torrent you just created or files another client downloaded, add the torrent with `--overwrite`
-into the folder that holds them:
+torrent you just created or files another client downloaded, switch on **Torrent files already
+there → Use them** under Options in the Add sheet, or add the torrent with `--overwrite` into the
+folder that holds them:
 
 ```bash
 ketch add --overwrite holiday.torrent ~/Videos/
@@ -569,9 +570,9 @@ tracker's staff to allow Ketch if it is refused.
   with an error that says so, when it is resolved or previewed, as a link or a file's content, and
   a link added directly fails as soon as it starts. Many
   peers or large pieces use more memory. A torrent or magnet keeps its first 128 trackers.
-- Ketch creates torrents from the CLI and the SDK (see [creating a torrent](#creating-a-torrent))
-  and seeds files already on disk (see [using files you already have](#using-files-you-already-have));
-  the apps have no screen for either yet.
+- Ketch creates torrents from the CLI and the SDK (see [creating a torrent](#creating-a-torrent));
+  the apps have no screen for that yet. Files already on disk can be used and seeded from the
+  apps and the CLI (see [using files you already have](#using-files-you-already-have)).
 
 ## For developers
 

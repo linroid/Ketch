@@ -297,6 +297,10 @@
   <string name="intake_conflict_overwrite">Overwrite</string>
   <string name="intake_conflict_rename_caption">Saves beside it under a new name.</string>
   <string name="intake_conflict_overwrite_caption">Replaces it once the download finishes.</string>
+  <!-- An option for torrents in the add sheet: use files of the torrent's name that are already in the folder. -->
+  <string name="intake_existing_files">Torrent files already there</string>
+  <string name="intake_existing_files_use">Use them</string>
+  <string name="intake_existing_files_caption">Checks the files of the torrent's name in the folder and downloads only what is missing or different. Off, the torrent saves beside them.</string>
   <!-- Chips of that option once it differs from the device's setting. -->
   <string name="intake_option_overwrite">Overwrites existing files</string>
   <string name="intake_option_rename">Keeps existing files</string>
