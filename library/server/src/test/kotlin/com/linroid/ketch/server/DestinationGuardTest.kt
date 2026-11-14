@@ -383,6 +383,23 @@ class DestinationGuardTest {
     }
 
   @Test
+  fun `POST with a token to another folder keeps renaming once the configuration overwrites`() =
+    testApplication {
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+      )
+
+      val elsewhere = client.createTask("${outside.path}/")
+
+      // The task reads the configuration when it starts, which may be after it changed.
+      assertEquals(
+        FileConflict.RENAME,
+        json.decodeFromString<TaskSnapshot>(elsewhere.bodyAsText()).request.fileConflict,
+      )
+    }
+
+  @Test
   fun `POST with a token asking to overwrite still never names an existing file`() =
     testApplication {
       File(downloads, "file.zip").writeText("keep")

@@ -55,7 +55,8 @@ internal class DestinationGuard(
    * [allowedDirectories]: elsewhere callers may add files, as owners do on their other devices,
    * but never replace one. A request that only follows [DownloadConfig.fileConflict], which the
    * owner set, is made to save beside existing files ([FileConflict.RENAME]) in such a folder
-   * instead of being refused. A file the caller names is given a free name as before.
+   * instead of being refused, also while the configuration renames, as a queued or scheduled
+   * task reads it only when it starts. A file the caller names is given a free name as before.
    *
    * @throws PathRejectedException if the destination lies outside the folders
    * @throws OverwriteRejectedException if the request may not replace existing files
@@ -68,14 +69,14 @@ internal class DestinationGuard(
       throw OverwriteRejectedException("Replacing existing files needs the API token")
     }
     val placed = placed(request, directory)
-    val overwrites = asked ||
-      (request.fileConflict == null && status.config.fileConflict == FileConflict.OVERWRITE)
-    if (!overwrites || replaceableIn(placed.destination, directory)) return placed
+    if (replaceableIn(placed.destination, directory)) return placed
     if (asked) {
       throw OverwriteRejectedException(
         "Existing files are only replaced in the download folder and the allowed folders",
       )
     }
+    // Whatever the configuration says now: a task reads it when it starts, which may be after
+    // the owner switched to overwriting.
     return placed.copy(fileConflict = FileConflict.RENAME)
   }
 
