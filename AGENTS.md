@@ -1902,6 +1902,21 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   a delegate of its own, only in an app bundle), Windows and Linux tray balloons are told apart
   from icon clicks by their lack of mouse events (`TrayClicks`, taking the last balloon posted),
   and `notify-send` waits for its `default` action
+- Android's ongoing notification (`AndroidNotifier.ongoingNotification`, posted only while
+  `ForegroundStatus.isRequired` keeps `KetchService` in the foreground: downloads, the local
+  server or Discover) shows as `OngoingPresentation.of(settings)` says. `[notifications]
+  statusBarIcon` (on) posts it in `CHANNEL_PROGRESS` (`downloads_progress`, default importance
+  without sound or vibration), as Android can hide the status bar icons of silent channels and
+  some devices always do; off posts it in `CHANNEL_ACTIVE` (`downloads_active`, low importance,
+  the only one before). Only the channel in use exists (`removeUnusedChannel`, after the
+  notification is posted in the other, as Android refuses before). `liveUpdates` (on) asks
+  Android 16+ to promote a single download to a Live Update with a segment per connection
+  (`isLiveUpdate`); off posts the plain progress bar. Both read leniently (anything but a Boolean
+  is on) and are followed live (`KetchService.present`). Settings → Notifications → Download
+  progress shows the switches, Live Updates only where `SystemNotifications.liveUpdates`, and a
+  row that opens the system's notification settings, only where the host provides
+  `LocalSystemNotifications` (Android's `AndroidSystemNotifications`;
+  `SettingsFeature.OngoingNotification` and `LiveUpdates` in search)
 - Success feedback (`SuccessFeedback`, `[notifications] successSound` / `successVibration`): a
   synthesized soft `Chime` and, on Android, a short vibration when a download finishes and is
   reported (`QueueDrained` included), or a Discover turn ends with results

@@ -175,6 +175,15 @@
   <string name="settings_notifications_allow_button">허용</string>
   <string name="settings_notifications_blocked">알림이 차단됨</string>
   <string name="settings_notifications_blocked_hint">브라우저 설정에서 이 사이트의 알림을 허용하세요.</string>
+  <string name="settings_notifications_progress">다운로드 진행 상황</string>
+  <string name="settings_notifications_progress_footer">이 알림은 Ketch가 다운로드하거나, 이 기기를 공유하거나, 검색하는 동안에만 표시됩니다.</string>
+  <string name="settings_notifications_status_bar">상태 표시줄에 표시</string>
+  <string name="settings_notifications_status_bar_on">다운로드하는 동안 상태 표시줄에 Ketch 아이콘이 표시됩니다.</string>
+  <string name="settings_notifications_status_bar_off">무음 알림으로 분류되며, 휴대전화가 아이콘을 숨길 수 있습니다.</string>
+  <string name="settings_notifications_live_updates">실시간 업데이트</string>
+  <string name="settings_notifications_live_updates_hint">다운로드가 하나일 때 진행 상황을 상태 표시줄의 칩으로 표시합니다.</string>
+  <string name="settings_notifications_system">시스템 알림 설정</string>
+  <string name="settings_notifications_system_hint">알림 종류별로 소리, 잠금 화면 등을 설정합니다.</string>
 
   <string name="settings_integration_extension">브라우저 확장 프로그램</string>
   <string name="settings_integration_extension_footer">브라우저의 다운로드를 사이트 쿠키와 함께 Ketch로 보냅니다.</string>
@@ -721,6 +730,9 @@
   <string name="settings_search_devices_keywords">음소거, 원격, NAS, 연결 유지</string>
   <string name="settings_search_browser_notifications">이 브라우저에서 Ketch 알림 표시</string>
   <string name="settings_search_browser_notifications_keywords">권한, 허용, 알림</string>
+  <string name="settings_search_status_bar_keywords">아이콘, 진행 중, 진행률, 실행 중, 무음</string>
+  <string name="settings_search_live_updates_keywords">칩, 캡슐, 알약, 아일랜드, 실시간 알림</string>
+  <string name="settings_search_system_notifications_keywords">채널, 카테고리, 소리, 잠금 화면</string>
   <string name="settings_search_extension">브라우저 다운로드를 Ketch로 보내기</string>
   <string name="settings_search_extension_keywords">chrome, 크롬, edge, 엣지, firefox, 파이어폭스, brave, 브레이브, arc, vivaldi, 웨일, 가로채기, 확장</string>
   <string name="settings_search_magnet_keywords">기본 앱, 연결 프로그램, 프로토콜, 마그넷</string>

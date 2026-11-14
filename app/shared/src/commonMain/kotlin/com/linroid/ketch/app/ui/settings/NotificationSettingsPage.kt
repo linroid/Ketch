@@ -17,7 +17,9 @@ import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.detail
 import com.linroid.ketch.app.instance.displayName
+import com.linroid.ketch.app.platform.LocalSystemNotifications
 import com.linroid.ketch.app.platform.SuccessFeedbackSupport
+import com.linroid.ketch.app.platform.SystemNotifications
 import com.linroid.ketch.app.platform.successFeedbackSupport
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.deviceId
@@ -25,6 +27,7 @@ import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.config.NotificationMode
 import com.linroid.ketch.config.NotificationSettings
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_open
 import ketch.app.shared.generated.resources.settings_notifications_all_finished
 import ketch.app.shared.generated.resources.settings_notifications_all_finished_hint
 import ketch.app.shared.generated.resources.settings_notifications_all_finished_off
@@ -51,7 +54,14 @@ import ketch.app.shared.generated.resources.settings_notifications_mode_in_app
 import ketch.app.shared.generated.resources.settings_notifications_mode_notify
 import ketch.app.shared.generated.resources.settings_notifications_mode_off
 import ketch.app.shared.generated.resources.settings_notifications_offline
+import ketch.app.shared.generated.resources.settings_notifications_live_updates
+import ketch.app.shared.generated.resources.settings_notifications_live_updates_hint
 import ketch.app.shared.generated.resources.settings_notifications_offline_hint
+import ketch.app.shared.generated.resources.settings_notifications_progress
+import ketch.app.shared.generated.resources.settings_notifications_progress_footer
+import ketch.app.shared.generated.resources.settings_notifications_status_bar
+import ketch.app.shared.generated.resources.settings_notifications_status_bar_off
+import ketch.app.shared.generated.resources.settings_notifications_status_bar_on
 import ketch.app.shared.generated.resources.settings_notifications_success
 import ketch.app.shared.generated.resources.settings_notifications_success_footer
 import ketch.app.shared.generated.resources.settings_notifications_success_footer_phone
@@ -59,6 +69,8 @@ import ketch.app.shared.generated.resources.settings_notifications_success_sound
 import ketch.app.shared.generated.resources.settings_notifications_success_sound_hint
 import ketch.app.shared.generated.resources.settings_notifications_success_vibration
 import ketch.app.shared.generated.resources.settings_notifications_success_vibration_hint
+import ketch.app.shared.generated.resources.settings_notifications_system
+import ketch.app.shared.generated.resources.settings_notifications_system_hint
 import ketch.app.shared.generated.resources.settings_notifications_this_device
 import org.jetbrains.compose.resources.stringResource
 
@@ -93,13 +105,15 @@ internal expect fun rememberNotificationPermission(): NotificationPermission?
 /**
  * Which events Ketch reports and how: as a notification, only inside the app, or not at all,
  * for which devices, and the success feedback. In the web app the browser's permission is asked
- * from here, when a report is turned on, never on load.
+ * from here, when a report is turned on, never on load. On Android, where
+ * [LocalSystemNotifications] is provided, also how the notification of running downloads shows.
  */
 @Composable
 fun NotificationSettingsPage(state: AppState) {
   val appSettings = state.appSettings
   val settings = appSettings.config.notifications
   val permission = rememberNotificationPermission()
+  val system = LocalSystemNotifications.current
   val save = { transform: (NotificationSettings) -> NotificationSettings ->
     appSettings.saveNotifications(transform)
   }
@@ -173,6 +187,8 @@ fun NotificationSettingsPage(state: AppState) {
     )
   }
 
+  if (system != null) OngoingNotificationGroup(settings, system, save)
+
   if (successFeedbackSupport != SuccessFeedbackSupport.None) {
     SuccessFeedbackGroup(
       settings = settings,
@@ -186,6 +202,56 @@ fun NotificationSettingsPage(state: AppState) {
       val muted = if (notify) it.mutedDevices - deviceId else it.mutedDevices + deviceId
       it.copy(mutedDevices = muted.distinct())
     }
+  }
+}
+
+/**
+ * How the Android download service's notification of running downloads shows: with its icon in
+ * the status bar or among the silent notifications, and, where the system has them, as a Live
+ * Update. The last row leads to the system's settings for each kind of notification.
+ */
+@Composable
+private fun OngoingNotificationGroup(
+  settings: NotificationSettings,
+  system: SystemNotifications,
+  save: ((NotificationSettings) -> NotificationSettings) -> Unit,
+) {
+  SettingsGroup(
+    title = stringResource(Res.string.settings_notifications_progress),
+    footer = stringResource(Res.string.settings_notifications_progress_footer),
+  ) {
+    SettingsSwitchRow(
+      title = stringResource(Res.string.settings_notifications_status_bar),
+      description = stringResource(
+        if (settings.statusBarIcon) {
+          Res.string.settings_notifications_status_bar_on
+        } else {
+          Res.string.settings_notifications_status_bar_off
+        },
+      ),
+      checked = settings.statusBarIcon,
+      onCheckedChange = { on -> save { it.copy(statusBarIcon = on) } },
+    )
+    if (system.liveUpdates) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_notifications_live_updates),
+        description = stringResource(Res.string.settings_notifications_live_updates_hint),
+        checked = settings.liveUpdates,
+        onCheckedChange = { on -> save { it.copy(liveUpdates = on) } },
+      )
+    }
+    SettingsRow(
+      title = stringResource(Res.string.settings_notifications_system),
+      description = stringResource(Res.string.settings_notifications_system_hint),
+      trailing = {
+        KetchButton(
+          text = stringResource(Res.string.action_open),
+          onClick = system::openSettings,
+          variant = KetchButtonVariant.Secondary,
+          size = KetchButtonSize.Small,
+        )
+      },
+    )
   }
 }
 

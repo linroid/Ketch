@@ -175,6 +175,15 @@
   <string name="settings_notifications_allow_button">許可</string>
   <string name="settings_notifications_blocked">通知はブロックされています</string>
   <string name="settings_notifications_blocked_hint">ブラウザの設定で、このサイトの通知を許可してください。</string>
+  <string name="settings_notifications_progress">ダウンロードの進行状況</string>
+  <string name="settings_notifications_progress_footer">この通知は、Ketchがダウンロード、このデバイスの共有、検索を行っている間だけ表示されます。</string>
+  <string name="settings_notifications_status_bar">ステータスバーに表示</string>
+  <string name="settings_notifications_status_bar_on">ダウンロード中、ステータスバーにKetchのアイコンを表示します。</string>
+  <string name="settings_notifications_status_bar_off">サイレント通知として扱われ、アイコンが非表示になる場合があります。</string>
+  <string name="settings_notifications_live_updates">ライブアップデート</string>
+  <string name="settings_notifications_live_updates_hint">ダウンロードが1件のとき、進行状況をステータスバーのチップで表示します。</string>
+  <string name="settings_notifications_system">システムの通知設定</string>
+  <string name="settings_notifications_system_hint">通知の種類ごとに、音やロック画面での表示などを設定します。</string>
 
   <string name="settings_integration_extension">ブラウザ拡張機能</string>
   <string name="settings_integration_extension_footer">ブラウザのダウンロードを、サイトのCookieと一緒にKetchに送信します。</string>
@@ -721,6 +730,9 @@
   <string name="settings_search_devices_keywords">ミュート, リモート, NAS, 接続を維持</string>
   <string name="settings_search_browser_notifications">このブラウザでKetchの通知を表示する</string>
   <string name="settings_search_browser_notifications_keywords">許可, アクセス許可, 権限</string>
+  <string name="settings_search_status_bar_keywords">アイコン, 常駐, 進行状況, 実行中, サイレント</string>
+  <string name="settings_search_live_updates_keywords">チップ, カプセル, ピル, アイランド, ライブ通知</string>
+  <string name="settings_search_system_notifications_keywords">チャンネル, カテゴリ, 音, ロック画面</string>
   <string name="settings_search_extension">ブラウザのダウンロードをKetchに送信</string>
   <string name="settings_search_extension_keywords">chrome, edge, firefox, brave, arc, vivaldi, 取り込み, 拡張, アドオン</string>
   <string name="settings_search_magnet_keywords">デフォルトのアプリ, 既定のアプリ, 関連付け, プロトコル</string>

@@ -19,6 +19,8 @@ import com.linroid.ketch.app.platform.DesktopHooks
 import com.linroid.ketch.app.platform.IntegrationStatus
 import com.linroid.ketch.app.platform.LocalDesktopHooks
 import com.linroid.ketch.app.platform.LocalIntegrationStatus
+import com.linroid.ketch.app.platform.LocalSystemNotifications
+import com.linroid.ketch.app.platform.SystemNotifications
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.FinishAction
 import com.linroid.ketch.app.state.FinishActions
@@ -212,6 +214,26 @@ class SettingsSnapshots {
     }
     appSettingsSnapshot("app-settings-phone-general", PhoneTall, SnapshotTheme.Light) {
       state.openSettings(SettingsTarget(SettingsTarget.Page.General, deviceId = "local"))
+    }
+  }
+
+  @Test
+  fun phone_notifications_onAndroid_showHowDownloadProgressShows() {
+    for (theme in SnapshotTheme.entries) {
+      withSettings(theme, PhoneTall.density) { environment ->
+        val name = "settings-phone-notifications-android-${theme.id}-${PhoneTall.id}"
+        SnapshotHarness.capture(name, PhoneTall) {
+          SettingsFrame(environment, theme, PhoneTall.density, desktop = false) {
+            CompositionLocalProvider(LocalSystemNotifications provides Android16Notifications) {
+              SettingsContent(
+                state = environment.controller.state,
+                target = SettingsTarget(SettingsTarget.Page.Notifications),
+                onClose = {},
+              )
+            }
+          }
+        }
+      }
     }
   }
 
@@ -442,6 +464,13 @@ internal fun <T> withSettings(
   { SettingsEnvironment(theme, density.toMode(), lastPage, access, finishActions) },
   block = block,
 )
+
+/** Android 16's notifications, which have Live Updates, opening no settings. */
+private object Android16Notifications : SystemNotifications {
+  override val liveUpdates = true
+
+  override fun openSettings() = Unit
+}
 
 /** The desktop app's choices once downloads finish, carrying out none of them. */
 private object DesktopFinishActions : FinishActions {

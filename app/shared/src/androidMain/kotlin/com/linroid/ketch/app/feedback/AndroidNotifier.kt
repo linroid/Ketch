@@ -54,11 +54,13 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.Instant
 
 /**
- * Posts Ketch's notifications on Android, in four channels:
+ * Posts Ketch's notifications on Android, in five channels:
  *
- * - [CHANNEL_ACTIVE]: the download service's [ongoing] notification, with the total progress,
- *   the files in flight and Pause all and Slow lane buttons. On Android 16 a single download
- *   shows its connections as progress segments and asks to be promoted to a status bar chip.
+ * - [CHANNEL_PROGRESS], or [CHANNEL_ACTIVE] when [presentation] keeps its icon out of the status
+ *   bar: the download service's ongoing notification, with the total progress, the files in
+ *   flight and Pause all and Slow lane buttons. On Android 16 a single download shows its
+ *   connections as progress segments and asks to be a Live Update, a status bar chip, unless
+ *   [presentation] turns that off.
  * - [CHANNEL_DONE]: finished downloads with Show and Share, grouped once more than
  *   [GROUP_AFTER] show. Tapping one saved on this device opens its file.
  * - [CHANNEL_FAILED]: failed downloads with Retry.
@@ -95,13 +97,22 @@ class AndroidNotifier(
   @Volatile
   var accent: KetchAccent = KetchAccent.Indigo
 
+  /**
+   * How the ongoing notification shows, as the notification settings say. After changing
+   * whether its icon shows in the status bar, call [setUpChannels], post the notification
+   * again, then [removeUnusedChannel].
+   */
+  @Volatile
+  var presentation: OngoingPresentation = OngoingPresentation()
+
   // The buttons of the notifications [notify] posts, read once by [setUpChannels] or on first use.
   @Volatile
   private var labels: Labels? = null
 
   /**
    * Creates the notification channels, named in the app's language, and removes the one older
-   * versions used. Calling it again renames them, such as after the language changed.
+   * versions used and the one [presentation] leaves unused. Calling it again renames them, such
+   * as after the language changed, and creates the one a new [presentation] posts in.
    */
   suspend fun setUpChannels() {
     val system = context.getSystemService(NotificationManager::class.java)
@@ -112,7 +123,7 @@ class AndroidNotifier(
     val requests = Res.string.notify_channel_requests.text().load()
     system.createNotificationChannels(
       listOf(
-        channel(CHANNEL_ACTIVE, active, NotificationManager.IMPORTANCE_LOW),
+        ongoingChannel(presentation.channel, active),
         channel(CHANNEL_DONE, done, NotificationManager.IMPORTANCE_DEFAULT),
         channel(CHANNEL_FAILED, failed, NotificationManager.IMPORTANCE_HIGH),
         channel(CHANNEL_PAIRING, pairing, NotificationManager.IMPORTANCE_HIGH),
@@ -121,7 +132,22 @@ class AndroidNotifier(
       )
     )
     system.deleteNotificationChannel(LEGACY_CHANNEL)
+    removeUnusedChannel()
     labels = Labels.load()
+  }
+
+  /**
+   * Removes the channel of running downloads that [presentation] does not post in, so the
+   * system's settings list one. Android refuses while the service's notification still shows in
+   * it; call it again once that one is posted in the other channel.
+   */
+  fun removeUnusedChannel() {
+    val system = context.getSystemService(NotificationManager::class.java)
+    try {
+      system.deleteNotificationChannel(presentation.unusedChannel)
+    } catch (e: SecurityException) {
+      log.d { "Keeping the unused channel for now: ${e.describeCauses()}" }
+    }
   }
 
   /**
@@ -139,7 +165,8 @@ class AndroidNotifier(
     discovering: Boolean = false,
   ): Notification {
     val downloads = OngoingDownloads.of(tasks)
-    val builder = NotificationCompat.Builder(context, CHANNEL_ACTIVE)
+    val presentation = presentation
+    val builder = NotificationCompat.Builder(context, presentation.channel)
       .setSmallIcon(smallIcon)
       .setColor(accentColor())
       .setCategory(NotificationCompat.CATEGORY_PROGRESS)
@@ -151,7 +178,7 @@ class AndroidNotifier(
       .setDeleteIntent(serviceIntent(ACTION_REPOST_NOTIFICATION))
     if (slowLane) builder.setSubText(Res.string.notify_slow_lane_on.text().load())
     when {
-      downloads != null -> describe(builder, downloads)
+      downloads != null -> describe(builder, downloads, presentation)
       serverPort != null -> builder
         .setContentTitle(Res.string.notify_sharing_device.text().load())
         .setContentText(Res.string.notify_server_on_port.text(serverPort).load())
@@ -269,10 +296,16 @@ class AndroidNotifier(
       .forEach { manager.cancel(it.tag, it.id) }
   }
 
-  private suspend fun describe(builder: NotificationCompat.Builder, downloads: OngoingDownloads) {
+  private suspend fun describe(
+    builder: NotificationCompat.Builder,
+    downloads: OngoingDownloads,
+    presentation: OngoingPresentation,
+  ) {
     builder.setContentTitle(downloads.title.load()).setContentText(downloads.text?.load())
     val lanes = downloads.lanes
-    if (lanes != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+    // Without Live Updates the notification is the plain progress bar of older Android versions,
+    // which nothing takes for one.
+    if (lanes != null && presentation.isLiveUpdate(singleDownload = true, Build.VERSION.SDK_INT)) {
       builder.setStyle(laneStyle(lanes, downloads)).setRequestPromotedOngoing(true)
       downloads.percent?.let { builder.setShortCriticalText(percentText(it).load()) }
     } else {
@@ -456,7 +489,21 @@ class AndroidNotifier(
   }
 
   private fun channel(id: String, name: String, importance: Int): NotificationChannel =
-    NotificationChannel(id, name, importance).apply { setShowBadge(id != CHANNEL_ACTIVE) }
+    NotificationChannel(id, name, importance)
+
+  // The channel that shows in the status bar is of default importance, as Android can hide the
+  // icons of lower ones there and some devices always do; it stays as quiet as the other.
+  private fun ongoingChannel(id: String, name: String): NotificationChannel {
+    if (id == CHANNEL_ACTIVE) {
+      return channel(id, name, NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) }
+    }
+    return channel(id, name, NotificationManager.IMPORTANCE_DEFAULT).apply {
+      setShowBadge(false)
+      setSound(null, null)
+      enableVibration(false)
+      enableLights(false)
+    }
+  }
 
   // Read on first use when [setUpChannels] has not run yet; [notify] runs off the main thread.
   private fun labels(): Labels = labels ?: runBlocking { Labels.load() }.also { labels = it }
@@ -479,8 +526,17 @@ class AndroidNotifier(
   }
 
   companion object {
-    /** Channel of the download service's ongoing notification. */
-    const val CHANNEL_ACTIVE: String = "downloads_active"
+    /**
+     * Channel of the download service's ongoing notification while its icon shows in the status
+     * bar, the default.
+     */
+    const val CHANNEL_PROGRESS: String = OngoingPresentation.CHANNEL_STATUS_BAR
+
+    /**
+     * Channel of the ongoing notification while it stays among the silent ones, and the only
+     * one versions before the status bar setting used.
+     */
+    const val CHANNEL_ACTIVE: String = OngoingPresentation.CHANNEL_SILENT
 
     /** Channel of finished downloads. */
     const val CHANNEL_DONE: String = "downloads_done"

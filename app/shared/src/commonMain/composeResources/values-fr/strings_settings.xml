@@ -179,6 +179,15 @@
   <string name="settings_notifications_allow_button">Autoriser</string>
   <string name="settings_notifications_blocked">Les notifications sont bloquées</string>
   <string name="settings_notifications_blocked_hint">Autorisez-les pour ce site dans les réglages de votre navigateur.</string>
+  <string name="settings_notifications_progress">Progression des téléchargements</string>
+  <string name="settings_notifications_progress_footer">Cette notification ne s'affiche que lorsque Ketch travaille : téléchargement, partage de cet appareil ou recherche.</string>
+  <string name="settings_notifications_status_bar">Afficher dans la barre d'état</string>
+  <string name="settings_notifications_status_bar_on">L'icône de Ketch apparaît dans la barre d'état pendant les téléchargements.</string>
+  <string name="settings_notifications_status_bar_off">Reste parmi les notifications silencieuses, dont le téléphone peut masquer les icônes.</string>
+  <string name="settings_notifications_live_updates">Mises à jour en direct</string>
+  <string name="settings_notifications_live_updates_hint">Un téléchargement seul affiche sa progression sous forme de chip dans la barre d'état.</string>
+  <string name="settings_notifications_system">Paramètres de notification du système</string>
+  <string name="settings_notifications_system_hint">Son, écran de verrouillage et plus pour chaque type de notification.</string>
 
   <string name="settings_integration_extension">Extension de navigateur</string>
   <string name="settings_integration_extension_footer">Envoie les téléchargements de votre navigateur à Ketch, avec les cookies du site.</string>
@@ -741,6 +750,9 @@
   <string name="settings_search_devices_keywords">silencieux, distant, nas, rester connecté</string>
   <string name="settings_search_browser_notifications">Autoriser ce navigateur à afficher les notifications de Ketch</string>
   <string name="settings_search_browser_notifications_keywords">autorisation, permission, autoriser</string>
+  <string name="settings_search_status_bar_keywords">icône, permanente, progression, en cours, silencieuse</string>
+  <string name="settings_search_live_updates_keywords">chip, capsule, pilule, îlot, île, notifications en direct</string>
+  <string name="settings_search_system_notifications_keywords">canaux, catégories, son, écran de verrouillage</string>
   <string name="settings_search_extension">Envoyer les téléchargements du navigateur à Ketch</string>
   <string name="settings_search_extension_keywords">chrome, edge, firefox, brave, arc, vivaldi, intercepter, capturer</string>
   <string name="settings_search_magnet_keywords">app par défaut, gestionnaire, protocole</string>
