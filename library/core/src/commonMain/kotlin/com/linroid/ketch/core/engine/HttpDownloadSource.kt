@@ -7,6 +7,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.redactUrl
 import com.linroid.ketch.core.segment.SegmentCalculator
 import com.linroid.ketch.core.segment.SegmentDownloader
 import com.linroid.ketch.core.segment.SegmentedDownloadHelper
@@ -47,11 +48,32 @@ internal class HttpDownloadSource(
     return lower.startsWith("http://") || lower.startsWith("https://")
   }
 
-  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource {
+  override suspend fun resolve(input: ResolveInput, config: DownloadConfig): ResolvedSource =
+    resolve(input, config, acceptWebPage = false)
+
+  /**
+   * [resolve], which fails with a [KetchError.SourceError] saying [WebPageAnswer.DETAIL] when
+   * the server answers a link named like a file with a web page ([WebPageAnswer]), unless
+   * [acceptWebPage]: a download whose request names its own file gets whatever the link serves.
+   * The headers only raise the suspicion; the first bytes of the content, fetched with a request
+   * of their own, settle it, so a file a server labels as HTML still downloads.
+   */
+  internal suspend fun resolve(
+    input: ResolveInput,
+    config: DownloadConfig,
+    acceptWebPage: Boolean,
+  ): ResolvedSource {
     val (url, headers) = input as ResolveInput.Url
     val engine = httpEngine.through(config.proxy)
-    val detector = RangeSupportDetector(engine, TransferWatchdog.of(config))
+    val watchdog = TransferWatchdog.of(config)
+    val detector = RangeSupportDetector(engine, watchdog)
     val serverInfo = detector.detect(url, headers)
+    if (!acceptWebPage && WebPageAnswer.suspect(url, serverInfo) &&
+      WebPageAnswer.isMarkup(firstBytes(engine, watchdog, url, headers))
+    ) {
+      log.w { "Server answered with a web page in place of the file: ${redactUrl(url)}" }
+      throw KetchError.SourceError(TYPE, detail = WebPageAnswer.DETAIL)
+    }
     val fileName = serverInfo.contentDisposition?.let {
       DefaultFileNameResolver.fromContentDisposition(it)
     } ?: DefaultFileNameResolver.fromUrls(url, serverInfo.url)
@@ -80,6 +102,35 @@ internal class HttpDownloadSource(
       checksum = serverInfo.checksum,
     )
   }
+
+  /**
+   * The first [WebPageAnswer.SNIFF_BYTES] of [url]'s content, fewer when it is shorter: the
+   * transfer is ended once they arrived.
+   */
+  private suspend fun firstBytes(
+    engine: HttpEngine,
+    watchdog: TransferWatchdog,
+    url: String,
+    headers: Map<String, String>,
+  ): ByteArray {
+    var head = ByteArray(0)
+    watchdog.watch { monitor ->
+      try {
+        engine.download(url, null, headers) { data ->
+          monitor.received(data.size)
+          head += data
+          if (head.size >= WebPageAnswer.SNIFF_BYTES) throw EnoughRead()
+        }
+      } catch (_: EnoughRead) {
+        // Ended by us; a cancellation of the caller is told apart below.
+      }
+    }
+    currentCoroutineContext().ensureActive()
+    return head
+  }
+
+  /** Ends [firstBytes]'s transfer, as a cancellation so engines pass it on unchanged. */
+  private class EnoughRead : CancellationException("Read enough")
 
   override suspend fun download(context: DownloadContext, state: HttpSourceState?) {
     if (state == null) downloadFresh(context) else continueFrom(context, state)
