@@ -1070,8 +1070,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   builds saved drop it), never in the v1 store, which hashes and serves it as zeros, and never
   in web seed requests. Resolved sizes and admission count content files only
 - Limits cap instead of failing: a torrent or magnet keeps its first 128 trackers
-  (`MAX_TRACKERS`), a metadata lookup ignores peers past `MAX_METADATA_PEERS` (4096), the v1
-  parser takes 10,000 content files at any depth (1,000,000 bencode values), and v2 resolution
+  (`MAX_TRACKERS`), a metadata lookup ignores peers past `MAX_METADATA_PEERS` (4096), every
+  reader of metainfo takes 10,000 content files at any depth (`MAX_METAINFO_NODES`, 1,000,000
+  bencode values, for v1, v2 and hybrid), and v2 resolution
   and tracker-only lookups skip trackers Ketch cannot announce to, such as `wss://`
   (`TrackerConfiguration.usable`; `prepare` stays strict for edits). New metainfo inputs that
   are private or resolved tracker-only, with no tracker left and no web seed, are refused when

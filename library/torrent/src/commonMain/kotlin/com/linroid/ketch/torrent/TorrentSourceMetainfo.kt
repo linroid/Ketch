@@ -6,6 +6,7 @@ import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.torrent.crypto.sha1Digest
 import com.linroid.ketch.torrent.metainfo.Bencode
+import com.linroid.ketch.torrent.metainfo.MAX_METAINFO_NODES
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.isDiskComponent
@@ -31,7 +32,7 @@ internal fun resolveV2Metainfo(
   privacy: TorrentDiscoveryPrivacy,
   newInput: Boolean = true,
 ): ResolvedSource? {
-  val envelope = Bencode.parse(bytes, config.maxMetadataBytes)
+  val envelope = Bencode.parse(bytes, config.maxMetadataBytes, MAX_METAINFO_NODES)
   val version = envelope["info"]?.get("meta version") ?: return null
   require(version.integer == 2L) { "Unsupported torrent metainfo version" }
   val document = TorrentV2Document.parse(bytes, maxDocumentBytes = config.maxMetadataBytes,
@@ -61,7 +62,7 @@ internal fun resolveV2Metainfo(
 }
 
 internal fun sourceTrackerTiers(bytes: ByteArray, maxBytes: Int): List<List<String>> {
-  val envelope = Bencode.parse(bytes, maxBytes)
+  val envelope = Bencode.parse(bytes, maxBytes, MAX_METAINFO_NODES)
   val tiers = envelope["announce-list"]?.let { node ->
     requireNotNull(node.list) { "Invalid tracker tiers" }.map { tier ->
       requireNotNull(tier.list) { "Invalid tracker tier" }.map { tracker ->

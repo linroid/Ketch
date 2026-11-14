@@ -22,7 +22,7 @@ internal class TorrentV2Document private constructor(
       document: ByteArray,
       maxDocumentBytes: Int = 4 * 1024 * 1024,
       maxInfoBytes: Int = 4 * 1024 * 1024,
-      maxNodes: Int = 100_000,
+      maxNodes: Int = MAX_METAINFO_NODES,
       maxFiles: Int = 10_000,
       maxLayerBytes: Long = 64L * 1024 * 1024,
       expectedIdentity: TorrentIdentity? = null,
