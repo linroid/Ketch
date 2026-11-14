@@ -2,6 +2,7 @@ package com.linroid.ketch.file
 
 import com.linroid.ketch.core.file.OutputPathReservations
 import com.linroid.ketch.core.file.platformFileSystem
+import com.linroid.ketch.core.file.renamedIfExists
 import okio.FileSystem
 import okio.Path
 import kotlin.random.Random
@@ -91,6 +92,23 @@ class OutputPathReservationsTest {
 
     assertNull(OutputPathReservations.reserveReplaceable("$folder/folder.zip"))
     assertNull(OutputPathReservations.reserveReplaceable("$folder/$long"))
+  }
+
+  @Test
+  fun renamedIfExists_existingFile_namesTheFreeNameBesideIt() = withFolder { folder ->
+    platformFileSystem.write(folder / "file.zip") {}
+    platformFileSystem.write(folder / "file (1).zip") {}
+
+    assertEquals("file (2).zip", renamedIfExists(folder.toString(), "file.zip"))
+    assertEquals("file (2).zip", renamedIfExists("$folder/", "sub/file.zip"))
+  }
+
+  @Test
+  fun renamedIfExists_freeNameOrFolderUri_isNull() = withFolder { folder ->
+    platformFileSystem.write(folder / "file.zip") {}
+
+    assertNull(renamedIfExists(folder.toString(), "other.zip"))
+    assertNull(renamedIfExists("content://com.android.providers/tree/1", "file.zip"))
   }
 
   @Test

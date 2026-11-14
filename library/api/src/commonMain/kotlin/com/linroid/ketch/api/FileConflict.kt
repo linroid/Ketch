@@ -13,7 +13,11 @@ import kotlinx.serialization.encoding.Encoder
  * saved to ([DownloadConfig.fileConflict], or [DownloadRequest.fileConflict] for one download).
  * Written as `rename` or `overwrite`; unknown values decode as [RENAME].
  *
- * It applies to names Ketch chooses: a file [Destination] names its file and always replaces it.
+ * [DownloadConfig.fileConflict] applies to names Ketch chooses: a request with a file
+ * [Destination] and no choice of its own names the file it writes, and always replaces it. With
+ * [DownloadRequest.fileConflict] set, the named file is treated like a name Ketch chose: [RENAME]
+ * saves beside an existing file, [OVERWRITE] replaces it.
+ *
  * Sources that write their own files, such as BitTorrent, and Android `content://` folders
  * always behave as [RENAME]. Needs [KetchFeatures.FILE_CONFLICT].
  */

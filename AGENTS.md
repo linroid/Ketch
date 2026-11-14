@@ -508,7 +508,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   partial file, as the download would then write over the file from its first byte. Sources that
   write their own files (torrents) and Android `content://` folders, whose provider names the
   document and has no atomic replace, always rename. A `requestId` resubmission keeps the task's
-  own choice. Tests: `FileConflictTest`
+  own choice. A file `Destination` is used as it is and replaced only while the request has no
+  `fileConflict` of its own: with one, the named file is treated like a name Ketch chose
+  (`RENAME` gets a free `name (n)`, `OVERWRITE` goes through `replaceablePath`), on a resume
+  too. `renamedIfExists(directory, fileName)` (core, public) is the name a renaming download
+  would get beside an existing file, `null` when the name is free or the folder is a URI.
+  Tests: `FileConflictTest`
 - Category folders: a request whose destination is `null` or a bare name is saved in the folder,
   inside the default directory, of the first of `DownloadConfig.categories` it matches
   (`DownloadCategory`: `extensions` or `mimeTypes`, either enough, and `hosts` with subdomains
@@ -1768,7 +1773,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   [Automation hooks](#automation-hooks-hooks)
 - `[download] fileConflict` (`"rename"` or `"overwrite"`) is `DownloadConfig.fileConflict`,
   edited in Settings → Downloads → Save to ("When a file already exists", `ConflictRow`) for
-  devices listing `download.fileConflict`, hidden while the folder is a document tree
+  devices listing `download.fileConflict`, hidden while the folder is a document tree. The add
+  sheet offers the same choice per download (`IntakeSession.offersFileConflict`, `fileConflict`:
+  an "If the file exists" field in the Options popover, and a chip once it differs from the
+  device's setting), not for torrents or `content://` folders. Requests carry it only when it
+  differs from the device's setting, and always when the sheet sends a file path (a folder and
+  a name), which would otherwise be replaced as it is. Adding to the embedded device, the sheet
+  looks for files of the names the downloads would get (`existingQueries`, `checkExisting`,
+  `renamedIfFileExists`, expect/actual: core's `renamedIfExists` off the main thread, `null`
+  on the web) whenever a name, the folder or the category folder changes, and warns under the
+  options what the choice does to them (`existingNotice`, `ExistingFilesNotice`, with the choice
+  beside it); remote devices cannot be asked, so they get the choice without a warning
 - `[[download.categories]]` tables hold `DownloadConfig.categories` (`folder`, `extensions`,
   `mimeTypes`, `hosts`), edited in Settings → Downloads (`ui/settings/CategorySettings.kt`, with
   `SuggestedCategory` presets named in the app's language and the field parsing in
@@ -2201,7 +2216,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   to it (403 `overwrite_rejected`, `OverwriteRejectedException`; a config that already overwrites
   applies), and with a token in a folder outside the download directory and
   `allowedDirectories`, where a request that only follows the config is pinned to `RENAME`
-  instead. A file path a caller names still gets a free name
+  instead. A file path a caller names still gets a free name, unless the request asks to
+  overwrite, with a token, in the download directory or `allowedDirectories`: the path then
+  keeps its name (`DestinationPathPolicy.confine(keepFileName = true)`) and the engine replaces
+  it; asked for elsewhere, it gets a free name and the request is pinned to `RENAME`
 - `POST /api/tasks` takes `checksum` as text (`"sha256:<hex>"`; a malformed one is 400), and
   task views carry it in `request` and the verified one in `Completed.checksum`; a mismatch is a
   `checksum_mismatch` error. `RemoteKetch.download` refuses a checksum for servers without

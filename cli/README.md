@@ -561,7 +561,8 @@ The exception is a download that overwrites existing files: one sent with `"file
 there is refused. Only clients with the token can ask for it, per task or by changing the setting
 with `PUT /api/config`: without a token both get `403 Forbidden` with an `overwrite_rejected`
 error, while a `fileConflict` you set in the config file applies. A file path a client names
-still gets a free name.
+still gets a free name, unless the task asks to overwrite, with the token, in one of those
+folders: it then replaces that file.
 
 File names a client gives are cleaned like the names sites suggest: only the part after the last
 `/` or `\` is kept, and characters Windows forbids become `_`.

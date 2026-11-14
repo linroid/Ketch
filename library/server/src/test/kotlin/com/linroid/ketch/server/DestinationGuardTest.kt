@@ -400,7 +400,7 @@ class DestinationGuardTest {
     }
 
   @Test
-  fun `POST with a token asking to overwrite still never names an existing file`() =
+  fun `POST with a token asking to overwrite a named file in the download folder keeps its name`() =
     testApplication {
       File(downloads, "file.zip").writeText("keep")
       val client = serve(
@@ -413,8 +413,56 @@ class DestinationGuardTest {
 
       assertEquals(HttpStatusCode.Created, response.status)
       val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
-      assertEquals(File(downloads, "file (1).zip").path, task.request.destination?.value)
+      assertEquals(File(downloads, "file.zip").path, task.request.destination?.value)
+      assertEquals(FileConflict.OVERWRITE, task.request.fileConflict)
     }
+
+  @Test
+  fun `POST with a token asking to overwrite a named file elsewhere gets a free name`() =
+    testApplication {
+      File(outside, "file.zip").writeText("keep")
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+      )
+
+      val response =
+        client.createTask("${outside.path}/file.zip", fileConflict = FileConflict.OVERWRITE)
+
+      assertEquals(HttpStatusCode.Created, response.status)
+      val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+      assertEquals(File(outside, "file (1).zip").path, task.request.destination?.value)
+      assertEquals(FileConflict.RENAME, task.request.fileConflict)
+    }
+
+  @Test
+  fun `POST with a token asking to rename a named file gets a free name`() = testApplication {
+    File(downloads, "file.zip").writeText("keep")
+    val client = serve(
+      createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+      apiToken = TOKEN,
+    )
+
+    val response =
+      client.createTask("${downloads.path}/file.zip", fileConflict = FileConflict.RENAME)
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(File(downloads, "file (1).zip").path, task.request.destination?.value)
+  }
+
+  @Test
+  fun `POST without a token asking to overwrite a named file is refused`() = testApplication {
+    File(downloads, "file.zip").writeText("keep")
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch)
+
+    val response =
+      client.createTask("${downloads.path}/file.zip", fileConflict = FileConflict.OVERWRITE)
+
+    assertOverwriteRejected(response)
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
 
   @Test
   fun `PUT config without a token switching to overwrite is refused`() = testApplication {

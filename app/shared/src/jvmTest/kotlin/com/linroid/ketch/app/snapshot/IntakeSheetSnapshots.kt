@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.unit.dp
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
@@ -215,6 +216,18 @@ class IntakeSheetSnapshots {
       scene.settle()
       // The Options pill of the single link's sheet.
       scene.click(OPTIONS_PILL_X, OPTIONS_PILL_Y)
+    }
+  }
+
+  @Test
+  fun existingFile_desktopAndPhone_warnsAndOffersTheChoice() {
+    for (choice in FileConflict.entries) {
+      intakeSnapshots("intake-exists-${choice.name.lowercase()}", DESKTOP_AND_PHONE) {
+        val session = state.intake.start(IntakeRequest(KERNEL))
+        session.fileCheck = { _, _ -> "linux-6.12 (1).tar.xz" }
+        session.fileConflict = choice
+        state.intake.resume(session)
+      }
     }
   }
 

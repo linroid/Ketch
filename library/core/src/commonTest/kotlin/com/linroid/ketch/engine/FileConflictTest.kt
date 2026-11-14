@@ -310,6 +310,92 @@ class FileConflictTest {
   }
 
   @Test
+  fun download_namedFileWithoutAChoice_isReplacedWhateverTheConfig() = runTest {
+    withKetch { ketch, engine, _, folder ->
+      writeOld(folder / "named.bin")
+
+      val task = ketch.download(named(folder))
+      runCurrent()
+
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals((folder / "named.bin").toString(), completed.outputPath)
+      assertContentEquals(engine.content, read(folder / "named.bin"))
+    }
+  }
+
+  @Test
+  fun download_namedFileAskedToRename_savesBesideTheExistingFile() = runTest {
+    withKetch(OVERWRITE) { ketch, engine, _, folder ->
+      writeOld(folder / "named.bin")
+
+      val task = ketch.download(named(folder).copy(fileConflict = FileConflict.RENAME))
+      runCurrent()
+
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals((folder / "named (1).bin").toString(), completed.outputPath)
+      assertContentEquals(OLD, read(folder / "named.bin"))
+      assertContentEquals(engine.content, read(folder / "named (1).bin"))
+    }
+  }
+
+  @Test
+  fun pauseAndResume_namedFileAskedToRename_keepsAFileThatAppeared() = runTest {
+    withKetch { ketch, engine, _, folder ->
+      engine.stallAfterBytes = 500
+      val task = ketch.download(named(folder).copy(fileConflict = FileConflict.RENAME))
+      runCurrent()
+      task.pause()
+      runCurrent()
+      writeOld(folder / "named.bin")
+
+      engine.stallAfterBytes = -1
+      task.resume()
+      runCurrent()
+
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals((folder / "named (1).bin").toString(), completed.outputPath)
+      assertContentEquals(OLD, read(folder / "named.bin"))
+    }
+  }
+
+  @Test
+  fun download_namedFileAskedToOverwrite_replacesItOnceComplete() = runTest {
+    withKetch { ketch, engine, _, folder ->
+      writeOld(folder / "named.bin")
+      engine.stallAfterBytes = 500
+      val task = ketch.download(named(folder).copy(fileConflict = FileConflict.OVERWRITE))
+      runCurrent()
+      assertContentEquals(OLD, read(folder / "named.bin"))
+      task.pause()
+      runCurrent()
+
+      engine.stallAfterBytes = -1
+      task.resume()
+      runCurrent()
+
+      val completed = assertIs<DownloadState.Completed>(task.state.value)
+      assertEquals((folder / "named.bin").toString(), completed.outputPath)
+      assertContentEquals(engine.content, read(folder / "named.bin"))
+    }
+  }
+
+  @Test
+  fun download_namedFileAskedToOverwriteWhileAnotherWritesIt_getsFreeName() = runTest {
+    withKetch { ketch, engine, _, folder ->
+      engine.stallAfterBytes = 500
+      val request = named(folder).copy(fileConflict = FileConflict.OVERWRITE)
+      val first = ketch.download(request)
+      runCurrent()
+
+      val second = ketch.download(request)
+      runCurrent()
+
+      assertEquals((folder / "named.bin").toString(), first.outputPath)
+      assertEquals((folder / "named (1).bin").toString(), second.outputPath)
+    }
+  }
+
+  @Test
   fun download_sameRequestIdWithAnotherFileConflict_returnsTheTaskUnchanged() = runTest {
     withKetch { ketch, engine, _, folder ->
       engine.stallAfterBytes = 500
@@ -367,6 +453,12 @@ class FileConflictTest {
   private fun request(folder: Path) = DownloadRequest(
     url = URL,
     destination = Destination("$folder/"),
+    connections = 1,
+  )
+
+  private fun named(folder: Path) = DownloadRequest(
+    url = URL,
+    destination = Destination((folder / "named.bin").toString()),
     connections = 1,
   )
 

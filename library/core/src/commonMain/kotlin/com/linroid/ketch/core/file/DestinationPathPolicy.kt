@@ -74,13 +74,20 @@ class DestinationPathPolicy(
    * - a URI is kept as it is
    *
    * @param baseDirectory the folder downloads go to when they name no folder
+   * @param keepFileName keeps a file path as it is named although it exists or is reserved, for
+   *   a download that decides itself what happens to the file there
    * @throws PathRejectedException if the destination lies outside the roots
    */
-  fun confine(destination: Destination, baseDirectory: String): Destination =
+  fun confine(
+    destination: Destination,
+    baseDirectory: String,
+    keepFileName: Boolean = false,
+  ): Destination =
     when (val confined = confineWithoutFreeName(destination, baseDirectory)) {
       is Confined.As -> confined.destination
       is Confined.File -> {
-        val file = OutputPathReservations.freePath(confined.path.toString())
+        val named = confined.path.toString()
+        val file = if (keepFileName) named else OutputPathReservations.freePath(named)
         if (!contains(file)) throw PathRejectedException(destination.value)
         Destination(file)
       }

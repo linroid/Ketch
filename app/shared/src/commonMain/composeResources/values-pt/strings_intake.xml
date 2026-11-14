@@ -174,6 +174,7 @@
   <string name="intake_reset_priority">Redefinir prioridade</string>
   <string name="intake_reset_start">Redefinir início</string>
   <string name="intake_reset_connections">Redefinir conexões</string>
+  <string name="intake_reset_conflict">Usar o ajuste do dispositivo</string>
   <plurals name="intake_headers_count">
     <item quantity="one">%1$d cabeçalho</item>
     <item quantity="other">%1$d cabeçalhos</item>
@@ -218,6 +219,17 @@
   <string name="intake_choose_folder">Escolher pasta…</string>
   <string name="intake_folder_on">Pasta em %1$s</string>
   <string name="intake_torrents_app_folder">Os arquivos baixados por torrent são salvos na pasta do app. As pastas escolhidas no app Arquivos só são usadas para downloads por links comuns</string>
+  <string name="intake_conflict">Se o arquivo já existir</string>
+  <string name="intake_conflict_rename">Renomear</string>
+  <string name="intake_conflict_overwrite">Substituir</string>
+  <string name="intake_conflict_rename_caption">Salva ao lado dele com outro nome.</string>
+  <string name="intake_conflict_overwrite_caption">Substitui o arquivo quando o download termina.</string>
+  <string name="intake_option_overwrite">Substitui arquivos existentes</string>
+  <string name="intake_option_rename">Mantém arquivos existentes</string>
+  <string name="intake_exists_rename">%1$s já está nesta pasta. Este download será salvo como %2$s.</string>
+  <string name="intake_exists_overwrite">%1$s já está nesta pasta. Este download vai substituí-lo ao terminar.</string>
+  <string name="intake_exists_rename_some">Alguns destes arquivos já estão nesta pasta. Esses downloads serão salvos com outros nomes.</string>
+  <string name="intake_exists_overwrite_some">Alguns destes arquivos já estão nesta pasta. Os downloads vão substituí-los ao terminar.</string>
 
   <string name="intake_advanced">Avançado</string>
   <string name="intake_hide">Ocultar</string>

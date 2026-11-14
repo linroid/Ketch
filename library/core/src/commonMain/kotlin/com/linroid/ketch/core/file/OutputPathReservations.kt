@@ -18,6 +18,9 @@ import okio.Path.Companion.toPath
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal object OutputPathReservations {
+  /** Whether a file or folder is at [path]. */
+  fun exists(path: String): Boolean = platformFileSystem.exists(path.toPath())
+
   // Normalized path to the number of downloads holding it: a file destination is used as it is,
   // by as many downloads as name it.
   private val reserved = AtomicReference(emptyMap<String, Int>())

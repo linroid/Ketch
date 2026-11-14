@@ -208,6 +208,7 @@
   <string name="intake_reset_priority">Сбросить приоритет</string>
   <string name="intake_reset_start">Сбросить время запуска</string>
   <string name="intake_reset_connections">Сбросить подключения</string>
+  <string name="intake_reset_conflict">Использовать настройку устройства</string>
   <plurals name="intake_headers_count">
     <item quantity="one">%1$d заголовок</item>
     <item quantity="few">%1$d заголовка</item>
@@ -258,6 +259,17 @@
   <string name="intake_choose_folder">Выбрать папку…</string>
   <string name="intake_folder_on">Папка на устройстве «%1$s»</string>
   <string name="intake_torrents_app_folder">Файлы из торрентов сохраняются в папку приложения. Папки, выбранные в «Файлах», используются только для загрузок по обычным ссылкам</string>
+  <string name="intake_conflict">Если файл уже существует</string>
+  <string name="intake_conflict_rename">Переименовать</string>
+  <string name="intake_conflict_overwrite">Перезаписать</string>
+  <string name="intake_conflict_rename_caption">Сохраняет рядом под новым именем.</string>
+  <string name="intake_conflict_overwrite_caption">Заменяет файл, когда загрузка завершится.</string>
+  <string name="intake_option_overwrite">Перезаписывает существующие файлы</string>
+  <string name="intake_option_rename">Сохраняет существующие файлы</string>
+  <string name="intake_exists_rename">Файл %1$s уже есть в этой папке. Эта загрузка будет сохранена как %2$s.</string>
+  <string name="intake_exists_overwrite">Файл %1$s уже есть в этой папке. Загрузка заменит его, когда завершится.</string>
+  <string name="intake_exists_rename_some">Некоторые из этих файлов уже есть в этой папке. Эти загрузки будут сохранены под новыми именами.</string>
+  <string name="intake_exists_overwrite_some">Некоторые из этих файлов уже есть в этой папке. Загрузки заменят их, когда завершатся.</string>
 
   <string name="intake_advanced">Дополнительно</string>
   <string name="intake_hide">Скрыть</string>

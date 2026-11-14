@@ -8,6 +8,8 @@ import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.isDirectory
+import com.linroid.ketch.api.isFile
+import com.linroid.ketch.api.isName
 import com.linroid.ketch.core.file.DestinationPathPolicy
 import com.linroid.ketch.core.file.PathRejectedException
 import java.io.File
@@ -56,7 +58,11 @@ internal class DestinationGuard(
    * but never replace one. A request that only follows [DownloadConfig.fileConflict], which the
    * owner set, is made to save beside existing files ([FileConflict.RENAME]) in such a folder
    * instead of being refused, also while the configuration renames, as a queued or scheduled
-   * task reads it only when it starts. A file the caller names is given a free name as before.
+   * task reads it only when it starts. A file the caller names is given a free name as before,
+   * unless the request asks to replace it and it lies in the download directory or
+   * [allowedDirectories]: it then keeps its name, and the engine replaces the file once the
+   * download completes, never one another download writes. Asked for elsewhere, the file gets
+   * a free name and the request is made to rename.
    *
    * @throws PathRejectedException if the destination lies outside the folders
    * @throws OverwriteRejectedException if the request may not replace existing files
@@ -68,9 +74,12 @@ internal class DestinationGuard(
     if (asked && !authenticated) {
       throw OverwriteRejectedException("Replacing existing files needs the API token")
     }
-    val placed = placed(request, directory)
+    // A file the caller names keeps its name only for a request that may replace it.
+    val named = if (asked) placed(request, directory, keepFileName = true) else null
+    if (named != null && replaceableIn(named.destination, directory)) return named
+    val placed = placed(request, directory, keepFileName = false)
     if (replaceableIn(placed.destination, directory)) return placed
-    if (asked) {
+    if (asked && placed.destination?.isFile() != true) {
       throw OverwriteRejectedException(
         "Existing files are only replaced in the download folder and the allowed folders",
       )
@@ -80,8 +89,15 @@ internal class DestinationGuard(
     return placed.copy(fileConflict = FileConflict.RENAME)
   }
 
-  /** [request] with its destination [confined][DestinationPathPolicy.confine]. */
-  private fun placed(request: DownloadRequest, directory: String): DownloadRequest {
+  /**
+   * [request] with its destination [confined][DestinationPathPolicy.confine]; with
+   * [keepFileName], a file path keeps its name although a file is there.
+   */
+  private fun placed(
+    request: DownloadRequest,
+    directory: String,
+    keepFileName: Boolean,
+  ): DownloadRequest {
     val destination = request.destination
     if (destination == null || passesAsUri(destination.value)) return request
     val policy = policy(directory)
@@ -91,21 +107,24 @@ internal class DestinationGuard(
     if (previous != null && policy.confinesTo(destination, directory, previous)) {
       return request.copy(destination = previous)
     }
-    val confined = policy.confine(destination, directory)
+    val confined = policy.confine(destination, directory, keepFileName)
     return if (confined == destination) request else request.copy(destination = confined)
   }
 
   /**
-   * Whether a download saved to [destination], already confined, may replace a file of the name
-   * Ketch chooses: it goes to the download [directory] (no destination, or a bare name) or to a
-   * folder inside it or [allowedDirectories]. A file the caller named got a free name, and a
-   * URI never has files replaced, so neither needs a check.
+   * Whether a download saved to [destination], already confined, may replace a file there: it
+   * goes to the download [directory] (no destination, or a bare name), or to a folder inside it
+   * or [allowedDirectories], or is a file in such a folder. A URI never has files replaced, so
+   * it needs no check.
    */
   private fun replaceableIn(destination: Destination?, directory: String): Boolean {
-    if (destination == null || !destination.isDirectory() || "://" in destination.value) {
-      return true
+    if (destination == null || destination.isName() || "://" in destination.value) return true
+    val folder = if (destination.isDirectory()) {
+      destination.value
+    } else {
+      File(destination.value).parent ?: return false
     }
-    return DestinationPathPolicy(allowedDirectories + directory).contains(destination.value)
+    return DestinationPathPolicy(allowedDirectories + directory).contains(folder)
   }
 
   /**

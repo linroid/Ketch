@@ -38,7 +38,8 @@ import kotlinx.serialization.Serializable
  *   server publishes. Only for sources Ketch writes as one file (not torrents); needs
  *   [KetchFeatures.CHECKSUM].
  * @property fileConflict replaces [DownloadConfig.fileConflict] for this download; `null`
- *   follows it. Needs [KetchFeatures.FILE_CONFLICT].
+ *   follows it. When set, it also decides for a file [destination], which is otherwise replaced
+ *   as it is. Needs [KetchFeatures.FILE_CONFLICT].
  */
 @Serializable
 data class DownloadRequest(

@@ -359,6 +359,7 @@ internal class DownloadExecution(
       ?: fileNameResolver.resolve(req, resolvedUrl)
     val target = resolveDestPath(
       destination = req.destination,
+      requested = req.fileConflict,
       // Resolved only when needed: the platform default may need an Android context. Sources
       // that write their own files need a filesystem folder, so a default folder given as a URI,
       // such as an Android content:// tree, leaves them the platform default.
@@ -553,8 +554,9 @@ internal class DownloadExecution(
         // Read as the resume starts, like the rest of the configuration: a file that took the
         // output path since the download chose it is replaced when files are overwritten now,
         // and kept otherwise.
-        replace = record.request.destination?.isFile() == true ||
-          config.fileConflict == FileConflict.OVERWRITE,
+        // A file the request names is replaced unless the request chose for itself.
+        replace = config.fileConflict == FileConflict.OVERWRITE ||
+          (record.request.destination?.isFile() == true && record.request.fileConflict == null),
       )
       Prepared(target, record.totalBytes, record.resolvedSource, sourceState)
     }
@@ -1108,7 +1110,10 @@ internal class DownloadExecution(
   /**
    * Picks the output path and reserves it until the execution stops, along with the partial file
    * the download writes to until it completes when [partial] asks for one ([OutputTarget]). A
-   * file [destination] is used as it is, and replaced once the download completes. Otherwise
+   * file [destination] is used as it is, and replaced once the download completes, unless the
+   * request chose for itself ([requested]): it then gets a free name beside an existing file
+   * ([FileConflict.RENAME]) or replaces it only where it is safe to ([FileConflict.OVERWRITE],
+   * [replaceablePath]), like a name Ketch chose. Otherwise
    * the name, a [destination] name or else [serverFileName] made safe with [sanitizeFileName],
    * is joined to the folder, must stay inside it, and gets a ` (n)` suffix when the file or its
    * partial file exists or another download reserved the path. With [FileConflict.OVERWRITE] a
@@ -1123,6 +1128,7 @@ internal class DownloadExecution(
    */
   private fun resolveDestPath(
     destination: Destination?,
+    requested: FileConflict?,
     defaultDir: () -> String,
     serverFileName: String,
     contentType: String?,
@@ -1131,8 +1137,18 @@ internal class DownloadExecution(
     fun partialOf(path: String) =
       if (partial && !path.contains("://")) partialPathFor(path) else null
     if (destination != null && destination.isFile()) {
-      val path = destination.value.also(::reserve)
-      return OutputTarget(path, partialOf(path), replace = true)
+      val named = destination.value
+      // Without a choice of its own, the request named the file it writes, whatever is there.
+      if (requested == null || !partial || named.contains("://")) {
+        reserve(named)
+        return OutputTarget(named, partialOf(named), replace = true)
+      }
+      if (requested == FileConflict.OVERWRITE) {
+        val replaced = replaceablePath(named)
+        if (replaced != null) return OutputTarget(replaced, partialOf(replaced), replace = true)
+      }
+      val reserved = OutputPathReservations.reserveUnique(named).also { reservedPaths += it }
+      return OutputTarget(reserved, partialOf(reserved), replace = false)
     }
     val fileName = when {
       destination != null && destination.isName() ->

@@ -16,6 +16,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchFeatures
@@ -41,6 +42,7 @@ import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.input.KeyboardPlatform
 import com.linroid.ketch.app.instance.DevicePresence
+import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.displayName
@@ -73,6 +75,12 @@ import ketch.app.shared.generated.resources.duration_minutes
 import ketch.app.shared.generated.resources.intake_add_failed
 import ketch.app.shared.generated.resources.intake_apply_failed
 import ketch.app.shared.generated.resources.intake_checksum_invalid
+import ketch.app.shared.generated.resources.intake_exists_overwrite
+import ketch.app.shared.generated.resources.intake_exists_overwrite_some
+import ketch.app.shared.generated.resources.intake_exists_rename
+import ketch.app.shared.generated.resources.intake_exists_rename_some
+import ketch.app.shared.generated.resources.intake_option_overwrite
+import ketch.app.shared.generated.resources.intake_option_rename
 import ketch.app.shared.generated.resources.intake_choose_files
 import ketch.app.shared.generated.resources.intake_file_list_failed
 import ketch.app.shared.generated.resources.intake_file_list_failed_unnamed
@@ -588,7 +596,16 @@ enum class IntakeOption {
 
   /** Connections of each download, or a torrent's peer limit. */
   Connections,
+
+  /** What a download does when a file of its name exists; only listed once it is changed. */
+  FileConflict,
 }
+
+/**
+ * A file the add sheet found where a download would be saved: its [name], and the name the
+ * download gets when it is [renamed] to be saved beside it.
+ */
+internal data class ExistingFile(val name: String, val renamed: String)
 
 /**
  * How [option] reads: "Unlimited", "Normal", "Now" and "Auto" at their defaults, or "Max
@@ -600,7 +617,8 @@ data class IntakeOptionValue(val option: IntakeOption, val text: UiText, val cha
 /**
  * The values the Options pill sums up, in order: speed, priority, start (left out when
  * [schedule] is `null`) and connections, as a peer limit for [torrents]. A server that allows
- * one connection reads "1 connection" without counting as a change.
+ * one connection reads "1 connection" without counting as a change. A [fileConflict] that
+ * differs from the device's setting follows as a change; the pill never sums it up otherwise.
  */
 internal fun intakeOptionValues(
   speedLimit: SpeedLimit,
@@ -611,6 +629,7 @@ internal fun intakeOptionValues(
   singleConnection: Boolean,
   now: Instant,
   zone: TimeZone,
+  fileConflict: FileConflict? = null,
 ): List<IntakeOptionValue> = buildList {
   val speedText = if (speedLimit.isUnlimited) {
     Res.string.intake_option_unlimited.text()
@@ -642,6 +661,13 @@ internal fun intakeOptionValues(
   }
   val connectionsChanged = connections > 0 && (torrents || !singleConnection)
   add(IntakeOptionValue(IntakeOption.Connections, connectionText, connectionsChanged))
+  if (fileConflict != null) {
+    val text = when (fileConflict) {
+      FileConflict.RENAME -> Res.string.intake_option_rename.text()
+      FileConflict.OVERWRITE -> Res.string.intake_option_overwrite.text()
+    }
+    add(IntakeOptionValue(IntakeOption.FileConflict, text, changed = true))
+  }
 }
 
 /** What the add sheet's main button does: its [verb] and the [hint] that names its key. */
@@ -861,6 +887,94 @@ class IntakeSession internal constructor(
       return Res.string.intake_checksum_invalid.text()
     }
 
+  // The choice made in the sheet; `null` follows the device's setting.
+  private var fileConflictChoice: FileConflict? by mutableStateOf(null)
+
+  /** What [target] does with existing files as it is set up. */
+  private val deviceFileConflict: FileConflict
+    get() = targetStatus?.config?.fileConflict ?: FileConflict.RENAME
+
+  /**
+   * Whether the sheet offers what a download does when a file of its name exists: when adding
+   * to a device that lets downloads choose ([KetchFeatures.FILE_CONFLICT]), unless nothing could
+   * follow the choice, as torrents, which write their own files, and an Android folder picked
+   * through the system, whose provider names the files.
+   */
+  val offersFileConflict: Boolean
+    get() {
+      if (mode != IntakeMode.Add || KetchFeatures.FILE_CONFLICT !in targetFeatures()) return false
+      val saveTo = folder ?: defaultFolder
+      if (saveTo?.startsWith(CONTENT_SCHEME, ignoreCase = true) == true) return false
+      return entries.any { !it.isTorrent }
+    }
+
+  /**
+   * What the downloads do when a file of their name exists: the device's setting until the sheet
+   * chooses otherwise.
+   */
+  var fileConflict: FileConflict
+    get() = fileConflictChoice?.takeIf { offersFileConflict } ?: deviceFileConflict
+    set(value) {
+      fileConflictChoice = value
+    }
+
+  /** Whether [fileConflict] differs from the device's setting, so requests carry it. */
+  val fileConflictChanged: Boolean get() = fileConflict != deviceFileConflict
+
+  /** Looks a folder and a name up on this device; replaced in tests and snapshots. */
+  internal var fileCheck: suspend (folder: String, name: String) -> String? = ::renamedIfFileExists
+
+  /** The files [checkExisting] found where the downloads would be saved. */
+  internal var existingFiles: List<ExistingFile> by mutableStateOf(emptyList())
+    private set
+
+  /**
+   * The folder and the name each download would be saved under, for [checkExisting]: of the
+   * single links that are not torrents, while the sheet offers the choice and adds to this
+   * device, whose files it can look at. Empty for another device, which cannot be asked.
+   */
+  internal val existingQueries: List<Pair<String, String>>
+    get() {
+      if (!offersFileConflict || target !is EmbeddedInstance) return emptyList()
+      val base = folder ?: defaultFolder ?: return emptyList()
+      return entries.filter { it.addable && !it.isTorrent && it.linkCount == 1 }.map { entry ->
+        val category = if (folder == null) categoryOf(entry) else null
+        val directory = category?.let { withSeparator(base, separator) + it } ?: base
+        directory to entry.name
+      }.distinct()
+    }
+
+  /**
+   * Looks for files that already have the names the downloads would get ([existingQueries]),
+   * off the caller's thread, and keeps what it found as [existingFiles] unless the rows, the
+   * names or the folder changed meanwhile. A guess: a server may still name a file differently.
+   */
+  suspend fun checkExisting() {
+    val queries = existingQueries
+    val found = queries.mapNotNull { (directory, name) ->
+      fileCheck(directory, name)?.let { ExistingFile(name, it) }
+    }
+    if (queries == existingQueries) existingFiles = found
+  }
+
+  /**
+   * What happens to the files already there ([existingFiles]) under [fileConflict], as a warning
+   * under the options; `null` when none was found or it cannot be told.
+   */
+  val existingNotice: UiText?
+    get() {
+      val files = existingFiles
+      if (files.isEmpty() || existingQueries.isEmpty()) return null
+      val only = files.singleOrNull()
+      return when (fileConflict) {
+        FileConflict.OVERWRITE -> only?.let { Res.string.intake_exists_overwrite.text(it.name) }
+          ?: Res.string.intake_exists_overwrite_some.text()
+        FileConflict.RENAME -> only?.let {
+          Res.string.intake_exists_rename.text(it.name, it.renamed)
+        } ?: Res.string.intake_exists_rename_some.text()
+      }
+    }
+
   /** The default directory of [target]. */
   val defaultFolder: String? get() = targetStatus?.system?.downloadDirectory
 
@@ -872,12 +986,16 @@ class IntakeSession internal constructor(
   val categoryFolder: String?
     get() {
       if (folder != null) return null
-      val entry = single ?: return null
-      val status = targetStatus ?: return null
-      if (KetchFeatures.CATEGORY_FOLDERS !in status.features) return null
-      val host = entry.url?.let(::urlHost)
-      return status.config.categoryFor(entry.name, entry.resolved?.contentType, host)?.folder
+      return categoryOf(single ?: return null)
     }
+
+  /** The category folder of [target] that takes [entry], whatever [folder] is chosen. */
+  private fun categoryOf(entry: IntakeEntry): String? {
+    val status = targetStatus ?: return null
+    if (KetchFeatures.CATEGORY_FOLDERS !in status.features) return null
+    val host = entry.url?.let(::urlHost)
+    return status.config.categoryFor(entry.name, entry.resolved?.contentType, host)?.folder
+  }
 
   /** Path separator of [target]. */
   val separator: String get() = targetStatus?.system?.separator ?: "/"
@@ -1079,15 +1197,17 @@ class IntakeSession internal constructor(
       singleConnection = !torrentsOnly && (maxConnections ?: MAX_CONNECTIONS) <= 1,
       now = clock.now(),
       zone = TimeZone.currentSystemDefault(),
+      fileConflict = fileConflict.takeIf { offersFileConflict && fileConflictChanged },
     )
 
-  /** Puts [option] back to its default: no limit, Normal, now or Auto. */
+  /** Puts [option] back to its default: no limit, Normal, now, Auto or the device's setting. */
   fun resetOption(option: IntakeOption) {
     when (option) {
       IntakeOption.Speed -> speedLimit = SpeedLimit.Unlimited
       IntakeOption.Priority -> priority = DownloadPriority.NORMAL
       IntakeOption.Start -> schedule = DownloadSchedule.Immediate
       IntakeOption.Connections -> connections = 0
+      IntakeOption.FileConflict -> fileConflictChoice = null
     }
   }
 
@@ -1514,16 +1634,24 @@ class IntakeSession internal constructor(
       is IntakeSource.Range -> source.urls
       is IntakeSource.File -> listOfNotNull(resolved?.url)
     }
+    val named = name.takeIf { urls.size == 1 }
+    // A file path is replaced as it is unless its request says what to do, so the sheet says
+    // whenever it names one; otherwise only a choice other than the device's setting is sent.
+    val namesFile = folder != null && !isSystemFolder && !named.isNullOrBlank()
+    val conflict = fileConflict.takeIf {
+      offersFileConflict && !entry.isTorrent && (namesFile || fileConflictChanged)
+    }
     return urls.mapIndexedNotNull { index, url ->
       try {
         DownloadRequest(
           url = url,
           destination = intakeDestination(
             folder = folder,
-            name = name.takeIf { urls.size == 1 },
+            name = named,
             separator = separator,
             torrent = entry.isTorrent,
           ),
+          fileConflict = conflict,
           connections = connections,
           headers = headers,
           properties = properties,

@@ -157,6 +157,7 @@
   <string name="intake_reset_priority">重設優先順序</string>
   <string name="intake_reset_start">重設開始時間</string>
   <string name="intake_reset_connections">重設連線數</string>
+  <string name="intake_reset_conflict">使用裝置的設定</string>
   <plurals name="intake_headers_count">
     <item quantity="other">%1$d 個標頭</item>
   </plurals>
@@ -198,6 +199,17 @@
   <string name="intake_choose_folder">選擇資料夾…</string>
   <string name="intake_folder_on">%1$s 上的資料夾</string>
   <string name="intake_torrents_app_folder">透過種子下載的檔案會儲存在應用程式資料夾中；在「檔案」中選擇的資料夾僅用於一般連結下載</string>
+  <string name="intake_conflict">檔案已存在時</string>
+  <string name="intake_conflict_rename">重新命名</string>
+  <string name="intake_conflict_overwrite">覆寫</string>
+  <string name="intake_conflict_rename_caption">以新名稱儲存在旁邊。</string>
+  <string name="intake_conflict_overwrite_caption">下載完成後取代它。</string>
+  <string name="intake_option_overwrite">覆寫既有檔案</string>
+  <string name="intake_option_rename">保留既有檔案</string>
+  <string name="intake_exists_rename">此資料夾中已有 %1$s。本次下載將儲存為 %2$s。</string>
+  <string name="intake_exists_overwrite">此資料夾中已有 %1$s。下載完成後將取代它。</string>
+  <string name="intake_exists_rename_some">其中一些檔案已在此資料夾中。這些下載將以新名稱儲存。</string>
+  <string name="intake_exists_overwrite_some">其中一些檔案已在此資料夾中。下載完成後將取代它們。</string>
 
   <string name="intake_advanced">進階</string>
   <string name="intake_hide">隱藏</string>

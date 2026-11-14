@@ -623,9 +623,14 @@ DownloadConfig(
 - `DownloadRequest.fileConflict` replaces the setting for one download; `null` follows it.
 - A name another unfinished download saves to is never taken, and neither is a folder's or a name
   too long for a partial file: such a download gets a free name, as with `RENAME`.
-- It applies to names Ketch chooses. A file `Destination` names its file and always replaces it.
-  Sources that write their own files, such as BitTorrent, and Android `content://` folders always
+- The setting applies to names Ketch chooses. A request with a file `Destination` and no
+  `fileConflict` of its own names the file it writes and always replaces it; with
+  `DownloadRequest.fileConflict` set, the named file is treated like a name Ketch chose, so
+  `RENAME` saves beside an existing file and `OVERWRITE` replaces it.
+- Sources that write their own files, such as BitTorrent, and Android `content://` folders always
   keep the existing file.
+- `renamedIfExists(directory, fileName)` in `library:core` tells, before a download is added,
+  the name it would get beside an existing file (`null` when the name is free).
 - Instances list `FILE_CONFLICT`. Over the REST API, only callers with the token can ask for
   `OVERWRITE`, and it only applies in the download directory and the server's
   `allowedDirectories`; see the [CLI reference](../cli/README.md#save-folders).
