@@ -154,6 +154,9 @@ internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
  *   less sets no such goal, the default.
  * @property blocklist peers never connected to and never accepted: addresses, CIDR blocks
  *   (`203.0.113.0/24`) and ranges (`203.0.113.1-203.0.113.99`); none by default.
+ * @property useProxy whether torrents go through the manual proxy of `[download.proxy]`, read
+ *   when the engine starts; off by default, and without effect while that proxy is not manual.
+ *   Through a proxy there is no DHT, uTP, UDP tracker, local discovery or port mapping.
  */
 @Serializable
 data class TorrentSettings(
@@ -173,6 +176,7 @@ data class TorrentSettings(
   val seedRatioPercent: Int = 0,
   val seedTimeMinutes: Int = 0,
   val blocklist: List<String> = emptyList(),
+  val useProxy: Boolean = false,
 ) {
   init {
     require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }

@@ -13,6 +13,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.ProxyAddress
 import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.SpeedLimitMode
 import com.linroid.ketch.api.log.KetchLogger
@@ -185,7 +186,7 @@ private fun runDownload(args: DownloadArgs.Download): Int {
     config = config,
     logger = Logger.console(quietLogLevel(ketchLogLevel)).above(progress),
     additionalSources = listOf(
-      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      FtpDownloadSource(), torrentSource(fileConfig.torrent, proxy = fileConfig.torrentProxy),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
       MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
@@ -213,7 +214,7 @@ private fun runListFiles(args: DownloadArgs.Download): Int {
     config = DownloadConfig(proxy = args.proxy ?: fileConfig.download.proxy),
     logger = Logger.console(quietLogLevel(ketchLogLevel)),
     additionalSources = listOf(
-      FtpDownloadSource(), torrentSource(fileConfig.torrent),
+      FtpDownloadSource(), torrentSource(fileConfig.torrent, proxy = fileConfig.torrentProxy),
       HlsDownloadSource(httpEngine), DashDownloadSource(httpEngine),
       MetalinkDownloadSource(httpEngine), WebDavDownloadSource(httpEngine),
     ),
@@ -520,7 +521,8 @@ private fun runServer(args: Array<String>): Int {
   val instanceId = deviceInstanceId()
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
-  val torrents = torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort)
+  val torrents = torrentSource(mergedConfig.torrent, listenPort = mergedConfig.torrent.listenPort,
+    proxy = mergedConfig.torrentProxy)
   val ketch = Ketch(
     httpEngine = httpEngine,
     taskStore = taskStore,
@@ -1124,7 +1126,8 @@ private fun runStandaloneMcp(
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
   // It serves an agent while the client runs, so it does not share finished torrents again when
   // it starts; MCP offers no seeding tool to stop them.
-  val torrents = torrentSource(fileConfig.torrent, restoreSeeding = false)
+  val torrents = torrentSource(fileConfig.torrent, restoreSeeding = false,
+    proxy = fileConfig.torrentProxy)
   val ketch = Ketch(
     httpEngine = httpEngine,
     taskStore = taskStore,
@@ -1274,17 +1277,19 @@ private fun printMcpUsage() {
  * and uploads as `[torrent] upload` and `uploadLimit` say. Only `ketch server` passes a
  * [listenPort], [TorrentSettings.listenPort]: the other commands may run beside it, so they let
  * the system pick a free port. [restoreSeeding] shares finished torrents again when the engine
- * starts, as `[torrent] upload = "seed"` asks; `ketch mcp --standalone` turns it off.
+ * starts, as `[torrent] upload = "seed"` asks; `ketch mcp --standalone` turns it off. Torrents
+ * go through [proxy], `[download.proxy]` while `[torrent] useProxy` is on.
  */
 private fun torrentSource(
   settings: TorrentSettings,
   listenPort: Int = 0,
   restoreSeeding: Boolean = true,
+  proxy: ProxyAddress? = null,
 ) = TorrentDownloadSource(
   config = TorrentConfig(
     listenPort = listenPort,
     stateDirectory = File(defaultConfigDir(), "torrent-state").path,
-  ).withSettings(settings.engineSettings),
+  ).withSettings(settings.engineSettings).copy(proxy = proxy),
   restoreSeeding = restoreSeeding,
 )
 

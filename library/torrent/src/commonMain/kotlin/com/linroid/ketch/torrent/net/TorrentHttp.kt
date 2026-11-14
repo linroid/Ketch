@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.net
 
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.engine.KtorHttpEngine
 import com.linroid.ketch.torrent.monotonicClock
@@ -97,6 +98,16 @@ internal class TorrentHttp(
 
   companion object {
     fun default(): TorrentHttp = TorrentHttp(KtorHttpEngine(logRequests = false), ownsEngine = true)
+
+    /** [default], with every request sent through [proxy]. */
+    fun default(proxy: Proxy): TorrentHttp {
+      val engine = KtorHttpEngine(logRequests = false)
+      // The proxied view shares the engine's clients and closes nothing: close the engine.
+      val proxied = engine.withProxy(proxy)
+      return TorrentHttp(object : HttpEngine by proxied {
+        override fun close() = engine.close()
+      }, ownsEngine = true)
+    }
   }
 }
 

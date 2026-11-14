@@ -405,6 +405,7 @@ listenPort = 16881            # read by `ketch server` only; 0 (default) picks a
 | `uploadLimit` | unlimited | Upload cap shared by all torrents. |
 | `seedRatioPercent` | 0 | A finished torrent stops seeding once it uploaded this percentage of its size, in all; 0 sets no goal. |
 | `seedTimeMinutes` | 0 | A finished torrent stops seeding after this many minutes since it last began; 0 sets no goal. |
+| `useProxy` | `false` | Sends torrents through the manual proxy of `[download.proxy]`, without DHT, uTP, UDP trackers, local discovery or port forwarding; read at start. See [torrents through the proxy](proxy.md#torrents-through-the-proxy). |
 | `blocklist` | `[]` | Peers never connected to or accepted, by address, CIDR block or range. See [blocking peers by address](#blocking-peers-by-address). |
 | `uploadWifiOnly` | `true` | Pause uploads off Wi-Fi; read by the Android and iOS apps only. See [only on Wi-Fi](#only-on-wi-fi). |
 | `encryption` | `preferred` | Protocol encryption; see [encryption](#encryption). An unknown value loads as `preferred`. |

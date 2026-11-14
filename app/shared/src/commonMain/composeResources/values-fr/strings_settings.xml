@@ -604,6 +604,8 @@
   <string name="settings_torrent_port_mapping_hint">Demande à votre routeur (UPnP ou NAT-PMP) de rediriger un port, pour que davantage de pairs puissent se connecter à cet appareil.</string>
   <string name="settings_torrent_local_discovery">Découverte de pairs locaux</string>
   <string name="settings_torrent_local_discovery_hint">Trouve les appareils de votre réseau local qui téléchargent ou partagent les mêmes torrents publics, pour qu'ils échangent des morceaux directement.</string>
+  <string name="settings_torrent_use_proxy">Utiliser le proxy</string>
+  <string name="settings_torrent_use_proxy_hint">Joint les pairs, les trackers HTTP et les sources web via le proxy défini dans Réseau. DHT, uTP, trackers UDP et redirection de port sont désactivés via un proxy, et les pairs ne peuvent pas se connecter à vous. Prend effet au redémarrage de Ketch.</string>
   <string name="settings_torrent_connections_footer">Le chiffrement cache la nature du trafic, pas les pairs auxquels vous vous connectez.</string>
   <string name="settings_torrent_trackers">Trackers supplémentaires</string>
   <string name="settings_torrent_no_trackers">Aucun tracker supplémentaire</string>

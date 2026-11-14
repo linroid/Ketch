@@ -189,7 +189,8 @@ class KetchService : Service() {
     val instanceId = DeviceStore(File(filesDir, DEVICE_FILE_NAME).path).instanceId()
     val torrentSource = TorrentDownloadSource(
       TorrentConfig(stateDirectory = filesDir.resolve("torrent-state").absolutePath)
-        .withSettings(config.torrent.engineSettings),
+        .withSettings(config.torrent.engineSettings)
+        .copy(proxy = config.torrentProxy),
       // Wi-Fi drivers drop multicast to save power unless an app holds a lock; LAN discovery
       // holds it only while a public torrent runs.
       multicastLock = {

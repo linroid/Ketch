@@ -121,6 +121,8 @@ import ketch.app.shared.generated.resources.settings_torrent_upload_while_downlo
 import ketch.app.shared.generated.resources.settings_torrent_upload_while_downloading_hint
 import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only
 import ketch.app.shared.generated.resources.settings_torrent_upload_wifi_only_hint
+import ketch.app.shared.generated.resources.settings_torrent_use_proxy
+import ketch.app.shared.generated.resources.settings_torrent_use_proxy_hint
 import ketch.app.shared.generated.resources.settings_torrent_utp
 import ketch.app.shared.generated.resources.settings_torrent_utp_hint
 import org.jetbrains.compose.resources.StringResource
@@ -500,6 +502,15 @@ private fun ConnectionsGroup(
           onChange(settings.copy(localDiscovery = on))
           if (on && onThisDevice) nearby.request(search = false) {}
         },
+      )
+    }
+    // The host builds the engine with it, so only this device's, and only from its next start.
+    if (onThisDevice) {
+      SettingsSwitchRow(
+        title = stringResource(Res.string.settings_torrent_use_proxy),
+        description = stringResource(Res.string.settings_torrent_use_proxy_hint),
+        checked = settings.useProxy,
+        onCheckedChange = { onChange(settings.copy(useProxy = it)) },
       )
     }
   }

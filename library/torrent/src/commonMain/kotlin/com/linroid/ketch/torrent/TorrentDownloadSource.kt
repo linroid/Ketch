@@ -4,6 +4,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
+import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.ResolveInput
 import com.linroid.ketch.api.ResolvedSource
@@ -62,8 +63,10 @@ import com.linroid.ketch.torrent.magnet.MagnetUri
 import com.linroid.ketch.torrent.metainfo.TorrentMetadata
 import com.linroid.ketch.torrent.metainfo.TorrentV2Document
 import com.linroid.ketch.torrent.metainfo.V2InfoHash
+import com.linroid.ketch.torrent.net.ProxiedTorrentNetwork
 import com.linroid.ketch.torrent.net.ResponseTooLargeException
 import com.linroid.ketch.torrent.net.TorrentHttp
+import com.linroid.ketch.torrent.net.createTorrentNetwork
 import com.linroid.ketch.torrent.storage.TorrentCheckpoint
 import com.linroid.ketch.torrent.storage.moveTorrentTree
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
@@ -157,7 +160,16 @@ class TorrentDownloadSource(
   private val multicastLock: TorrentMulticastLock? = null,
   uploadsPaused: Boolean = false,
 ) : DownloadSource<TorrentSourceState> {
-  private val httpDelegate = lazy { httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default() }
+  private val httpDelegate = lazy {
+    // Trackers, web seeds and tracker lists go through the proxy too; an engine that cannot use
+    // one fails them rather than connect around it.
+    val proxied = config.proxy?.let { Proxy.Manual(it) }
+    when {
+      proxied == null -> httpEngine?.let { TorrentHttp(it) } ?: TorrentHttp.default()
+      httpEngine != null -> TorrentHttp(httpEngine.withProxy(proxied))
+      else -> TorrentHttp.default(proxied)
+    }
+  }
   private val http by httpDelegate
   private val additionalTrackers = AtomicReference(config.additionalTrackers)
   private val listedTrackers = AtomicReference(emptyList<String>())
@@ -198,9 +210,19 @@ class TorrentDownloadSource(
   internal var engineFactory: (TorrentConfig) -> TorrentEngine = {
     // May map ports and join the LAN's discovery group; TorrentConfig.portMapping and
     // localDiscovery, which their setters change, decide if it does.
-    KotlinTorrentEngine(it, http = http, portMapping = true,
-      localDiscovery = ::openLsdMulticast, multicastLock = multicastLock,
-      magnetLookupTime = magnetLookupTime)
+    val proxy = it.proxy
+    if (proxy == null) {
+      KotlinTorrentEngine(it, http = http, portMapping = true,
+        localDiscovery = ::openLsdMulticast, multicastLock = multicastLock,
+        magnetLookupTime = magnetLookupTime)
+    } else {
+      // Nothing that a proxy cannot carry: no DHT, uTP, port mapping or LAN discovery, whatever
+      // the settings say, and a network that sends no datagram at all.
+      log.i { "Torrents use a ${proxy.type} proxy: DHT, uTP, UDP trackers and port mapping off" }
+      KotlinTorrentEngine(it.copy(dhtEnabled = false, utpEnabled = false, portMapping = false,
+        localDiscovery = false), ProxiedTorrentNetwork(createTorrentNetwork(), proxy),
+        http = http, magnetLookupTime = magnetLookupTime)
+    }
   }
   private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.disk)
   private val trackerListSubscription = TrackerLists(

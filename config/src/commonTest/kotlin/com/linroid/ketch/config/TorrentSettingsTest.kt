@@ -7,6 +7,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class TorrentSettingsTest {
 
@@ -294,5 +296,30 @@ class TorrentSettingsTest {
     val replaced = legacy.withEngineSettings(engine.copy(trackerListUrls = listOf("https://n/t")))
     assertEquals(null, replaced.trackerListUrl)
     assertEquals(listOf("https://n/t"), replaced.trackerListAddresses)
+  }
+
+  @Test
+  fun `torrents take the manual download proxy only when asked to`() {
+    fun config(torrent: String) = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[download.proxy]
+      |mode = "manual"
+      |url = "socks5://127.0.0.1:1080"
+      |username = "ketch"
+      |password = "secret"
+      |
+      |[torrent]
+      |$torrent
+      """.trimMargin(),
+    )
+
+    // Off unless the file says so: a proxy set for downloads does not move torrents onto it.
+    assertNull(config("utp = true").torrentProxy)
+    val proxy = assertNotNull(config("useProxy = true").torrentProxy)
+    assertEquals("socks5://127.0.0.1:1080", proxy.url)
+    assertEquals("ketch", proxy.username)
+    // Nor is there one to use while downloads follow the system or connect directly.
+    assertNull(KetchConfig(torrent = TorrentSettings(useProxy = true)).torrentProxy)
   }
 }

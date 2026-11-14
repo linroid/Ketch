@@ -1,5 +1,6 @@
 package com.linroid.ketch.torrent
 
+import com.linroid.ketch.api.ProxyAddress
 import com.linroid.ketch.torrent.tracker.TRACKER_SCRAPE_WORKSPACE_BYTES
 
 /**
@@ -52,6 +53,13 @@ data class TorrentConfig(
    * share pieces directly. Private and tracker-only torrents never take part. Android, JVM only.
    */
   val localDiscovery: Boolean = true,
+  /**
+   * A SOCKS5 or HTTP proxy every torrent reaches its peers, HTTP trackers and web seeds through,
+   * read as the engine starts; `null` connects directly. While set, what a proxy cannot carry is
+   * off rather than sent around it: DHT, uTP, UDP trackers, local discovery and port mapping,
+   * and peers cannot connect in.
+   */
+  val proxy: ProxyAddress? = null,
   val maxActiveTorrents: Int = 5,
   val connectionsPerTorrent: Int = 100,
   val enableUpload: Boolean = false,
