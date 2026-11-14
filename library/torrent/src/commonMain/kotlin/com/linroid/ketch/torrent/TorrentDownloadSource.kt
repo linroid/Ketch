@@ -221,7 +221,7 @@ class TorrentDownloadSource(
       log.i { "Torrents use a ${proxy.type} proxy: DHT, uTP, UDP trackers and port mapping off" }
       KotlinTorrentEngine(it.copy(dhtEnabled = false, utpEnabled = false, portMapping = false,
         localDiscovery = false), ProxiedTorrentNetwork(createTorrentNetwork(), proxy),
-        http = http, magnetLookupTime = magnetLookupTime)
+        http = http, magnetLookupTime = magnetLookupTime, proxied = true)
     }
   }
   private val scope = CoroutineScope(SupervisorJob() + TorrentDispatchers.disk)

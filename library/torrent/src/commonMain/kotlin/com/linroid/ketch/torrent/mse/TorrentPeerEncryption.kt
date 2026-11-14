@@ -37,6 +37,11 @@ internal class TorrentPeerEncryption(
   private val keyPairs: () -> MseKeyPair = ::MseKeyPair,
   /** Looks a peer's host name up when a filter is set, so the filter sees its address. */
   private val resolve: suspend (String) -> List<ByteArray> = ::resolveTorrentHost,
+  /**
+   * Off when a proxy resolves host names: a peer named by host is then dialed by that name,
+   * unfiltered, rather than looked up here, which would tell the local resolver of it.
+   */
+  private val resolveNames: Boolean = true,
 ) : TorrentNetwork by delegate {
   private val log = KetchLogger("TorrentEngine")
   private val current = AtomicReference(policy)
@@ -62,6 +67,7 @@ internal class TorrentPeerEncryption(
       if (filter.blocks(remote.host)) throw IOException("The peer's address is blocked")
       return remote
     }
+    if (!resolveNames) return remote
     val address = resolve(remote.host).map(::numericHost).firstOrNull { !filter.blocks(it) }
       ?: throw IOException("The peer's address is blocked")
     return PeerEndpoint(address, remote.port)

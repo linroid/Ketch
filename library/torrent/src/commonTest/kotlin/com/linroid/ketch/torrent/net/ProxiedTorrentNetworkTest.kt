@@ -1,6 +1,7 @@
 package com.linroid.ketch.torrent.net
 
 import com.linroid.ketch.api.ProxyAddress
+import com.linroid.ketch.torrent.engine.resolveEndpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
@@ -203,6 +204,16 @@ class ProxiedTorrentNetworkTest {
       assertEquals(listOf(basic), f.seen.credentials)
       assertFailsWith<IOException> { f.through(ProxyAddress.Type.HTTP).connect(f.peer) }
     }
+  }
+
+  @Test
+  fun endpointsOfAProxiedEngine_keepHostNamesForTheProxy() = runTest {
+    assertEquals(listOf(PeerEndpoint("peer.example", 6881)),
+      resolveEndpoint("peer.example:6881", resolve = false))
+    assertEquals(listOf(PeerEndpoint("203.0.113.7", 51413)),
+      resolveEndpoint("203.0.113.7:51413", resolve = false))
+    assertEquals(listOf(PeerEndpoint("2001:db8:0:0:0:0:0:1", 6881)),
+      resolveEndpoint("[2001:db8::1]:6881", resolve = false))
   }
 
   @Test

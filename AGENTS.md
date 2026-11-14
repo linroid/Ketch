@@ -1425,7 +1425,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (SOCKS5 `CONNECT` with user name and password, host names left to the proxy; or HTTP
   `CONNECT` with Basic credentials), whose `bindUdp` sockets send and receive nothing and whose
   `listen` binds loopback, with DHT, uTP, port mapping and local discovery off in its config
-  whatever the settings say, and no port mapper or LSD transport at all; trackers, web seeds,
+  whatever the settings say, and no port mapper or LSD transport at all. The engine is built
+  `proxied`: a peer named by host (`x.pe`, a tracker's list) is dialed by that name
+  (`resolveEndpoint(resolve = false)`, `TorrentPeerEncryption(resolveNames = false)`, so the IP
+  filter checks addresses only), and UDP trackers fail at once instead of timing out; trackers, web seeds,
   metainfo and tracker lists go through `HttpEngine.withProxy` (an engine that cannot use one
   fails them, `TorrentHttp.default(proxy)` without an injected engine). Hosts pass
   `KetchConfig.torrentProxy`: the manual proxy of `[download.proxy]` while `[torrent] useProxy`

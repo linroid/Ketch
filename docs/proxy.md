@@ -76,7 +76,10 @@ A proxy carries TCP connections Ketch opens and nothing else, so through one Ket
 what would otherwise go around it and reveal your address: DHT, uTP, UDP trackers, local peer
 discovery and port forwarding, and other peers cannot connect to you. Expect fewer peers,
 especially for torrents that rely on DHT or UDP trackers; adding `http` or `https` trackers
-helps. Host names of trackers may still be looked up by your system's DNS. The setting is read
+helps. UDP trackers are skipped at once, so they do not hold up the `http` ones listed after
+them. Peers given by host name are resolved by the proxy, not by your system, and the blocklist
+then applies to peers given by address only. Host names of HTTP trackers are resolved by a
+SOCKS5 proxy; with an HTTP proxy your system may still look them up. The setting is read
 when the torrent engine starts, so changing it, or the proxy itself, takes effect after a
 restart.
 

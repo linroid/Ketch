@@ -58,6 +58,26 @@ class TorrentPeerFilterTest {
   }
 
   @Test
+  fun `through a proxy a peer listed by name is dialed by that name and never looked up`() =
+    runTest {
+      val delegate = Refusing()
+      val lookups = mutableListOf<String>()
+      val network = TorrentPeerEncryption(delegate, TorrentEncryption.DISABLED,
+        resolve = { host -> lookups += host; emptyList() }, resolveNames = false)
+      network.filter = { TorrentIpFilter.parse(listOf("203.0.113.0/24")) }
+
+      assertFailsWith<IOException> { network.dial(PeerEndpoint("peer.example", 6881), tag) }
+      val blocked = assertFailsWith<IOException> {
+        network.dial(PeerEndpoint("203.0.113.7", 6881), tag)
+      }
+
+      // The proxy resolves the name; addresses are still filtered.
+      assertEquals(listOf(PeerEndpoint("peer.example", 6881)), delegate.dialed)
+      assertTrue(lookups.isEmpty())
+      assertTrue("blocked" in blocked.message.orEmpty())
+    }
+
+  @Test
   fun `a peer listed by name is dialed at an address the filter allows`() = runTest {
     val delegate = Refusing()
     val names = mapOf(
