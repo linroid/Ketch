@@ -570,6 +570,32 @@ class TorrentSeedingControlTest {
   }
 
   @Test
+  fun queue_seederToldToStop_handsItsSlotToTheNextTaskMeantToSeed() = harness {
+    val store = MemoryTaskStore()
+    val older = v1Record("older", MultiFileTorrent(listOf(40_000, 30_000)), root / "older", 1_000)
+    val newer = v1Record("newer", MultiFileTorrent(listOf(50_000, 20_000)), root / "newer", 2_000)
+    store.save(newer)
+    store.save(older)
+    val source = source(maxActiveTorrents = 1)
+    val ketch = ketch(source, store)
+    ketch.start()
+    val tasks = ketch.tasks.value.associateBy { it.taskId }
+    checkNotNull(tasks["older"]).awaitSeeding(true)
+    eventually("the walk to end") { source.seedingAvailability("newer") == SeedingOutcome.NO_SLOT }
+    val controller = assertNotNull(ketch.controller(TorrentController))
+
+    controller.setSeeding("older", false, ketch.context("older", "stop"))
+
+    // The one that waited seeds without a restart; the one told to stop stays stopped.
+    checkNotNull(tasks["newer"]).awaitSeeding(true)
+    assertNull(source.sessionOf("older"))
+    assertEquals(false, store.intent("older"))
+    assertEquals(setOf("newer"), source.seedingTaskIds.value)
+    source.stopSeeding("newer")
+    source.assertNoLeaks()
+  }
+
+  @Test
   fun restore_disabled_neverStartsSessions() = harness {
     val store = MemoryTaskStore()
     store.save(v1Record("kept", MultiFileTorrent(listOf(40_000, 30_000)), root / "kept"))
