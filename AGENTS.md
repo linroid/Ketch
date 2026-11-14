@@ -1288,7 +1288,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   it (`DownloadExecution.existingPath`, `OutputPathReservations.reserveExisting`; not while a
   running download reserved it or another unfinished task saves there). The v1 store uses
   files it finds and checks them; the v2 store takes existing folders and regular files as its
-  own (`TorrentV2PieceStore(adoptExisting)`, from `TorrentV2TaskSpec.adoptExisting`; never a
+  own (`TorrentV2PieceStore(adoptExisting)`, as a recheck does; never a
   symbolic link), so they are checked like owned ones, written over where they differ, and
   deleted with the task's files. Without the request torrents still save beside what is there.
   Tests: `TorrentAdoptFilesTest` (created v1, v2 and hybrid torrents complete from the files
