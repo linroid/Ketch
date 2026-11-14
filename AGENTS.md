@@ -1381,7 +1381,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   seed again (`prepareRecheck`, `SourceHost.reopen`); a paused one is checked when it next
   starts. Payload counters start again with the new checkpoint, and pieces kept for skipped
   files in the v1 sidecar are downloaded again when their files are chosen. The server lets a
-  caller move only where it may save (`DestinationGuard.checkMove`, 403 `path_rejected`). The
+  caller move only files it may delete, into a folder and to a path (`<directory>/<name>`) it
+  may save at (`DestinationGuard.checkMove`, 403 `path_rejected`). A copy between volumes whose
+  original cannot be deleted afterwards still counts as moved, with a warning, and a moved task
+  removed with its files before it runs again takes them as its own first (`v1Store` and
+  `v2Store` with `adopt`). The
   apps have no control for it yet
 - Editing trackers: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(add, remove))`
   (REST `PUT /api/torrents/{id}/trackers`, answering the list; capability `tracker-edit`) removes

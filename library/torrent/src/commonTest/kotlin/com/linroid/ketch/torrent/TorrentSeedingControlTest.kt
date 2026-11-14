@@ -39,6 +39,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path
+import okio.Path.Companion.toPath
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
@@ -376,6 +377,35 @@ class TorrentSeedingControlTest {
     task.remove(deleteFiles = true)
     eventually("the moved files to be deleted") {
       torrentFileSystem.metadataOrNull(moved / "a") == null
+    }
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun relocate_taskRemovedWithItsFilesBeforeItRunsAgain_deletesThemAtTheNewPlace() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val store = MemoryTaskStore()
+    // Moved while they were not running, as a paused task is: nothing has checked them since.
+    val v1 = v1Record("v1-moved", MultiFileTorrent(listOf(40_000, 30_000)), root / "one",
+      sharing = false)
+    val v2 = v2Record("v2-moved", v2Fixture, root / "two")
+      .let { it.copy(control = TaskControl(sharing = false)) }
+    for (record in listOf(v1, v2)) {
+      val from = checkNotNull(record.outputPath)
+      val to = (root / "moved" / from.toPath().name).toString()
+      val state = source.relocate(record.taskId, from, to, record.sourceState)
+      store.save(record.copy(outputPath = to, sourceState = state))
+    }
+    val ketch = ketch(source, store)
+    ketch.start()
+    assertTrue(torrentFileSystem.exists(root / "moved" / "one" / "f0"))
+    assertTrue(torrentFileSystem.exists(root / "moved" / "two" / "a"))
+
+    for (task in ketch.tasks.value) task.remove(deleteFiles = true)
+
+    eventually("the moved files to be deleted") {
+      torrentFileSystem.metadataOrNull(root / "moved" / "one" / "f0") == null &&
+        torrentFileSystem.metadataOrNull(root / "moved" / "two" / "a") == null
     }
     source.assertNoLeaks()
   }

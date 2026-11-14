@@ -7,13 +7,15 @@ import okio.Path
 /**
  * Moves the file or folder [source] to [target], which must not exist: by renaming it, or
  * where that fails, as between volumes, by copying it and then deleting the original. A copy
- * that fails is deleted again, leaving [source] as it was.
+ * that fails is deleted again, leaving [source] as it was. Once the copy is complete the files
+ * are at [target] for good: returns false when the original could then not be deleted whole,
+ * and what is left of it stays where it was.
  */
-internal fun moveTorrentTree(files: FileSystem, source: Path, target: Path) {
+internal fun moveTorrentTree(files: FileSystem, source: Path, target: Path): Boolean {
   check(files.metadataOrNull(target) == null) { "The folder already has something of that name" }
   try {
     files.atomicMove(source, target)
-    return
+    return true
   } catch (_: IOException) {
     // Not on one volume: copied below.
   }
@@ -34,5 +36,10 @@ internal fun moveTorrentTree(files: FileSystem, source: Path, target: Path) {
     files.deleteRecursively(target, mustExist = false)
     throw e
   }
-  files.deleteRecursively(source, mustExist = false)
+  return try {
+    files.deleteRecursively(source, mustExist = false)
+    true
+  } catch (_: IOException) {
+    false
+  }
 }

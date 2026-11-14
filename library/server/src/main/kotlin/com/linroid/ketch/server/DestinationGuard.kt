@@ -164,16 +164,26 @@ internal class DestinationGuard(
   }
 
   /**
-   * Checks that a download's files may be moved into [directory], as a download may be saved
-   * there.
+   * Checks that [task]'s files may be moved into [directory] (only the folder for a task this
+   * server does not have, which no move then happens for): that they may be deleted where
+   * they are ([checkDeletion]), as a move takes them away from there, and that both the folder
+   * and the path they get in it, the folder and the name they have, are where a download may be
+   * saved, so no move makes a hidden or protected file out of a download's name.
    *
-   * @throws PathRejectedException if the folder lies outside the folders
+   * @throws PathRejectedException if the files, the folder or the new path lie outside the
+   *   folders
    */
-  suspend fun checkMove(directory: String) {
-    val status = ketch.status()
-    if (passesAsUri(directory) || !policy(status.system.downloadDirectory).contains(directory)) {
+  suspend fun checkMove(task: DownloadTask?, directory: String) {
+    task?.let { checkDeletion(it) }
+    val policy = policy(ketch.status().system.downloadDirectory)
+    if (passesAsUri(directory) || !policy.contains(directory)) {
       throw PathRejectedException(directory)
     }
+    val from = task?.outputPath ?: (task?.state?.value as? DownloadState.Completed)?.outputPath
+    val name = from?.trimEnd('/', '\\')?.substringAfterLast('/')?.substringAfterLast('\\')
+    if (name.isNullOrEmpty()) return
+    val target = directory.trimEnd('/', '\\') + "/" + name
+    if (!policy.contains(target)) throw PathRejectedException(target)
   }
 
   /**

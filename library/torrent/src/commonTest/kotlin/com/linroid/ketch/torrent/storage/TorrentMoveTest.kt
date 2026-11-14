@@ -10,12 +10,22 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TorrentMoveTest {
   /** A file system that cannot rename, as between two volumes, and may fail to copy [failing]. */
-  private class NoRename(delegate: FileSystem, val failing: String? = null) :
-    ForwardingFileSystem(delegate) {
+  private class NoRename(
+    delegate: FileSystem,
+    val failing: String? = null,
+    val keeps: Boolean = false,
+  ) : ForwardingFileSystem(delegate) {
+    override fun delete(path: Path, mustExist: Boolean) {
+      if (keeps) throw IOException("read-only")
+      super.delete(path, mustExist)
+    }
+
     override fun atomicMove(source: Path, target: Path): Unit = throw IOException("cross-device")
 
     override fun copy(source: Path, target: Path) {
@@ -66,6 +76,16 @@ class TorrentMoveTest {
     }
     assertContentEquals(byteArrayOf(1, 2, 3), read(root / "from" / "pack" / "a.bin"))
     assertNull(torrentFileSystem.metadataOrNull(root / "to" / "pack"))
+  }
+
+  @Test
+  fun `a copy whose original cannot be deleted still counts as moved`() = tree { root ->
+    // The files are whole at their new place, so that is where the task saves from now on.
+    assertFalse(moveTorrentTree(NoRename(torrentFileSystem, keeps = true), root / "from" / "pack",
+      root / "to" / "pack"))
+    assertContentEquals(byteArrayOf(1, 2, 3), read(root / "to" / "pack" / "a.bin"))
+    assertContentEquals(byteArrayOf(1, 2, 3), read(root / "from" / "pack" / "a.bin"))
+    assertTrue(moveTorrentTree(torrentFileSystem, root / "to" / "pack", root / "to" / "again"))
   }
 
   @Test

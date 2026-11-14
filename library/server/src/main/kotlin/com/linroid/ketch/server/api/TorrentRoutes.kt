@@ -162,7 +162,7 @@ internal fun Route.torrentRoutes(
     val taskId = resource.parent.id
     val body = call.receiveJson<TorrentRelocateRequest>()
     log.d { "PUT /api/torrents/$taskId/location" }
-    destinations.checkMove(body.directory)
+    destinations.checkMove(ketch.tasks.value.firstOrNull { it.taskId == taskId }, body.directory)
     controller.relocate(taskId, body.directory)
     call.respond(controller.snapshot(taskId) ?: throw notFound(taskId))
   }

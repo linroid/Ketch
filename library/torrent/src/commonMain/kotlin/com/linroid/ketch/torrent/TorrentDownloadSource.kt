@@ -499,7 +499,10 @@ class TorrentDownloadSource(
       try {
         target.parent?.let { files.createDirectories(it) }
         // A task that created nothing yet has nothing to move.
-        if (files.metadataOrNull(source) != null) moveTorrentTree(files, source, target)
+        if (files.metadataOrNull(source) != null && !moveTorrentTree(files, source, target)) {
+          // The task saves at its new place all the same: the copy there is whole.
+          log.w { "Moved taskId=$taskId, but could not delete all of what it left behind" }
+        }
       } catch (e: IOException) {
         throw KetchError.Disk(e)
       }
@@ -2511,7 +2514,7 @@ class TorrentDownloadSource(
         engine.load()?.removeTorrent(state.infoHash, deleteFiles = true)
       }
       tasks.release(context.taskId)
-      val store = v1Store(context, state) ?: return
+      val store = v1Store(context, state, adopt = true) ?: return
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }
     } catch (e: CancellationException) { throw e
@@ -2543,10 +2546,15 @@ class TorrentDownloadSource(
     }
   }
 
-  /** [state]'s v1 store with the files it owns recovered, or null when nothing was saved. */
+  /**
+   * [state]'s v1 store with the files it owns recovered, or null when nothing was saved. With
+   * [adopt], a task whose files were moved and that has not run since takes the files at its
+   * new place as its own first, as its next run would have: nothing else records that they are.
+   */
   private suspend fun v1Store(
     context: DownloadContext,
     state: TorrentSourceState,
+    adopt: Boolean = false,
   ): TorrentPieceStore? {
     val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }
       ?.let { TorrentCheckpoint.decode(decodeBase64(it)) }
@@ -2555,15 +2563,17 @@ class TorrentDownloadSource(
       ?: return null
     val output = context.outputPath ?: checkpoint?.output ?: state.savePath
     if (output.isEmpty()) return null
+    val adopting = adopt && state.relocated && checkpoint == null
     val store = TorrentPieceStore(metadata, output.toPath(),
-      state.selectedFileIds.map { it.toInt() }.toSet(), context.taskId)
+      state.selectedFileIds.map { it.toInt() }.toSet(), context.taskId,
+      adoptExisting = adopting)
     checkpoint?.let { store.restore(it) }
-    store.recoverOwnership()
+    if (adopting) store.initialize() else store.recoverOwnership()
     return store
   }
 
   private suspend fun cleanupV2(context: DownloadContext, state: TorrentSourceState) {
-    val store = v2Store(context, state)
+    val store = v2Store(context, state, adopt = true)
     try {
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }
@@ -2574,6 +2584,7 @@ class TorrentDownloadSource(
   private suspend fun v2Store(
     context: DownloadContext,
     state: TorrentSourceState,
+    adopt: Boolean = false,
   ): TorrentV2PieceStore {
     check(!tasks.isReserved(context.taskId)) { "Join the torrent download before cleanup" }
     val metainfo = requireNotNull(metainfoOf(context.preResolved, state)) { "No saved metainfo" }
@@ -2588,6 +2599,7 @@ class TorrentDownloadSource(
     val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }?.let {
       requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(it)))
     }
+    val adopting = adopt && state.relocated && checkpoint == null
     // The creation log may be bound to any selection the task ran with: the checkpoint's, the
     // one the state mirrors, or the record's.
     val store = TorrentV2PieceStore(document, absolute, selected, context.taskId,
@@ -2595,10 +2607,14 @@ class TorrentDownloadSource(
       Semaphore(config.maxOpenPayloadFiles),
       creationLogPath = v2CreationLog(absolute, context.taskId),
       legacySelections = listOfNotNull(checkpoint?.selected, state.selectedFileIds,
-        context.request.selectedFileIds).filter { it.isNotEmpty() })
+        context.request.selectedFileIds).filter { it.isNotEmpty() },
+      // A task whose files were moved and that has not run since owns them only once a store
+      // takes them, as its next run would have.
+      adoptExisting = adopting)
     try {
       checkpoint?.let { store.restore(it) }
       store.recoverOwnership()
+      if (adopting) store.initialize()
     } catch (e: Throwable) {
       store.close()
       throw e
