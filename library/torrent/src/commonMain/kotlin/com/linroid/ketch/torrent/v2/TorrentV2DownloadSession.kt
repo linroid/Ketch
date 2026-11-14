@@ -29,7 +29,9 @@ import com.linroid.ketch.torrent.peer.PeerOutcomeReport
 import com.linroid.ketch.torrent.storage.TorrentOutputMapping
 import com.linroid.ketch.torrent.storage.TorrentV2Checkpoint
 import com.linroid.ketch.torrent.storage.TorrentV2PieceStore
+import com.linroid.ketch.torrent.tracker.TrackerStatus
 import com.linroid.ketch.torrent.tracker.TrackerTopic
+import com.linroid.ketch.torrent.tracker.mergeTrackerStatuses
 import com.linroid.ketch.torrent.v2.peer.PeerV2Connector
 import com.linroid.ketch.torrent.v2.peer.PeerV2Dialer
 import com.linroid.ketch.torrent.v2.peer.PeerV2Pool
@@ -168,6 +170,12 @@ internal interface TorrentV2DiscoverySink {
    * discovery announces again, sooner than the trackers asked, whenever it grows.
    */
   fun reannounceRequests(): Long = 0
+
+  /**
+   * How the trackers of one announcer answer now: [key] names the announcer, such as a topic,
+   * and an empty list ends it.
+   */
+  fun trackerStatus(key: String, statuses: List<TrackerStatus>) {}
 }
 
 /**
@@ -243,6 +251,12 @@ internal class TorrentV2DownloadSession private constructor(
 
   /** Why the running download makes no progress, while it does not; null once it stops. */
   override val stall: StateFlow<TorrentStall?> get() = mutableStall
+
+  // By announcer, each updated from its own coroutine; merged only when read.
+  private val trackerStatuses = MutableStateFlow<Map<String, List<TrackerStatus>>>(emptyMap())
+
+  /** The trackers of every topic the transfer announces under, one status per tracker. */
+  override fun trackers(): List<TrackerStatus> = mergeTrackerStatuses(trackerStatuses.value.values)
 
   /** Raised each time a stalled transfer asks its trackers for peers; see [Sink]. */
   private val reannounces = AtomicLong(0)
@@ -613,6 +627,10 @@ internal class TorrentV2DownloadSession private constructor(
     override fun receivedBytes(): Long = store.receivedBytes()
 
     override fun reannounceRequests(): Long = reannounces.load()
+
+    override fun trackerStatus(key: String, statuses: List<TrackerStatus>) {
+      trackerStatuses.update { if (statuses.isEmpty()) it - key else it + (key to statuses) }
+    }
   }
 
   private suspend fun transfer() = coroutineScope {

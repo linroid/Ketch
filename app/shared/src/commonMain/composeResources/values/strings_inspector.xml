@@ -9,6 +9,17 @@
   <string name="inspector_tab_connections">Connections</string>
   <string name="inspector_tab_files">Files</string>
   <string name="inspector_tab_activity">Activity</string>
+  <!-- The Trackers tab of a torrent: each tracker's address, how it last answered, and the peers it named and counts. -->
+  <string name="inspector_tab_trackers">Trackers</string>
+  <string name="inspector_tracker_idle">Not asked yet</string>
+  <string name="inspector_tracker_announcing">Asking…</string>
+  <string name="inspector_tracker_working">Working</string>
+  <string name="inspector_tracker_failed">Failed</string>
+  <string name="inspector_tracker_timed_out">No answer</string>
+  <string name="inspector_tracker_peers">Peers: %1$d</string>
+  <string name="inspector_tracker_seeders">Seeding: %1$d</string>
+  <string name="inspector_tracker_leechers">Downloading: %1$d</string>
+  <string name="inspector_trackers_empty">This torrent names no trackers of its own.</string>
 
   <!-- How long a connection has received nothing. %1$d is a number of seconds or minutes. -->
   <string name="inspector_stalled_seconds">Stalled %1$d s</string>

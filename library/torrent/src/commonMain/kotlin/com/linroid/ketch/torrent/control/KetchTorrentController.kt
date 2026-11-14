@@ -38,6 +38,7 @@ import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
 import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
@@ -203,6 +204,27 @@ internal class KetchTorrentController(
       null
     }
     return export ?: throw TorrentCommandException(
+      TorrentCommandError.METADATA_UNAVAILABLE,
+      "The torrent is not known yet",
+    )
+  }
+
+  override suspend fun trackers(taskId: String): List<TorrentTracker>? {
+    val task = torrentTask(taskId) ?: return null
+    requireCapability(TorrentCapability.TRACKERS, TorrentCommandError.UNSUPPORTED)
+    val record = recordOf(task)
+    val trackers = try {
+      source.torrentTrackers(
+        taskId = taskId,
+        url = record.request.url,
+        sourceState = record.sourceState,
+        resolved = record.resolvedSource ?: record.request.resolvedSource,
+      )
+    } catch (e: IllegalArgumentException) {
+      log.w { "Cannot list the trackers of taskId=$taskId: ${e.describeCauses()}" }
+      null
+    }
+    return trackers ?: throw TorrentCommandException(
       TorrentCommandError.METADATA_UNAVAILABLE,
       "The torrent is not known yet",
     )

@@ -178,6 +178,7 @@ These exist on servers listing `torrent.control`:
 | `GET /api/torrents/{id}` | A torrent task's snapshot |
 | `GET /api/torrents/{id}/files?limit=&cursor=&sort=&desc=true` | A page of its files, up to 1000, sorted `torrent`, `name`, `size`, `extension` or `selected` |
 | `PUT /api/torrents/{id}/selection`, `/seeding` | Choose its files, or start or stop seeding it, guarded by a revision and an idempotency key |
+| `GET /api/torrents/{id}/trackers` | Its own trackers in tier order: endpoint (never the path), state (`idle`, `announcing`, `working`, `failed`, `timed-out`), peers named, seeders, leechers and what the tracker said (`trackers` capability) |
 | `GET /api/torrents/{id}/export?metainfo=true` | Its info hashes and magnet link (none for a private torrent), with its `.torrent` file as Base64 when `metainfo` is true (`export` capability) |
 | `GET /api/torrents/{id}/events` | Deprecated: SSE `snapshot` events of it; the event stream carries them |
 

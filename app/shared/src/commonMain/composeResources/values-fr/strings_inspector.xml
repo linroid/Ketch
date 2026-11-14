@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">Connexions</string>
   <string name="inspector_tab_files">Fichiers</string>
   <string name="inspector_tab_activity">Activité</string>
+  <string name="inspector_tab_trackers">Trackers</string>
+  <string name="inspector_tracker_idle">Pas encore interrogé</string>
+  <string name="inspector_tracker_announcing">Interrogation…</string>
+  <string name="inspector_tracker_working">Fonctionne</string>
+  <string name="inspector_tracker_failed">Échec</string>
+  <string name="inspector_tracker_timed_out">Pas de réponse</string>
+  <string name="inspector_tracker_peers">Pairs : %1$d</string>
+  <string name="inspector_tracker_seeders">En partage : %1$d</string>
+  <string name="inspector_tracker_leechers">En téléchargement : %1$d</string>
+  <string name="inspector_trackers_empty">Ce torrent ne nomme aucun tracker.</string>
 
   <string name="inspector_stalled_seconds">Bloquée depuis %1$d s</string>
   <string name="inspector_stalled_minutes">Bloquée depuis %1$d min</string>

@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">Verbindungen</string>
   <string name="inspector_tab_files">Dateien</string>
   <string name="inspector_tab_activity">Aktivität</string>
+  <string name="inspector_tab_trackers">Tracker</string>
+  <string name="inspector_tracker_idle">Noch nicht gefragt</string>
+  <string name="inspector_tracker_announcing">Wird gefragt …</string>
+  <string name="inspector_tracker_working">Funktioniert</string>
+  <string name="inspector_tracker_failed">Fehlgeschlagen</string>
+  <string name="inspector_tracker_timed_out">Keine Antwort</string>
+  <string name="inspector_tracker_peers">Peers: %1$d</string>
+  <string name="inspector_tracker_seeders">Seeder: %1$d</string>
+  <string name="inspector_tracker_leechers">Lädt herunter: %1$d</string>
+  <string name="inspector_trackers_empty">Dieser Torrent nennt keine eigenen Tracker.</string>
 
   <string name="inspector_stalled_seconds">Stockt seit %1$d s</string>
   <string name="inspector_stalled_minutes">Stockt seit %1$d min</string>

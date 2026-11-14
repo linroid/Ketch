@@ -130,6 +130,12 @@ internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController)
     call.respond(export)
   }
 
+  get<Torrents.ById.Trackers> { resource ->
+    val taskId = resource.parent.id
+    log.d { "GET /api/torrents/$taskId/trackers" }
+    call.respond(controller.trackers(taskId) ?: throw notFound(taskId))
+  }
+
   sse("/api/torrents/{id}/events") {
     val taskId = call.parameters["id"]!!
     log.d { "SSE client connected to /api/torrents/$taskId/events" }

@@ -43,6 +43,9 @@ import com.linroid.ketch.app.ui.inspector.tabs.ActivityTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTabContent
+import com.linroid.ketch.app.ui.inspector.tabs.TrackersTabContent
+import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.app.state.FileOrder
 import com.linroid.ketch.app.state.FileSort
 import com.linroid.ketch.app.state.FileSortSurface
@@ -80,6 +83,27 @@ class InspectorTabsSnapshots {
           }
           TabCard("Files 14", DockedWidth) { FilesTabContent(season()) }
           TabCard("Activity", DockedWidth) { Activity(ubuntu()) }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun trackers_eachState_rendersWhatTheTrackerSaid() {
+    val size = SnapshotSize(360.dp, 420.dp, KetchDensity.Compact)
+    val trackers = listOf(
+      TorrentTracker("udp://tracker.opentrackr.org:1337", 0, TorrentTrackerState.WORKING,
+        peers = 48, seeders = 1204, leechers = 87),
+      TorrentTracker("https://tracker.example.org:443", 0, TorrentTrackerState.FAILED,
+        failures = 3, message = "Torrent is not registered with this tracker"),
+      TorrentTracker("udp://open.stealth.si:80", 1, TorrentTrackerState.TIMED_OUT, failures = 1),
+      TorrentTracker("http://tracker.files.example:6969", 1, TorrentTrackerState.ANNOUNCING),
+      TorrentTracker("udp://backup.example:451", 2, TorrentTrackerState.IDLE),
+    )
+    for (theme in SnapshotTheme.entries) {
+      snapshot("inspector-trackers", size, theme) {
+        Column(Modifier.padding(KetchTheme.spacing.s4)) {
+          TabCard("Trackers", DockedWidth) { TrackersTabContent(trackers) }
         }
       }
     }

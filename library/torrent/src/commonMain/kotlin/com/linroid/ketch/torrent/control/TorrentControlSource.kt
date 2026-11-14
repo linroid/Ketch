@@ -13,6 +13,7 @@ import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentReachability
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentStall
+import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.engine.TorrentPayloadCounters
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +91,20 @@ internal interface TorrentControlSource {
     resolved: ResolvedSource?,
     includeMetainfo: Boolean,
   ): TorrentExport? = null
+
+  /**
+   * The own trackers of the task [taskId], which downloads [url], and how each answers: from
+   * its session in this process when it has one that announces, else idle ones from the
+   * metainfo the task kept ([resolved], or [sourceState] as older builds saved it) or from a
+   * magnet [url]; `null` while neither is known. For sources whose [torrentCapabilities] list
+   * `trackers`.
+   */
+  suspend fun torrentTrackers(
+    taskId: String,
+    url: String,
+    sourceState: SourceState?,
+    resolved: ResolvedSource?,
+  ): List<TorrentTracker>? = null
 
   /** What the task's session in this process is doing, or `null` when it has none. */
   suspend fun liveTorrent(taskId: String): LiveTorrent?

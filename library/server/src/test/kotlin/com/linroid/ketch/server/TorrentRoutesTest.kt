@@ -27,6 +27,8 @@ import com.linroid.ketch.torrent.api.TorrentReachabilityStatus
 import com.linroid.ketch.torrent.api.TorrentRevision
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import com.linroid.ketch.torrent.api.TorrentSnapshot
+import com.linroid.ketch.torrent.api.TorrentTracker
+import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import io.ktor.client.request.get
 import io.ktor.client.request.put
@@ -142,6 +144,17 @@ class TorrentRoutesTest {
       context: TorrentCommandContext,
     ): TorrentCommandResult =
       throw TorrentCommandException(TorrentCommandError.POLICY_DENIED, "Seeding is switched off")
+
+    override suspend fun trackers(taskId: String): List<TorrentTracker>? =
+      if (taskId == "t1") {
+        listOf(
+          TorrentTracker("udp://a.example:1337", 0, TorrentTrackerState.WORKING, peers = 12),
+          TorrentTracker("http://b.example:80", 1, TorrentTrackerState.FAILED, failures = 2,
+            message = "unregistered torrent"),
+        )
+      } else {
+        null
+      }
 
     val exports = mutableListOf<Pair<String, Boolean>>()
 
@@ -385,6 +398,19 @@ class TorrentRoutesTest {
 
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(true, controller.sequential)
+  }
+
+  @Test
+  fun trackers_answerTheList_withWireStates() = testApplication {
+    application { with(controlledServer()) { configureServer() } }
+
+    val body = client.get("/api/torrents/t1/trackers").bodyAsText()
+    val trackers = json.decodeFromString<List<TorrentTracker>>(body)
+
+    assertEquals(listOf("udp://a.example:1337", "http://b.example:80"), trackers.map { it.endpoint })
+    assertEquals(TorrentTrackerState.FAILED, trackers[1].state)
+    assertTrue("\"working\"" in body)
+    assertEquals(HttpStatusCode.NotFound, client.get("/api/torrents/none/trackers").status)
   }
 
   @Test

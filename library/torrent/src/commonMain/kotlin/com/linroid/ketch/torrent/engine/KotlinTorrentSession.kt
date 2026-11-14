@@ -214,6 +214,7 @@ internal class KotlinTorrentSession(
   private val trackerControl = AtomicReference<TrackerControl?>(null)
   private val _trackerStatus = MutableStateFlow<List<TrackerStatus>>(emptyList())
   val trackerStatus: StateFlow<List<TrackerStatus>> = _trackerStatus
+  override fun trackers(): List<TrackerStatus> = _trackerStatus.value
 
   suspend fun reannounceTrackers(): Boolean = trackerControl.load()?.reannounce() ?: false
 

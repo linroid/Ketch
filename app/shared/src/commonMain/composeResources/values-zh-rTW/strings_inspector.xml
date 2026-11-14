@@ -4,6 +4,16 @@
   <string name="inspector_tab_connections">連線</string>
   <string name="inspector_tab_files">檔案</string>
   <string name="inspector_tab_activity">動態</string>
+  <string name="inspector_tab_trackers">Tracker</string>
+  <string name="inspector_tracker_idle">尚未詢問</string>
+  <string name="inspector_tracker_announcing">正在詢問…</string>
+  <string name="inspector_tracker_working">正常</string>
+  <string name="inspector_tracker_failed">失敗</string>
+  <string name="inspector_tracker_timed_out">無回應</string>
+  <string name="inspector_tracker_peers">節點：%1$d</string>
+  <string name="inspector_tracker_seeders">做種：%1$d</string>
+  <string name="inspector_tracker_leechers">下載中：%1$d</string>
+  <string name="inspector_trackers_empty">此種子沒有自帶的 Tracker。</string>
 
   <string name="inspector_stalled_seconds">已停滯 %1$d 秒</string>
   <string name="inspector_stalled_minutes">已停滯 %1$d 分鐘</string>
