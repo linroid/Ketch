@@ -7,9 +7,6 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchApi
-import com.linroid.ketch.api.isDirectory
-import com.linroid.ketch.api.isFile
-import com.linroid.ketch.api.isName
 import com.linroid.ketch.core.file.DestinationPathPolicy
 import com.linroid.ketch.core.file.PathRejectedException
 import java.io.File
@@ -79,7 +76,7 @@ internal class DestinationGuard(
     if (named != null && replaceableIn(named.destination, directory)) return named
     val placed = placed(request, directory, keepFileName = false)
     if (replaceableIn(placed.destination, directory)) return placed
-    if (asked && placed.destination?.isFile() != true) {
+    if (asked && placed.destination?.namesFile() != true) {
       throw OverwriteRejectedException(
         "Existing files are only replaced in the download folder and the allowed folders",
       )
@@ -118,8 +115,8 @@ internal class DestinationGuard(
    * it needs no check.
    */
   private fun replaceableIn(destination: Destination?, directory: String): Boolean {
-    if (destination == null || destination.isName() || "://" in destination.value) return true
-    val folder = if (destination.isDirectory()) {
+    if (destination == null || destination.isBareName() || "://" in destination.value) return true
+    val folder = if (destination.namesFolder()) {
       destination.value
     } else {
       File(destination.value).parent ?: return false
@@ -203,6 +200,15 @@ internal class DestinationGuard(
     const val CONTENT_URI_PREFIX = "content://"
   }
 }
+
+// What a destination names, by the rules of file paths. Not `library:api`'s `isFile`, `isName`
+// and `isDirectory`: those compile to a class per platform (`Destination_jvmKt`), which the
+// Android app, where this server also runs, does not have.
+private fun Destination.isBareName(): Boolean = '/' !in value && '\\' !in value
+
+private fun Destination.namesFolder(): Boolean = value.endsWith('/') || value.endsWith('\\')
+
+private fun Destination.namesFile(): Boolean = !isBareName() && !namesFolder()
 
 /**
  * Thrown when an API caller asks for downloads to replace existing files
