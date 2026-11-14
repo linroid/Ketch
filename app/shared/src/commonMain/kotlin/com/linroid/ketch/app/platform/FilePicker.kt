@@ -8,6 +8,12 @@ interface FilePicker {
   val canPickFolder: Boolean
 
   /**
+   * Whether [pickFolder] answers a file path, which a download's files can be moved into, rather
+   * than a document tree, as on Android.
+   */
+  val picksFilePaths: Boolean get() = true
+
+  /**
    * Asks the user for a folder to save downloads in.
    *
    * @param initialFolder folder to start in, where the platform allows it.

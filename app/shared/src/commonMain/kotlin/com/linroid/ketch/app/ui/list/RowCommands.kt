@@ -13,15 +13,18 @@ import com.linroid.ketch.app.i18n.load
 import com.linroid.ketch.app.i18n.text
 import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.platform.FileActions
+import com.linroid.ketch.app.platform.FilePicker
 import com.linroid.ketch.app.platform.SystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.DiscoverRequest
 import com.linroid.ketch.app.state.IntakeRequest
 import com.linroid.ketch.app.state.IntakeSeed
+import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
 import com.linroid.ketch.app.state.RowAction
 import com.linroid.ketch.app.state.TaskKey
 import com.linroid.ketch.app.state.TaskRow
 import com.linroid.ketch.app.state.catchingUnlessCancelled
+import com.linroid.ketch.app.state.isDocumentTree
 import com.linroid.ketch.app.util.errorDetails
 import com.linroid.ketch.app.util.referer
 import com.linroid.ketch.torrent.api.TorrentCommandContext
@@ -51,6 +54,7 @@ import ketch.app.shared.generated.resources.downloads_failed_resume
 import ketch.app.shared.generated.resources.downloads_failed_retry
 import ketch.app.shared.generated.resources.downloads_failed_reveal
 import ketch.app.shared.generated.resources.downloads_failed_check_files
+import ketch.app.shared.generated.resources.downloads_failed_move_files
 import ketch.app.shared.generated.resources.downloads_failed_seeding
 import ketch.app.shared.generated.resources.downloads_failed_speed_limit
 import ketch.app.shared.generated.resources.downloads_open_source_failed
@@ -90,7 +94,10 @@ internal enum class TaskCommand(val key: String, private val failure: StringReso
   Seed("seed", Res.string.downloads_failed_seeding),
 
   /** Checks a finished torrent's files again. */
-  CheckFiles("check-files", Res.string.downloads_failed_check_files);
+  CheckFiles("check-files", Res.string.downloads_failed_check_files),
+
+  /** Moves a torrent's files into another folder. */
+  MoveFiles("move-files", Res.string.downloads_failed_move_files);
 
   /**
    * The failure of this command on [what], a task's name or a number of downloads, on [device]:
@@ -143,6 +150,7 @@ internal enum class CopiedText(
  * @property files opens and reveals downloaded files; `null` where they are out of reach.
  * @property clipboard receives copied links, paths and error details; `null` where there is none.
  * @property scope runs clipboard writes.
+ * @property picker chooses the folder a torrent's files move into; `null` where there is none.
  * @param openUri opens a web page, such as the page a link was captured from.
  */
 internal class RowCommands(
@@ -150,6 +158,7 @@ internal class RowCommands(
   val files: FileActions?,
   val clipboard: SystemClipboard?,
   val scope: CoroutineScope,
+  val picker: FilePicker? = null,
   private val openUri: (String) -> Unit,
 ) {
   /** Whether [action] can run on [row] here; files need [files] and copies a clipboard. */
@@ -161,6 +170,10 @@ internal class RowCommands(
     RowAction.OpenSourcePage -> sourcePage(row) != null
     RowAction.FindAnotherSource -> row.device.capabilities.canDiscover
     RowAction.StopSeeding, RowAction.Seed, RowAction.CheckFiles ->
+      state.torrentControllerOf(row.key.deviceId) != null
+    // On this device only, where the system's dialog names a folder its files can move into.
+    RowAction.MoveFiles -> picker?.canPickFolder == true && picker.picksFilePaths &&
+      row.key.deviceId == LOCAL_DEVICE_ID && row.outputFile?.let(::isDocumentTree) == false &&
       state.torrentControllerOf(row.key.deviceId) != null
     else -> true
   }
@@ -211,6 +224,7 @@ internal class RowCommands(
       RowAction.StopSeeding -> setSeeding(row, seeding = false)
       RowAction.Seed -> setSeeding(row, seeding = true)
       RowAction.CheckFiles -> checkFiles(row)
+      RowAction.MoveFiles -> moveFiles(row)
       RowAction.EditLink,
       RowAction.RetryWithOptions,
       RowAction.EnterCredentials -> state.openIntake(retryRequest(row))
@@ -271,6 +285,24 @@ internal class RowCommands(
       val controller = app.torrentControllerOf(row.key.deviceId)
         ?: throw UnsupportedOperationException()
       controller.recheck(taskId)
+    }
+  }
+
+  /**
+   * Asks for a folder, starting where [row]'s torrent is saved, and moves its files there
+   * through its device's [TorrentController]; nothing happens when no folder is chosen.
+   */
+  fun moveFiles(row: TaskRow): Job {
+    val app = state
+    val picker = picker
+    return scope.launch {
+      val saved = row.outputFile?.let(::folderHolding)
+      val folder = picker?.pickFolder(saved) ?: return@launch
+      command(row, TaskCommand.MoveFiles) {
+        val controller = app.torrentControllerOf(row.key.deviceId)
+          ?: throw UnsupportedOperationException()
+        controller.relocate(taskId, folder)
+      }
     }
   }
 
@@ -372,6 +404,13 @@ private val WEB_SCHEMES = listOf("https://", "http://")
 /** Where [row]'s file is or goes: its output, else a destination that names a path. */
 private fun folderPath(row: TaskRow): String? =
   row.outputFile ?: row.request.destination?.takeUnless(Destination::isName)?.value
+
+/** The folder holding [path], with either separator; `null` when it names none. */
+private fun folderHolding(path: String): String? {
+  val trimmed = path.trimEnd('/', '\\')
+  return trimmed.take(trimmed.lastIndexOfAny(charArrayOf('/', '\\')).coerceAtLeast(0))
+    .ifEmpty { null }
+}
 
 /** A new idempotency key for a [TorrentController] command. */
 @OptIn(ExperimentalUuidApi::class)

@@ -26,6 +26,7 @@ import com.linroid.ketch.app.i18n.verbatim
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.platform.FileActions
 import com.linroid.ketch.app.platform.rememberFileActions
+import com.linroid.ketch.app.platform.rememberFilePicker
 import com.linroid.ketch.app.platform.rememberSystemClipboard
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
@@ -570,8 +571,9 @@ internal fun rememberRowCommands(state: AppState): RowCommands {
   val clipboard = rememberSystemClipboard()
   val uriHandler = LocalUriHandler.current
   val scope = rememberCoroutineScope()
-  return remember(state, files, clipboard, uriHandler, scope) {
-    RowCommands(state, files, clipboard, scope, uriHandler::openUri)
+  val picker = rememberFilePicker()
+  return remember(state, files, clipboard, uriHandler, scope, picker) {
+    RowCommands(state, files, clipboard, scope, picker, uriHandler::openUri)
   }
 }
 

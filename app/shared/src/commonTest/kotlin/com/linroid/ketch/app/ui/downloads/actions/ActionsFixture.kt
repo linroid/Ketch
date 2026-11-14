@@ -41,7 +41,8 @@ internal class ActionsFixture(
   val files = FakeFileActions(revealLabel, canTrash)
   val clipboard = FakeClipboard()
   val state: AppState get() = controller.state
-  val commands = RowCommands(controller.state, files, clipboard, scope.backgroundScope, openUri)
+  val commands = RowCommands(controller.state, files, clipboard, scope.backgroundScope,
+    openUri = openUri)
   val runner = RowActionRunner(commands)
 
   /** Adds a task in [state] to the device. */

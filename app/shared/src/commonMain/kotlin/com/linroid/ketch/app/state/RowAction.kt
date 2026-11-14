@@ -9,6 +9,7 @@ import com.linroid.ketch.app.util.isTorrent
 import com.linroid.ketch.app.util.toCopy
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.action_row_check_files
+import ketch.app.shared.generated.resources.action_row_move_files
 import ketch.app.shared.generated.resources.action_row_choose_files
 import ketch.app.shared.generated.resources.action_row_connections
 import ketch.app.shared.generated.resources.action_row_copy_details
@@ -148,6 +149,9 @@ sealed class RowAction(val label: UiText, val destructive: Boolean = false) {
    * changed.
    */
   data object CheckFiles : RowAction(Res.string.action_row_check_files.text())
+
+  /** Moves a finished torrent's files into a folder chosen with the system's folder dialog. */
+  data object MoveFiles : RowAction(Res.string.action_row_move_files.text())
 
   /** Cancels the task after confirmation; its progress cannot be resumed. */
   data object StopAndDiscard :
@@ -323,6 +327,7 @@ private fun completed(
     // comes with its torrent snapshot, which the inspector follows and rows do not.
     RowAction.StopSeeding.takeIf { seeding },
     RowAction.CheckFiles.takeIf { torrent },
+    RowAction.MoveFiles.takeIf { torrent && local },
     RowAction.CopyLink,
     RowAction.CopyPath,
     RowAction.SendTo,

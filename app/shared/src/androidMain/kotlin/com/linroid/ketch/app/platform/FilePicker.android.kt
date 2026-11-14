@@ -50,6 +50,7 @@ private class AndroidFilePicker(
   private val torrentLauncher: ManagedActivityResultLauncher<Array<String>, List<Uri>>,
 ) : FilePicker {
   override val canPickFolder: Boolean = true
+  override val picksFilePaths: Boolean = false
 
   override suspend fun pickFolder(initialFolder: String?): String? {
     val initial = initialFolder?.takeIf { it.startsWith(CONTENT_SCHEME) }

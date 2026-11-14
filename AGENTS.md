@@ -1385,8 +1385,12 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   may save at (`DestinationGuard.checkMove`, 403 `path_rejected`). A copy between volumes whose
   original cannot be deleted afterwards still counts as moved, with a warning, and a moved task
   removed with its files before it runs again takes them as its own first (`v1Store` and
-  `v2Store` with `adopt`). The
-  apps have no control for it yet
+  `v2Store` with `adopt`). In
+  the apps, a finished torrent's row menu offers Move files… (`RowAction.MoveFiles`,
+  `RowCommands.moveFiles`, `TaskCommand.MoveFiles`) on this device where the system's folder
+  dialog names a file path (`FilePicker.picksFilePaths`: not Android's document trees, nor the
+  web): it asks for a folder, starting where the torrent is saved, and moves the files there.
+  Remote devices have no control for it yet
 - Editing trackers: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(add, remove))`
   (REST `PUT /api/torrents/{id}/trackers`, answering the list; capability `tracker-edit`) removes
   the trackers at the endpoints `remove` names and appends each announce URL of `add` as a tier

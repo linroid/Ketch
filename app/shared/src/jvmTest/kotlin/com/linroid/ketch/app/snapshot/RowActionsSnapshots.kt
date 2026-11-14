@@ -59,7 +59,9 @@ import com.linroid.ketch.app.components.PriorityGlyph
 import com.linroid.ketch.app.components.StatusDot
 import com.linroid.ketch.app.components.StatusDotDefaults
 import com.linroid.ketch.app.i18n.resolve
+import com.linroid.ketch.app.platform.DroppedFile
 import com.linroid.ketch.app.platform.FileActions
+import com.linroid.ketch.app.platform.FilePicker
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalAppState
@@ -423,7 +425,7 @@ private fun StandInDownloads(
     val rows = view.rows
     val scope = rememberCoroutineScope()
     val runner = remember(state, files) {
-      val commands = RowCommands(state, files, SnapshotClipboard(), scope) {}
+      val commands = RowCommands(state, files, SnapshotClipboard(), scope, SnapshotFolders) {}
       RowActionRunner(commands)
     }
     val actions = rememberListActions(rows, state, runner)
@@ -741,4 +743,13 @@ private fun bandSnapshot(
       scene.close()
     }
   }
+}
+
+/** A folder dialog that is there and never answers, so menus offer what needs one. */
+private object SnapshotFolders : FilePicker {
+  override val canPickFolder: Boolean = true
+
+  override suspend fun pickFolder(initialFolder: String?): String? = null
+
+  override suspend fun pickTorrentFiles(): List<DroppedFile> = emptyList()
 }

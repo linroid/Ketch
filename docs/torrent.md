@@ -549,10 +549,11 @@ answers the new list; SDK: `TorrentController.editTrackers(taskId, TorrentTracke
 
 ### Moving a torrent's files
 
-A torrent's files can be moved to another folder without adding it again:
+A torrent's files can be moved to another folder without adding it again. In the desktop app,
+right-click a finished torrent saved on this computer and choose **Move files…**, then pick the
+folder; the phone apps and torrents on other devices have no button for it yet. REST:
 `PUT /api/torrents/{id}/location` with `{"directory": "/absolute/folder"}`, on devices listing
-the `relocate` capability (SDK: `TorrentController.relocate(taskId, directory)`); the apps have
-no button for it yet. The files keep their name inside the new folder. A downloading torrent
+the `relocate` capability (SDK: `TorrentController.relocate(taskId, directory)`). The files keep their name inside the new folder. A downloading torrent
 stops for the move and goes on after it; a finished one is checked at its new place and seeds
 again if it was seeding; a paused one is checked when it next starts. On the same volume the move
 is a rename; between volumes the files are copied and the originals deleted once the copy is

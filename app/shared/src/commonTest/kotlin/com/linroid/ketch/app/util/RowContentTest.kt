@@ -274,6 +274,10 @@ class RowContentTest {
     assertTrue(RowAction.CheckFiles in taskActions(torrent, state, local).menu)
     assertTrue(RowAction.CheckFiles in taskActions(torrent, state, remote).menu)
     assertFalse(RowAction.CheckFiles in taskActions(request, state, local).menu)
+    // Its files can be moved on this device, where a folder can be chosen.
+    assertTrue(RowAction.MoveFiles in taskActions(torrent, state, local).menu)
+    assertFalse(RowAction.MoveFiles in taskActions(torrent, state, remote).menu)
+    assertFalse(RowAction.MoveFiles in taskActions(request, state, local).menu)
     assertFalse(
       RowAction.StopSeeding in taskActions(request, state.copy(sharing = false), local).menu
     )

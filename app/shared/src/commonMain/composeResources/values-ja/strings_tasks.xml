@@ -141,6 +141,7 @@
   <string name="action_row_download_all_files">すべてのファイルをダウンロード</string>
   <string name="action_row_stop_seeding">シードを停止</string>
   <string name="action_row_check_files">ファイルを確認</string>
+  <string name="action_row_move_files">ファイルを移動…</string>
   <string name="action_row_seed">シード</string>
   <plurals name="batch_pause">
     <item quantity="other">%1$d件のダウンロードを一時停止</item>

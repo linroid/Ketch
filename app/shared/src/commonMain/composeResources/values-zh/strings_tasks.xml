@@ -141,6 +141,7 @@
   <string name="action_row_download_all_files">下载全部文件</string>
   <string name="action_row_stop_seeding">停止做种</string>
   <string name="action_row_check_files">校验文件</string>
+  <string name="action_row_move_files">移动文件…</string>
   <string name="action_row_seed">做种</string>
   <plurals name="batch_pause">
     <item quantity="other">暂停 %1$d 个下载</item>

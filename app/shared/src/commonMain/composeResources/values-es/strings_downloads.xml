@@ -242,6 +242,7 @@
   <string name="downloads_failed_files">Error al cambiar los archivos de %1$s en %2$s</string>
   <string name="downloads_failed_seeding">Error al cambiar el sembrado de %1$s en %2$s</string>
   <string name="downloads_failed_check_files">Error al comprobar los archivos de %1$s en %2$s</string>
+  <string name="downloads_failed_move_files">Error al mover los archivos de %1$s en %2$s</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="one">Se pausó %1$d descarga</item>
