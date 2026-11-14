@@ -32,7 +32,7 @@ jobs:
       matrix:
         include:
           - name: macOS-arm64
-            runner: macos-14
+            runner: macos-15
             os: macos
             arch: arm64
             ext: tar.gz
