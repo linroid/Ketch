@@ -24,6 +24,7 @@ import com.linroid.ketch.app.feedback.AndroidFeedbackPlayer
 import com.linroid.ketch.app.feedback.AndroidNotifier
 import com.linroid.ketch.app.feedback.MessageNotifications
 import com.linroid.ketch.app.feedback.NotificationCopy
+import com.linroid.ketch.app.feedback.OngoingPresentation
 import com.linroid.ketch.app.feedback.PairingNotices
 import com.linroid.ketch.app.feedback.SuccessFeedback
 import com.linroid.ketch.app.feedback.UnreadableFile
@@ -161,6 +162,12 @@ class KetchService : Service() {
       service = KetchService::class.java,
       smallIcon = R.drawable.ic_stat_ketch,
     )
+    val app = application as KetchApplication
+    val configStore = app.configStore
+    val config = configStore.load()
+    notifier.accent = config.appearance.accent.toKetchAccent()
+    // The settings pick the channel the first notification is posted in.
+    notifier.presentation = OngoingPresentation.of(config.notifications)
     // Call startForeground() before onCreate returns, to avoid an ANR from the
     // startForegroundService() timeout, so the channels and the first notification, whose text
     // is read from the string resources, are made here. The monitor updates it later.
@@ -172,10 +179,6 @@ class KetchService : Service() {
     // No app controller runs yet, so the messages a stopped one notified about are gone.
     notifier.withdrawMessages()
 
-    val app = application as KetchApplication
-    val configStore = app.configStore
-    val config = configStore.load()
-    notifier.accent = config.appearance.accent.toKetchAccent()
     keepAwake.value = config.power.keepAwake
     val driverFactory = DriverFactory(this) { unreadable ->
       app.unreadableFiles.report(UnreadableFile(UnreadableFile.Kind.Downloads, unreadable.movedTo))
@@ -330,7 +333,7 @@ class KetchService : Service() {
    * opens [MainActivity], which runs the message's first action. It gives success feedback when a
    * search finds downloads, keeps the service in the foreground while Discover searches, so
    * the search keeps going, and can ask, once the user leaves the app, and follows the keep awake
-   * setting.
+   * setting and how the settings want the ongoing notification shown.
    */
   fun follow(controller: AppController) {
     followed = controller
@@ -351,6 +354,10 @@ class KetchService : Service() {
       // The setting keeps its last value once the app closes, as the service keeps running.
       snapshotFlow { controller.appSettings.config.power.keepAwake }
         .collect { if (followed === controller) keepAwake.value = it }
+    }
+    controller.scope.launch {
+      snapshotFlow { OngoingPresentation.of(controller.appSettings.config.notifications) }
+        .collect { if (followed === controller) present(it) }
     }
     controller.scope.launch {
       // A controller that closes after the next one started leaves the count to that one.
@@ -549,6 +556,20 @@ class KetchService : Service() {
       slowLane = speedMode.mode.value.isSlowLane,
       discovering = status.discovering > 0,
     )
+
+  /**
+   * Shows the ongoing notification as [presentation] says from now on: at once while the service
+   * is in the foreground, in the other channel when the status bar setting changed.
+   */
+  private suspend fun present(presentation: OngoingPresentation) {
+    if (notifier.presentation == presentation) return
+    log.i { "Showing the ongoing notification as $presentation" }
+    notifier.presentation = presentation
+    notifier.setUpChannels()
+    if (isForeground && latestStatus.isRequired) enterForeground(ongoing(latestStatus))
+    // Android only lets go of a channel once the service's notification left it.
+    notifier.removeUnusedChannel()
+  }
 
   private fun enterForeground(notification: Notification) {
     try {

@@ -234,6 +234,17 @@
   <string name="settings_notifications_allow_button">Allow</string>
   <string name="settings_notifications_blocked">Notifications are blocked</string>
   <string name="settings_notifications_blocked_hint">Allow them for this site in your browser's settings.</string>
+  <!-- Group on Android: how the notification of running downloads shows. -->
+  <string name="settings_notifications_progress">Download progress</string>
+  <string name="settings_notifications_progress_footer">This notification shows only while Ketch is working: downloading, sharing this device or searching.</string>
+  <string name="settings_notifications_status_bar">Show in the status bar</string>
+  <string name="settings_notifications_status_bar_on">Ketch's icon shows in the status bar while downloads run.</string>
+  <string name="settings_notifications_status_bar_off">Stays among the silent notifications, whose icons your phone may hide.</string>
+  <!-- Android 16's name for an ongoing notification shown as a chip in the status bar. -->
+  <string name="settings_notifications_live_updates">Live Updates</string>
+  <string name="settings_notifications_live_updates_hint">A single download shows its progress as a chip in the status bar.</string>
+  <string name="settings_notifications_system">System notification settings</string>
+  <string name="settings_notifications_system_hint">Sound, lock screen and more for each kind of notification.</string>
 
   <!-- Integration. -->
   <string name="settings_integration_extension">Browser extension</string>
@@ -983,6 +994,9 @@
   <string name="settings_search_devices_keywords">mute, remote, nas, keep connected</string>
   <string name="settings_search_browser_notifications">Let this browser show Ketch's notifications</string>
   <string name="settings_search_browser_notifications_keywords">permission, allow</string>
+  <string name="settings_search_status_bar_keywords">icon, ongoing, progress, running, silent</string>
+  <string name="settings_search_live_updates_keywords">chip, capsule, pill, island, promoted, live notifications</string>
+  <string name="settings_search_system_notifications_keywords">channels, sound, lock screen, android</string>
   <string name="settings_search_extension">Send browser downloads to Ketch</string>
   <string name="settings_search_extension_keywords">chrome, edge, firefox, brave, arc, vivaldi, capture</string>
   <string name="settings_search_magnet_keywords">default app, handler, protocol</string>

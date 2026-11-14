@@ -68,6 +68,12 @@ internal enum class SettingsFeature {
 
   /** The app zooms its own UI: desktop. */
   Zoom,
+
+  /** The app shows an ongoing notification the system's settings tune: Android. */
+  OngoingNotification,
+
+  /** The system shows a running download as a Live Update: Android 16 and later. */
+  LiveUpdates,
 }
 
 /**

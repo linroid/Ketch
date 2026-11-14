@@ -56,7 +56,12 @@ import ketch.app.shared.generated.resources.settings_notifications_browser
 import ketch.app.shared.generated.resources.settings_notifications_devices
 import ketch.app.shared.generated.resources.settings_notifications_failed
 import ketch.app.shared.generated.resources.settings_notifications_finished
+import ketch.app.shared.generated.resources.settings_notifications_live_updates
+import ketch.app.shared.generated.resources.settings_notifications_live_updates_hint
 import ketch.app.shared.generated.resources.settings_notifications_offline
+import ketch.app.shared.generated.resources.settings_notifications_status_bar
+import ketch.app.shared.generated.resources.settings_notifications_system
+import ketch.app.shared.generated.resources.settings_notifications_system_hint
 import ketch.app.shared.generated.resources.settings_search_accent
 import ketch.app.shared.generated.resources.settings_search_accent_keywords
 import ketch.app.shared.generated.resources.settings_search_ai_access
@@ -101,6 +106,7 @@ import ketch.app.shared.generated.resources.settings_search_full_speed_cap
 import ketch.app.shared.generated.resources.settings_search_full_speed_cap_keywords
 import ketch.app.shared.generated.resources.settings_search_language_keywords
 import ketch.app.shared.generated.resources.settings_search_licenses_keywords
+import ketch.app.shared.generated.resources.settings_search_live_updates_keywords
 import ketch.app.shared.generated.resources.settings_search_logs
 import ketch.app.shared.generated.resources.settings_search_logs_description
 import ketch.app.shared.generated.resources.settings_search_logs_keywords
@@ -137,6 +143,8 @@ import ketch.app.shared.generated.resources.settings_search_source_keywords
 import ketch.app.shared.generated.resources.settings_search_speed_mode
 import ketch.app.shared.generated.resources.settings_search_speed_mode_keywords
 import ketch.app.shared.generated.resources.settings_search_start_hidden_keywords
+import ketch.app.shared.generated.resources.settings_search_status_bar_keywords
+import ketch.app.shared.generated.resources.settings_search_system_notifications_keywords
 import ketch.app.shared.generated.resources.settings_search_test_keywords
 import ketch.app.shared.generated.resources.settings_search_theme
 import ketch.app.shared.generated.resources.settings_search_theme_keywords
@@ -303,6 +311,26 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     description = Res.string.settings_search_browser_notifications.text(),
     keywords = Res.string.settings_search_browser_notifications_keywords,
     needs = SettingsFeature.BrowserNotifications,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Notifications,
+    title = Res.string.settings_notifications_status_bar,
+    keywords = Res.string.settings_search_status_bar_keywords,
+    needs = SettingsFeature.OngoingNotification,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Notifications,
+    title = Res.string.settings_notifications_live_updates,
+    description = Res.string.settings_notifications_live_updates_hint.text(),
+    keywords = Res.string.settings_search_live_updates_keywords,
+    needs = SettingsFeature.LiveUpdates,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Notifications,
+    title = Res.string.settings_notifications_system,
+    description = Res.string.settings_notifications_system_hint.text(),
+    keywords = Res.string.settings_search_system_notifications_keywords,
+    needs = SettingsFeature.OngoingNotification,
   ),
   // Integration
   SettingsIndexEntry(

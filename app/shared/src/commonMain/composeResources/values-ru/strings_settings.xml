@@ -187,6 +187,15 @@
   <string name="settings_notifications_allow_button">Разрешить</string>
   <string name="settings_notifications_blocked">Уведомления заблокированы</string>
   <string name="settings_notifications_blocked_hint">Разрешите их для этого сайта в настройках браузера.</string>
+  <string name="settings_notifications_progress">Ход загрузок</string>
+  <string name="settings_notifications_progress_footer">Это уведомление показывается, только пока Ketch работает: загружает, предоставляет доступ к этому устройству или ищет.</string>
+  <string name="settings_notifications_status_bar">Показывать в строке состояния</string>
+  <string name="settings_notifications_status_bar_on">Пока идут загрузки, значок Ketch виден в строке состояния.</string>
+  <string name="settings_notifications_status_bar_off">Остаётся среди беззвучных уведомлений, значки которых телефон может скрывать.</string>
+  <string name="settings_notifications_live_updates">Живые обновления</string>
+  <string name="settings_notifications_live_updates_hint">Ход единственной загрузки показывается в виде чипа в строке состояния.</string>
+  <string name="settings_notifications_system">Системные настройки уведомлений</string>
+  <string name="settings_notifications_system_hint">Звук, экран блокировки и другое для каждого вида уведомлений.</string>
 
   <string name="settings_integration_extension">Расширение браузера</string>
   <string name="settings_integration_extension_footer">Отправляет загрузки браузера в Ketch вместе с cookie сайта.</string>
@@ -781,6 +790,9 @@
   <string name="settings_search_devices_keywords">без звука, удалённое, nas, оставаться подключённым</string>
   <string name="settings_search_browser_notifications">Разрешить этому браузеру показывать уведомления Ketch</string>
   <string name="settings_search_browser_notifications_keywords">разрешение, разрешить, доступ</string>
+  <string name="settings_search_status_bar_keywords">значок, иконка, постоянное, прогресс, выполняется, беззвучное</string>
+  <string name="settings_search_live_updates_keywords">чип, капсула, островок, остров, живые уведомления</string>
+  <string name="settings_search_system_notifications_keywords">каналы, категории, звук, экран блокировки</string>
   <string name="settings_search_extension">Отправлять загрузки браузера в Ketch</string>
   <string name="settings_search_extension_keywords">chrome, хром, edge, firefox, brave, arc, vivaldi, перехват, плагин, дополнение</string>
   <string name="settings_search_magnet_keywords">приложение по умолчанию, обработчик, протокол, магнет</string>

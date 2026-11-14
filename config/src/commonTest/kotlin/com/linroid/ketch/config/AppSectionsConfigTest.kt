@@ -51,6 +51,35 @@ class AppSectionsConfigTest {
   }
 
   @Test
+  fun decode_ongoingNotificationSwitches_readsBooleans() {
+    val decoded = decodeNotifications("statusBarIcon = false\nliveUpdates = false")
+    assertEquals(false, decoded.statusBarIcon)
+    assertEquals(false, decoded.liveUpdates)
+    val text = decodeNotifications("statusBarIcon = \"false\"\nliveUpdates = \"true\"")
+    assertEquals(false, text.statusBarIcon)
+    assertEquals(true, text.liveUpdates)
+  }
+
+  @Test
+  fun decode_ongoingNotificationSwitchesOfAnotherType_loadAsOn() {
+    val decoded = decodeNotifications("statusBarIcon = 0\nliveUpdates = \"chip\"\nfailed = \"off\"")
+    assertEquals(true, decoded.statusBarIcon)
+    assertEquals(true, decoded.liveUpdates)
+    // The rest of the section is still read.
+    assertEquals(NotificationMode.Off, decoded.failed)
+  }
+
+  @Test
+  fun decode_ongoingNotificationSwitchesLeftOut_areOn() {
+    val decoded = decodeNotifications("finished = \"in-app\"")
+    assertEquals(true, decoded.statusBarIcon)
+    assertEquals(true, decoded.liveUpdates)
+  }
+
+  private fun decodeNotifications(body: String): NotificationSettings =
+    ConfigStore.decode("[notifications]\n$body").notifications
+
+  @Test
   fun decode_handWrittenSpeedRules_readsDaysAndTimes() {
     val decoded = ConfigStore.toml.decodeFromString(
       KetchConfig.serializer(),
@@ -208,6 +237,8 @@ internal val populatedAppSections = KetchConfig(
     mutedDevices = listOf("192.168.1.20:8642"),
     successSound = false,
     successVibration = false,
+    statusBarIcon = false,
+    liveUpdates = false,
   ),
   integration = IntegrationSettings(magnetHandler = true, torrentFileHandler = true),
   power = PowerSettings(keepAwake = false),

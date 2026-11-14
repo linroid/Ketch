@@ -175,6 +175,15 @@
   <string name="settings_notifications_allow_button">允許</string>
   <string name="settings_notifications_blocked">通知已被封鎖</string>
   <string name="settings_notifications_blocked_hint">請在瀏覽器的設定中允許此網站傳送通知。</string>
+  <string name="settings_notifications_progress">下載進度</string>
+  <string name="settings_notifications_progress_footer">僅在 Ketch 運作時顯示此通知：下載、分享此裝置或搜尋時。</string>
+  <string name="settings_notifications_status_bar">在狀態列中顯示</string>
+  <string name="settings_notifications_status_bar_on">下載進行時，狀態列會顯示 Ketch 的圖示。</string>
+  <string name="settings_notifications_status_bar_off">歸入靜音通知，手機可能會隱藏其圖示。</string>
+  <string name="settings_notifications_live_updates">即時更新</string>
+  <string name="settings_notifications_live_updates_hint">只有一個下載時，在狀態列中以膠囊顯示其進度。</string>
+  <string name="settings_notifications_system">系統通知設定</string>
+  <string name="settings_notifications_system_hint">為每類通知設定音效、鎖定畫面顯示等。</string>
 
   <string name="settings_integration_extension">瀏覽器擴充功能</string>
   <string name="settings_integration_extension_footer">將瀏覽器的下載連同網站的 Cookie 一起傳送到 Ketch。</string>
@@ -721,6 +730,9 @@
   <string name="settings_search_devices_keywords">靜音, 遠端, nas, 保持連線</string>
   <string name="settings_search_browser_notifications">允許此瀏覽器顯示 Ketch 的通知</string>
   <string name="settings_search_browser_notifications_keywords">權限, 允許</string>
+  <string name="settings_search_status_bar_keywords">圖示, 常駐, 進度, 執行中, 靜音</string>
+  <string name="settings_search_live_updates_keywords">膠囊, 動態, 島, 即時通知, 即時動態</string>
+  <string name="settings_search_system_notifications_keywords">通知頻道, 類別, 音效, 鎖定畫面</string>
   <string name="settings_search_extension">將瀏覽器的下載傳送到 Ketch</string>
   <string name="settings_search_extension_keywords">chrome, edge, firefox, brave, arc, vivaldi, 擷取, 外掛, 擴充</string>
   <string name="settings_search_magnet_keywords">預設應用程式, 預設程式, 協定, 關聯</string>

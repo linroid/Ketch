@@ -44,6 +44,7 @@ import com.linroid.ketch.app.instance.EmbeddedInstance
 import com.linroid.ketch.app.instance.InstanceEntry
 import com.linroid.ketch.app.log.FileLogger
 import com.linroid.ketch.app.platform.LocalDesktopHooks
+import com.linroid.ketch.app.platform.LocalSystemNotifications
 import com.linroid.ketch.app.platform.isMobilePlatform
 import com.linroid.ketch.app.platform.keepAwakeSupported
 import com.linroid.ketch.app.platform.zoomSupported
@@ -100,6 +101,7 @@ internal fun SettingsContent(
   val active by state.activeInstance.collectAsState()
   val inWindow = LocalDesktopHooks.current.isSupported
   val permission = rememberNotificationPermission()
+  val systemNotifications = LocalSystemNotifications.current
 
   var deviceId by rememberSaveable { mutableStateOf(target?.deviceId) }
   var query by rememberSaveable { mutableStateOf(initialQuery) }
@@ -136,6 +138,8 @@ internal fun SettingsContent(
       add(SettingsFeature.Keyboard)
     }
     if (permission != null) add(SettingsFeature.BrowserNotifications)
+    if (systemNotifications != null) add(SettingsFeature.OngoingNotification)
+    if (systemNotifications?.liveUpdates == true) add(SettingsFeature.LiveUpdates)
     if (fileLogger != null) add(SettingsFeature.Logs)
     if (keepAwakeSupported) add(SettingsFeature.KeepAwake)
     if (zoomSupported) add(SettingsFeature.Zoom)

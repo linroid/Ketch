@@ -24,6 +24,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.edit
@@ -44,7 +45,9 @@ import com.linroid.ketch.app.i18n.appLanguageContext
 import com.linroid.ketch.app.instance.InstanceManager
 import com.linroid.ketch.app.instance.RemoteInstance
 import com.linroid.ketch.app.instance.ServerState
+import com.linroid.ketch.app.platform.AndroidSystemNotifications
 import com.linroid.ketch.app.platform.LocalAppUpdates
+import com.linroid.ketch.app.platform.LocalSystemNotifications
 import com.linroid.ketch.app.state.AiDiscoverController
 import com.linroid.ketch.app.state.AppController
 import com.linroid.ketch.app.state.LOCAL_DEVICE_ID
@@ -138,7 +141,11 @@ class MainActivity : ComponentActivity() {
         controller.state.openSettings(SettingsTarget(SettingsTarget.Page.Sharing, LOCAL_DEVICE_ID))
         sharingRequested = false
       }
-      CompositionLocalProvider(LocalAppUpdates provides model.updates) {
+      val systemNotifications = remember { AndroidSystemNotifications(this) }
+      CompositionLocalProvider(
+        LocalAppUpdates provides model.updates,
+        LocalSystemNotifications provides systemNotifications,
+      ) {
         App(
           controller,
           activityEvents = svc.activityEvents,
