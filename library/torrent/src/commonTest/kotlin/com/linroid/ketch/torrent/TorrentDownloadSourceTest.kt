@@ -217,7 +217,7 @@ class TorrentDownloadSourceTest {
       KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL), source.features)
     val engine = setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability",
       "settings", "seed-goals", "sequential", "export", "trackers",
-      "recheck")
+      "recheck", "import")
     // Local discovery only where the platform can join the LAN group.
     assertEquals(if (lsdSupported) engine + "local-discovery" else engine,
       source.torrentCapabilities)

@@ -1191,6 +1191,12 @@ internal class DownloadExecution(
       val replaced = replaceablePath(outputPath)
       if (replaced != null) return OutputTarget(replaced, partialOf(replaced), replace = true)
     }
+    // A source that writes its own files has no finished file to move over what is there: it
+    // works in place, so only a request that asks for it, never the setting, gets the path.
+    if (!partial && requested == FileConflict.OVERWRITE) {
+      val existing = existingPath(outputPath)
+      if (existing != null) return OutputTarget(existing, partial = null, replace = false)
+    }
     val reserved = OutputPathReservations.reserveUnique(outputPath).also { reservedPaths += it }
     return OutputTarget(reserved, partialOf(reserved), replace = false)
   }
@@ -1205,17 +1211,36 @@ internal class DownloadExecution(
    * would write over the file from its first byte, or it is a folder.
    */
   private fun replaceablePath(outputPath: String): String? {
-    val path = outputPath.toPath().normalized()
-    val taken = unfinishedOutputs().any { other ->
-      if (other.contains("://")) return@any false
-      val owned = other.toPath().normalized()
-      path == owned || generateSequence(path.parent) { it.parent }.any { it == owned }
-    }
-    if (taken) {
+    if (takenByAnotherTask(outputPath)) {
       log.d { "Not replacing another task's output for taskId=$taskId" }
       return null
     }
     return OutputPathReservations.reserveReplaceable(outputPath)?.also { reservedPaths += it }
+  }
+
+  /**
+   * Reserves and returns [outputPath] for a source that writes its own files and uses the ones
+   * already there, as a request with [FileConflict.OVERWRITE] asks: the source proves what the
+   * path holds and writes over what differs. `null`, reserving nothing, when a running download
+   * reserved the path or another unfinished task saves there or in a folder of that name, and
+   * the download gets a free name instead.
+   */
+  private fun existingPath(outputPath: String): String? {
+    if (takenByAnotherTask(outputPath)) {
+      log.d { "Not using another task's output for taskId=$taskId" }
+      return null
+    }
+    return OutputPathReservations.reserveExisting(outputPath)?.also { reservedPaths += it }
+  }
+
+  /** Whether another unfinished task saves at [outputPath] or in a folder above it. */
+  private fun takenByAnotherTask(outputPath: String): Boolean {
+    val path = outputPath.toPath().normalized()
+    return unfinishedOutputs().any { other ->
+      if (other.contains("://")) return@any false
+      val owned = other.toPath().normalized()
+      path == owned || generateSequence(path.parent) { it.parent }.any { it == owned }
+    }
   }
 
   /**

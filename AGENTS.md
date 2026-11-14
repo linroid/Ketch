@@ -523,9 +523,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   The name gets `name (n)` as with `RENAME` when a running download reserved it, its partial
   file exists, another unfinished task saves there or in a folder of that name
   (`Ketch.unfinishedOutputs`), it ends in `.ketch`, it is a folder, or it is too long for a
-  partial file, as the download would then write over the file from its first byte. Sources that
-  write their own files (torrents) and Android `content://` folders, whose provider names the
-  document and has no atomic replace, always rename. A `requestId` resubmission keeps the task's
+  partial file, as the download would then write over the file from its first byte. Android `content://`
+  folders, whose provider names the document and has no atomic replace, always rename, and so
+  do sources that write their own files (torrents) under the setting; a torrent request that
+  asks to overwrite uses the files in place instead (see BitTorrent). A `requestId` resubmission keeps the task's
   own choice. A file `Destination` is used as it is and replaced only while the request has no
   `fileConflict` of its own: with one, the named file is treated like a name Ketch chose
   (`RENAME` gets a free `name (n)`, `OVERWRITE` goes through `replaceablePath`), on a resume
@@ -1281,6 +1282,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Files already in place (capability `import`): a torrent request with
+  `fileConflict = OVERWRITE` (`ketch add --overwrite`, never the setting, as a source that
+  writes its own files works in place) gets the name Ketch chose although a folder or file has
+  it (`DownloadExecution.existingPath`, `OutputPathReservations.reserveExisting`; not while a
+  running download reserved it or another unfinished task saves there). The v1 store uses
+  files it finds and checks them; the v2 store takes existing folders and regular files as its
+  own (`TorrentV2PieceStore(adoptExisting)`, from `TorrentV2TaskSpec.adoptExisting`; never a
+  symbolic link), so they are checked like owned ones, written over where they differ, and
+  deleted with the task's files. Without the request torrents still save beside what is there.
+  Tests: `TorrentAdoptFilesTest` (created v1, v2 and hybrid torrents complete from the files
+  in place without a peer)
 - Creation: `TorrentCreator.create(path, TorrentCreateOptions, onProgress)` (public, in
   `TorrentCreator.kt`; internal `createTorrent` takes the file system) hashes a file or folder
   in one pass on the disk dispatcher and returns a `CreatedTorrent` (metainfo bytes, info
@@ -1296,7 +1308,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `--json`) saves `<name>.torrent` and prints its path and magnet link. Tests:
   `TorrentCreatorTest` (identical bytes to the hand-written fixtures),
   `CreatedTorrentInteropTest` (jvmTest: libtorrent opens each format and seeds the files),
-  `CreateTorrentTest`. Seeding a created torrent needs adopting existing files, not built yet
+  `CreateTorrentTest`
 - Recheck: `TorrentController.recheck(taskId)` (REST `POST /api/torrents/{id}/recheck`, which
   answers the snapshot; capability `recheck`). Every start of a torrent already checks its
   files, so the command acts by state (`KetchTorrentController`): a completed task stops its

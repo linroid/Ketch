@@ -66,6 +66,22 @@ internal object OutputPathReservations {
   }
 
   /**
+   * Reserves and returns [candidate], whatever is there, for a download whose source writes its
+   * own files and uses the ones already in place; `null`, reserving nothing, when another
+   * download reserved the path.
+   */
+  fun reserveExisting(candidate: String): String? {
+    val path = candidate.toPath()
+    while (true) {
+      val current = reserved.load()
+      val keys = keys(path)
+      if (keys.any { it in current }) return null
+      val next = keys.fold(current) { map, key -> map + (key to (map[key] ?: 0) + 1) }
+      if (reserved.compareAndSet(current, next)) return path.toString()
+    }
+  }
+
+  /**
    * [candidate], or when it exists or is reserved, the first free `name (n).ext` beside it,
    * without reserving it.
    */
