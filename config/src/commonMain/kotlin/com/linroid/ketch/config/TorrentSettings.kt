@@ -152,6 +152,8 @@ internal object LenientSpeedLimitSerializer : KSerializer<SpeedLimit> {
  *   its size; 0 or less sets no such goal, the default.
  * @property seedTimeMinutes a finished torrent stops seeding after this many minutes of it; 0 or
  *   less sets no such goal, the default.
+ * @property blocklist peers never connected to and never accepted: addresses, CIDR blocks
+ *   (`203.0.113.0/24`) and ranges (`203.0.113.1-203.0.113.99`); none by default.
  */
 @Serializable
 data class TorrentSettings(
@@ -170,6 +172,7 @@ data class TorrentSettings(
   val localDiscovery: Boolean = true,
   val seedRatioPercent: Int = 0,
   val seedTimeMinutes: Int = 0,
+  val blocklist: List<String> = emptyList(),
 ) {
   init {
     require(listenPort in 0..65535) { "listenPort must be between 0 and 65535" }
@@ -220,6 +223,7 @@ data class TorrentSettings(
       trackerListUrls = trackerListAddresses,
       seedRatioPercent = seedRatioPercent,
       seedTimeMinutes = seedTimeMinutes,
+      blockedAddresses = blocklist.map { it.trim() }.filter { it.isNotEmpty() },
     )
 
   /**
@@ -251,6 +255,7 @@ data class TorrentSettings(
       localDiscovery = settings.localDiscovery,
       seedRatioPercent = settings.seedRatioPercent,
       seedTimeMinutes = settings.seedTimeMinutes,
+      blocklist = settings.blockedAddresses,
     )
   }
 

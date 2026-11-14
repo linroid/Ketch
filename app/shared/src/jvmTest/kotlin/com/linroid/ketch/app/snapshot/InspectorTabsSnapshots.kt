@@ -43,6 +43,7 @@ import com.linroid.ketch.app.ui.inspector.tabs.ActivityTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTab
 import com.linroid.ketch.app.ui.inspector.tabs.ConnectionsTabContent
 import com.linroid.ketch.app.ui.inspector.tabs.FilesTabContent
+import com.linroid.ketch.app.ui.settings.BlockedAddressesGroup
 import com.linroid.ketch.app.ui.inspector.tabs.TrackersTabContent
 import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.api.TorrentTrackerState
@@ -83,6 +84,21 @@ class InspectorTabsSnapshots {
           }
           TabCard("Files 14", DockedWidth) { FilesTabContent(season()) }
           TabCard("Activity", DockedWidth) { Activity(ubuntu()) }
+        }
+      }
+    }
+  }
+
+  @Test
+  fun settings_blockedAddresses_listsThemWithAFieldToAddMore() {
+    val size = SnapshotSize(560.dp, 420.dp, KetchDensity.Compact)
+    for (theme in SnapshotTheme.entries) {
+      snapshot("settings-torrent-blocked", size, theme) {
+        Column(Modifier.padding(KetchTheme.spacing.s4)) {
+          BlockedAddressesGroup(
+            blocked = listOf("203.0.113.0/24", "198.51.100.7", "2001:db8::/32"),
+            onChange = {},
+          )
         }
       }
     }

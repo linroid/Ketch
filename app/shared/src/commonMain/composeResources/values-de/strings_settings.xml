@@ -607,6 +607,12 @@
   <string name="settings_torrent_connections_footer">Verschlüsselung verbirgt, welche Art von Datenverkehr es ist, nicht, mit wem du dich verbindest.</string>
   <string name="settings_torrent_trackers">Zusätzliche Tracker</string>
   <string name="settings_torrent_no_trackers">Keine zusätzlichen Tracker</string>
+  <string name="settings_torrent_blocked">Blockierte Adressen</string>
+  <string name="settings_torrent_blocked_footer">Ketch verbindet sich nie mit Peers an diesen Adressen und weist sie ab, wenn sie sich verbinden.</string>
+  <string name="settings_torrent_blocked_add">Adressen blockieren</string>
+  <string name="settings_torrent_blocked_add_hint">Adressen, Blöcke wie 203.0.113.0/24 oder Bereiche wie 203.0.113.1-203.0.113.99.</string>
+  <string name="settings_torrent_blocked_none">Keine blockierten Adressen</string>
+  <string name="settings_torrent_blocked_invalid">Keine Adresse, kein Block und kein Bereich: %1$s</string>
   <string name="settings_torrent_remote">Aktualisiere Ketch auf %1$s, um diese Einstellungen hier zu ändern.</string>
   <string name="settings_torrent_reach_reachable">Peers können sich auf Port %2$d mit %1$s verbinden.</string>
   <plurals name="settings_torrent_reach_forwarded">

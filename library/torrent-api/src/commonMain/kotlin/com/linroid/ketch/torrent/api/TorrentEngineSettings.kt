@@ -60,6 +60,10 @@ enum class TorrentEncryptionSetting(val wireName: String) {
  *   its size, in all; 0 sets no such goal
  * @property seedTimeMinutes a finished torrent stops seeding after this many minutes of seeding
  *   since it last started; 0 sets no such goal
+ * @property blockedAddresses peers never connected to and never accepted: addresses
+ *   (`203.0.113.7`), CIDR blocks (`203.0.113.0/24`, `2001:db8::/32`) and ranges
+ *   (`203.0.113.1-203.0.113.99`); only engines advertising [TorrentCapability.IP_FILTER] apply
+ *   them
  */
 @Serializable
 data class TorrentEngineSettings(
@@ -74,6 +78,7 @@ data class TorrentEngineSettings(
   val trackerListUrls: List<String> = emptyList(),
   val seedRatioPercent: Int = 0,
   val seedTimeMinutes: Int = 0,
+  val blockedAddresses: List<String> = emptyList(),
 )
 
 /**
@@ -93,6 +98,7 @@ data class TorrentSettingsChange(
   val trackerListUrls: List<String>? = null,
   val seedRatioPercent: Int? = null,
   val seedTimeMinutes: Int? = null,
+  val blockedAddresses: List<String>? = null,
 ) {
   /** Whether it changes nothing. */
   val isEmpty: Boolean get() = this == TorrentSettingsChange()
@@ -110,6 +116,7 @@ data class TorrentSettingsChange(
     trackerListUrls = trackerListUrls ?: settings.trackerListUrls,
     seedRatioPercent = seedRatioPercent ?: settings.seedRatioPercent,
     seedTimeMinutes = seedTimeMinutes ?: settings.seedTimeMinutes,
+    blockedAddresses = blockedAddresses ?: settings.blockedAddresses,
   )
 
   companion object {
@@ -126,6 +133,7 @@ data class TorrentSettingsChange(
       trackerListUrls = to.trackerListUrls.takeIf { it != from.trackerListUrls },
       seedRatioPercent = to.seedRatioPercent.takeIf { it != from.seedRatioPercent },
       seedTimeMinutes = to.seedTimeMinutes.takeIf { it != from.seedTimeMinutes },
+      blockedAddresses = to.blockedAddresses.takeIf { it != from.blockedAddresses },
     )
   }
 }

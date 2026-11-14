@@ -595,6 +595,12 @@
   <string name="settings_torrent_connections_footer">加密隱藏的是流量類型，而不是連線的對象。</string>
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>
+  <string name="settings_torrent_blocked">已封鎖的位址</string>
+  <string name="settings_torrent_blocked_footer">Ketch 不會連線到這些位址上的節點，也會拒絕它們的連線。</string>
+  <string name="settings_torrent_blocked_add">封鎖位址</string>
+  <string name="settings_torrent_blocked_add_hint">位址、位址區塊（如 203.0.113.0/24）或範圍（如 203.0.113.1-203.0.113.99）。</string>
+  <string name="settings_torrent_blocked_none">沒有已封鎖的位址</string>
+  <string name="settings_torrent_blocked_invalid">不是位址、位址區塊或範圍：%1$s</string>
   <string name="settings_torrent_remote">請更新 %1$s 上的 Ketch，以便在這裡變更這些設定。</string>
   <string name="settings_torrent_reach_reachable">對等端可以透過連接埠 %2$d 連線至 %1$s。</string>
   <plurals name="settings_torrent_reach_forwarded">

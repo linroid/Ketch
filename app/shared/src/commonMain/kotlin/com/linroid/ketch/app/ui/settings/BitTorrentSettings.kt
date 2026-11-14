@@ -34,6 +34,7 @@ import com.linroid.ketch.app.state.AppState
 import com.linroid.ketch.app.state.LocalClock
 import com.linroid.ketch.app.state.MAX_EXTRA_TRACKERS
 import com.linroid.ketch.app.state.RejectedTracker
+import com.linroid.ketch.app.state.addBlockedAddresses
 import com.linroid.ketch.app.state.addTrackers
 import com.linroid.ketch.app.state.isTrackerListUrl
 import com.linroid.ketch.app.state.speedChoices
@@ -73,6 +74,12 @@ import ketch.app.shared.generated.resources.settings_torrent_list_none
 import ketch.app.shared.generated.resources.settings_torrent_list_remove
 import ketch.app.shared.generated.resources.settings_torrent_list_subscribe
 import ketch.app.shared.generated.resources.settings_torrent_list_subscribe_hint
+import ketch.app.shared.generated.resources.settings_torrent_blocked
+import ketch.app.shared.generated.resources.settings_torrent_blocked_add
+import ketch.app.shared.generated.resources.settings_torrent_blocked_add_hint
+import ketch.app.shared.generated.resources.settings_torrent_blocked_footer
+import ketch.app.shared.generated.resources.settings_torrent_blocked_invalid
+import ketch.app.shared.generated.resources.settings_torrent_blocked_none
 import ketch.app.shared.generated.resources.settings_torrent_list_trackers
 import ketch.app.shared.generated.resources.settings_torrent_list_update
 import ketch.app.shared.generated.resources.settings_torrent_list_url_hint
@@ -257,6 +264,92 @@ fun BitTorrentSettings(state: AppState, device: InstanceEntry) {
     onChange = controller::updateTorrent,
     onRefresh = controller::refreshTrackerList,
   )
+  if (controller.ipFilterSupported) {
+    BlockedAddressesGroup(torrent.blocklist) { list ->
+      controller.updateTorrent(torrent.copy(blocklist = list))
+    }
+  }
+}
+
+/**
+ * The peers the device never connects to, by address: a field that takes addresses, blocks and
+ * ranges, several at once, and the list with a button to remove each.
+ */
+@Composable
+internal fun BlockedAddressesGroup(blocked: List<String>, onChange: (List<String>) -> Unit) {
+  var text by remember { mutableStateOf("") }
+  var rejected by remember { mutableStateOf(emptyList<String>()) }
+  val add = {
+    if (text.isNotBlank()) {
+      val added = addBlockedAddresses(blocked, text)
+      if (added.addresses != blocked) onChange(added.addresses)
+      rejected = added.rejected
+      text = rejected.joinToString(" ")
+    }
+  }
+  SettingsGroup(
+    title = stringResource(Res.string.settings_torrent_blocked),
+    footer = stringResource(Res.string.settings_torrent_blocked_footer),
+    action = if (blocked.isNotEmpty()) {
+      {
+        KetchButton(
+          text = stringResource(Res.string.settings_torrent_remove_all),
+          onClick = { onChange(emptyList()) },
+          variant = KetchButtonVariant.Ghost,
+          size = KetchButtonSize.Small,
+        )
+      }
+    } else {
+      null
+    },
+  ) {
+    SettingsRow(
+      title = stringResource(Res.string.settings_torrent_blocked_add),
+      description = stringResource(Res.string.settings_torrent_blocked_add_hint),
+    ) {
+      Row(
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(KetchTheme.spacing.s2),
+      ) {
+        SettingsTextField(
+          value = text,
+          onValueChange = {
+            text = it
+            rejected = emptyList()
+          },
+          modifier = Modifier.weight(1f),
+          placeholder = "203.0.113.0/24",
+          error = rejected.takeIf { it.isNotEmpty() }?.let {
+            stringResource(Res.string.settings_torrent_blocked_invalid, it.joinToString(" "))
+          },
+          onDone = add,
+          mono = true,
+        )
+        KetchButton(
+          text = stringResource(Res.string.action_add),
+          onClick = add,
+          variant = KetchButtonVariant.Secondary,
+          enabled = text.isNotBlank(),
+        )
+      }
+    }
+    if (blocked.isEmpty()) {
+      SettingsRow(title = stringResource(Res.string.settings_torrent_blocked_none))
+    }
+    for (entry in blocked) {
+      SettingsRow(
+        title = entry,
+        trailing = {
+          KetchIconButton(
+            icon = KetchIcon.Close,
+            onClick = { onChange(blocked - entry) },
+            size = KetchButtonSize.Small,
+            contentDescription = stringResource(Res.string.settings_torrent_remove, entry),
+          )
+        },
+      )
+    }
+  }
 }
 
 /**

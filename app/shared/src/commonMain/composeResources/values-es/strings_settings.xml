@@ -607,6 +607,12 @@
   <string name="settings_torrent_connections_footer">El cifrado oculta qué tipo de tráfico es, no con quién te conectas.</string>
   <string name="settings_torrent_trackers">Trackers adicionales</string>
   <string name="settings_torrent_no_trackers">Sin trackers adicionales</string>
+  <string name="settings_torrent_blocked">Direcciones bloqueadas</string>
+  <string name="settings_torrent_blocked_footer">Ketch nunca se conecta a pares en estas direcciones y los rechaza cuando se conectan.</string>
+  <string name="settings_torrent_blocked_add">Bloquear direcciones</string>
+  <string name="settings_torrent_blocked_add_hint">Direcciones, bloques como 203.0.113.0/24 o rangos como 203.0.113.1-203.0.113.99.</string>
+  <string name="settings_torrent_blocked_none">Sin direcciones bloqueadas</string>
+  <string name="settings_torrent_blocked_invalid">No es una dirección, un bloque ni un rango: %1$s</string>
   <string name="settings_torrent_remote">Actualiza Ketch en %1$s para cambiar estos ajustes aquí.</string>
   <string name="settings_torrent_reach_reachable">Los pares pueden conectarse a %1$s en el puerto %2$d.</string>
   <plurals name="settings_torrent_reach_forwarded">

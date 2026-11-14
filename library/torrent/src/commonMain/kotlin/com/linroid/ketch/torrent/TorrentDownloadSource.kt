@@ -168,6 +168,7 @@ class TorrentDownloadSource(
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMapping = AtomicBoolean(config.portMapping)
   private val localDiscovery = AtomicBoolean(config.localDiscovery)
+  private val blockedAddresses = AtomicReference(config.blockedAddresses)
   // What [settings] reports; changed only by changeSettings, under settingsMutex.
   private val settingsState = MutableStateFlow(config.engineSettings())
   private val settingsMutex = Mutex()
@@ -363,6 +364,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.RECHECK.wireName)
       add(TorrentCapability.IMPORT.wireName)
       add(TorrentCapability.FILE_PRIORITY.wireName)
+      add(TorrentCapability.IP_FILTER.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -640,7 +642,8 @@ class TorrentDownloadSource(
   private fun engineConfig(): TorrentConfig = config.copy(additionalTrackers = extraTrackers(),
     uploadPolicy = engineUploadPolicy(), uploadRateLimit = uploadRateLimit.load(),
     encryption = encryption.load(), utpEnabled = utpEnabled.load(),
-    portMapping = portMapping.load(), localDiscovery = localDiscovery.load())
+    portMapping = portMapping.load(), localDiscovery = localDiscovery.load(),
+    blockedAddresses = blockedAddresses.load())
 
   /**
    * The settings every torrent runs with, which `ketch.controller(TorrentController)` reads and
@@ -680,6 +683,13 @@ class TorrentDownloadSource(
       if (after.utp != before.utp) storeUtpEnabled(after.utp)
       if (after.portMapping != before.portMapping) storePortMapping(after.portMapping)
       if (after.localDiscovery != before.localDiscovery) storeLocalDiscovery(after.localDiscovery)
+      if (after.blockedAddresses != before.blockedAddresses) {
+        // Stored under the lock an engine starts under, so one starting now runs this list.
+        engineMutex.withLock {
+          blockedAddresses.store(after.blockedAddresses)
+          engine.load()?.setBlockedAddresses(after.blockedAddresses)
+        }
+      }
       if (after.trackers != before.trackers) storeAdditionalTrackers(after.trackers)
       if (after.subscribedTrackerLists != before.subscribedTrackerLists) {
         // After the configured lists' restore, which would otherwise subscribe to them again.
@@ -704,6 +714,14 @@ class TorrentDownloadSource(
       encryption.store(value)
       engine.load()?.setEncryption(value)
     }
+  }
+
+  /**
+   * Replaces [TorrentConfig.blockedAddresses] for connections opened or accepted from now on;
+   * open ones keep running. Never starts the engine.
+   */
+  suspend fun setBlockedAddresses(addresses: List<String>) {
+    changeSettings { it.copy(blockedAddresses = addresses) }
   }
 
   /**

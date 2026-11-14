@@ -595,6 +595,12 @@
   <string name="settings_torrent_connections_footer">暗号化で隠れるのは通信の種類で、接続相手は隠れません。</string>
   <string name="settings_torrent_trackers">追加トラッカー</string>
   <string name="settings_torrent_no_trackers">追加トラッカーはありません</string>
+  <string name="settings_torrent_blocked">ブロック中のアドレス</string>
+  <string name="settings_torrent_blocked_footer">Ketchはこれらのアドレスのピアに接続せず、接続してきた場合は拒否します。</string>
+  <string name="settings_torrent_blocked_add">アドレスをブロック</string>
+  <string name="settings_torrent_blocked_add_hint">アドレス、203.0.113.0/24 のようなブロック、または 203.0.113.1-203.0.113.99 のような範囲。</string>
+  <string name="settings_torrent_blocked_none">ブロック中のアドレスはありません</string>
+  <string name="settings_torrent_blocked_invalid">アドレス、ブロック、範囲のいずれでもありません：%1$s</string>
   <string name="settings_torrent_remote">これらの設定をここで変更するには、%1$sのKetchをアップデートしてください。</string>
   <string name="settings_torrent_reach_reachable">ピアはポート%2$dで%1$sに接続できます。</string>
   <plurals name="settings_torrent_reach_forwarded">

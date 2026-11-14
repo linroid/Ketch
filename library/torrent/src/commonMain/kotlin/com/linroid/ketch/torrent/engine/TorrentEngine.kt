@@ -104,6 +104,9 @@ internal interface TorrentEngine {
   /** Replaces the encryption policy for connections opened from now on. */
   suspend fun setEncryption(encryption: TorrentEncryption) {}
 
+  /** Replaces the peers never connected to or accepted; open connections keep running. */
+  suspend fun setBlockedAddresses(addresses: List<String>) {}
+
   /** Switches uTP for connections opened from now on; open ones keep running. */
   suspend fun setUtpEnabled(enabled: Boolean) {}
 

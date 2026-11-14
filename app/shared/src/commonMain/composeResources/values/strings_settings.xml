@@ -799,6 +799,13 @@
   <string name="settings_torrent_connections_footer">Encryption hides what the traffic is, not who you connect to.</string>
   <string name="settings_torrent_trackers">Extra trackers</string>
   <string name="settings_torrent_no_trackers">No extra trackers</string>
+  <!-- BitTorrent settings: peers by address that are never connected to. -->
+  <string name="settings_torrent_blocked">Blocked addresses</string>
+  <string name="settings_torrent_blocked_footer">Ketch never connects to peers at these addresses and turns them away when they connect.</string>
+  <string name="settings_torrent_blocked_add">Block addresses</string>
+  <string name="settings_torrent_blocked_add_hint">Addresses, blocks such as 203.0.113.0/24, or ranges such as 203.0.113.1-203.0.113.99.</string>
+  <string name="settings_torrent_blocked_none">No blocked addresses</string>
+  <string name="settings_torrent_blocked_invalid">Not an address, a block or a range: %1$s</string>
   <!-- On the page of a device that is not this one, %1$s. config.toml is a file name. -->
   <string name="settings_torrent_remote">Update Ketch on %1$s to change these settings here.</string>
   <!-- Whether peers on the internet can connect to a device. %1$s is the device's name, %2$d the

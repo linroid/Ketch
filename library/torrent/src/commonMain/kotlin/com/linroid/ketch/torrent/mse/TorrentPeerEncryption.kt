@@ -8,11 +8,16 @@ import com.linroid.ketch.torrent.net.PrefixedConnection
 import com.linroid.ketch.torrent.net.TorrentConnection
 import com.linroid.ketch.torrent.net.TorrentNetwork
 import com.linroid.ketch.torrent.net.connectWithin
+import com.linroid.ketch.torrent.net.resolveTorrentHost
+import com.linroid.ketch.torrent.net.numericHost
+import com.linroid.ketch.torrent.net.numericAddress
+import com.linroid.ketch.torrent.net.TorrentIpFilter
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import okio.ByteString
 import okio.IOException
+import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -30,6 +35,8 @@ internal class TorrentPeerEncryption(
   policy: TorrentEncryption,
   private val handshakeTimeoutMs: Long = 10_000,
   private val keyPairs: () -> MseKeyPair = ::MseKeyPair,
+  /** Looks a peer's host name up when a filter is set, so the filter sees its address. */
+  private val resolve: suspend (String) -> List<ByteArray> = ::resolveTorrentHost,
 ) : TorrentNetwork by delegate {
   private val log = KetchLogger("TorrentEngine")
   private val current = AtomicReference(policy)
@@ -38,6 +45,28 @@ internal class TorrentPeerEncryption(
   var policy: TorrentEncryption
     get() = current.load()
     set(value) = current.store(value)
+  /** The addresses no peer is dialed at, read as each dial starts. */
+  @Volatile var filter: () -> TorrentIpFilter = { TorrentIpFilter.NONE }
+
+  /**
+   * Where to dial [remote] under the [filter]: itself when it is an address that is not
+   * blocked, and for a host name, as an HTTP tracker may list one, the first address it resolves
+   * to that is not blocked, so the name cannot lead to a blocked address when it is connected.
+   *
+   * @throws IOException when every address of it is blocked
+   */
+  private suspend fun allowed(remote: PeerEndpoint): PeerEndpoint {
+    val filter = filter()
+    if (filter.isEmpty) return remote
+    if (numericAddress(remote.host) != null) {
+      if (filter.blocks(remote.host)) throw IOException("The peer's address is blocked")
+      return remote
+    }
+    val address = resolve(remote.host).map(::numericHost).firstOrNull { !filter.blocks(it) }
+      ?: throw IOException("The peer's address is blocked")
+    return PeerEndpoint(address, remote.port)
+  }
+
   private val mutex = Mutex()
   private val plaintextPeers = LinkedHashSet<PeerEndpoint>()
 
@@ -47,8 +76,9 @@ internal class TorrentPeerEncryption(
     tag: ByteArray,
     connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
   ): TorrentConnection {
+    val target = allowed(remote)
     // Each connect has its own deadline, so a plaintext retry still has time after MSE failed.
-    suspend fun connect() = delegate.connectWithin(remote, connectTimeoutMs)
+    suspend fun connect() = delegate.connectWithin(target, connectTimeoutMs)
     val policy = policy
     if (policy == TorrentEncryption.DISABLED) return connect()
     if (policy == TorrentEncryption.PREFERRED && mutex.withLock { remote in plaintextPeers }) {
