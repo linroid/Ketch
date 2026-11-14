@@ -33,14 +33,16 @@ internal data class TrackerStatus(
 
 /**
  * One status per tracker from the [statuses] of several announcers of one torrent, as a hybrid's
- * two swarms announce to the same trackers: by tier, then in the order first seen. A tracker
+ * two swarms announce to the same trackers: by tier, then in the order first seen. Announcers of
+ * the same tiers number their trackers alike, so a tracker is told by its [TrackerStatus.id] as
+ * well as its label: two on one host, which differ only in their path, stay two. A tracker
  * keeps the status that says most, one that answered over one that is asked, over one that
  * failed, over one not asked yet, and of two alike the one that named more peers.
  */
 internal fun mergeTrackerStatuses(statuses: Collection<List<TrackerStatus>>): List<TrackerStatus> {
-  val merged = linkedMapOf<Pair<Int, String>, TrackerStatus>()
+  val merged = linkedMapOf<Triple<Int, Int, String>, TrackerStatus>()
   for (status in statuses.flatten()) {
-    val key = status.tier to status.label
+    val key = Triple(status.tier, status.id, status.label)
     val kept = merged[key]
     if (kept == null || status.weight() > kept.weight()) merged[key] = status
   }

@@ -1287,7 +1287,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   failures in a row and the tracker's cleaned message. `TrackerStatus` carries `label` and
   `tier`, and `TorrentSession.trackers()` reads them: a v1 session's tracker control, and a v2
   or hybrid session's announcers through `TorrentV2DiscoverySink.trackerStatus`, one status per
-  tracker (`mergeTrackerStatuses`: answered over asking over failed over idle), a private
+  tracker (`mergeTrackerStatuses`, by tier, id and label, so two trackers on one host stay two:
+  answered over asking over failed over idle), a private
   hybrid's current tracker only. Without a session that announces, `idleTrackers` lists the
   metainfo's usable trackers, else a magnet's. Trackers Ketch adds to public torrents are never
   listed. The inspector's Trackers tab (`TrackersTab`, `trackerView`), offered for torrents on

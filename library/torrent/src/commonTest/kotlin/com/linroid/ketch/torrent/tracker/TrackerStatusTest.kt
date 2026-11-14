@@ -72,23 +72,36 @@ class TrackerStatusTest {
 
   @Test
   fun mergedStatusesKeepWhatSaysMostOfEachTracker() {
-    fun status(label: String, tier: Int, outcome: TrackerStatus.Outcome, peers: Int? = null) =
-      TrackerStatus(id = 7, outcome = outcome, lastPeerCount = peers, label = label, tier = tier)
+    fun status(
+      id: Int,
+      label: String,
+      tier: Int,
+      outcome: TrackerStatus.Outcome,
+      peers: Int? = null,
+    ) = TrackerStatus(id = id, outcome = outcome, lastPeerCount = peers, label = label, tier = tier)
+    // Two trackers of the first tier share a host and differ only in their path.
     val v2 = listOf(
-      status("http://a:80", 0, TrackerStatus.Outcome.FAILED),
-      status("http://b:80", 1, TrackerStatus.Outcome.SUCCEEDED, peers = 2),
+      status(0, "http://a:80", 0, TrackerStatus.Outcome.FAILED),
+      status(1, "http://a:80", 0, TrackerStatus.Outcome.FAILED),
+      status(2, "http://b:80", 1, TrackerStatus.Outcome.SUCCEEDED, peers = 2),
     )
     val v1 = listOf(
-      status("http://a:80", 0, TrackerStatus.Outcome.SUCCEEDED, peers = 5),
-      status("http://b:80", 1, TrackerStatus.Outcome.NOT_CONTACTED),
+      status(0, "http://a:80", 0, TrackerStatus.Outcome.SUCCEEDED, peers = 5),
+      status(1, "http://a:80", 0, TrackerStatus.Outcome.NOT_CONTACTED),
+      status(2, "http://b:80", 1, TrackerStatus.Outcome.NOT_CONTACTED),
     )
 
     val merged = mergeTrackerStatuses(listOf(v2, v1))
 
-    assertEquals(listOf("http://a:80", "http://b:80"), merged.map { it.label })
-    assertEquals(listOf(0, 1), merged.map { it.id })
-    assertEquals(listOf(5, 2), merged.map { it.lastPeerCount })
-    assertEquals(TrackerStatus.Outcome.SUCCEEDED, merged[0].outcome)
+    assertEquals(listOf("http://a:80", "http://a:80", "http://b:80"), merged.map { it.label })
+    assertEquals(listOf(0, 1, 2), merged.map { it.id })
+    assertEquals(listOf(5, null, 2), merged.map { it.lastPeerCount })
+    // One answering never hides that the other on its host failed.
+    assertEquals(
+      listOf(TrackerStatus.Outcome.SUCCEEDED, TrackerStatus.Outcome.FAILED,
+        TrackerStatus.Outcome.SUCCEEDED),
+      merged.map { it.outcome },
+    )
     assertEquals(emptyList(), mergeTrackerStatuses(emptyList()))
   }
 
