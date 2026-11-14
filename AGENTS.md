@@ -152,8 +152,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `SelectionRequest`, `SelectionPlan`, `SelectionUpdate`, `SourceExtension` and `SourceHost`
   (what `DownloadSource.attach` adds: controllers for `KetchApi.controller`, `start`,
   `taskCompleted` and `selectionChanged` hooks, and the host's record reads, ledgered
-  `selectFiles`/`setSharing`, `showSharing`, `saveSharingIntent` and `saveSourceState`, which
-  saves a completed task's source state for a session outside a download, such as a seeder's),
+  `selectFiles`/`setSharing`, `showSharing`, `saveSharingIntent`, `saveSourceState`, which
+  saves a completed task's source state for a session outside a download, such as a seeder's,
+  and `reopen`, which runs a completed task again from what it saved),
   `SpeedLimiter`, `TokenBucket`, `DelegatingSpeedLimiter`, `MultiNetworkHttpEngine`,
   `ConfigurableNetworkHttpEngine`, `NetworkInterfaceProvider`, `ConnectionRegistry`,
   `ConnectionReporter`, `ConnectionHandle`, `ConnectionSpec`, `UrlAuthority`, `HttpExchange`,
@@ -1279,6 +1280,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Recheck: `TorrentController.recheck(taskId)` (REST `POST /api/torrents/{id}/recheck`, which
+  answers the snapshot; capability `recheck`). Every start of a torrent already checks its
+  files, so the command acts by state (`KetchTorrentController`): a completed task stops its
+  seeder (a run would take it over unchecked) and runs again through `SourceHost.reopen`, which
+  queues a completed task as a resume under its control lock, clearing `completedAt`, so the
+  source proves what is on disk, downloads what is missing and completes anew, seeding again if
+  meant to; a downloading task is paused and resumed; paused, queued and failed ones are left to
+  their next start; a canceled one is `INVALID_STATE`. The apps offer Check files
+  (`RowAction.CheckFiles`, `TaskCommand.CheckFiles`) in a finished torrent's menu. Tests:
+  `TorrentSeedingControlTest` (a corrupted and a deleted file download again),
+  `KetchTorrentControllerTest`
 - Trackers: `TorrentController.trackers(taskId)` (REST `GET /api/torrents/{id}/trackers`;
   capability `trackers`) lists a task's own trackers as `TorrentTracker`s in tier order:
   `endpoint` (`trackerLabel`: scheme, host and port, never a path or passkey), `tier`,

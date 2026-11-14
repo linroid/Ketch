@@ -5,8 +5,10 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.app.i18n.UiText
 import com.linroid.ketch.app.i18n.text
+import com.linroid.ketch.app.util.isTorrent
 import com.linroid.ketch.app.util.toCopy
 import ketch.app.shared.generated.resources.Res
+import ketch.app.shared.generated.resources.action_row_check_files
 import ketch.app.shared.generated.resources.action_row_choose_files
 import ketch.app.shared.generated.resources.action_row_connections
 import ketch.app.shared.generated.resources.action_row_copy_details
@@ -141,6 +143,12 @@ sealed class RowAction(val label: UiText, val destructive: Boolean = false) {
   /** Shares a finished torrent's files with other peers again. */
   data object Seed : RowAction(Res.string.action_row_seed.text())
 
+  /**
+   * Checks a finished torrent's files against its hashes again and downloads what is missing or
+   * changed.
+   */
+  data object CheckFiles : RowAction(Res.string.action_row_check_files.text())
+
   /** Cancels the task after confirmation; its progress cannot be resumed. */
   data object StopAndDiscard :
     RowAction(Res.string.action_row_stop_and_discard.text(), destructive = true)
@@ -273,7 +281,8 @@ fun taskActions(
       val startNow = RowAction.StartNow.takeIf { capabilities.canReschedule }
       waitingOrRunning(startNow, listOfNotNull(startNow), capabilities)
     }
-    is DownloadState.Completed -> completed(capabilities, fileMissing, state.sharing)
+    is DownloadState.Completed ->
+      completed(capabilities, fileMissing, state.sharing, isTorrent(request))
     is DownloadState.Failed -> failed(request, state, device, retryCount)
     is DownloadState.Canceled -> restartable()
   }
@@ -302,6 +311,7 @@ private fun completed(
   capabilities: RowCapabilities,
   fileMissing: Boolean,
   seeding: Boolean,
+  torrent: Boolean,
 ): TaskActions {
   val local = !capabilities.isRemote
   if (local && fileMissing) return restartable()
@@ -312,6 +322,7 @@ private fun completed(
     // Live seeding only: the intent of a task waiting to seed, such as for uploads to resume,
     // comes with its torrent snapshot, which the inspector follows and rows do not.
     RowAction.StopSeeding.takeIf { seeding },
+    RowAction.CheckFiles.takeIf { torrent },
     RowAction.CopyLink,
     RowAction.CopyPath,
     RowAction.SendTo,

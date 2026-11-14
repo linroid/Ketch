@@ -344,6 +344,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.SEQUENTIAL.wireName)
       add(TorrentCapability.EXPORT.wireName)
       add(TorrentCapability.TRACKERS.wireName)
+      add(TorrentCapability.RECHECK.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {

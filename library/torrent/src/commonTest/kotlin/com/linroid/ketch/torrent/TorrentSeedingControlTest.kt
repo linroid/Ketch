@@ -40,6 +40,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -224,6 +225,54 @@ class TorrentSeedingControlTest {
     val bytes = torrentFileSystem.read(path) { readByteArray() }
     bytes[bytes.size / 2] = (bytes[bytes.size / 2] + 1).toByte()
     torrentFileSystem.write(path) { write(bytes) }
+  }
+
+  @Test
+  fun recheck_completedTaskWithAChangedFile_downloadsItAgain() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+    val first = task.awaitCompleted()
+    val file = output / "f0"
+    corrupt(file)
+    torrentFileSystem.delete(output / "f1")
+
+    assertNotNull(ketch.controller(TorrentController)).recheck(task.taskId)
+
+    // The run that checks it replaces the completed state, then completes anew.
+    awaitStage("the recheck to finish", task) {
+      task.state.first { it is DownloadState.Completed && it.completedAt != first.completedAt }
+    }
+    assertContentEquals(torrent.payloads[0], torrentFileSystem.read(file) { readByteArray() })
+    assertContentEquals(torrent.payloads[1],
+      torrentFileSystem.read(output / "f1") { readByteArray() })
+    assertEquals(TaskState.COMPLETED, store.load(task.taskId)?.state)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun recheck_seedingTask_checksThenSeedsAgain() = harness {
+    val source = source()
+    val ketch = ketch(source)
+    ketch.start()
+    val task = ketch.download(request(0))
+    val first = task.awaitCompleted()
+    task.awaitSeeding(true)
+    val before = assertNotNull(source.sessionOf(task.taskId))
+
+    assertNotNull(ketch.controller(TorrentController)).recheck(task.taskId)
+
+    awaitStage("the recheck to finish", task) {
+      task.state.first {
+        it is DownloadState.Completed && it.completedAt != first.completedAt && it.sharing
+      }
+    }
+    // A session of its own checked the files; the seeder it replaced was not taken over.
+    assertTrue(source.sessionOf(task.taskId) !== before)
+    source.stopSeeding(task.taskId)
+    source.assertNoLeaks()
   }
 
   @Test

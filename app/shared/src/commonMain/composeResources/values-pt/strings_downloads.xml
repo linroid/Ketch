@@ -241,6 +241,7 @@
   <string name="downloads_failed_reschedule">Não foi possível reagendar %1$s (%2$s)</string>
   <string name="downloads_failed_files">Não foi possível alterar os arquivos de %1$s (%2$s)</string>
   <string name="downloads_failed_seeding">Não foi possível alterar o semeio de %1$s (%2$s)</string>
+  <string name="downloads_failed_check_files">Não foi possível verificar os arquivos de %1$s (%2$s)</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="one">%1$d download pausado</item>

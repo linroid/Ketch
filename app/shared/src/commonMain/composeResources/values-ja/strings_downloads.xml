@@ -227,6 +227,7 @@
   <string name="downloads_failed_reschedule">%2$sで%1$sの予約を変更できませんでした</string>
   <string name="downloads_failed_files">%2$sで%1$sのファイルを変更できませんでした</string>
   <string name="downloads_failed_seeding">%2$sで%1$sのシードを変更できませんでした</string>
+  <string name="downloads_failed_check_files">%2$sで%1$sのファイルを確認できませんでした</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">%1$d件のダウンロードを一時停止しました</item>

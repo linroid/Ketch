@@ -124,4 +124,13 @@ interface SourceHost {
    * changes, so it may be called from one, such as a command's `afterSave`.
    */
   suspend fun saveSourceState(task: DownloadTask, state: SourceState)
+
+  /**
+   * Runs the completed [task] again from what it saved, into the same place and with its files
+   * and progress as they are, so its source proves what is on disk and downloads what is
+   * missing: it shows queued, then whatever its run reports, and completes again. Returns false,
+   * changing nothing, for a task that is not completed. Sharing the source still does for the
+   * task is the caller's to stop first.
+   */
+  suspend fun reopen(task: DownloadTask): Boolean = false
 }

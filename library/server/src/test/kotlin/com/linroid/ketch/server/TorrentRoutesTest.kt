@@ -31,6 +31,7 @@ import com.linroid.ketch.torrent.api.TorrentTracker
 import com.linroid.ketch.torrent.api.TorrentTrackerState
 import com.linroid.ketch.torrent.api.TorrentUploadSetting
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -155,6 +156,15 @@ class TorrentRoutesTest {
       } else {
         null
       }
+
+    val rechecked = mutableListOf<String>()
+
+    override suspend fun recheck(taskId: String) {
+      if (taskId != "t1") {
+        throw TorrentCommandException(TorrentCommandError.NOT_FOUND, "No such torrent download")
+      }
+      rechecked += taskId
+    }
 
     val exports = mutableListOf<Pair<String, Boolean>>()
 
@@ -398,6 +408,20 @@ class TorrentRoutesTest {
 
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(true, controller.sequential)
+  }
+
+  @Test
+  fun recheck_reachesTheController_andAnswersTheSnapshot() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val response = client.post("/api/torrents/t1/recheck")
+    val missing = client.post("/api/torrents/none/recheck")
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals("t1", json.decodeFromString<TorrentSnapshot>(response.bodyAsText()).taskId)
+    assertEquals(listOf("t1"), controller.rechecked)
+    assertEquals(HttpStatusCode.NotFound, missing.status)
   }
 
   @Test

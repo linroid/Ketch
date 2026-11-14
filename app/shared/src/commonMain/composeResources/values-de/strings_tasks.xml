@@ -143,6 +143,7 @@
   <string name="action_row_choose_files">Dateien auswählen…</string>
   <string name="action_row_download_all_files">Alle Dateien herunterladen</string>
   <string name="action_row_stop_seeding">Seeden beenden</string>
+  <string name="action_row_check_files">Dateien prüfen</string>
   <string name="action_row_seed">Seeden</string>
   <plurals name="batch_pause">
     <item quantity="one">%1$d Download pausieren</item>

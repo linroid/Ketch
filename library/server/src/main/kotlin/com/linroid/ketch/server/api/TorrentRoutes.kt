@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.api.TorrentPageRequest
 import com.linroid.ketch.torrent.api.TorrentSettingsChange
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.resources.get
+import io.ktor.server.resources.post
 import io.ktor.server.resources.put
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -128,6 +129,13 @@ internal fun Route.torrentRoutes(ketch: KetchApi, controller: TorrentController)
     val export = controller.export(taskId, metainfo = resource.metainfo ?: false)
       ?: throw notFound(taskId)
     call.respond(export)
+  }
+
+  post<Torrents.ById.Recheck> { resource ->
+    val taskId = resource.parent.id
+    log.d { "POST /api/torrents/$taskId/recheck" }
+    controller.recheck(taskId)
+    call.respond(controller.snapshot(taskId) ?: throw notFound(taskId))
   }
 
   get<Torrents.ById.Trackers> { resource ->

@@ -1113,6 +1113,74 @@ class KetchTorrentControllerTest {
   }
 
   @Test
+  fun `recheck runs a completed task again and stops its seeding first`() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.RECHECK.wireName
+    val ketch = ketch(source)
+    val task = completedTask(ketch, source)
+    val runs = source.inner.runs.value.size
+
+    ketch.torrents.recheck(task.taskId)
+    runCurrent()
+
+    assertEquals(listOf(task.taskId), source.stopped)
+    assertEquals(runs + 1, source.inner.runs.value.size)
+    assertTrue(source.inner.runs.value.last().resumed)
+    assertIs<DownloadState.Downloading>(task.state.value)
+    source.inner.runs.value.last().finish.complete(Unit)
+    runCurrent()
+    assertIs<DownloadState.Completed>(task.state.value)
+    ketch.close()
+  }
+
+  @Test
+  fun `recheck restarts a running task and leaves a paused one to its next start`() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.RECHECK.wireName
+    val ketch = ketch(source)
+    val task = ketch.download(request("0"))
+    runCurrent()
+    assertIs<DownloadState.Downloading>(task.state.value)
+
+    ketch.torrents.recheck(task.taskId)
+    runCurrent()
+    assertEquals(2, source.inner.runs.value.size)
+    assertIs<DownloadState.Downloading>(task.state.value)
+
+    task.pause()
+    runCurrent()
+    ketch.torrents.recheck(task.taskId)
+    runCurrent()
+    assertEquals(2, source.inner.runs.value.size)
+    assertIs<DownloadState.Paused>(task.state.value)
+    ketch.close()
+  }
+
+  @Test
+  fun `recheck refuses canceled unknown and unsupported tasks`() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    val task = pausedTask(ketch)
+
+    val unsupported = assertFailsWith<TorrentCommandException> {
+      ketch.torrents.recheck(task.taskId)
+    }
+    assertEquals(TorrentCommandError.UNSUPPORTED, unsupported.error)
+
+    source.capabilities += TorrentCapability.RECHECK.wireName
+    val missing = assertFailsWith<TorrentCommandException> { ketch.torrents.recheck("missing") }
+    assertEquals(TorrentCommandError.NOT_FOUND, missing.error)
+
+    task.cancel()
+    runCurrent()
+    val canceled = assertFailsWith<TorrentCommandException> {
+      ketch.torrents.recheck(task.taskId)
+    }
+    assertEquals(TorrentCommandError.INVALID_STATE, canceled.error)
+    ketch.close()
+  }
+
+  @Test
   fun `export is unsupported for a source without the capability`() = runTest {
     val source = ControlledSource()
     val ketch = ketch(source)
