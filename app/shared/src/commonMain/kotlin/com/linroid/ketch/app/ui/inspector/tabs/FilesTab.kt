@@ -54,6 +54,7 @@ import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchChip
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
+import com.linroid.ketch.app.components.KetchIconButton
 import com.linroid.ketch.app.components.KetchMenu
 import com.linroid.ketch.app.components.KetchRadio
 import com.linroid.ketch.app.components.KetchTextField
@@ -91,6 +92,8 @@ import com.linroid.ketch.app.ui.intake.toggleState
 import com.linroid.ketch.app.ui.list.TaskCommand
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_file_description
+import ketch.app.shared.generated.resources.inspector_file_first
+import ketch.app.shared.generated.resources.inspector_file_first_on
 import ketch.app.shared.generated.resources.inspector_file_description_no_share
 import ketch.app.shared.generated.resources.inspector_file_unnamed
 import ketch.app.shared.generated.resources.inspector_files_all_done
@@ -173,11 +176,16 @@ fun FilesTab(
     LaunchedEffect(needsNames, row.state::class, row.segments.isEmpty()) {
       if (needsNames) model.load()
     }
+    // Only a torrent that still downloads has an order to change.
+    val orders = torrent && row.state !is DownloadState.Completed
+    LaunchedEffect(model, orders) { if (orders) model.loadFirst() }
     FilesTabContent(
       row = row,
       modifier = modifier,
       maxHeight = maxHeight,
       list = model.filesOf(row.request),
+      first = model.first.takeIf { orders },
+      onFirst = model::toggleFirst,
       model = model.takeIf { selectable },
       sort = state.appSettings.fileSort(FileSortSurface.Inspector),
       onSort = { state.appSettings.saveFileSort(FileSortSurface.Inspector, it) },
@@ -199,6 +207,8 @@ internal fun FilesTabContent(
   model: FileSelectionModel? = null,
   sort: FileSort = FileSortSurface.Inspector.default,
   onSort: (FileSort) -> Unit = {},
+  first: Set<String>? = null,
+  onFirst: (List<String>) -> Unit = {},
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -350,6 +360,10 @@ internal fun FilesTabContent(
                   if (single) m.choose(file.id, applied) else m.toggle(node.fileIds, applied)
                 }
               },
+              // Files that are skipped or already whole have no place in the order.
+              first = first?.takeIf { file.selected && !file.isDone }?.let { ids ->
+                FileFirst(on = ids.containsAll(node.fileIds)) { onFirst(node.fileIds) }
+              },
               tree = if (nested) {
                 FileTreePlace(
                   depth = node.depth,
@@ -473,6 +487,9 @@ private class FileCheck(val state: ToggleableState, val single: Boolean, val onT
   val checked: Boolean get() = state == ToggleableState.On
 }
 
+/** Whether a row's files download before the others ([on]), and what its button does. */
+private class FileFirst(val on: Boolean, val onToggle: () -> Unit)
+
 /**
  * Where a row sits in a list with folders: how deep, and for a [folder] row its path, whether it
  * is [collapsed], the [size] of every file in it and what its chevron does.
@@ -498,6 +515,7 @@ private fun FileRow(
   progress: Boolean,
   check: FileCheck?,
   tree: FileTreePlace? = null,
+  first: FileFirst? = null,
 ) {
   val colors = KetchTheme.colors
   val spacing = KetchTheme.spacing
@@ -588,6 +606,18 @@ private fun FileRow(
         KetchFileTypeChip(fileName = name, size = KetchFileTypeChipDefaults.TableSize)
       }
       FileName(if (folder != null) "$name/" else name, Modifier.weight(1f), dimmed = !file.selected)
+      if (first != null) {
+        KetchIconButton(
+          icon = KetchIcon.Bolt,
+          onClick = first.onToggle,
+          size = KetchButtonSize.Small,
+          tint = if (first.on) colors.accentText else colors.textTertiary,
+          contentDescription = stringResource(
+            if (first.on) Res.string.inspector_file_first_on else Res.string.inspector_file_first,
+          ),
+          selected = first.on,
+        )
+      }
       Text(
         text = size,
         style = type.numeral,

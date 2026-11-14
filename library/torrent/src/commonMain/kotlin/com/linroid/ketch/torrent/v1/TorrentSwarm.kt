@@ -171,6 +171,8 @@ internal class TorrentSwarm(
   private val utpEnabled: () -> Boolean = { false },
   /** Whether pieces open in order rather than rarest first, read live. */
   private val sequential: () -> Boolean = { false },
+  /** The pieces to open before any other, read live; see [TorrentPieceScheduler]. */
+  private val priority: () -> BooleanArray? = { null },
   /** Fetches the torrent's web seeds (BEP 19); null leaves them out. */
   private val webSeedHttp: TorrentHttp? = null,
   /** The first backoff of a failed web seed; tests pass a short one. */
@@ -257,7 +259,7 @@ internal class TorrentSwarm(
       return@supervisorScope
     }
     val scheduler = TorrentPieceScheduler(BooleanArray(store.pieceCount) { store.needed(it) },
-      store.verifiedPieces(), store::pieceSize, budget, nowMs, onDiscarded, sequential)
+      store.verifiedPieces(), store::pieceSize, budget, nowMs, onDiscarded, sequential, priority)
     // Any piece may become wanted, and the first is the longest.
     val largestPiece = if (store.pieceCount == 0) 0 else store.pieceSize(0)
     val peerOverhead = PEER_WIRE_BYTES + store.pieceCount * 4

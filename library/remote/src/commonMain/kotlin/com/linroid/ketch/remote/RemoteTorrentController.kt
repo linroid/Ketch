@@ -3,6 +3,7 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
+import com.linroid.ketch.endpoints.torrent.TorrentPriorityRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
@@ -342,6 +343,24 @@ internal class RemoteTorrentController(
         )
       )
     }
+  }
+
+  override suspend fun priorityFiles(taskId: String): Set<String> {
+    requireCapability(TorrentCapability.FILE_PRIORITY)
+    val answer = call<TorrentPriorityRequest>(notFoundIsNull = false) {
+      httpClient.get(Torrents.ById.Priority(parent = Torrents.ById(id = taskId)))
+    } ?: throw IllegalStateException("Empty response")
+    return answer.fileIds
+  }
+
+  override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
+    requireCapability(TorrentCapability.FILE_PRIORITY)
+    call<TorrentPriorityRequest>(notFoundIsNull = false) {
+      httpClient.put(Torrents.ById.Priority(parent = Torrents.ById(id = taskId))) {
+        contentType(ContentType.Application.Json)
+        setBody(TorrentPriorityRequest(fileIds))
+      }
+    } ?: throw IllegalStateException("Empty response")
   }
 
   override suspend fun recheck(taskId: String) {

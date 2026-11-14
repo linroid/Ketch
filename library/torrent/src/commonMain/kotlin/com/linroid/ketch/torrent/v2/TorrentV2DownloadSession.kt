@@ -242,6 +242,21 @@ internal class TorrentV2DownloadSession private constructor(
   private val sequential = AtomicBoolean(false)
 
   override fun setSequential(sequential: Boolean) = this.sequential.store(sequential)
+
+  private val priorityPieces = AtomicReference<BooleanArray?>(null)
+
+  override fun setPriorityFiles(fileIds: Set<String>) {
+    val pieces = BooleanArray(layout.pieceCount.toInt())
+    var any = false
+    for (file in layout.files) {
+      if (file.id !in fileIds || file.length == 0L) continue
+      val start = (file.offset / layout.pieceLength).toInt()
+      val count = ((file.length - 1) / layout.pieceLength + 1).toInt()
+      pieces.fill(true, start, start + count)
+      any = true
+    }
+    priorityPieces.store(pieces.takeIf { any })
+  }
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (v2 ${logHash(document.info.hash.hex)})"
 
@@ -746,7 +761,7 @@ internal class TorrentV2DownloadSession private constructor(
                 swarm = TorrentV2Swarm(document, runtime, restricted, waitForPeers, discovered,
                   dial, failures, loopControls, connectionLimit::value, generation::load,
                   serve = serve, sessionUploadRate = uploadRate, onCompleted = ::completed,
-                  sequential = sequential::load,
+                  sequential = sequential::load, priority = priorityPieces::load,
                   uploadedOverV1 = { v1Uploaded.addAndFetch(it.toLong()) },
                   onRoom = room::store, onIncomplete = ::incomplete,
                   incomingFailures = incomingFailures, webSeeds = webSeeds,

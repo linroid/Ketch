@@ -196,6 +196,23 @@ internal class TorrentPieceStore(
     return files
   }
 
+  /**
+   * The pieces holding bytes of the files [ids] name, by metainfo index; null when they hold
+   * none, as for no files.
+   */
+  fun piecesOfFiles(ids: Set<String>): BooleanArray? {
+    val pieces = BooleanArray(pieceCount)
+    var any = false
+    for (id in ids) {
+      val file = id.toIntOrNull()?.takeIf { it in metadata.files.indices } ?: continue
+      for (index in piecesOf(file)) {
+        pieces[index] = true
+        any = true
+      }
+    }
+    return pieces.takeIf { any }
+  }
+
   /** The pieces holding bytes of [file]; empty for an empty file. */
   private fun piecesOf(file: Int): IntRange {
     if (metadata.files[file].size == 0L) return IntRange.EMPTY

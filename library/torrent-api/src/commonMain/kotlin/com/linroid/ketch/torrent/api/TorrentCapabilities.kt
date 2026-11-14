@@ -28,6 +28,7 @@ enum class TorrentCapability(val wireName: String) {
   LOCAL_DISCOVERY("local-discovery"),
   SEED_GOALS("seed-goals"),
   SEQUENTIAL("sequential"),
+  FILE_PRIORITY("file-priority"),
 }
 
 /**

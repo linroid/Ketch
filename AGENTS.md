@@ -1282,6 +1282,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- File priorities (capability `file-priority`): `TorrentController.priorityFiles(taskId)` and
+  `setPriorityFiles(taskId, fileIds)` (REST `GET`/`PUT /api/torrents/{id}/priority`,
+  `TorrentPriorityRequest`; `TorrentFileEntry.priority` in file pages) name the files a task
+  downloads before its others; unknown IDs are `INVALID_INPUT`. Saved in
+  `TorrentSourceState.priorityFileIds` and applied live through
+  `TorrentSession.setPriorityFiles`, which turns them into a piece bitmap: the v1 scheduler
+  opens those pieces before any other (`TorrentPieceScheduler(priority)`, `orderToOpen`), and
+  the v2 loop begins them first (`TorrentV2RarityPicker.next`), each in order or rarest first
+  as usual, falling back to the rest once a peer has none left. It orders, never selects. The
+  Files tab shows a bolt button on unfinished, selected files and folders of a downloading
+  torrent (`FileSelectionModel.first`, `toggleFirst`, `loadFirst`)
 - Files already in place (capability `import`): a torrent request with
   `fileConflict = OVERWRITE` (`ketch add --overwrite`, never the setting, as a source that
   writes its own files works in place) gets the name Ketch chose although a folder or file has
@@ -1358,7 +1369,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - Sequential download: `TorrentController.setSequential` (REST `PUT .../sequential`, capability
   `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
   by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
-  `SequentialControl` switches it. It orders pieces, not per-file priorities
+  `SequentialControl` switches it. It orders pieces; file priorities choose which files first
 - Seed goals: `TorrentEngineSettings.seedRatioPercent` and `seedTimeMinutes` (`[torrent]`, 0 for
   none; capability `seed-goals`). A seeder's watcher (`watchSeeder`) checks `seedGoalReached` every
   10 s while it seeds, against all it uploaded (saved counters included) and the time since this

@@ -106,6 +106,30 @@ interface TorrentController {
     )
 
   /**
+   * The files the task downloads before its others, which [files] entries mark too
+   * ([TorrentFileEntry.priority]); empty for the usual order. Fails with
+   * [TorrentCommandError.NOT_FOUND] for unknown and non-torrent tasks. Advertised as
+   * [TorrentCapability.FILE_PRIORITY].
+   */
+  suspend fun priorityFiles(taskId: String): Set<String> = throw TorrentCommandException(
+    error = TorrentCommandError.UNSUPPORTED,
+    message = "File priorities are unavailable",
+  )
+
+  /**
+   * Sets the files [priorityFiles] answers: the ones the task downloads before its others, at
+   * once and whenever it runs; an empty set goes back to the usual order. It orders the download
+   * and selects nothing: a file outside the selection is not downloaded for it. Fails with
+   * [TorrentCommandError.INVALID_INPUT] for an ID the torrent does not list. Advertised as
+   * [TorrentCapability.FILE_PRIORITY].
+   */
+  suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>): Unit =
+    throw TorrentCommandException(
+      error = TorrentCommandError.UNSUPPORTED,
+      message = "File priorities are unavailable",
+    )
+
+  /**
    * Checks the task's files against the torrent's hashes again and downloads what is missing or
    * changed: a completed task runs again from what it has (it stops seeding meanwhile, and
    * seeds again once it completes if it was meant to), and a downloading one starts over its

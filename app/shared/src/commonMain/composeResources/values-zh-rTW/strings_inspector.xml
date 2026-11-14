@@ -176,6 +176,8 @@
   <string name="inspector_percent_spoken">百分之 %1$d</string>
 
   <string name="inspector_files_waiting">檔案清單會隨種子的中繼資料一起取得。</string>
+  <string name="inspector_file_first">優先下載</string>
+  <string name="inspector_file_first_on">正在優先下載 · 恢復正常順序</string>
   <plurals name="inspector_files_done_of">
     <item quantity="other">已完成 %1$d 個檔案，共 %2$d 個</item>
   </plurals>

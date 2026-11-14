@@ -176,6 +176,8 @@
   <string name="inspector_percent_spoken">%1$dパーセント</string>
 
   <string name="inspector_files_waiting">ファイルの一覧は、トレントのメタデータを受信すると表示されます。</string>
+  <string name="inspector_file_first">先にダウンロード</string>
+  <string name="inspector_file_first_on">先にダウンロード中 · 通常の順序に戻す</string>
   <plurals name="inspector_files_done_of">
     <item quantity="other">%2$d個中%1$d個のファイルが完了</item>
   </plurals>

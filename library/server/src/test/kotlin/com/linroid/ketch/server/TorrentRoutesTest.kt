@@ -157,6 +157,14 @@ class TorrentRoutesTest {
         null
       }
 
+    var first: Set<String>? = null
+
+    override suspend fun priorityFiles(taskId: String): Set<String> = first.orEmpty()
+
+    override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
+      first = fileIds
+    }
+
     val rechecked = mutableListOf<String>()
 
     override suspend fun recheck(taskId: String) {
@@ -408,6 +416,21 @@ class TorrentRoutesTest {
 
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(true, controller.sequential)
+  }
+
+  @Test
+  fun priority_reachesTheController() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val response = client.put("/api/torrents/t1/priority") {
+      contentType(ContentType.Application.Json)
+      setBody("""{"fileIds":["2","5"]}""")
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(setOf("2", "5"), controller.first)
+    assertEquals("""{"fileIds":["2","5"]}""", client.get("/api/torrents/t1/priority").bodyAsText())
   }
 
   @Test

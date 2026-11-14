@@ -185,6 +185,16 @@ task, also after a restart. Pieces that are rarest first help the swarm more and
 faster, so leave it off unless you want to play the file. REST: `PUT
 /api/torrents/{id}/sequential`.
 
+### Downloading some files first
+
+In a downloading torrent's Files tab, the bolt button on a file (or a folder) has Ketch fetch its
+pieces before the rest: the episode you want to watch tonight, or the small files of a large
+pack. Click it again to go back to the normal order. It changes the order only; it never adds a
+file you unticked, and it combines with downloading in order, which then applies within the files
+that come first. The choice stays with the task, also after a restart. REST:
+`GET` and `PUT /api/torrents/{id}/priority` with `{"fileIds": [...]}`, on devices listing the
+`file-priority` capability; SDK: `TorrentController.setPriorityFiles(taskId, fileIds)`.
+
 ### Checking the files again
 
 Ketch checks a torrent's files against its hashes every time the torrent starts, so pausing and

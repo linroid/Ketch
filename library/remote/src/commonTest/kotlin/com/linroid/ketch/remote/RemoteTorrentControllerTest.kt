@@ -186,6 +186,35 @@ class RemoteTorrentControllerTest {
   }
 
   @Test
+  fun priorityFiles_readAndSetTheServers_andFailClosedWithoutTheCapability() = runTest {
+    var stored = """{"fileIds":["1"]}"""
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "file-priority")))
+        ?: if (request.url.encodedPath == "/api/torrents/t1/priority") {
+          if (request.method == HttpMethod.Put) stored = (request.body as TextContent).text
+          json(stored)
+        } else error("Unexpected request")
+    }
+    val older = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect")))
+        ?: error("Unexpected request")
+    }
+    try {
+      assertEquals(setOf("1"), fixture.controller.priorityFiles("t1"))
+      fixture.controller.setPriorityFiles("t1", setOf("2", "3"))
+      assertEquals(setOf("2", "3"), fixture.controller.priorityFiles("t1"))
+      failure(TorrentCommandError.UNSUPPORTED) { older.controller.priorityFiles("t1") }
+      failure(TorrentCommandError.UNSUPPORTED) {
+        older.controller.setPriorityFiles("t1", setOf("1"))
+      }
+      assertEquals(listOf("/api/torrents/capabilities"), older.paths)
+    } finally {
+      fixture.client.close()
+      older.client.close()
+    }
+  }
+
+  @Test
   fun recheck_postsToTheServer_andFailsClosedWithoutTheCapability() = runTest {
     val methods = mutableListOf<HttpMethod>()
     val fixture = fixture { request, _ ->

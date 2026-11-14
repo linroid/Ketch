@@ -11,6 +11,7 @@ import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.api.log.describeCauses
+import com.linroid.ketch.torrent.api.TorrentCapability
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentPageRequest
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +59,46 @@ internal class FileSelectionModel(
   /** Whether the last click tried to uncheck the last checked file, which stays checked. */
   var keepOne: Boolean by mutableStateOf(false)
     private set
+
+  /**
+   * The files the task downloads before its others, on a device that can order them
+   * ([TorrentCapability.FILE_PRIORITY]); `null` on one that cannot, and until [loadFirst] read
+   * them.
+   */
+  var first: Set<String>? by mutableStateOf(null)
+    private set
+
+  /** Reads [first] from [controller]; a device that cannot order files leaves it `null`. */
+  suspend fun loadFirst() {
+    val controller = controller ?: return
+    catchingUnlessCancelled {
+      if (controller.capabilities().supports(TorrentCapability.FILE_PRIORITY)) {
+        controller.priorityFiles(task.taskId)
+      } else {
+        null
+      }
+    }.onSuccess { first = it }.onFailure { e ->
+      log.d { "Couldn't read the first files of taskId=${task.taskId}: ${e.describeCauses()}" }
+    }
+  }
+
+  /**
+   * Downloads the files of [fileIds] first when any of them is not, else puts them all back in
+   * the usual order. Shown at once; a failure goes back and is passed to [onFailure].
+   */
+  fun toggleFirst(fileIds: List<String>) {
+    val controller = controller ?: return
+    val before = first ?: return
+    val next = if (before.containsAll(fileIds)) before - fileIds.toSet() else before + fileIds
+    first = next
+    launch {
+      catchingUnlessCancelled { controller.setPriorityFiles(task.taskId, next) }.onFailure { e ->
+        // A later click may have changed it again; only this one is undone.
+        if (first == next) first = before
+        onFailure(e)
+      }
+    }
+  }
 
   /** The files of [request]: its resolved list, else the one [load] read. */
   fun filesOf(request: DownloadRequest): List<SourceFile>? =

@@ -95,6 +95,14 @@ class KetchTorrentControllerTest {
 
     override suspend fun liveTorrent(taskId: String): LiveTorrent? = live[taskId]
 
+    var first: Set<String> = emptySet()
+
+    override suspend fun priorityFiles(taskId: String, sourceState: SourceState?) = first
+
+    override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
+      first = fileIds
+    }
+
     /** What [torrentTrackers] answers. */
     var trackers: List<TorrentTracker>? = null
 
@@ -1177,6 +1185,36 @@ class KetchTorrentControllerTest {
       ketch.torrents.recheck(task.taskId)
     }
     assertEquals(TorrentCommandError.INVALID_STATE, canceled.error)
+    ketch.close()
+  }
+
+  @Test
+  fun `priority files are kept by the source and marked in the file pages`() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    val task = pausedTask(ketch)
+
+    val unsupported = assertFailsWith<TorrentCommandException> {
+      ketch.torrents.setPriorityFiles(task.taskId, setOf("1"))
+    }
+    assertEquals(TorrentCommandError.UNSUPPORTED, unsupported.error)
+
+    source.capabilities += TorrentCapability.FILE_PRIORITY.wireName
+    ketch.torrents.setPriorityFiles(task.taskId, setOf("1"))
+    assertEquals(setOf("1"), source.first)
+    assertEquals(setOf("1"), ketch.torrents.priorityFiles(task.taskId))
+    val page = assertNotNull(ketch.torrents.files(task.taskId))
+    assertEquals(listOf("1"), page.files.filter { it.priority }.map { it.id })
+
+    // A file the torrent does not list is refused, and nothing changes.
+    val unknown = assertFailsWith<TorrentCommandException> {
+      ketch.torrents.setPriorityFiles(task.taskId, setOf("1", "999"))
+    }
+    assertEquals(TorrentCommandError.INVALID_INPUT, unknown.error)
+    assertEquals(setOf("1"), source.first)
+
+    ketch.torrents.setPriorityFiles(task.taskId, emptySet())
+    assertTrue(source.first.isEmpty())
     ketch.close()
   }
 

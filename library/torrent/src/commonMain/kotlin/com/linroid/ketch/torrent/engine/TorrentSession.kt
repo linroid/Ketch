@@ -51,6 +51,12 @@ internal interface TorrentSession {
   val stall: StateFlow<TorrentStall?> get() = NO_STALL
 
   /**
+   * Downloads the files [fileIds] name before the others, at once; none for the usual order.
+   * Files outside the selection are not downloaded for it.
+   */
+  fun setPriorityFiles(fileIds: Set<String>) {}
+
+  /**
    * How the session's own trackers answer now, in tier order; empty while it announces to none.
    * The trackers Ketch adds to public torrents are not listed.
    */

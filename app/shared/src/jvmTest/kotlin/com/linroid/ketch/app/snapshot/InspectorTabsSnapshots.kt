@@ -89,6 +89,20 @@ class InspectorTabsSnapshots {
   }
 
   @Test
+  fun files_downloadFirst_marksTheFilesThatComeFirst() {
+    val size = SnapshotSize(360.dp, 520.dp, KetchDensity.Compact)
+    for (theme in SnapshotTheme.entries) {
+      snapshot("inspector-files-first", size, theme) {
+        Column(Modifier.padding(KetchTheme.spacing.s4)) {
+          TabCard("Files 14", DockedWidth) {
+            FilesTabContent(season(), first = setOf("9", "10"))
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   fun trackers_eachState_rendersWhatTheTrackerSaid() {
     val size = SnapshotSize(360.dp, 420.dp, KetchDensity.Compact)
     val trackers = listOf(

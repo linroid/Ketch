@@ -68,6 +68,25 @@ class TorrentPieceSchedulerTest {
   }
 
   @Test
+  fun priority_opensItsPiecesFirst_thenTheRestInTheUsualOrder() = runTest {
+    var first: BooleanArray? = booleanArrayOf(false, true, false)
+    val scheduler = TorrentPieceScheduler(BooleanArray(3) { true }, BooleanArray(3), { piece },
+      TorrentBufferBudget(4 * piece), { 0 }, priority = { first })
+    scheduler.availability(1, all(3))
+    // Peer 2 lacks piece 2, which makes it the rarest: it would open first.
+    scheduler.availability(2, booleanArrayOf(true, true, false))
+
+    // The piece of the file to download first opens before the rarest one.
+    assertEquals(1, scheduler.request(1, max = 1).requests.single().index)
+    // With none of it left to open, the usual order goes on, also once the choice is cleared.
+    val rest = scheduler.request(2, max = 8).requests.map { it.index }.distinct()
+    assertEquals(listOf(1, 0), rest)
+    first = null
+    assertEquals(2, scheduler.request(1, max = 8).requests.map { it.index }.distinct().last())
+    scheduler.close()
+  }
+
+  @Test
   fun sequential_opensLowestPieceThoughALaterOneIsRarer() = runTest {
     suspend fun firstPiece(sequential: Boolean): Int {
       val scheduler = TorrentPieceScheduler(BooleanArray(3) { true }, BooleanArray(3), { piece },

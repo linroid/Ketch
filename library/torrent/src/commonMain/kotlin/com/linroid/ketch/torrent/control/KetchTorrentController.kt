@@ -356,6 +356,7 @@ internal class KetchTorrentController(
       cursor.offset
     } ?: 0
     val selected = selectedIds(task, files)
+    val first = source.priorityFiles(taskId, record.sourceState)
     val sorted = files.sortedByFileOrder(
       order = order.order,
       descending = descending,
@@ -365,7 +366,8 @@ internal class KetchTorrentController(
     )
     val end = minOf(offset + page.limit, sorted.size)
     val entries = sorted.subList(offset, end).map {
-      TorrentFileEntry(it.id, it.name, it.size.coerceAtLeast(0), it.id in selected)
+      TorrentFileEntry(it.id, it.name, it.size.coerceAtLeast(0), it.id in selected,
+        priority = it.id in first)
     }
     val next = if (end < sorted.size) {
       PageCursor(taskId, revisions.epoch, generation, end, order.wireName, descending).encode()
@@ -402,6 +404,30 @@ internal class KetchTorrentController(
       host.selectFiles(task, fileIds, command(task, context, digest) {})
     }
     return result(taskId, outcome, seeding = null)
+  }
+
+  override suspend fun priorityFiles(taskId: String): Set<String> {
+    val task = torrentTask(taskId) ?: throw notFound()
+    requireCapability(TorrentCapability.FILE_PRIORITY, TorrentCommandError.UNSUPPORTED)
+    return source.priorityFiles(task.taskId, recordOf(task).sourceState)
+  }
+
+  override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
+    val task = torrentTask(taskId) ?: throw notFound()
+    requireCapability(TorrentCapability.FILE_PRIORITY, TorrentCommandError.UNSUPPORTED)
+    val files = filesOf(task) ?: throw TorrentCommandException(
+      TorrentCommandError.METADATA_UNAVAILABLE,
+      "The file list is not known yet",
+    )
+    val known = files.mapTo(HashSet()) { it.id }
+    if (fileIds.size > DownloadTask.MAX_SELECTED_FILES || !known.containsAll(fileIds)) {
+      throw TorrentCommandException(
+        TorrentCommandError.INVALID_INPUT,
+        "The files to download first must be files of the torrent",
+      )
+    }
+    source.setPriorityFiles(task.taskId, fileIds)
+    controlChanged()
   }
 
   override suspend fun setSequential(taskId: String, sequential: Boolean) {
