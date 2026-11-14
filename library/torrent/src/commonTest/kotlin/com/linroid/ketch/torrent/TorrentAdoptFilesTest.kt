@@ -6,6 +6,7 @@ import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.ResolveInput
+import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.torrent.control.UnusedHttpEngine
@@ -77,15 +78,21 @@ class TorrentAdoptFilesTest {
     }
   }
 
+  /** A torrent of what [content] holds now, resolved for a download. */
+  private suspend fun Harness.torrentOf(format: TorrentFormat, content: Path): ResolvedSource {
+    val created = createTorrent(torrentSystemFileSystem, content,
+      TorrentCreateOptions(format = format, pieceLength = 16_384, createdBy = null)) { _, _ -> }
+    return ketch.resolve(ResolveInput.Content(created.metainfo, "pack.torrent"))
+  }
+
   private suspend fun Harness.add(
     format: TorrentFormat,
     conflict: FileConflict?,
     content: Path = root / "pack",
     into: Path = root,
+    resolved: ResolvedSource? = null,
   ): DownloadTask {
-    val created = createTorrent(torrentSystemFileSystem, content,
-      TorrentCreateOptions(format = format, pieceLength = 16_384, createdBy = null)) { _, _ -> }
-    val resolved = ketch.resolve(ResolveInput.Content(created.metainfo, "pack.torrent"))
+    val resolved = resolved ?: torrentOf(format, content)
     return ketch.download(DownloadRequest(
       url = resolved.url,
       destination = Destination("$into/"),
@@ -123,13 +130,16 @@ class TorrentAdoptFilesTest {
     writeContent()
     torrentFileSystem.createDirectories(root / "other")
     torrentFileSystem.write(root / "other" / "x.bin") { write(payload(30_000)) }
+    // Made before the other download writes into the folder, whose files and bookkeeping
+    // come and go while it runs.
+    val pack = torrentOf(TorrentFormat.V2, root / "pack")
     // No peer has it, so it stays unfinished, inside the folder the next torrent names.
     val inside = add(TorrentFormat.V1, conflict = null, content = root / "other",
       into = root / "pack" / "sub")
     inside.state.first { it is DownloadState.Downloading }
     while (inside.outputPath == null) delay(20)
 
-    val task = add(TorrentFormat.V2, FileConflict.OVERWRITE)
+    val task = add(TorrentFormat.V2, FileConflict.OVERWRITE, resolved = pack)
 
     task.state.first { it is DownloadState.Downloading }
     while (task.outputPath == null) delay(20)
