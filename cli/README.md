@@ -72,7 +72,7 @@ Run `ketch` with no arguments, or with `--help`, to print the usage. Every comma
 | Command | What it does |
 |---|---|
 | [`ketch <url> [destination]`](#download-a-file) | Download one file and exit |
-| [`ketch add`, `list`, `pause`, `resume`, `watch`](#work-on-a-running-ketch) | Control the downloads of the Ketch app or server that is running |
+| [`ketch add`, `list`, `pause`, `resume`, `watch`, `export`](#work-on-a-running-ketch) | Control the downloads of the Ketch app or server that is running |
 | [`ketch server`](#server) | Run the Ketch server: REST API, web UI and downloads |
 | [`ketch mcp`](#mcp-server) | Serve Ketch to AI agents over the Model Context Protocol |
 | [`ketch ai-discover <query>`](#ai-discovery) | Ask an LLM agent to find download links |
@@ -235,6 +235,7 @@ ketch list [options]
 ketch pause [options] <task-id>... | --all
 ketch resume [options] <task-id>... | --all
 ketch watch [options] [<task-id>...]
+ketch export [options] <task-id>
 ```
 
 ### Which Ketch they use
@@ -333,6 +334,19 @@ Downloads are listed oldest first. Besides the [task states](#task-json), `STATE
 `queued #n` (its place in the queue), `waiting` (paused for an urgent download) and
 `choose files` (waiting for a file selection). `--json` prints a JSON array of
 [task objects](#task-json) instead.
+
+### Export a torrent
+
+```bash
+ketch export 3f2a
+ketch export 3f2a --output ubuntu.torrent
+```
+
+`ketch export` prints the magnet link of a torrent download, with the torrent's name, trackers
+and web seeds. With `--output <file>` (`-o`) it saves the `.torrent` file instead and prints
+where; `--json` prints the name, info hashes and magnet link as JSON. A private torrent has no
+magnet link, so export its file; a magnet still looking for its metadata has no file yet. It
+exits 1 when the task is not a torrent or the Ketch it uses cannot export.
 
 ### Pause and resume
 

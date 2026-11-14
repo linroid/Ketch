@@ -144,8 +144,8 @@ the command line with `ketch update` ([how updates work](docs/updates.md)).
 - **Headless on a NAS or server** — `ketch server`, also as a [Docker image](docs/docker.md),
   runs the same engine with a REST API and the web app built in, and the apps find it on your
   network.
-- **From a terminal** — `ketch add`, `list`, `pause`, `resume` and `watch` control the downloads
-  of the Ketch app or a server from a terminal or a script; `watch` prints JSON lines
+- **From a terminal** — `ketch add`, `list`, `pause`, `resume`, `watch` and `export` control the
+  downloads of the Ketch app or a server from a terminal or a script; `watch` prints JSON lines
   ([CLI](cli/README.md#work-on-a-running-ketch)).
 - **Automation hooks** — Run a command or call a signed webhook when a download is added,
   finishes or fails, from `ketch server` or the desktop app ([hooks](docs/hooks.md)).

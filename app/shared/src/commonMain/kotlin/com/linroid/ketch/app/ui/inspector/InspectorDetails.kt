@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,7 +70,10 @@ import com.linroid.ketch.app.theme.KetchDensity
 import com.linroid.ketch.app.theme.KetchTheme
 import com.linroid.ketch.app.ui.downloads.actions.RowActionRunner
 import com.linroid.ketch.app.ui.inspector.tabs.middleEllipsis
+import com.linroid.ketch.app.ui.inspector.tabs.rememberFeatures
 import com.linroid.ketch.app.util.averageSpeed
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentExport
 import ketch.app.shared.generated.resources.Res
 import ketch.app.shared.generated.resources.inspector_copied
 import ketch.app.shared.generated.resources.inspector_copy_detail
@@ -81,7 +85,9 @@ import ketch.app.shared.generated.resources.inspector_copy_failed_connections
 import ketch.app.shared.generated.resources.inspector_copy_failed_device
 import ketch.app.shared.generated.resources.inspector_copy_failed_finished
 import ketch.app.shared.generated.resources.inspector_copy_failed_headers
+import ketch.app.shared.generated.resources.inspector_copy_failed_info_hash
 import ketch.app.shared.generated.resources.inspector_copy_failed_link
+import ketch.app.shared.generated.resources.inspector_copy_failed_magnet
 import ketch.app.shared.generated.resources.inspector_copy_failed_path
 import ketch.app.shared.generated.resources.inspector_copy_failed_property
 import ketch.app.shared.generated.resources.inspector_copy_failed_size
@@ -96,7 +102,9 @@ import ketch.app.shared.generated.resources.inspector_detail_connections
 import ketch.app.shared.generated.resources.inspector_detail_device
 import ketch.app.shared.generated.resources.inspector_detail_finished
 import ketch.app.shared.generated.resources.inspector_detail_headers
+import ketch.app.shared.generated.resources.inspector_detail_info_hash
 import ketch.app.shared.generated.resources.inspector_detail_link
+import ketch.app.shared.generated.resources.inspector_detail_magnet
 import ketch.app.shared.generated.resources.inspector_detail_path
 import ketch.app.shared.generated.resources.inspector_detail_property
 import ketch.app.shared.generated.resources.inspector_detail_size
@@ -113,6 +121,8 @@ import kotlinx.datetime.TimeZone
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
+private val log = KetchLogger("Inspector")
+
 /** Copies text to the clipboard, posting an error when the system refuses. */
 @Stable
 internal class Copier(
@@ -120,8 +130,6 @@ internal class Copier(
   private val scope: CoroutineScope,
   private val state: AppState,
 ) {
-  private val log = KetchLogger("Inspector")
-
   /** Whether there is a clipboard to copy to. */
   val enabled: Boolean get() = clipboard != null
 
@@ -171,6 +179,7 @@ internal fun TaskDetails(
   InspectorSection(stringResource(Res.string.inspector_section_details), modifier) {
     DetailRow(Detail.Source, copier, sourceLabel(request, row.isTorrent).resolve())
     LinkRow(request.url, copier)
+    if (row.isTorrent) TorrentIdentity(state, row, copier)
     val path = row.outputPath
     if (path != null) {
       val reveal = !row.device.capabilities.isRemote &&
@@ -240,6 +249,56 @@ internal fun TaskDetails(
     capturedText(request)?.let { DetailRow(Detail.Captured, copier, it.resolve()) }
     Advanced(row, copier)
   }
+}
+
+/**
+ * A torrent's info hash and, unless its link already is one, its magnet link, on devices whose
+ * torrent controls export them; nothing while the torrent is not known yet. They are asked for
+ * again as the task's state changes kind, as a `.torrent` link has neither until it is fetched.
+ * A private torrent has no magnet link.
+ */
+@Composable
+private fun TorrentIdentity(state: AppState, row: TaskRow, copier: Copier) {
+  val features = rememberFeatures(state, row)
+  val controller = remember(features, row.key) { state.torrentControllerOf(row.key.deviceId) }
+    ?: return
+  var export by remember(row.key, controller) { mutableStateOf<TorrentExport?>(null) }
+  LaunchedEffect(row.key, controller, row.state::class) {
+    catchingUnlessCancelled {
+      if (controller.capabilities().supports(TorrentCapability.EXPORT)) {
+        controller.export(row.key.taskId)
+      } else {
+        null
+      }
+    }.onSuccess { export = it }.onFailure { e ->
+      log.d { "No export of taskId=${row.key.taskId}: ${e.describeCauses()}" }
+    }
+  }
+  val identity = torrentIdentity(export, row.request.url) ?: return
+  DetailRow(Detail.InfoHash, copier, copy = identity.infoHash, mono = true) {
+    MiddleText(identity.infoHash, KetchTheme.typography.monoS, KetchTheme.colors.textPrimary)
+  }
+  val magnet = identity.magnet ?: return
+  DetailRow(Detail.Magnet, copier, copy = magnet, mono = true) {
+    MiddleText(magnet, KetchTheme.typography.monoS, KetchTheme.colors.textPrimary)
+  }
+}
+
+/**
+ * What [TorrentIdentity] shows of a torrent.
+ *
+ * @property infoHash its v1 info hash, or the v2 one of a torrent without
+ * @property magnet its magnet link, or `null` when it has none or [TaskDetails] shows it as the
+ *   task's link
+ */
+internal data class TorrentIdentityView(val infoHash: String, val magnet: String?)
+
+/** What the inspector shows of [export] for a task downloading [url]; `null` for nothing. */
+internal fun torrentIdentity(export: TorrentExport?, url: String): TorrentIdentityView? {
+  if (export == null) return null
+  val hash = export.infoHash ?: export.infoHashV2 ?: return null
+  val linked = url.startsWith("magnet:", ignoreCase = true)
+  return TorrentIdentityView(hash, export.magnet.takeUnless { linked })
 }
 
 /** The link: host in a heavier weight and the path shortened in the middle on one line. */
@@ -325,6 +384,8 @@ private enum class Detail(val label: StringResource, val copyFailed: StringResou
   Device(Res.string.inspector_detail_device, Res.string.inspector_copy_failed_device),
   Captured(Res.string.inspector_detail_captured, Res.string.inspector_copy_failed_captured),
   Checksum(Res.string.inspector_detail_checksum, Res.string.inspector_copy_failed_checksum),
+  InfoHash(Res.string.inspector_detail_info_hash, Res.string.inspector_copy_failed_info_hash),
+  Magnet(Res.string.inspector_detail_magnet, Res.string.inspector_copy_failed_magnet),
   TaskId(Res.string.inspector_detail_task_id, Res.string.inspector_copy_failed_task_id),
   Headers(Res.string.inspector_detail_headers, Res.string.inspector_copy_failed_headers),
   Property(Res.string.inspector_detail_property, Res.string.inspector_copy_failed_property),

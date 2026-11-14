@@ -11,6 +11,11 @@ import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.remote.ConnectionState
 import com.linroid.ketch.remote.RemoteApiException
+import com.linroid.ketch.torrent.api.TorrentCapability
+import com.linroid.ketch.torrent.api.TorrentCommandError
+import com.linroid.ketch.torrent.api.TorrentCommandException
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentFeatures
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +32,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
+import java.io.IOException
 import java.io.PrintStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
@@ -65,6 +71,7 @@ internal suspend fun runInstanceCommand(
     is InstanceCommand.ListTasks -> attach(endpoint).use { list(it, command, out) }
     is InstanceCommand.Pause -> attach(endpoint).use { pause(it, command, out, err) }
     is InstanceCommand.Resume -> attach(endpoint).use { resume(it, command, out, err) }
+    is InstanceCommand.Export -> attach(endpoint).use { export(it, command, out, err) }
     is InstanceCommand.Watch -> attach(endpoint).use { attachment ->
       command.interval?.let { attachment.ketch.progressInterval = it }
       watchTasks(
@@ -231,6 +238,95 @@ private suspend fun resume(
     matchTasks(tasks, command.ids)
   }
   return act(targets, unmatched, out, err, verb = "resume") { it.resume() }
+}
+
+private suspend fun export(
+  attachment: Attachment,
+  command: InstanceCommand.Export,
+  out: PrintStream,
+  err: PrintStream,
+): Int {
+  val (matched, problems) = matchTasks(attachment.ketch.tasks.value, listOf(command.id))
+  val task = matched.singleOrNull() ?: throw CliFailure(problems.first())
+  val controller = if (TorrentFeatures.CONTROL in attachment.status.features) {
+    attachment.ketch.controller(TorrentController)
+  } else {
+    null
+  }
+  return exportTorrent(task.taskId, controller, command, attachment.endpoint.label, out, err)
+}
+
+/**
+ * Prints the magnet link of the torrent task [taskId] to [out], its details as JSON with
+ * [InstanceCommand.Export.json], or saves its `.torrent` file to
+ * [InstanceCommand.Export.output] and prints where.
+ *
+ * @param controller the torrent controls of the instance named [label], or `null` without any
+ * @throws CliFailure if the instance cannot export it, or it has nothing of what was asked for
+ */
+internal suspend fun exportTorrent(
+  taskId: String,
+  controller: TorrentController?,
+  command: InstanceCommand.Export,
+  label: String,
+  out: PrintStream,
+  err: PrintStream,
+): Int {
+  val short = taskId.take(SHORT_ID_LENGTH)
+  val export = try {
+    if (controller?.capabilities()?.supports(TorrentCapability.EXPORT) != true) {
+      throw CliFailure("$label can't export torrents; update it.")
+    }
+    controller.export(taskId, metainfo = command.output != null)
+  } catch (e: TorrentCommandException) {
+    throw CliFailure(
+      when (e.error) {
+        TorrentCommandError.METADATA_UNAVAILABLE ->
+          "the torrent of $short is not known yet; try again once it has started"
+        else -> "couldn't export $short: ${e.message}"
+      }
+    )
+  } catch (e: RemoteApiException) {
+    throw CliFailure("couldn't export $short: ${e.message}")
+  } ?: throw CliFailure("$short is not a torrent")
+  val output = command.output
+  when {
+    command.json -> out.println(
+      buildJsonObject {
+        put("taskId", export.taskId)
+        put("name", export.name)
+        put("infoHash", export.infoHash)
+        put("infoHashV2", export.infoHashV2)
+        put("private", export.privateTorrent)
+        put("magnet", export.magnet)
+      }
+    )
+    output != null -> {
+      val bytes = export.metainfoBytes() ?: throw CliFailure(
+        "$short has no .torrent file yet: it is still looking for the torrent's metadata"
+      )
+      val file = File(output).absoluteFile
+      try {
+        withContext(Dispatchers.IO) {
+          file.parentFile?.mkdirs()
+          file.writeBytes(bytes)
+        }
+      } catch (e: IOException) {
+        throw CliFailure("couldn't write ${file.path}: ${e.message}")
+      }
+      if (export.privateTorrent) {
+        err.println("Note: this is a private torrent; its file may hold your tracker passkey.")
+      }
+      out.println(file.path)
+    }
+    else -> out.println(
+      export.magnet ?: throw CliFailure(
+        "$short is a private torrent, which has no magnet link; save its .torrent file " +
+          "with --output <file>"
+      )
+    )
+  }
+  return InstanceExit.OK
 }
 
 /** Runs [action] on each of [targets], printing each one's state after it. */

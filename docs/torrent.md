@@ -185,6 +185,19 @@ task, also after a restart. Pieces that are rarest first help the swarm more and
 faster, so leave it off unless you want to play the file. REST: `PUT
 /api/torrents/{id}/sequential`.
 
+### Sharing a torrent as a link or file
+
+A torrent task's inspector shows its **Info hash** and, for a torrent added from a `.torrent`
+file or link, its **Magnet link**; click one to copy it. The magnet link names the torrent's own
+name, trackers and web seeds, never the extra trackers of your settings. A private torrent has no
+magnet link: its trackers may carry your passkey, and its peers would not send its metadata.
+
+From a terminal, `ketch export <task-id>` prints the magnet link and
+`ketch export <task-id> --output pack.torrent` saves the `.torrent` file (see the
+[CLI](../cli/README.md#export-a-torrent)). A magnet that is still looking for its metadata has a
+link but no file yet. REST: `GET /api/torrents/{id}/export`, with `?metainfo=true` for the file
+as Base64. Devices that can do this list the `export` capability.
+
 ## Seeding and uploading
 
 By default Ketch uploads verified pieces to peers while a torrent downloads, and stops once it
@@ -656,8 +669,10 @@ It offers `capabilities()` (such as `file-selection`, `v1`, `v2`, `hybrid`, `utp
 which describe the backend, not its current settings, and `seeding` while the configured policy is
 `SEED_AFTER_COMPLETION`, also while uploads are paused), `snapshot(taskId)`, sorted file
 pages (`files`), `select` and `setSeeding` commands guarded by a revision and an idempotency
-key, and `settings()` and `updateSettings(change)` (`TorrentEngineSettings`,
-`TorrentSettingsChange`; the `settings` capability). In process, `updateSettings` runs
+key, `export(taskId, metainfo)` (`TorrentExport`: the info hashes, the magnet link and, when
+asked for, the `.torrent` file; the `export` capability), and `settings()` and
+`updateSettings(change)` (`TorrentEngineSettings`, `TorrentSettingsChange`; the `settings`
+capability). In process, `updateSettings` runs
 `TorrentDownloadSource.applySettings`, and `TorrentDownloadSource.settings` reports the result, so a
 host that keeps settings in a file follows it to save what clients change. A snapshot's
 `counters` add up every session of the task: `receivedPayloadBytes`,

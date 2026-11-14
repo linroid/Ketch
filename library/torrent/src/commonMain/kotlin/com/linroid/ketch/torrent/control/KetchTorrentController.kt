@@ -8,6 +8,7 @@ import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SourceFile
 import com.linroid.ketch.api.log.KetchLogger
+import com.linroid.ketch.api.log.describeCauses
 import com.linroid.ketch.api.sortedByFileOrder
 import com.linroid.ketch.core.engine.SourceHost
 import com.linroid.ketch.core.engine.SourceState
@@ -27,6 +28,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentCounters
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
@@ -181,6 +183,29 @@ internal class KetchTorrentController(
   override suspend fun snapshot(taskId: String): TorrentSnapshot? {
     val task = torrentTask(taskId) ?: return null
     return snapshotOf(task)
+  }
+
+  override suspend fun export(taskId: String, metainfo: Boolean): TorrentExport? {
+    val task = torrentTask(taskId) ?: return null
+    requireCapability(TorrentCapability.EXPORT, TorrentCommandError.UNSUPPORTED)
+    val record = recordOf(task)
+    val export = try {
+      source.torrentExport(
+        taskId = taskId,
+        url = record.request.url,
+        sourceState = record.sourceState,
+        resolved = record.resolvedSource ?: record.request.resolvedSource,
+        includeMetainfo = metainfo,
+      )
+    } catch (e: IllegalArgumentException) {
+      // Metainfo this build cannot read, such as one a newer build saved.
+      log.w { "Cannot export taskId=$taskId: ${e.describeCauses()}" }
+      null
+    }
+    return export ?: throw TorrentCommandException(
+      TorrentCommandError.METADATA_UNAVAILABLE,
+      "The torrent is not known yet",
+    )
   }
 
   /**

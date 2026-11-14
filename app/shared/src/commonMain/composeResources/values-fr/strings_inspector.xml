@@ -103,6 +103,8 @@
   <string name="inspector_detail_device">Appareil</string>
   <string name="inspector_detail_captured">Provenance</string>
   <string name="inspector_detail_checksum">Somme de contrôle</string>
+  <string name="inspector_detail_info_hash">Hash d'info</string>
+  <string name="inspector_detail_magnet">Lien magnet</string>
   <string name="inspector_checksum_verified">%1$s · vérifiée</string>
   <string name="inspector_checksum_pending">%1$s · vérifiée à la fin</string>
   <string name="inspector_section_advanced">Avancé</string>
@@ -123,6 +125,8 @@
   <string name="inspector_copy_failed_device">Impossible de copier l'appareil</string>
   <string name="inspector_copy_failed_captured">Impossible de copier la provenance</string>
   <string name="inspector_copy_failed_checksum">Impossible de copier la somme de contrôle</string>
+  <string name="inspector_copy_failed_info_hash">Impossible de copier le hash d'info</string>
+  <string name="inspector_copy_failed_magnet">Impossible de copier le lien magnet</string>
   <string name="inspector_copy_failed_task_id">Impossible de copier l'ID de la tâche</string>
   <string name="inspector_copy_failed_headers">Impossible de copier les en-têtes</string>
   <string name="inspector_copy_failed_property">Impossible de copier la propriété</string>

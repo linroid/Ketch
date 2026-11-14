@@ -1400,6 +1400,8 @@ private fun printUsage() {
   println("  pause <id>... | --all    Pause downloads")
   println("  resume <id>... | --all   Resume downloads")
   println("  watch [<id>...]          Print changes as JSON lines")
+  println("  export <id>              Print a torrent's magnet link, or save")
+  println("                           its .torrent file with --output")
   println("                           Run `ketch <command> --help` for")
   println("                           their options")
   println()
@@ -1482,6 +1484,13 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
         out.println("paused one. Any unique start of an ID will do.")
       }
     }
+    "export" -> {
+      out.println("Usage: ketch export [options] <task-id>")
+      out.println()
+      out.println("Print the magnet link of a torrent download of the running")
+      out.println("Ketch, or save its .torrent file. Any unique start of the ID")
+      out.println("will do. A private torrent has no magnet link.")
+    }
     "watch" -> {
       out.println("Usage: ketch watch [options] [<task-id>...]")
       out.println()
@@ -1518,6 +1527,12 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
     out.println("  --overwrite              Replace a file of the download's name")
     out.println("                           once it completes, instead of saving")
     out.println("                           beside it as name (1).ext")
+  }
+  if (name == "export") {
+    out.println("  -o, --output <file>      Save the .torrent file there and print")
+    out.println("                           its path instead of the magnet link")
+    out.println("  --json                   Print the name, info hashes and magnet")
+    out.println("                           link as JSON instead")
   }
   if (name == "add" || name == "list") {
     out.println("  --json                   Print JSON instead")

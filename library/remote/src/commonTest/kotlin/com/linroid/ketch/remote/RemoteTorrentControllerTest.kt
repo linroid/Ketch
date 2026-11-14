@@ -9,6 +9,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentEncryptionSetting
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
 import com.linroid.ketch.torrent.api.TorrentPageRequest
@@ -137,6 +138,48 @@ class RemoteTorrentControllerTest {
       assertEquals(listOf("/api/torrents/capabilities"), fixture.paths)
     } finally {
       fixture.client.close()
+    }
+  }
+
+  @Test
+  fun export_asksForTheTorrentFileOnlyWhenWanted_andFailsClosedWithoutTheCapability() = runTest {
+    val export = TorrentExport("t1", name = "pack", infoHash = "a".repeat(40),
+      magnet = "magnet:?xt=urn:btih:" + "a".repeat(40))
+    val queries = mutableListOf<String>()
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "export")))
+        ?: when (request.url.encodedPath) {
+          "/api/torrents/t1/export" -> {
+            queries += request.url.encodedQuery
+            json(json.encodeToString(export))
+          }
+          "/api/torrents/gone/export" -> json(
+            json.encodeToString(ErrorResponse("not_found", "No torrent download gone")),
+            HttpStatusCode.NotFound,
+          )
+          "/api/torrents/magnet/export" -> json(
+            json.encodeToString(ErrorResponse("metadata_unavailable", "Not known yet")),
+            HttpStatusCode.Conflict,
+          )
+          else -> error("Unexpected request")
+        }
+    }
+    val older = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect")))
+        ?: error("Unexpected request")
+    }
+    try {
+      assertEquals(export, fixture.controller.export("t1"))
+      assertEquals(export, fixture.controller.export("t1", metainfo = true))
+      assertEquals(listOf("", "metainfo=true"), queries)
+      assertNull(fixture.controller.export("gone"))
+      failure(TorrentCommandError.METADATA_UNAVAILABLE) { fixture.controller.export("magnet") }
+      // A server without the capability is never asked.
+      failure(TorrentCommandError.UNSUPPORTED) { older.controller.export("t1") }
+      assertEquals(listOf("/api/torrents/capabilities"), older.paths)
+    } finally {
+      fixture.client.close()
+      older.client.close()
     }
   }
 

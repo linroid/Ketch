@@ -16,6 +16,9 @@ import kotlinx.serialization.Serializable
  * - `GET /api/torrents/{id}/files`     — a page of its files (`?limit&cursor&sort&desc`)
  * - `PUT /api/torrents/{id}/selection` — choose its files, guarded by a revision
  * - `PUT /api/torrents/{id}/seeding`   — start or stop seeding it, guarded by a revision
+ * - `PUT /api/torrents/{id}/sequential` — download its pieces in order or not
+ * - `GET /api/torrents/{id}/export`    — its magnet link and info hashes (`?metainfo=true` adds
+ *   its `.torrent` file)
  * - `GET /api/torrents/{id}/events`    — SSE stream of its snapshots
  */
 @Serializable
@@ -70,6 +73,14 @@ data class Torrents(val parent: Api = Api()) {
     @Serializable
     @Resource("sequential")
     data class Sequential(val parent: ById)
+
+    /**
+     * The task's magnet link and info hashes as a `TorrentExport`, with its `.torrent` file as
+     * Base64 when [metainfo] is true.
+     */
+    @Serializable
+    @Resource("export")
+    data class Export(val parent: ById, val metainfo: Boolean? = null)
 
     /** SSE stream: `snapshot` events, then `removed` or `error` before it closes. */
     @Serializable

@@ -16,6 +16,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentCommandResult
 import com.linroid.ketch.torrent.api.TorrentController
 import com.linroid.ketch.torrent.api.TorrentEngineSettings
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentFileEntry
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentFilePage
@@ -42,6 +43,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
@@ -140,6 +142,26 @@ class TorrentRoutesTest {
       context: TorrentCommandContext,
     ): TorrentCommandResult =
       throw TorrentCommandException(TorrentCommandError.POLICY_DENIED, "Seeding is switched off")
+
+    val exports = mutableListOf<Pair<String, Boolean>>()
+
+    override suspend fun export(taskId: String, metainfo: Boolean): TorrentExport? {
+      exports += taskId to metainfo
+      return when (taskId) {
+        "t1" -> TorrentExport(
+          taskId = taskId,
+          name = "pack",
+          infoHash = "a".repeat(40),
+          magnet = "magnet:?xt=urn:btih:" + "a".repeat(40),
+          metainfo = if (metainfo) "ZDRlOg==" else null,
+        )
+        "magnet" -> throw TorrentCommandException(
+          TorrentCommandError.METADATA_UNAVAILABLE,
+          "The torrent is not known yet",
+        )
+        else -> null
+      }
+    }
 
     var sequential: Boolean? = null
 
@@ -363,6 +385,37 @@ class TorrentRoutesTest {
 
     assertEquals(HttpStatusCode.OK, response.status)
     assertEquals(true, controller.sequential)
+  }
+
+  @Test
+  fun export_answersTheMagnet_andTheTorrentFileWhenAsked() = testApplication {
+    val controller = ScriptedController()
+    application { with(controlledServer(controller)) { configureServer() } }
+
+    val link = json.decodeFromString<TorrentExport>(
+      client.get("/api/torrents/t1/export").bodyAsText()
+    )
+    val file = json.decodeFromString<TorrentExport>(
+      client.get("/api/torrents/t1/export?metainfo=true").bodyAsText()
+    )
+
+    assertEquals("magnet:?xt=urn:btih:" + "a".repeat(40), link.magnet)
+    assertNull(link.metainfo)
+    assertEquals("ZDRlOg==", file.metainfo)
+    assertEquals(listOf("t1" to false, "t1" to true), controller.exports)
+  }
+
+  @Test
+  fun export_unknownTaskAndUnknownTorrent_answerTheirErrors() = testApplication {
+    application { with(controlledServer()) { configureServer() } }
+
+    val missing = client.get("/api/torrents/none/export")
+    val unknown = client.get("/api/torrents/magnet/export")
+
+    assertEquals(HttpStatusCode.NotFound, missing.status)
+    assertEquals("not_found", missing.error().error)
+    assertEquals(HttpStatusCode.Conflict, unknown.status)
+    assertEquals("metadata_unavailable", unknown.error().error)
   }
 
   @Test

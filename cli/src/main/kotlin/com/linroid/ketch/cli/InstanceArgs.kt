@@ -9,7 +9,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /** The commands that work on a running instance rather than an engine of their own. */
-internal val INSTANCE_COMMANDS = setOf("add", "list", "pause", "resume", "watch")
+internal val INSTANCE_COMMANDS = setOf("add", "list", "pause", "resume", "watch", "export")
 
 /**
  * Where an attaching command finds its instance: `--server` and `--token`, or what
@@ -67,6 +67,20 @@ internal sealed interface InstanceCommand {
     val ids: List<String>,
     val interval: Duration? = null,
   ) : InstanceCommand
+
+  /**
+   * `ketch export`: prints the magnet link of the torrent task [id] names, or saves its
+   * `.torrent` file.
+   *
+   * @property output where to save the `.torrent` file; `null` prints the magnet link
+   * @property json prints the torrent's name, hashes and magnet link as JSON instead
+   */
+  data class Export(
+    override val target: Target,
+    val id: String,
+    val output: String? = null,
+    val json: Boolean = false,
+  ) : InstanceCommand
 }
 
 /** The arguments of an attaching command. */
@@ -106,14 +120,16 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
   val positional = mutableListOf<String>()
 
   var interval: Duration? = null
+  var output: String? = null
   val valueOptions = when (command) {
     "add" -> addValueOptions
     "watch" -> targetOptions + "--interval"
+    "export" -> targetOptions + setOf("--output", "-o")
     else -> targetOptions
   }
   val flags = when (command) {
     "add" -> setOf("--json", NO_PROXY_OPTION, OVERWRITE_OPTION)
-    "list" -> setOf("--json")
+    "list", "export" -> setOf("--json")
     "pause", "resume" -> setOf("--all")
     else -> emptySet()
   }
@@ -145,6 +161,8 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
           CHECKSUM_OPTION -> checksum = parseChecksumOption(value).getOrElse {
             return InstanceArgs.Invalid(it.message ?: "invalid checksum")
           }
+          "--output", "-o" -> output = value.takeIf { it.isNotBlank() }
+            ?: return InstanceArgs.Invalid("$arg must not be empty")
           "--interval" -> interval = parseInterval(value)
             ?: return InstanceArgs.Invalid("invalid interval '$value' (e.g. 500ms, 2s)")
           in PROXY_OPTIONS -> proxy.apply(arg, value)?.let { return InstanceArgs.Invalid(it) }
@@ -206,6 +224,14 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
       }
     }
     "watch" -> InstanceCommand.Watch(target, positional, interval)
+    "export" -> {
+      val id = positional.getOrNull(0) ?: return InstanceArgs.Invalid("missing <task-id>")
+      positional.getOrNull(1)?.let { return InstanceArgs.Invalid("unexpected argument '$it'") }
+      if (json && output != null) {
+        return InstanceArgs.Invalid("give --json or --output, not both")
+      }
+      InstanceCommand.Export(target, id, output, json)
+    }
     else -> throw IllegalArgumentException("Not an instance command: $command")
   }
   return InstanceArgs.Run(parsed)

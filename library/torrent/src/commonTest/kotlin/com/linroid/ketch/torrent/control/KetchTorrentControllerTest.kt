@@ -24,6 +24,7 @@ import com.linroid.ketch.torrent.api.TorrentCommandContext
 import com.linroid.ketch.torrent.api.TorrentCommandError
 import com.linroid.ketch.torrent.api.TorrentCommandException
 import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentExport
 import com.linroid.ketch.torrent.api.TorrentFileOrder
 import com.linroid.ketch.torrent.api.TorrentInterest
 import com.linroid.ketch.torrent.api.TorrentPageRequest
@@ -91,6 +92,18 @@ class KetchTorrentControllerTest {
     }
 
     override suspend fun liveTorrent(taskId: String): LiveTorrent? = live[taskId]
+
+    /** What [torrentExport] answers, or an error it throws. */
+    var export: (taskId: String, url: String, includeMetainfo: Boolean) -> TorrentExport? =
+      { _, _, _ -> null }
+
+    override suspend fun torrentExport(
+      taskId: String,
+      url: String,
+      sourceState: SourceState?,
+      resolved: ResolvedSource?,
+      includeMetainfo: Boolean,
+    ): TorrentExport? = export(taskId, url, includeMetainfo)
 
     /** Saved counters by the source state data that holds them. */
     val payloads = mutableMapOf<String, TorrentPayloadCounters>()
@@ -1020,5 +1033,58 @@ class KetchTorrentControllerTest {
     } finally {
       ketch.close()
     }
+  }
+
+  @Test
+  fun `export answers what the source knows of the task`() = runTest {
+    val source = ControlledSource()
+    source.capabilities += TorrentCapability.EXPORT.wireName
+    val ketch = ketch(source)
+    val task = pausedTask(ketch)
+    val asked = mutableListOf<Triple<String, String, Boolean>>()
+    source.export = { taskId, url, metainfo ->
+      asked += Triple(taskId, url, metainfo)
+      TorrentExport(taskId, magnet = "magnet:?xt=urn:btih:" + "a".repeat(40))
+    }
+
+    val export = assertNotNull(ketch.torrents.export(task.taskId, metainfo = true))
+
+    assertEquals(task.taskId, export.taskId)
+    assertEquals(listOf(Triple(task.taskId, "pick:files", true)), asked)
+    assertNull(ketch.torrents.export("missing"))
+    ketch.close()
+  }
+
+  @Test
+  fun `export fails while nothing identifies the torrent or its metainfo is unreadable`() =
+    runTest {
+      val source = ControlledSource()
+      source.capabilities += TorrentCapability.EXPORT.wireName
+      val ketch = ketch(source)
+      val task = pausedTask(ketch)
+
+      val unknown = assertFailsWith<TorrentCommandException> {
+        ketch.torrents.export(task.taskId)
+      }
+      assertEquals(TorrentCommandError.METADATA_UNAVAILABLE, unknown.error)
+
+      source.export = { _, _, _ -> throw IllegalArgumentException("Unsupported metainfo") }
+      val unreadable = assertFailsWith<TorrentCommandException> {
+        ketch.torrents.export(task.taskId)
+      }
+      assertEquals(TorrentCommandError.METADATA_UNAVAILABLE, unreadable.error)
+      ketch.close()
+    }
+
+  @Test
+  fun `export is unsupported for a source without the capability`() = runTest {
+    val source = ControlledSource()
+    val ketch = ketch(source)
+    val task = pausedTask(ketch)
+
+    val error = assertFailsWith<TorrentCommandException> { ketch.torrents.export(task.taskId) }
+
+    assertEquals(TorrentCommandError.UNSUPPORTED, error.error)
+    ketch.close()
   }
 }

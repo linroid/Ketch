@@ -135,6 +135,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   from older backends; `stall`: why a download makes no progress), `TorrentStall`
   (`TorrentStallReason`: `missing-pieces`, `no-peers`, `choked`, `slow-peers` or `unknown`, which
   unknown wire values decode as; the missing pieces and their files, the peers), `TorrentCounters`, `TorrentActivity`, `TorrentRevision`,
+  `TorrentExport` (`TorrentController.export`),
   `TorrentCommandContext`, `TorrentCommandResult`, `TorrentCommandError`/
   `TorrentCommandException`, `TorrentPageRequest`, `TorrentFilePage`, `TorrentFileEntry`,
   `TorrentFileOrder` (wire names, each naming a `FileOrder`)
@@ -287,6 +288,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`TorrentWebSeed`), `TorrentV2WebSeeds`
 - `com.linroid.ketch.torrent.control` (internal) -- `TorrentControls` (the source's
   `SourceExtension`: seeding watcher and restore), `KetchTorrentController`, `TorrentRevisions`,
+  `exportOf`,
   `TorrentControlSource` (with `LiveTorrent`, `SeedingTask`, `SeedingOutcome`)
 
 ### `library:endpoints`
@@ -297,7 +299,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `PriorityRequest`, `ConnectionsRequest`, `FileSelectionRequest`, `PairingRequest`,
   `PairingTicket`, `PairingStatus`, `PairingState`, `HealthResponse`, `HealthStatus`
 - `com.linroid.ketch.endpoints.torrent` -- `Torrents` (the `/api/torrents` resources,
-  `Torrents.Settings` among them), `TorrentSelectionRequest`, `TorrentSeedingRequest`
+  `Torrents.Settings` and `Torrents.ById.Export` among them), `TorrentSelectionRequest`, `TorrentSeedingRequest`
 - `com.linroid.ketch.endpoints.stream` -- the event stream's wire format (see the
   [plan](docs/plans/event-stream.md)): `StreamEvents` (`FEATURE` = `events.stream`, event names,
   error codes, limits, `intervalStep`), `StreamSubscription` (`progressIntervalMs`,
@@ -1276,6 +1278,15 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Export: `TorrentController.export(taskId, metainfo)` (REST `GET /api/torrents/{id}/export`,
+  `?metainfo=true`; capability `export`) answers a `TorrentExport`: the v1 and v2 info hashes,
+  the name, the magnet link and, when asked for, the `.torrent` file as Base64
+  (`metainfoBytes()`). `exportOf` (`control/TorrentExports.kt`) builds it from the metainfo the
+  task kept, else from a magnet URL without its `x.pe` and `so`; neither is
+  `METADATA_UNAVAILABLE`. The magnet names the metainfo's own trackers and web seeds, and a
+  private torrent has none (passkeys). The inspector's details show Info hash and, unless the
+  task's link is a magnet, Magnet link (`TorrentIdentity`, `torrentIdentity`), and
+  `ketch export <id> [--output <file>] [--json]` prints the link or saves the file
 - Sequential download: `TorrentController.setSequential` (REST `PUT .../sequential`, capability
   `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
   by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
@@ -2367,7 +2378,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `-Os` on GraalVM for JDK 23 and later and `-Ob` before (smaller than the default `-O2`), and
   bundles the web UI with its wasm and JS gzipped, which `KetchServer` sends compressed to
   browsers that accept gzip
-- `ketch add`, `list`, `pause`, `resume` and `watch` work on a running instance through
+- `ketch add`, `list`, `pause`, `resume`, `watch` and `export` work on a running instance through
   `RemoteKetch` instead of an engine of their own (`InstanceCommands`). `InstanceLocator` takes
   `--server` / `KETCH_SERVER` (with `--token` / `KETCH_API_TOKEN`), else the desktop app, asked
   over its `SingleInstance` endpoint for `LocalApiServer` (`DesktopApp`, request `cli/connect`;

@@ -157,6 +157,31 @@ class InstanceArgsTest {
   }
 
   @Test
+  fun `export takes one task ID and where to save the torrent file`() {
+    assertEquals(InstanceCommand.Export(Target(), "3f2a"), run("export", "3f2a"))
+    assertEquals(
+      InstanceCommand.Export(Target(), "3f2a", output = "pack.torrent"),
+      run("export", "-o", "pack.torrent", "3f2a"),
+    )
+    assertEquals(
+      InstanceCommand.Export(Target(), "3f2a", json = true),
+      run("export", "3f2a", "--json"),
+    )
+    assertEquals(
+      InstanceArgs.Invalid("missing <task-id>"),
+      parseInstanceArgs("export", emptyList()),
+    )
+    assertEquals(
+      InstanceArgs.Invalid("unexpected argument '9c1e'"),
+      parseInstanceArgs("export", listOf("3f2a", "9c1e")),
+    )
+    assertEquals(
+      InstanceArgs.Invalid("give --json or --output, not both"),
+      parseInstanceArgs("export", listOf("3f2a", "--json", "--output", "a.torrent")),
+    )
+  }
+
+  @Test
   fun `a double dash ends the options`() {
     val command = assertIs<InstanceCommand.Add>(run("add", "--", "-file.iso"))
 

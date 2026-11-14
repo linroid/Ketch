@@ -439,5 +439,25 @@
   {
     "name": "io.ktor.utils.io.pool.DefaultPool",
     "fields": [{"name": "top", "allowUnsafeAccess": true}]
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentExport",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentExport$Companion",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCapabilities",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.linroid.ketch.torrent.api.TorrentCapabilities$Companion",
+    "allDeclaredMethods": true
   }
 ]

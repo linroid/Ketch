@@ -94,6 +94,18 @@ interface TorrentController {
     )
 
   /**
+   * The task's magnet link and info hashes, with its `.torrent` file when [metainfo] is true, or
+   * `null` for unknown and non-torrent tasks. A private torrent has no magnet link. Fails with
+   * [TorrentCommandError.METADATA_UNAVAILABLE] while nothing identifies the torrent yet, as
+   * before a `.torrent` link is fetched. Advertised as [TorrentCapability.EXPORT].
+   */
+  suspend fun export(taskId: String, metainfo: Boolean = false): TorrentExport? =
+    throw TorrentCommandException(
+      error = TorrentCommandError.UNSUPPORTED,
+      message = "Torrent export is unavailable",
+    )
+
+  /**
    * Whether peers can connect to the backend's torrent engine, through how many NAT layers its
    * port is forwarded, and whether it punches through NATs; advertised as
    * [TorrentCapability.REACHABILITY].
