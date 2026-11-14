@@ -274,6 +274,18 @@ class TorrentDownloadSource(
 
     override suspend fun setSequential(taskId: String, sequential: Boolean) =
       source.setSequential(taskId, sequential)
+
+    override suspend fun priorityFiles(taskId: String, sourceState: SourceState?) =
+      source.priorityFiles(taskId) { source.savedPriorityFiles(sourceState) }
+
+    override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) =
+      source.setPriorityFiles(taskId, fileIds)
+
+    override fun withPriorityFiles(state: SourceState, fileIds: Set<String>) =
+      source.withPriorityFiles(state, fileIds)
+
+    override fun withSequential(state: SourceState, sequential: Boolean) =
+      source.withSequential(state, sequential)
     override val restoresSeeding: Boolean get() = source.restoresSeeding
     override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
 
@@ -350,6 +362,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.TRACKERS.wireName)
       add(TorrentCapability.RECHECK.wireName)
       add(TorrentCapability.IMPORT.wireName)
+      add(TorrentCapability.FILE_PRIORITY.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -374,6 +387,44 @@ class TorrentDownloadSource(
     rechecks.update { it + taskId }
     checkOnly.update { if (seedAfter) it - taskId else it + taskId }
   }
+
+  /** What tasks were last told by [setPriorityFiles], in this process. */
+  private val priorityChoices = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+
+  /** The files [state], as a task saved it, downloads first. */
+  internal fun savedPriorityFiles(state: SourceState?): Set<String> =
+    state?.let { runCatching { decodeState(it) }.getOrNull()?.priorityFileIds }.orEmpty()
+
+  /** The files [taskId] downloads first: what it was told, else what its run says. */
+  internal suspend fun priorityFiles(taskId: String, saved: () -> Set<String>): Set<String> =
+    priorityChoices.value[taskId]
+      ?: stateMutex.withLock { states[taskId]?.priorityFileIds } ?: saved()
+
+  /**
+   * Downloads the files [fileIds] of [taskId] before its others, at once if it runs and
+   * whenever it next does; none for the usual order.
+   */
+  internal suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
+    priorityChoices.update { it + (taskId to fileIds) }
+    stateMutex.withLock {
+      states[taskId]?.let { states[taskId] = it.copy(priorityFileIds = fileIds) }
+    }
+    tasks.session(taskId)?.setPriorityFiles(fileIds)
+  }
+
+  /** The saved [state] as [change] makes it, or as it is when it cannot be read. */
+  private fun changed(
+    state: SourceState,
+    change: (TorrentSourceState) -> TorrentSourceState,
+  ): SourceState = runCatching { encodeState(change(decodeState(state))) }.getOrDefault(state)
+
+  /** What [TorrentControlSource.withPriorityFiles] answers. */
+  internal fun withPriorityFiles(state: SourceState, fileIds: Set<String>): SourceState =
+    changed(state) { it.copy(priorityFileIds = fileIds) }
+
+  /** What [TorrentControlSource.withSequential] answers. */
+  internal fun withSequential(state: SourceState, sequential: Boolean): SourceState =
+    changed(state) { it.copy(sequential = sequential) }
 
   /** What tasks were last told by [setSequential], in this process. */
   private val sequentialChoices = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -1658,7 +1709,8 @@ class TorrentDownloadSource(
     // The metainfo is Ketch's to keep; only states older builds saved carry it.
     val state = TorrentSourceState(hash, total, previous?.resumeData ?: "", selected, output,
       previous?.metainfo.orEmpty(), version = 2, privacy = privacy,
-      sequential = previous?.sequential == true)
+      sequential = previous?.sequential == true,
+      priorityFileIds = previous?.priorityFileIds.orEmpty())
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1694,7 +1746,8 @@ class TorrentDownloadSource(
     val total = table.totalOf(selected)
     val state = TorrentSourceState(hash, total, previous?.resumeData.orEmpty(), selected, output,
       previous?.metainfo.orEmpty(), version = 3, privacy = privacy,
-      sequential = previous?.sequential == true)
+      sequential = previous?.sequential == true,
+      priorityFileIds = previous?.priorityFileIds.orEmpty())
     log.i {
       "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1773,7 +1826,8 @@ class TorrentDownloadSource(
       var lent = false
       try {
         val sequential = sequentialChoices.value[taskId] ?: state.sequential
-        rememberState(taskId, state.copy(sequential = sequential))
+        val first = priorityChoices.value[taskId] ?: state.priorityFileIds
+        rememberState(taskId, state.copy(sequential = sequential, priorityFileIds = first))
         val running = adopted ?: open().also { created ->
           session = created
           tasks.attach(taskId, created)
@@ -1781,6 +1835,7 @@ class TorrentDownloadSource(
           context.acknowledgeSelection(initialRevision)
         }
         running.setSequential(sequential)
+        running.setPriorityFiles(first)
         // Payload pays this run's task limits, also on a session an earlier run opened.
         running.setTaskThrottle(context.throttle)
         // An adopted session applies the current selection first, whatever it ran with.

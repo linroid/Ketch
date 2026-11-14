@@ -31,6 +31,24 @@ class TorrentV2RarityPickerTest {
   }
 
   @Test
+  fun next_takesUrgentPiecesFirst_thenTheUsualOrder() {
+    val budget = TorrentBufferBudget(4096)
+    val picker = assertNotNull(TorrentV2RarityPicker.create<String>(3, budget, maxPeers = 3))
+    try {
+      assertTrue(picker.update("a", byteArrayOf(224.toByte())))
+      assertTrue(picker.update("b", byteArrayOf(192.toByte())))
+      // Piece 2 is the rarest, piece 1 belongs to a file to download first.
+      val urgent = booleanArrayOf(false, true, false)
+      assertEquals(1, picker.next("a", inOrder = false, urgent = urgent) { true })
+      // With no urgent piece left to begin, the rarest comes next, or the lowest in order.
+      assertEquals(2, picker.next("a", inOrder = false, urgent = urgent) { it != 1 })
+      assertEquals(0, picker.next("a", inOrder = true, urgent = urgent) { it != 1 })
+      assertEquals(2, picker.next("a", inOrder = false, urgent = null) { true })
+      assertNull(picker.next("a", inOrder = false, urgent = urgent) { false })
+    } finally { picker.close() }
+  }
+
+  @Test
   fun lowest_takesTheFirstEligiblePieceWhateverItsRarity() {
     val budget = TorrentBufferBudget(4096)
     val picker = assertNotNull(TorrentV2RarityPicker.create<String>(3, budget, maxPeers = 3))

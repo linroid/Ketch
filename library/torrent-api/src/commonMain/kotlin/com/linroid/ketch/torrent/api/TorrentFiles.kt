@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
  * @property path the file's path inside the torrent
  * @property size the file's size in bytes
  * @property selected whether the task downloads it
+ * @property priority whether the task downloads it before its other files
+ *   ([TorrentController.setPriorityFiles]); false from backends without file priorities
  */
 @Serializable
 data class TorrentFileEntry(
@@ -19,6 +21,7 @@ data class TorrentFileEntry(
   val path: String,
   val size: Long,
   val selected: Boolean,
+  val priority: Boolean = false,
 ) {
   init {
     require(id.length in 1..128 && path.length <= 4096 && size >= 0)

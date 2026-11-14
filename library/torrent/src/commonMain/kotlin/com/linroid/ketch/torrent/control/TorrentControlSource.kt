@@ -65,6 +65,18 @@ internal interface TorrentControlSource {
   /** Downloads [taskId]'s pieces in order or not. */
   suspend fun setSequential(taskId: String, sequential: Boolean) {}
 
+  /** The files [taskId] downloads before its others; [sourceState] is what its task saved. */
+  suspend fun priorityFiles(taskId: String, sourceState: SourceState?): Set<String> = emptySet()
+
+  /** Downloads the files [fileIds] of [taskId] before its others; none for the usual order. */
+  suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {}
+
+  /** [state], as a task saved it, with [fileIds] as the files to download first. */
+  fun withPriorityFiles(state: SourceState, fileIds: Set<String>): SourceState = state
+
+  /** [state], as a task saved it, downloading its pieces in order or not. */
+  fun withSequential(state: SourceState, sequential: Boolean): SourceState = state
+
   /** Tasks that reached a seed goal, as they do; they keep seeding until told to stop. */
   val seedGoalsReached: Flow<String> get() = emptyFlow()
 

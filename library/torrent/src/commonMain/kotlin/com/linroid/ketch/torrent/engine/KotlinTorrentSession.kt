@@ -115,6 +115,11 @@ internal class KotlinTorrentSession(
 
   override fun setSequential(sequential: Boolean) = this.sequential.store(sequential)
 
+  private val priorityPieces = AtomicReference<BooleanArray?>(null)
+
+  override fun setPriorityFiles(fileIds: Set<String>) =
+    priorityPieces.store(store.piecesOfFiles(fileIds))
+
   private val log = KetchLogger("TorrentSession")
   private val label = "taskId=${store.taskId} (${logHash(store.metadata.infoHash.hex)})"
   @Volatile private var seedOnly = seedOnly
@@ -465,7 +470,7 @@ internal class KotlinTorrentSession(
           }
           try {
             TorrentSwarm(store, network, budget, peerId = peerId,
-              sequential = sequential::load,
+              sequential = sequential::load, priority = priorityPieces::load,
               connections = { connectionLimit.load() }, uploadBudget = uploadBudget,
               peerBudget = peerBudget, stall = _stall, reannounce = { reannounceTrackers() },
               uploadPolicy = uploadPolicy,

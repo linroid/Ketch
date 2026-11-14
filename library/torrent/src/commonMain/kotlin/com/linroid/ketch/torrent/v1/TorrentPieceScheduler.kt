@@ -47,6 +47,12 @@ internal class TorrentPieceScheduler(
   private val onDiscard: (Long) -> Unit = {},
   /** Whether pieces open lowest index first, so a file plays while it downloads, read live. */
   private val sequential: () -> Boolean = { false },
+  /**
+   * The pieces to open before any other, those of the files to download first, read live; null
+   * for none. Among them, and among the rest once a peer has none of them left to open, pieces
+   * open in the usual order.
+   */
+  private val priority: () -> BooleanArray? = { null },
 ) {
   private val mutex = Mutex()
   private var wanted = wanted.copyOf()
@@ -520,19 +526,20 @@ internal class TorrentPieceScheduler(
    * fetches, split between every peer and seed, and its later pieces only buffers that leave half
    * the budget free, so peers keep pieces to fetch and buffers to fetch them with. In the endgame
    * a seed may fetch a piece one other fetcher has, and such a duplicate is never extended.
+   * While pieces of [priority] are free, a run starts at the first of them and ends where they
+   * end, so a seed fetches the files to download first before the others too.
    */
   suspend fun claimRun(peer: Int, maxPieces: Int, maxBytes: Int): List<Claim> = mutex.withLock {
     check(peer !in claims)
     // A seed has every piece but those it could not serve ([withdraw]).
     val has = availability[peer]
+    val urgent = priority()
+    fun free(index: Int) = wanted[index] && !verified[index] && openPieces[index] == null &&
+      seedOwned[index] == 0 && has?.get(index) != false
     var first = -1
-    for (index in 0 until pieceCount) {
-      if (wanted[index] && !verified[index] && openPieces[index] == null &&
-        seedOwned[index] == 0 && has?.get(index) != false) {
-        first = index
-        break
-      }
-    }
+    if (urgent != null) first = (0 until pieceCount).firstOrNull { urgent[it] && free(it) } ?: -1
+    val urgentRun = first >= 0
+    if (first < 0) first = (0 until pieceCount).firstOrNull(::free) ?: -1
     if (first < 0 && remaining <= availability.size) {
       for (index in 0 until pieceCount) {
         val fetchers = seedOwned[index] + if (openPieces[index] != null) 1 else 0
@@ -552,8 +559,7 @@ internal class TorrentPieceScheduler(
     var bytes = claim.lease.bytes
     var index = first + 1
     while (run.size < minOf(maxPieces, share) && index < pieceCount) {
-      if (!wanted[index] || verified[index] || openPieces[index] != null ||
-        seedOwned[index] > 0 || has?.get(index) == false) break
+      if (!free(index) || urgentRun && urgent?.get(index) != true) break
       val size = pieceSize(index)
       if (bytes + size > maxBytes ||
         budget.capacity - budget.allocated - size < budget.capacity / 2) break
@@ -733,9 +739,9 @@ internal class TorrentPieceScheduler(
   }
 
   /**
-   * Opens pieces [peer] has, lowest index first when [sequential], else rarest first, then lowest
-   * index, and hands it their blocks until [requests] holds [max]. Returns whether the budget had
-   * no buffer for one.
+   * Opens pieces [peer] has, those of [priority] before the others, each lowest index first when
+   * [sequential], else rarest first, then lowest index, and hands it their blocks until
+   * [requests] holds [max]. Returns whether the budget had no buffer for one.
    */
   private fun openFor(
     peer: Int,
@@ -747,10 +753,15 @@ internal class TorrentPieceScheduler(
     dueAt: Long,
   ): Boolean {
     val wantedPieces = (max - requests.size + blocksPerPiece - 1) / blocksPerPiece
-    val order = if (sequential()) {
-      (0 until pieceCount).asSequence().filter { opens(it, pieces, eligible) }.take(wantedPieces)
-        .toList()
-    } else rarestToOpen(pieces, eligible, wantedPieces)
+    val first = priority()
+    val order = if (first == null) {
+      orderToOpen(pieces, eligible, wantedPieces)
+    } else {
+      val urgent = orderToOpen(pieces, { eligible(it) && first[it] }, wantedPieces)
+      if (urgent.size >= wantedPieces) urgent else {
+        urgent + orderToOpen(pieces, { eligible(it) && !first[it] }, wantedPieces - urgent.size)
+      }
+    }
     for (index in order) {
       if (requests.size >= max) break
       val piece = openPiece(index, now) ?: return true
@@ -759,6 +770,16 @@ internal class TorrentPieceScheduler(
     }
     return false
   }
+
+  /** The [wantedPieces] pieces to open next: in order when [sequential], else rarest first. */
+  private fun orderToOpen(
+    pieces: BooleanArray,
+    eligible: (Int) -> Boolean,
+    wantedPieces: Int,
+  ): List<Int> = if (sequential()) {
+    (0 until pieceCount).asSequence().filter { opens(it, pieces, eligible) }.take(wantedPieces)
+      .toList()
+  } else rarestToOpen(pieces, eligible, wantedPieces)
 
   /** The [wantedPieces] rarest pieces [pieces] holds that may open, then by lowest index. */
   private fun rarestToOpen(

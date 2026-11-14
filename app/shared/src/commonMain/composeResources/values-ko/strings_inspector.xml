@@ -176,6 +176,8 @@
   <string name="inspector_percent_spoken">%1$d퍼센트</string>
 
   <string name="inspector_files_waiting">토렌트 메타데이터를 받으면 파일 목록이 표시됩니다.</string>
+  <string name="inspector_file_first">먼저 다운로드</string>
+  <string name="inspector_file_first_on">먼저 다운로드 중 · 일반 순서로 되돌리기</string>
   <plurals name="inspector_files_done_of">
     <item quantity="other">파일 %2$d개 중 %1$d개 완료</item>
   </plurals>

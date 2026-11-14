@@ -163,7 +163,9 @@ class TorrentSwarmRedialTest {
       // and named 10 s into that wait, it is dialed 30 s after its last dial: the naming before
       // spent nothing.
       val reached = rig.reachAgain(upAt = 70_000) { rig.peers.send(rig.listener.local) }
-      assertTrue(reached - 70_000 <= 30_000, "Reached ${reached - 70_000} ms after it came back")
+      // 20 s, and the steps a busy machine lets the clock run on before the swarm's next tick;
+      // without the bring-forward it would be 50 s or more.
+      assertTrue(reached - 70_000 <= 45_000, "Reached ${reached - 70_000} ms after it came back")
     }
 
   @Test

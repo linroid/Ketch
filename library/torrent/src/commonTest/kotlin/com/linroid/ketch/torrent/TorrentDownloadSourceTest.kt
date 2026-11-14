@@ -12,7 +12,10 @@ import com.linroid.ketch.core.engine.DownloadContext
 import com.linroid.ketch.core.engine.HttpEngine
 import com.linroid.ketch.core.engine.SelectionRequest
 import com.linroid.ketch.core.engine.ServerInfo
+import com.linroid.ketch.core.engine.SourceState
 import com.linroid.ketch.core.engine.canHandle
+import com.linroid.ketch.core.engine.decodeState
+import com.linroid.ketch.core.engine.encodeState
 import com.linroid.ketch.api.ResolvedSource
 import com.linroid.ketch.core.file.FileAccessor
 import com.linroid.ketch.torrent.api.TorrentController
@@ -212,13 +215,31 @@ class TorrentDownloadSourceTest {
     completed)
 
   @Test
+  fun savedState_takesTheFilesToDownloadFirstAndTheOrder_keepingTheRest() {
+    val state = TorrentSourceState("ab".repeat(20), 40_000, "checkpoint", setOf("0", "2"),
+      "/downloads/pack")
+    val saved = source.encodeState(state)
+
+    val first = source.withPriorityFiles(saved, setOf("2"))
+    assertEquals(setOf("2"), source.savedPriorityFiles(first))
+    val ordered = source.withSequential(first, true)
+    assertTrue(source.savedSequential(ordered))
+    assertEquals(state.copy(priorityFileIds = setOf("2"), sequential = true),
+      source.decodeState(ordered))
+    // A state that cannot be read, such as another source's, is left as it is.
+    val other = SourceState("http", "{}")
+    assertEquals(other, source.withPriorityFiles(other, setOf("2")))
+    assertEquals(other, source.withSequential(other, true))
+  }
+
+  @Test
   fun features_listSelectionFeatures() {
     assertEquals(setOf(KetchFeatures.FILE_SELECTION,
       KetchFeatures.AWAIT_FILE_SELECTION, TorrentFeatures.CONTROL,
       TorrentFeatures.EXISTING_FILES), source.features)
     val engine = setOf("file-selection", "v1", "v2", "hybrid", "utp", "mse-pe", "reachability",
       "settings", "seed-goals", "sequential", "export", "trackers",
-      "recheck", "import")
+      "recheck", "import", "file-priority")
     // Local discovery only where the platform can join the LAN group.
     assertEquals(if (lsdSupported) engine + "local-discovery" else engine,
       source.torrentCapabilities)

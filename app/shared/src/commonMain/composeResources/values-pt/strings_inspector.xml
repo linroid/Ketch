@@ -186,6 +186,8 @@
   <string name="inspector_percent_spoken">%1$d por cento</string>
 
   <string name="inspector_files_waiting">A lista de arquivos chega com os metadados do torrent.</string>
+  <string name="inspector_file_first">Baixar primeiro</string>
+  <string name="inspector_file_first_on">Baixando primeiro · voltar à ordem normal</string>
   <plurals name="inspector_files_done_of">
     <item quantity="one">%1$d de %2$d arquivo concluído</item>
     <item quantity="other">%1$d de %2$d arquivos concluídos</item>

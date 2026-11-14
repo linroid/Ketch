@@ -31,6 +31,8 @@ data class TorrentSourceState internal constructor(
   internal val privacy: TorrentDiscoveryPrivacy? = null,
   /** Whether pieces download in order; see [TorrentDownloadSource.setSequential]. */
   internal val sequential: Boolean = false,
+  /** The files to download first; see [TorrentDownloadSource.setPriorityFiles]. */
+  internal val priorityFileIds: Set<String> = emptySet(),
 ) {
   init {
     require(version in 1..3) { "Unsupported torrent resume version" }

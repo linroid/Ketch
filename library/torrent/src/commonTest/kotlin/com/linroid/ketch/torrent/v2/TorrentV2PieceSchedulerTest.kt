@@ -643,6 +643,29 @@ class TorrentV2PieceSchedulerTest {
   }
 
   @Test
+  fun claimWebSeedRun_startsAtUrgentPieces_andEndsWhereTheyEnd() {
+    // Pieces 0 to 7 lie in "a", 8 and 9 in "b", the file to download first.
+    val fixture = TorrentV2Fixture.build(listOf("a" to 8 * 32_768, "b" to 2 * 32_768))
+    val buffers = TorrentBufferBudget(4 * 1024 * 1024)
+    val state = TorrentBufferBudget(1024 * 1024)
+    val scheduler = assertNotNull(TorrentV2PieceScheduler.create(fixture.layout, emptySet(),
+      BooleanArray(10), buffers, state, maxActive = 64))
+    val urgent = BooleanArray(10) { it >= 8 }
+
+    val first = scheduler.claimWebSeedRun(fetchers = 1, urgent = urgent)
+    assertEquals(listOf(8, 9), first.map { it.index })
+    // None of them is free now: the next run follows the files, and never duplicates one.
+    val second = scheduler.claimWebSeedRun(fetchers = 1, urgent = urgent)
+    assertEquals(0, second.first().index)
+    for (claim in first + second) {
+      claim.lease.close()
+      scheduler.webSeedDone(claim.index, verified = false)
+    }
+    scheduler.close()
+    assertEquals(0, buffers.allocated)
+  }
+
+  @Test
   fun claimWebSeedRun_extendsOverFreePiecesWithinItsShare() {
     // Pieces 0 to 7 lie in "a", 8 and 9 in "b".
     val fixture = TorrentV2Fixture.build(listOf("a" to 8 * 32_768, "b" to 2 * 32_768))

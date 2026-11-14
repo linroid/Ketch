@@ -85,6 +85,21 @@ internal class TorrentV2RarityPicker<P : Any> private constructor(
     return null
   }
 
+  /**
+   * The piece [peer] begins next: an [eligible] one of [urgent], the pieces of the files to
+   * download first, while it has one, else any eligible one; each [lowest] first when
+   * [inOrder], else as [pick] chooses.
+   */
+  fun next(
+    peer: P,
+    inOrder: Boolean,
+    urgent: BooleanArray?,
+    eligible: (Int) -> Boolean,
+  ): Int? {
+    fun choose(among: (Int) -> Boolean) = if (inOrder) lowest(peer, among) else pick(peer, among)
+    return urgent?.let { first -> choose { eligible(it) && first[it] } } ?: choose(eligible)
+  }
+
   /** Eligibility is an actor-local lookup; no I/O or allocation should run in this callback. */
   fun pick(peer: P, eligible: (Int) -> Boolean): Int? {
     check(!closed)

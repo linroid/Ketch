@@ -50,6 +50,50 @@ class FileSelectionModelTest {
   }
 
   @Test
+  fun toggleFirst_ordersFilesOnTheDevice_andUndoesARefusal() = runTest {
+    val controller = PagedController(files, pageSize = 2, capabilities = setOf("file-priority"))
+    controller.first = setOf("0")
+    val task = RecordingKetchApi().add(downloading(), DownloadRequest(MAGNET))
+    val failures = mutableListOf<Throwable>()
+    val model = FileSelectionModel(task, controller, { block -> launch(block = block) }) {
+      failures += it
+    }
+
+    assertNull(model.first)
+    model.loadFirst()
+    assertEquals(setOf("0"), model.first)
+
+    model.toggleFirst(listOf("1", "2"))
+    assertEquals(setOf("0", "1", "2"), model.first)
+    runCurrent()
+    assertEquals(setOf("0", "1", "2"), controller.first)
+    // Every one of them is first already: the same click puts them back.
+    model.toggleFirst(listOf("1", "2"))
+    runCurrent()
+    assertEquals(setOf("0"), controller.first)
+
+    controller.refuse = true
+    model.toggleFirst(listOf("0"))
+    assertEquals(emptySet(), model.first)
+    runCurrent()
+    assertEquals(setOf("0"), model.first)
+    assertEquals(1, failures.size)
+  }
+
+  @Test
+  fun loadFirst_deviceWithoutFilePriorities_offersNone() = runTest {
+    val controller = PagedController(files, pageSize = 2)
+    val task = RecordingKetchApi().add(downloading(), DownloadRequest(MAGNET))
+    val model = model(task, controller)
+
+    model.loadFirst()
+    model.toggleFirst(listOf("0"))
+
+    assertNull(model.first)
+    assertTrue(controller.first.isEmpty())
+  }
+
+  @Test
   fun load_resolvedSource_keepsItsNames() = runTest {
     val controller = PagedController(files, pageSize = 2)
     val request = DownloadRequest(MAGNET, resolvedSource = source())
@@ -195,11 +239,25 @@ class FileSelectionModelTest {
 internal class PagedController(
   private val files: List<SourceFile>,
   private val pageSize: Int,
+  private val capabilities: Set<String> = emptySet(),
 ) : TorrentController {
   val cursors = mutableListOf<String?>()
   private val revision = TorrentRevision("epoch", 1)
 
-  override suspend fun capabilities(): TorrentCapabilities = TorrentCapabilities()
+  /** The files downloaded first, as [setPriorityFiles] left them. */
+  var first: Set<String> = emptySet()
+
+  /** Fails the next [setPriorityFiles]. */
+  var refuse = false
+
+  override suspend fun capabilities(): TorrentCapabilities = TorrentCapabilities(names = capabilities)
+
+  override suspend fun priorityFiles(taskId: String): Set<String> = first
+
+  override suspend fun setPriorityFiles(taskId: String, fileIds: Set<String>) {
+    if (refuse) throw IllegalStateException("refused")
+    first = fileIds
+  }
 
   override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
 

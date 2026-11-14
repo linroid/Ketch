@@ -126,6 +126,14 @@ interface SourceHost {
   suspend fun saveSourceState(task: DownloadTask, state: SourceState)
 
   /**
+   * Saves what [change] makes of the source state [task] saved ([TaskRecord.sourceState]), in
+   * any state of the task: for a setting the source keeps there that changes while no download
+   * of the task runs to save it. [change] gets the state as it is saved then, so it must carry
+   * over everything else, and may run more than once. A task that saved no state yet keeps none.
+   */
+  suspend fun changeSourceState(task: DownloadTask, change: (SourceState) -> SourceState) {}
+
+  /**
    * Runs the completed [task] again from what it saved, into the same place and with its files
    * and progress as they are, so its source proves what is on disk and downloads what is
    * missing: it shows queued, then whatever its run reports, and completes again. Returns false,
