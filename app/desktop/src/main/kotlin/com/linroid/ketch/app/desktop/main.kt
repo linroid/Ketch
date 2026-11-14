@@ -709,7 +709,8 @@ private fun createInstanceManager(
   val taskStore = createSqliteTaskStore(driverFactory)
   val torrentSource = TorrentDownloadSource(
     TorrentConfig(stateDirectory = File(configDir, "torrent-state").path)
-      .withSettings(config.torrent.engineSettings),
+      .withSettings(config.torrent.engineSettings)
+      .copy(proxy = config.torrentProxy),
   )
   return InstanceManager(
     factory = InstanceFactory(

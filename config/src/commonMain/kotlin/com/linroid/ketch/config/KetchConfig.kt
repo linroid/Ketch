@@ -1,6 +1,8 @@
 package com.linroid.ketch.config
 
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.Proxy
+import com.linroid.ketch.api.ProxyAddress
 import com.linroid.ketch.api.SpeedSettings
 import kotlinx.serialization.Serializable
 
@@ -41,6 +43,13 @@ data class KetchConfig(
   val power: PowerSettings = PowerSettings(),
   val hooks: List<HookConfig> = emptyList(),
 ) {
+  /**
+   * The proxy torrents go through: the manual one of `[download.proxy]` while
+   * `[torrent] useProxy` is on, else `null`, for direct connections.
+   */
+  val torrentProxy: ProxyAddress?
+    get() = (download.proxy as? Proxy.Manual)?.address?.takeIf { torrent.useProxy }
+
   companion object {
     /**
      * What runs in place of a config file that cannot be read: the defaults, except that

@@ -224,6 +224,12 @@ internal class KotlinTorrentEngine(
   multicastLock: TorrentMulticastLock? = null,
   /** Test hook: how long one magnet metadata lookup runs. */
   private val magnetLookupTime: Duration = MAGNET_LOOKUP_TIME,
+  /**
+   * The network reaches peers through a proxy: a peer's host name is left to the proxy to
+   * resolve, never looked up here, and UDP trackers, which a proxy cannot carry, are refused at
+   * once rather than waited for.
+   */
+  private val proxied: Boolean = false,
   /** Test hook: how long a magnet metadata lookup goes on once nothing waits for it. */
   magnetLookupGrace: Duration = ABANDONED_LOOKUP_GRACE,
   /** Test hook: the file system v1 stores keep their payload in. */
@@ -274,7 +280,8 @@ internal class KotlinTorrentEngine(
     utpEndpoints.load()[host]
   }
   private val connectionBudget = TorrentConnectionBudget(utpFallback, config.maxConnections)
-  private val network = TorrentPeerEncryption(connectionBudget, config.encryption)
+  private val network = TorrentPeerEncryption(connectionBudget, config.encryption,
+    resolveNames = !proxied)
   private val ipFilter = AtomicReference(TorrentIpFilter.NONE)
 
   init {
@@ -315,7 +322,13 @@ internal class KotlinTorrentEngine(
     exchangeBudgets.cache, magnetLookupGrace)
   /** Magnet metadata lookups running, those nothing waits for in their grace too; for tests. */
   internal val pendingMetadataLookups: Int get() = cache.pendingFetches
-  private val tracker = TorrentTracker(http, network)
+  private val tracker = if (proxied) {
+    TorrentTracker(http, network, resolve = {
+      throw okio.IOException("UDP trackers cannot be reached through a proxy")
+    })
+  } else {
+    TorrentTracker(http, network)
+  }
   // One peer ID for every peer, tracker and metadata lookup (BEP 20), as private trackers check.
   private val peerId = TorrentClient.peerId()
   private val mutex = Mutex()
@@ -965,7 +978,7 @@ internal class KotlinTorrentEngine(
     supervisorScope {
       launch {
         for (text in magnet.explicitPeers) {
-          attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
+          attempt { resolveEndpoint(text, !proxied) }?.forEach { output.send(it) }
         }
       }
       suspend fun announce(tiers: TrackerTiers) {
@@ -1363,7 +1376,7 @@ internal class KotlinTorrentEngine(
       magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { endpoint ->
           attempt {
-            resolveEndpoint(endpoint).forEach {
+            resolveEndpoint(endpoint, !proxied).forEach {
               sink.offer(it, explicitTopic, PeerOrigin.EXPLICIT)
             }
           }
@@ -1473,7 +1486,7 @@ internal class KotlinTorrentEngine(
       }
       magnetUri?.let { uri -> launch {
         MagnetUri.parse(uri).explicitPeers.forEach { text ->
-          attempt { resolveEndpoint(text) }?.forEach { output.send(it) }
+          attempt { resolveEndpoint(text, !proxied) }?.forEach { output.send(it) }
         }
       } }
       // The peers that sent its metadata.
@@ -1985,10 +1998,15 @@ private suspend fun <T> attempt(label: String? = null, block: suspend () -> T): 
   null
 }
 
-internal suspend fun resolveEndpoint(value: String): List<PeerEndpoint> {
+/**
+ * The endpoints `host:port` in [value] names: every address its host resolves to, or with
+ * [resolve] off the host as it is, for a proxy to resolve.
+ */
+internal suspend fun resolveEndpoint(value: String, resolve: Boolean = true): List<PeerEndpoint> {
   val port = value.substringAfterLast(':').toIntOrNull()
   require(port != null && port in 1..65535) { "Invalid peer endpoint" }
   val host = value.substringBeforeLast(':').removeSurrounding("[", "]")
+  if (!resolve) return listOf(PeerEndpoint(numericAddress(host)?.let(::numericHost) ?: host, port))
   return resolveTorrentHost(host).map { PeerEndpoint(numericHost(it), port) }
 }
 

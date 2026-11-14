@@ -592,6 +592,8 @@
   <string name="settings_torrent_port_mapping_hint">라우터(UPnP 또는 NAT-PMP)에 포트 포워딩을 요청해 더 많은 피어가 이 기기에 연결할 수 있게 합니다.</string>
   <string name="settings_torrent_local_discovery">로컬 피어 검색</string>
   <string name="settings_torrent_local_discovery_hint">같은 공개 토렌트를 다운로드하거나 공유하는 로컬 네트워크의 기기를 찾아 조각을 직접 주고받습니다.</string>
+  <string name="settings_torrent_use_proxy">프록시 사용</string>
+  <string name="settings_torrent_use_proxy_hint">네트워크에서 설정한 프록시를 통해 피어, HTTP 트래커, 웹 시드에 연결합니다. 프록시를 사용하면 DHT, uTP, UDP 트래커, 포트 포워딩이 꺼지고 피어가 연결해 올 수 없습니다. Ketch를 다시 시작하면 적용됩니다.</string>
   <string name="settings_torrent_connections_footer">암호화는 트래픽의 종류를 숨길 뿐, 누구와 연결하는지는 숨기지 않습니다.</string>
   <string name="settings_torrent_trackers">추가 트래커</string>
   <string name="settings_torrent_no_trackers">추가 트래커 없음</string>

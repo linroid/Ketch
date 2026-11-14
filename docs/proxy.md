@@ -56,12 +56,32 @@ it adds to. `ketch add` refuses these options for a device that does not support
 | Traffic | Proxy |
 | --- | --- |
 | HTTP(S) downloads, HLS and DASH streams, and previews (`resolve`) | The proxy setting |
-| FTP downloads, BitTorrent peers | Always direct |
-| BitTorrent trackers over HTTP, `.torrent` files and web seeds | The system's settings |
+| FTP downloads | Always direct |
+| BitTorrent peers | Direct, or the manual proxy with `[torrent] useProxy` (below) |
+| BitTorrent trackers over HTTP, `.torrent` files and web seeds | The system's settings, or the manual proxy with `[torrent] useProxy` |
 | AI discovery's page fetches | Never proxied |
 
 A download reads the setting when it starts or resumes, so a change applies to downloads started
 afterwards.
+
+## Torrents through the proxy
+
+Torrents connect directly unless you ask otherwise: with a manual proxy set, turn on
+**Settings → BitTorrent → Connections → Use the proxy** (`[torrent] useProxy = true`) and
+restart Ketch. Peers are then reached through the proxy, SOCKS5 or HTTP `CONNECT`, and so are
+HTTP trackers, web seeds, `.torrent` files and the tracker lists. The bypass list does not apply
+to torrents.
+
+A proxy carries TCP connections Ketch opens and nothing else, so through one Ketch switches off
+what would otherwise go around it and reveal your address: DHT, uTP, UDP trackers, local peer
+discovery and port forwarding, and other peers cannot connect to you. Expect fewer peers,
+especially for torrents that rely on DHT or UDP trackers; adding `http` or `https` trackers
+helps. UDP trackers are skipped at once, so they do not hold up the `http` ones listed after
+them. Peers given by host name are resolved by the proxy, not by your system, and the blocklist
+then applies to peers given by address only. Host names of HTTP trackers are resolved by a
+SOCKS5 proxy; with an HTTP proxy your system may still look them up. The setting is read
+when the torrent engine starts, so changing it, or the proxy itself, takes effect after a
+restart.
 
 ## Proxy URLs
 

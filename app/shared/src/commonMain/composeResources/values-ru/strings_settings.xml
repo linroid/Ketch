@@ -628,6 +628,8 @@
   <string name="settings_torrent_port_mapping_hint">Просит роутер (UPnP или NAT-PMP) пробросить порт, чтобы к этому устройству могло подключиться больше пиров.</string>
   <string name="settings_torrent_local_discovery">Поиск пиров в локальной сети</string>
   <string name="settings_torrent_local_discovery_hint">Находит устройства в вашей локальной сети, которые скачивают или раздают те же публичные торренты, чтобы они обменивались частями напрямую.</string>
+  <string name="settings_torrent_use_proxy">Использовать прокси</string>
+  <string name="settings_torrent_use_proxy_hint">Пиры, HTTP-трекеры и веб-сиды доступны через прокси, заданный в разделе «Сеть». Через прокси не работают DHT, uTP, UDP-трекеры и проброс порта, а пиры не могут подключаться к вам. Вступает в силу после перезапуска Ketch.</string>
   <string name="settings_torrent_connections_footer">Шифрование скрывает, что это за трафик, но не то, с кем вы соединяетесь.</string>
   <string name="settings_torrent_trackers">Дополнительные трекеры</string>
   <string name="settings_torrent_no_trackers">Нет дополнительных трекеров</string>

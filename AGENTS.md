@@ -667,7 +667,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 - HTTP requests can be spread round-robin over selected network interfaces
   (`KetchApi.selectNetworkInterfaces`, `MultiNetworkHttpEngine`); see
   [multiple networks](docs/multiple-networks.md)
-- Proxies for HTTP(S), HLS and DASH downloads (not FTP or BitTorrent; Discover never proxies):
+- Proxies for HTTP(S), HLS and DASH downloads (not FTP; BitTorrent only with
+  `[torrent] useProxy`, see the torrent section; Discover never proxies):
   `DownloadConfig.proxy` (`[download.proxy]`), replaced per task by `DownloadRequest.proxy`, which
   `DownloadCoordinator` folds into the run's `DownloadContext.config` (`forRequest`); `resolve`
   uses the global one. `Proxy` is sealed: `System` (default), `Direct` or `Manual` with a
@@ -1418,6 +1419,22 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
   by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
   `SequentialControl` switches it. It orders pieces; file priorities choose which files first
+- Proxy: `TorrentConfig.proxy` (a `ProxyAddress`, read as the engine starts) sends every
+  torrent through a SOCKS5 or HTTP proxy. `TorrentDownloadSource`'s engine factory then builds
+  the engine over `ProxiedTorrentNetwork` (`net`), whose `connect` tunnels through the proxy
+  (SOCKS5 `CONNECT` with user name and password, host names left to the proxy; or HTTP
+  `CONNECT` with Basic credentials), whose `bindUdp` sockets send and receive nothing and whose
+  `listen` binds loopback, with DHT, uTP, port mapping and local discovery off in its config
+  whatever the settings say, and no port mapper or LSD transport at all. The engine is built
+  `proxied`: a peer named by host (`x.pe`, a tracker's list) is dialed by that name
+  (`resolveEndpoint(resolve = false)`, `TorrentPeerEncryption(resolveNames = false)`, so the IP
+  filter checks addresses only), and UDP trackers fail at once instead of timing out; trackers, web seeds,
+  metainfo and tracker lists go through `HttpEngine.withProxy` (an engine that cannot use one
+  fails them, `TorrentHttp.default(proxy)` without an injected engine). Hosts pass
+  `KetchConfig.torrentProxy`: the manual proxy of `[download.proxy]` while `[torrent] useProxy`
+  is on (off by default; Settings → BitTorrent → Connections → Use the proxy, this device
+  only), in the desktop, Android and iOS apps and the CLI; a change applies at the next start.
+  Tests: `ProxiedTorrentNetworkTest` (scripted SOCKS5 and HTTP proxies on loopback)
 - IP filter (capability `ip-filter`): `TorrentConfig.blockedAddresses` / `[torrent] blocklist`
   / `TorrentEngineSettings.blockedAddresses` (live through `setBlockedAddresses` and
   `updateSettings`, which refuses entries that are none with `INVALID_INPUT`) lists addresses,

@@ -592,6 +592,8 @@
   <string name="settings_torrent_port_mapping_hint">請求路由器（UPnP 或 NAT-PMP）轉送一個連接埠，讓更多對等端能連線至此裝置。</string>
   <string name="settings_torrent_local_discovery">本機對等端探索</string>
   <string name="settings_torrent_local_discovery_hint">尋找區域網路中下載或分享相同公開種子的裝置，讓它們直接交換資料塊。</string>
+  <string name="settings_torrent_use_proxy">使用代理</string>
+  <string name="settings_torrent_use_proxy_hint">透過「網路」中設定的代理連線節點、HTTP Tracker 和網頁種子。使用代理時 DHT、uTP、UDP Tracker 和連接埠轉送皆關閉，其他節點也無法連入。重新啟動 Ketch 後生效。</string>
   <string name="settings_torrent_connections_footer">加密隱藏的是流量類型，而不是連線的對象。</string>
   <string name="settings_torrent_trackers">額外的 Tracker</string>
   <string name="settings_torrent_no_trackers">沒有額外的 Tracker</string>

@@ -127,7 +127,8 @@ private fun createInstanceManager(unreadableFiles: UnreadableFiles): InstanceMan
   val instanceId = DeviceStore("$supportDir/$DEVICE_FILE_NAME").instanceId()
   val torrentSource = TorrentDownloadSource(
     TorrentConfig(stateDirectory = "$supportDir/torrent-state")
-      .withSettings(config.torrent.engineSettings),
+      .withSettings(config.torrent.engineSettings)
+      .copy(proxy = config.torrentProxy),
     // Paused until the path monitor reports the network, moments after launch.
     uploadsPaused = config.torrent.uploadWifiOnly,
   )
