@@ -485,7 +485,8 @@ class TorrentRoutesTest {
 
     val edited = client.put("/api/torrents/t1/trackers") {
       contentType(ContentType.Application.Json)
-      setBody("""{"add":["udp://t.example:6969/announce"],"remove":["udp://old.example:1"]}""")
+      setBody(json.encodeToString(TorrentTrackerEdit(listOf("udp://t.example:6969/announce"),
+        listOf("udp://old.example:1"))))
     }
     val refused = client.put("/api/torrents/t1/trackers") {
       contentType(ContentType.Application.Json)
