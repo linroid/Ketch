@@ -212,6 +212,30 @@ From a terminal, `ketch export <task-id>` prints the magnet link and
 link but no file yet. REST: `GET /api/torrents/{id}/export`, with `?metainfo=true` for the file
 as Base64. Devices that can do this list the `export` capability.
 
+### Creating a torrent
+
+`ketch create` makes a `.torrent` file of a file or a folder and prints where it saved it, then
+its magnet link:
+
+```bash
+ketch create --tracker udp://tracker.example:1337/announce ~/Videos/holiday
+```
+
+- `--format v1` (the default) opens in every client, `v2` only in newer ones, and `hybrid` in
+  both, with padding entries that older clients list as `.pad` files.
+- The piece size is picked for about a thousand pieces; `--piece-length 256k` sets it (a power of
+  two from 16k to 16m).
+- `--tracker` and `--web-seed` repeat; each tracker is a tier of its own, tried in the order given.
+  `--private` marks the torrent private, which needs a tracker, and `--source` adds the tag some
+  private trackers ask for.
+- A folder's files are listed in the order BitTorrent v2 sorts them. Symbolic links and other
+  special files are left out. A torrent holds at most 10,000 files and 4 MiB of metadata.
+
+See the [CLI](../cli/README.md#create-a-torrent) for every option. In the SDK,
+`TorrentCreator.create(path, TorrentCreateOptions(...))` returns the file's bytes, the info
+hashes and the magnet link, and reports progress as it hashes. The torrents are checked against
+libtorrent, which opens them and finds the files complete.
+
 ## Seeding and uploading
 
 By default Ketch uploads verified pieces to peers while a torrent downloads, and stops once it
@@ -523,7 +547,8 @@ tracker's staff to allow Ketch if it is refused.
   with an error that says so, when it is resolved or previewed, as a link or a file's content, and
   a link added directly fails as soon as it starts. Many
   peers or large pieces use more memory. A torrent or magnet keeps its first 128 trackers.
-- Ketch does not create torrents.
+- Ketch creates torrents from the CLI and the SDK (see [creating a torrent](#creating-a-torrent));
+  the apps have no screen for it yet, and Ketch cannot yet seed files it did not download itself.
 
 ## For developers
 

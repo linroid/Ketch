@@ -73,6 +73,7 @@ Run `ketch` with no arguments, or with `--help`, to print the usage. Every comma
 |---|---|
 | [`ketch <url> [destination]`](#download-a-file) | Download one file and exit |
 | [`ketch add`, `list`, `pause`, `resume`, `watch`, `export`](#work-on-a-running-ketch) | Control the downloads of the Ketch app or server that is running |
+| [`ketch create <path>`](#create-a-torrent) | Make a `.torrent` file of a file or folder |
 | [`ketch server`](#server) | Run the Ketch server: REST API, web UI and downloads |
 | [`ketch mcp`](#mcp-server) | Serve Ketch to AI agents over the Model Context Protocol |
 | [`ketch ai-discover <query>`](#ai-discovery) | Ask an LLM agent to find download links |
@@ -403,6 +404,36 @@ app quits.
   `requestId` and `checksum` (the one asked for).
 
 Request headers are left out, as they can hold credentials.
+
+## Create a torrent
+
+```bash
+ketch create [options] <path>
+```
+
+Hashes the file or folder at `<path>`, saves `<name>.torrent` in the current directory and prints
+its path, then the torrent's magnet link (a private torrent has none). Progress shows on stderr
+when it runs in a terminal.
+
+| Option | What it does |
+|---|---|
+| `-o`, `--output <file>` | Where to save the `.torrent` file; a folder saves `<name>.torrent` in it |
+| `--format <format>` | `v1` (default), `v2` or `hybrid` |
+| `-t`, `--tracker <url>` | A tracker to announce to; repeatable, tried in the order given |
+| `--web-seed <url>` | An `http(s)` address that serves the content; repeatable |
+| `--private` | Find peers through the trackers only; needs a tracker |
+| `--piece-length <size>` | A power of two from `16k` to `16m`; about 1000 pieces by default |
+| `--name <name>` | The torrent's name; the file or folder's by default |
+| `--comment <text>` | A comment stored in the file |
+| `--source <tag>` | A private tracker's source tag, which changes the info hash |
+| `--overwrite` | Replace an existing `.torrent` file |
+| `--json` | Print `file`, `name`, `infoHash`, `infoHashV2`, `magnet`, `size`, `pieceLength` and `files` as JSON |
+
+The file is never saved inside the folder it describes, where the next run would list it as
+content: with a folder as `<path>`, run the command from elsewhere or pass `--output`.
+
+It exits 0 on success, 1 when the content cannot be read or made into a torrent, the file
+exists or it would be saved inside `<path>`, and 2 for invalid arguments.
 
 ## Server
 
