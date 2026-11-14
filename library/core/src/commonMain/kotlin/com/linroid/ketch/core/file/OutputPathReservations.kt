@@ -42,6 +42,27 @@ internal object OutputPathReservations {
   }
 
   /**
+   * Reserves and returns [candidate] for a download that replaces the file there once it
+   * completes, or returns `null`, reserving nothing, when it must not: another download reserved
+   * the path, its partial file exists (an unfinished download's), it has no partial name to be
+   * written under until then ([partialPathFor]), it is named as a partial file itself, which may
+   * be a paused download's, or it is not a file, as a folder.
+   */
+  fun reserveReplaceable(candidate: String): String? {
+    val path = candidate.toPath()
+    if (path.name.endsWith(PARTIAL_FILE_SUFFIX)) return null
+    val partial = partialPathFor(path)?.toPath() ?: return null
+    while (true) {
+      val current = reserved.load()
+      val keys = keys(path)
+      if (keys.any { it in current } || platformFileSystem.exists(partial)) return null
+      if (platformFileSystem.metadataOrNull(path)?.isRegularFile == false) return null
+      val next = keys.fold(current) { map, key -> map + (key to (map[key] ?: 0) + 1) }
+      if (reserved.compareAndSet(current, next)) return path.toString()
+    }
+  }
+
+  /**
    * [candidate], or when it exists or is reserved, the first free `name (n).ext` beside it,
    * without reserving it.
    */

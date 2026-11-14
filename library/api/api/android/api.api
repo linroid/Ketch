@@ -350,8 +350,8 @@ public final class com/linroid/ketch/api/DownloadConfig {
 	public static final field Companion Lcom/linroid/ketch/api/DownloadConfig$Companion;
 	public static final field MIN_SPEED_WINDOW_MS J
 	public fun <init> ()V
-	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lcom/linroid/ketch/api/FileConflict;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lcom/linroid/ketch/api/FileConflict;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()I
 	public final fun component11-3Xq65sA ()J
@@ -360,6 +360,7 @@ public final class com/linroid/ketch/api/DownloadConfig {
 	public final fun component14 ()I
 	public final fun component15 ()Lcom/linroid/ketch/api/Proxy;
 	public final fun component16 ()Ljava/util/List;
+	public final fun component17 ()Lcom/linroid/ketch/api/FileConflict;
 	public final fun component2 ()I
 	public final fun component3 ()J
 	public final fun component4 ()Z
@@ -368,12 +369,13 @@ public final class com/linroid/ketch/api/DownloadConfig {
 	public final fun component7 ()J
 	public final fun component8 ()J
 	public final fun component9 ()J
-	public final fun copy-Xkg0QqQ (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;)Lcom/linroid/ketch/api/DownloadConfig;
-	public static synthetic fun copy-Xkg0QqQ$default (Lcom/linroid/ketch/api/DownloadConfig;Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadConfig;
+	public final fun copy-QDNdO2s (Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lcom/linroid/ketch/api/FileConflict;)Lcom/linroid/ketch/api/DownloadConfig;
+	public static synthetic fun copy-QDNdO2s$default (Lcom/linroid/ketch/api/DownloadConfig;Ljava/lang/String;IJZJJJJJIJIIILcom/linroid/ketch/api/Proxy;Ljava/util/List;Lcom/linroid/ketch/api/FileConflict;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBufferSize ()I
 	public final fun getCategories ()Ljava/util/List;
 	public final fun getDefaultDirectory ()Ljava/lang/String;
+	public final fun getFileConflict ()Lcom/linroid/ketch/api/FileConflict;
 	public final fun getIdleTimeoutMs ()J
 	public final fun getMaxConcurrentDownloads ()I
 	public final fun getMaxConnectionsPerDownload ()I
@@ -458,8 +460,8 @@ public final class com/linroid/ketch/api/DownloadProgress$Companion {
 
 public final class com/linroid/ketch/api/DownloadRequest {
 	public static final field Companion Lcom/linroid/ketch/api/DownloadRequest$Companion;
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lcom/linroid/ketch/api/FileConflict;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lcom/linroid/ketch/api/FileConflict;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Lcom/linroid/ketch/api/ResolvedSource;
@@ -467,6 +469,7 @@ public final class com/linroid/ketch/api/DownloadRequest {
 	public final fun component13 ()Lcom/linroid/ketch/api/Proxy;
 	public final fun component14 ()Z
 	public final fun component15 ()Lcom/linroid/ketch/api/Checksum;
+	public final fun component16 ()Lcom/linroid/ketch/api/FileConflict;
 	public final fun component2-jWx8kFM ()Ljava/lang/String;
 	public final fun component3 ()I
 	public final fun component4 ()Ljava/util/Map;
@@ -475,14 +478,15 @@ public final class com/linroid/ketch/api/DownloadRequest {
 	public final fun component7 ()Lcom/linroid/ketch/api/DownloadPriority;
 	public final fun component8 ()Lcom/linroid/ketch/api/DownloadSchedule;
 	public final fun component9 ()Ljava/util/Set;
-	public final fun copy-C1rT4yw (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;)Lcom/linroid/ketch/api/DownloadRequest;
-	public static synthetic fun copy-C1rT4yw$default (Lcom/linroid/ketch/api/DownloadRequest;Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadRequest;
+	public final fun copy-zf3iCsc (Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lcom/linroid/ketch/api/FileConflict;)Lcom/linroid/ketch/api/DownloadRequest;
+	public static synthetic fun copy-zf3iCsc$default (Lcom/linroid/ketch/api/DownloadRequest;Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;Ljava/util/Map;JLcom/linroid/ketch/api/DownloadPriority;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/Set;Ljava/util/List;Lcom/linroid/ketch/api/ResolvedSource;Ljava/lang/String;Lcom/linroid/ketch/api/Proxy;ZLcom/linroid/ketch/api/Checksum;Lcom/linroid/ketch/api/FileConflict;ILjava/lang/Object;)Lcom/linroid/ketch/api/DownloadRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAwaitFileSelection ()Z
 	public final fun getChecksum ()Lcom/linroid/ketch/api/Checksum;
 	public final fun getConditions ()Ljava/util/List;
 	public final fun getConnections ()I
 	public final fun getDestination-jWx8kFM ()Ljava/lang/String;
+	public final fun getFileConflict ()Lcom/linroid/ketch/api/FileConflict;
 	public final fun getHeaders ()Ljava/util/Map;
 	public final fun getPriority ()Lcom/linroid/ketch/api/DownloadPriority;
 	public final fun getProperties ()Ljava/util/Map;
@@ -801,6 +805,19 @@ public final class com/linroid/ketch/api/DownloadTask$DefaultImpls {
 	public static synthetic fun reschedule$default (Lcom/linroid/ketch/api/DownloadTask;Lcom/linroid/ketch/api/DownloadSchedule;Ljava/util/List;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun resume-fK3SEAU$default (Lcom/linroid/ketch/api/DownloadTask;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun selectFiles (Lcom/linroid/ketch/api/DownloadTask;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/linroid/ketch/api/FileConflict : java/lang/Enum {
+	public static final field Companion Lcom/linroid/ketch/api/FileConflict$Companion;
+	public static final field OVERWRITE Lcom/linroid/ketch/api/FileConflict;
+	public static final field RENAME Lcom/linroid/ketch/api/FileConflict;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/linroid/ketch/api/FileConflict;
+	public static fun values ()[Lcom/linroid/ketch/api/FileConflict;
+}
+
+public final class com/linroid/ketch/api/FileConflict$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class com/linroid/ketch/api/FileOrder : java/lang/Enum {
@@ -1319,6 +1336,7 @@ public final class com/linroid/ketch/api/KetchFeatures {
 	public static final field CHECKSUM Ljava/lang/String;
 	public static final field CONFIG_PERSISTED Ljava/lang/String;
 	public static final field COUNTRIES Ljava/lang/String;
+	public static final field FILE_CONFLICT Ljava/lang/String;
 	public static final field FILE_SELECTION Ljava/lang/String;
 	public static final field FINITE_DASH Ljava/lang/String;
 	public static final field FINITE_HLS Ljava/lang/String;

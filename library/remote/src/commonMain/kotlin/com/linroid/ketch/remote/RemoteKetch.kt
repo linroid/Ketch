@@ -7,6 +7,7 @@ import com.linroid.ketch.api.CountryDatabaseStatus
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
@@ -348,6 +349,10 @@ class RemoteKetch internal constructor(
     if (request.checksum != null && KetchFeatures.CHECKSUM !in features()) {
       throw UnsupportedOperationException("This device cannot verify checksums")
     }
+    // An older server would ignore the choice and save beside the file it was told to replace.
+    if (request.fileConflict != null && KetchFeatures.FILE_CONFLICT !in features()) {
+      throw UnsupportedOperationException("This device cannot choose what existing files do")
+    }
     val response = httpClient.post(Api.Tasks()) {
       contentType(ContentType.Application.Json)
       setBody(request)
@@ -466,6 +471,12 @@ class RemoteKetch internal constructor(
   override suspend fun updateConfig(config: DownloadConfig) {
     log.d { "Updating config: speedLimit=${config.speedLimit}" }
     requireProxySupport(config.proxy)
+    // An older server would drop the field and keep saving beside existing files.
+    if (config.fileConflict != FileConflict.RENAME &&
+      KetchFeatures.FILE_CONFLICT !in status().features
+    ) {
+      throw UnsupportedOperationException("This device cannot replace existing files")
+    }
     val response = httpClient.put(Api.Config()) {
       contentType(ContentType.Application.Json)
       setBody(config)

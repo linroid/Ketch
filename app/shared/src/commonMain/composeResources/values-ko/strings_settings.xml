@@ -378,6 +378,11 @@
   <string name="settings_downloads_change">변경…</string>
   <string name="settings_downloads_enter_path">경로 입력…</string>
   <string name="settings_downloads_use_default">다운로드 폴더 사용</string>
+  <string name="settings_downloads_conflict">같은 이름의 파일이 있을 때</string>
+  <string name="settings_downloads_conflict_rename">이름 변경</string>
+  <string name="settings_downloads_conflict_overwrite">덮어쓰기</string>
+  <string name="settings_downloads_conflict_rename_hint">file (1).zip처럼 새 이름으로 함께 저장합니다.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">다운로드가 끝나면 파일을 대체합니다. 토렌트는 항상 기존 파일을 유지합니다.</string>
   <string name="settings_downloads_folders">추가 시트의 폴더</string>
   <string name="settings_downloads_folders_footer">다운로드를 추가할 때 고정한 폴더가 먼저 표시됩니다.</string>
   <string name="settings_downloads_pinned">고정됨 · %1$s</string>
@@ -752,6 +757,8 @@
   <string name="settings_search_checklist_keywords">시작하기, 온보딩, 설정, 체크리스트</string>
   <string name="settings_search_welcome_keywords">온보딩, 첫 실행, 소개, 환영</string>
   <string name="settings_search_save_to_keywords">폴더, 디렉터리, 위치, 경로, 저장 위치</string>
+  <string name="settings_search_conflict">다운로드 이름을 바꾸거나 같은 이름의 파일을 대체</string>
+  <string name="settings_search_conflict_keywords">덮어쓰기, 대체, 이름 변경, 중복, 기존 파일, 같은 이름, 충돌</string>
   <string name="settings_search_folders">고정한 폴더와 최근 폴더</string>
   <string name="settings_search_folders_keywords">즐겨찾기, 고정, 최근</string>
   <string name="settings_search_categories">유형이나 사이트별로 다운로드를 폴더에 정리</string>

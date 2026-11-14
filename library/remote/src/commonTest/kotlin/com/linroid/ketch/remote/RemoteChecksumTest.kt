@@ -3,6 +3,7 @@ package com.linroid.ketch.remote
 import com.linroid.ketch.api.Checksum
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.KetchStatus
 import com.linroid.ketch.api.SystemInfo
@@ -64,6 +65,32 @@ class RemoteChecksumTest {
         remote.download(DownloadRequest("https://example.com/file", checksum = checksum))
       }
       assertTrue(bodies.single().contains("\"checksum\":\"$checksum\""), bodies.single())
+    } finally {
+      remote.close()
+    }
+  }
+
+  @Test
+  fun fileConflict_serverWithoutFeature_isRefusedBeforeSending() = runTest {
+    val paths = mutableListOf<String>()
+    val remote = RemoteKetch("remote.example", 8642, null, false, MockEngine { request ->
+      paths += request.url.encodedPath
+      respond(
+        Json.encodeToString(status(features = emptySet())),
+        HttpStatusCode.OK,
+        headersOf(HttpHeaders.ContentType, "application/json"),
+      )
+    })
+    try {
+      assertFailsWith<UnsupportedOperationException> {
+        remote.download(
+          DownloadRequest("https://example.com/file", fileConflict = FileConflict.OVERWRITE),
+        )
+      }
+      assertFailsWith<UnsupportedOperationException> {
+        remote.updateConfig(DownloadConfig(fileConflict = FileConflict.OVERWRITE))
+      }
+      assertEquals(setOf("/api/status"), paths.toSet())
     } finally {
       remote.close()
     }

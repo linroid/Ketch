@@ -378,6 +378,11 @@
   <string name="settings_downloads_change">更改…</string>
   <string name="settings_downloads_enter_path">输入路径…</string>
   <string name="settings_downloads_use_default">使用下载文件夹</string>
+  <string name="settings_downloads_conflict">文件已存在时</string>
+  <string name="settings_downloads_conflict_rename">重命名</string>
+  <string name="settings_downloads_conflict_overwrite">覆盖</string>
+  <string name="settings_downloads_conflict_rename_hint">以新名称保存在旁边，例如 file (1).zip。</string>
+  <string name="settings_downloads_conflict_overwrite_hint">下载完成后替换该文件。种子下载始终保留原文件。</string>
   <string name="settings_downloads_folders">添加面板中的文件夹</string>
   <string name="settings_downloads_folders_footer">添加下载时，已固定的文件夹排在最前。</string>
   <string name="settings_downloads_pinned">已固定 · %1$s</string>
@@ -752,6 +757,8 @@
   <string name="settings_search_checklist_keywords">入门, 新手引导, 设置</string>
   <string name="settings_search_welcome_keywords">新手引导, 首次运行, 介绍, 欢迎</string>
   <string name="settings_search_save_to_keywords">文件夹, 目录, 位置, 路径, 保存位置</string>
+  <string name="settings_search_conflict">重命名下载的文件，或替换同名文件</string>
+  <string name="settings_search_conflict_keywords">覆盖, 替换, 重命名, 重复, 已存在的文件, 同名, 冲突</string>
   <string name="settings_search_folders">已固定和最近的文件夹</string>
   <string name="settings_search_folders_keywords">收藏, 固定, 最近</string>
   <string name="settings_search_categories">按类型或网站将下载分类到文件夹</string>

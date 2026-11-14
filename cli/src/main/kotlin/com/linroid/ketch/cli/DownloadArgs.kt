@@ -5,6 +5,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.FileOrder
 import com.linroid.ketch.api.Proxy
@@ -45,8 +46,13 @@ internal sealed interface DownloadArgs {
     val reverse: Boolean = false,
     /** `--checksum`: the digest the file must have; `null` checks only a published one. */
     val checksum: Checksum? = null,
+    /** `--overwrite`: replace a file of the download's name instead of saving beside it. */
+    val overwrite: Boolean = false,
   ) : DownloadArgs
 }
+
+/** The flag that sets [DownloadRequest.fileConflict] to [FileConflict.OVERWRITE]. */
+internal const val OVERWRITE_OPTION = "--overwrite"
 
 /** The option that sets [DownloadRequest.checksum]. */
 internal const val CHECKSUM_OPTION = "--checksum"
@@ -230,6 +236,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   var fileOrder: FileOrder? = null
   var reverse = false
   var checksum: Checksum? = null
+  var overwrite = false
 
   var i = 0
   while (i < args.size) {
@@ -239,6 +246,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
       arg == NO_PROXY_OPTION -> proxy.noProxy()
       arg == "--list-files" -> listFiles = true
       arg == "--reverse" -> reverse = true
+      arg == OVERWRITE_OPTION -> overwrite = true
       arg in valueOptions -> {
         val value = args.getOrNull(i + 1)
           ?: return DownloadArgs.Invalid("$arg requires a value")
@@ -288,6 +296,9 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
   if (listFiles && checksum != null) {
     return DownloadArgs.Invalid("--list-files and $CHECKSUM_OPTION cannot be used together")
   }
+  if (listFiles && overwrite) {
+    return DownloadArgs.Invalid("--list-files and $OVERWRITE_OPTION cannot be used together")
+  }
   return DownloadArgs.Download(
     url = url,
     destination = destination,
@@ -305,6 +316,7 @@ internal fun parseDownloadArgs(args: List<String>): DownloadArgs {
     fileOrder = fileOrder ?: FileOrder.SOURCE,
     reverse = reverse,
     checksum = checksum,
+    overwrite = overwrite,
   )
 }
 
@@ -320,6 +332,7 @@ internal fun DownloadArgs.Download.toRequest(destination: Destination): Download
     proxy = proxy,
     selectedFileIds = fileIds,
     checksum = checksum,
+    fileConflict = FileConflict.OVERWRITE.takeIf { overwrite },
   )
 
 /**

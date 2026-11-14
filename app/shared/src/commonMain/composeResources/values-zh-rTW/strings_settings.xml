@@ -378,6 +378,11 @@
   <string name="settings_downloads_change">更改…</string>
   <string name="settings_downloads_enter_path">輸入路徑…</string>
   <string name="settings_downloads_use_default">使用「下載」資料夾</string>
+  <string name="settings_downloads_conflict">檔案已存在時</string>
+  <string name="settings_downloads_conflict_rename">重新命名</string>
+  <string name="settings_downloads_conflict_overwrite">覆寫</string>
+  <string name="settings_downloads_conflict_rename_hint">以新名稱儲存在旁邊，例如 file (1).zip。</string>
+  <string name="settings_downloads_conflict_overwrite_hint">下載完成後取代該檔案。種子下載一律保留原檔案。</string>
   <string name="settings_downloads_folders">新增面板中的資料夾</string>
   <string name="settings_downloads_folders_footer">新增下載時，已釘選的資料夾會排在最前面。</string>
   <string name="settings_downloads_pinned">已釘選 · %1$s</string>
@@ -752,6 +757,8 @@
   <string name="settings_search_checklist_keywords">入門, 新手引導, 設定步驟</string>
   <string name="settings_search_welcome_keywords">新手引導, 首次執行, 簡介, 歡迎</string>
   <string name="settings_search_save_to_keywords">資料夾, 目錄, 位置, 路徑, 目的地, 儲存位置</string>
+  <string name="settings_search_conflict">重新命名下載的檔案，或取代同名檔案</string>
+  <string name="settings_search_conflict_keywords">覆寫, 取代, 重新命名, 重複, 已存在的檔案, 同名, 衝突</string>
   <string name="settings_search_folders">已釘選和最近使用的資料夾</string>
   <string name="settings_search_folders_keywords">我的最愛, 釘選, 最近</string>
   <string name="settings_search_categories">依類型或網站將下載項目分類到資料夾</string>

@@ -378,6 +378,11 @@
   <string name="settings_downloads_change">変更…</string>
   <string name="settings_downloads_enter_path">パスを入力…</string>
   <string name="settings_downloads_use_default">ダウンロードフォルダを使用</string>
+  <string name="settings_downloads_conflict">同じ名前のファイルがある場合</string>
+  <string name="settings_downloads_conflict_rename">名前を変更</string>
+  <string name="settings_downloads_conflict_overwrite">上書き</string>
+  <string name="settings_downloads_conflict_rename_hint">file (1).zip のように別の名前で保存します。</string>
+  <string name="settings_downloads_conflict_overwrite_hint">ダウンロードの完了後にファイルを置き換えます。トレントでは常に元のファイルを残します。</string>
   <string name="settings_downloads_folders">追加シートのフォルダ</string>
   <string name="settings_downloads_folders_footer">ダウンロードを追加するとき、ピン留めしたフォルダが先頭に表示されます。</string>
   <string name="settings_downloads_pinned">ピン留め · %1$s</string>
@@ -752,6 +757,8 @@
   <string name="settings_search_checklist_keywords">はじめに, オンボーディング, セットアップ</string>
   <string name="settings_search_welcome_keywords">オンボーディング, 初回起動, ようこそ, 紹介</string>
   <string name="settings_search_save_to_keywords">フォルダ, ディレクトリ, 場所, パス, 保存先</string>
+  <string name="settings_search_conflict">ダウンロードの名前を変更するか、同じ名前のファイルを置き換える</string>
+  <string name="settings_search_conflict_keywords">上書き, 置き換え, 名前の変更, 重複, 既存のファイル, 同名, 競合</string>
   <string name="settings_search_folders">ピン留めしたフォルダと最近のフォルダ</string>
   <string name="settings_search_folders_keywords">お気に入り, ピン留め, 最近</string>
   <string name="settings_search_categories">ダウンロードを種類やサイトでフォルダに振り分ける</string>

@@ -28,7 +28,8 @@ import kotlinx.serialization.Serializable
  * @property proxy replaces [DownloadConfig.proxy] for this download; saved with its password
  * @property requestId a caller's UUID for this submission. With [KetchFeatures.REQUEST_ID], an
  *   identical resubmission returns the existing task, unchanged; reusing it with another source,
- *   destination, headers, properties, proxy or checksum is rejected.
+ *   destination, headers, properties, proxy or checksum is rejected; the task keeps its own
+ *   [fileConflict].
  * @property awaitFileSelection with no [selectedFileIds], pause for
  *   [PauseReason.AwaitingFileSelection] once several files or variants are known
  *   ([KetchFeatures.AWAIT_FILE_SELECTION])
@@ -36,6 +37,8 @@ import kotlinx.serialization.Serializable
  *   [KetchError.ChecksumMismatch]. Without one, HTTP downloads are checked against a digest the
  *   server publishes. Only for sources Ketch writes as one file (not torrents); needs
  *   [KetchFeatures.CHECKSUM].
+ * @property fileConflict replaces [DownloadConfig.fileConflict] for this download; `null`
+ *   follows it. Needs [KetchFeatures.FILE_CONFLICT].
  */
 @Serializable
 data class DownloadRequest(
@@ -54,6 +57,7 @@ data class DownloadRequest(
   val proxy: Proxy? = null,
   val awaitFileSelection: Boolean = false,
   val checksum: Checksum? = null,
+  val fileConflict: FileConflict? = null,
 ) {
   init {
     require(url.isNotBlank()) { "URL must not be blank" }

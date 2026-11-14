@@ -33,6 +33,8 @@ import kotlinx.serialization.Serializable
  *   [DownloadRequest.proxy] replaces it per download
  * @property categories folders under [defaultDirectory] for downloads that choose none; the
  *   first match wins ([DownloadCategory])
+ * @property fileConflict what a download does when a file already has the name Ketch chose for
+ *   it; [DownloadRequest.fileConflict] replaces it per download
  */
 @Serializable
 data class DownloadConfig(
@@ -52,6 +54,7 @@ data class DownloadConfig(
   val maxConnectionsPerHost: Int = 16,
   val proxy: Proxy = Proxy.System,
   val categories: List<DownloadCategory> = emptyList(),
+  val fileConflict: FileConflict = FileConflict.RENAME,
 ) {
   init {
     require(retryCount >= 0) { "retryCount must be non-negative" }

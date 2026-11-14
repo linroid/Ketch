@@ -38,6 +38,9 @@ maxConnectionsPerDownload = 4
 # Queue limits count downloads, not individual connections; 0 means unlimited.
 maxConcurrentDownloads = 4
 maxConnectionsPerHost = 16
+# When a file of the download's name exists: "rename" saves beside it, as
+# "name (1).ext"; "overwrite" replaces it once the download completes.
+# fileConflict = "rename"
 
 # Advanced settings (defaults are usually fine):
 # retryCount = 3  # retries in a row without progress before a download fails

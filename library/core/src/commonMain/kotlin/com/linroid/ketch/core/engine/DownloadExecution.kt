@@ -5,6 +5,7 @@ import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
@@ -81,6 +82,8 @@ import okio.Path.Companion.toPath
  * @param timeSource measures download speed and the time added to [TaskRecord.downloadTime]
  * @param clock stamps [TaskRecord.completedAt] when the download completes
  * @param openFile opens the output file of a source that does not write its own files
+ * @param unfinishedOutputs where the other unfinished tasks save: files and folders this
+ *   download never replaces
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal class DownloadExecution(
@@ -95,6 +98,7 @@ internal class DownloadExecution(
   private val openFile: (path: String, ioDispatcher: CoroutineDispatcher) -> FileAccessor =
     ::createFileAccessor,
   private val connections: ConnectionReporter = ConnectionReporter.None,
+  private val unfinishedOutputs: () -> List<String> = { emptyList() },
 ) {
   private val log = KetchLogger("Execution")
 
@@ -546,7 +550,11 @@ internal class DownloadExecution(
       val target = OutputTarget(
         path = outputPath,
         partial = record.partialPath.takeUnless { source.managesOwnFileIo },
-        replace = record.request.destination?.isFile() == true,
+        // Read as the resume starts, like the rest of the configuration: a file that took the
+        // output path since the download chose it is replaced when files are overwritten now,
+        // and kept otherwise.
+        replace = record.request.destination?.isFile() == true ||
+          config.fileConflict == FileConflict.OVERWRITE,
       )
       Prepared(target, record.totalBytes, record.resolvedSource, sourceState)
     }
@@ -1103,7 +1111,9 @@ internal class DownloadExecution(
    * file [destination] is used as it is, and replaced once the download completes. Otherwise
    * the name, a [destination] name or else [serverFileName] made safe with [sanitizeFileName],
    * is joined to the folder, must stay inside it, and gets a ` (n)` suffix when the file or its
-   * partial file exists or another download reserved the path. The folder is a
+   * partial file exists or another download reserved the path. With [FileConflict.OVERWRITE] a
+   * file at that path is replaced once the download completes instead, where it is safe to
+   * ([replaceablePath]). The folder is a
    * [destination] folder; without one, it is the folder of the first of
    * [DownloadConfig.categories] that the name, [contentType] and the URL host match, or else
    * the default one. In an Android content:// folder the partial document is created now, and
@@ -1148,8 +1158,35 @@ internal class DownloadExecution(
         IllegalArgumentException("File name \"$fileName\" leaves the folder $directory"),
       )
     }
+    if (partial && config.fileConflict == FileConflict.OVERWRITE) {
+      val replaced = replaceablePath(outputPath)
+      if (replaced != null) return OutputTarget(replaced, partialOf(replaced), replace = true)
+    }
     val reserved = OutputPathReservations.reserveUnique(outputPath).also { reservedPaths += it }
     return OutputTarget(reserved, partialOf(reserved), replace = false)
+  }
+
+  /**
+   * Reserves and returns [outputPath] for a download that replaces the file there once it
+   * completes ([FileConflict.OVERWRITE]): the file stays as it is until the finished partial
+   * file is moved over it. `null`, reserving nothing, when the path is not this download's to
+   * replace, and it gets a free name instead: a running download reserved it, an unfinished
+   * download's partial file is beside it, another unfinished task saves there or in a folder of
+   * that name ([unfinishedOutputs]), the name is too long for a partial file, so the download
+   * would write over the file from its first byte, or it is a folder.
+   */
+  private fun replaceablePath(outputPath: String): String? {
+    val path = outputPath.toPath().normalized()
+    val taken = unfinishedOutputs().any { other ->
+      if (other.contains("://")) return@any false
+      val owned = other.toPath().normalized()
+      path == owned || generateSequence(path.parent) { it.parent }.any { it == owned }
+    }
+    if (taken) {
+      log.d { "Not replacing another task's output for taskId=$taskId" }
+      return null
+    }
+    return OutputPathReservations.reserveReplaceable(outputPath)?.also { reservedPaths += it }
   }
 
   /**
@@ -1222,7 +1259,8 @@ internal class DownloadExecution(
    * Where a download saves: its output [path], and the [partial] file it writes until it
    * completes and is moved to [path] (`null` to write to [path] itself). An Android content://
    * partial document is its own [path] until it is renamed. A finished download [replace]s an
-   * existing [path] only when the caller named that file.
+   * existing [path] only when the caller named that file or files are overwritten
+   * ([FileConflict.OVERWRITE]).
    */
   private class OutputTarget(val path: String, val partial: String?, val replace: Boolean) {
     val writePath: String get() = partial ?: path

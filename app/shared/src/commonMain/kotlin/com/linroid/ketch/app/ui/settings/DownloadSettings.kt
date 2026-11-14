@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchFeatures
 import com.linroid.ketch.api.SystemInfo
 import com.linroid.ketch.api.log.KetchLogger
@@ -32,6 +33,7 @@ import com.linroid.ketch.app.components.KetchButton
 import com.linroid.ketch.app.components.KetchButtonSize
 import com.linroid.ketch.app.components.KetchButtonVariant
 import com.linroid.ketch.app.components.KetchIconButton
+import com.linroid.ketch.app.components.KetchSegmented
 import com.linroid.ketch.app.i18n.resolve
 import com.linroid.ketch.app.i18n.spanText
 import com.linroid.ketch.app.i18n.text
@@ -64,6 +66,11 @@ import ketch.app.shared.generated.resources.settings_downloads_at_once_more
 import ketch.app.shared.generated.resources.settings_downloads_at_once_unlimited
 import ketch.app.shared.generated.resources.settings_downloads_change
 import ketch.app.shared.generated.resources.settings_downloads_choose_folder
+import ketch.app.shared.generated.resources.settings_downloads_conflict
+import ketch.app.shared.generated.resources.settings_downloads_conflict_overwrite
+import ketch.app.shared.generated.resources.settings_downloads_conflict_overwrite_hint
+import ketch.app.shared.generated.resources.settings_downloads_conflict_rename
+import ketch.app.shared.generated.resources.settings_downloads_conflict_rename_hint
 import ketch.app.shared.generated.resources.settings_downloads_enter_path
 import ketch.app.shared.generated.resources.settings_downloads_folder
 import ketch.app.shared.generated.resources.settings_downloads_folders
@@ -153,18 +160,27 @@ fun DownloadSettings(state: AppState, device: InstanceEntry) {
     device !is RemoteInstance || presence.firstOrNull { it.deviceId == device.deviceId }
       ?.status?.let { KetchFeatures.TRANSFER_TIMEOUTS in it.features } ?: false
   }
-  FolderGroup(device, config, onChange)
+  // Until a remote device reports, it may be older than the choice and ignore it.
+  val choosesConflicts = remember(presence, device) {
+    device !is RemoteInstance || presence.firstOrNull { it.deviceId == device.deviceId }
+      ?.status?.let { KetchFeatures.FILE_CONFLICT in it.features } ?: false
+  }
+  FolderGroup(device, config, choosesConflicts, onChange)
   CategoryGroup(device, { controller.download ?: config }, sortsIntoFolders, onChange)
   FolderShortcuts(state, device, config)
   QueueGroup(config, dropsStalls, onChange)
 }
 
-/** Where [device] saves downloads, with the free space there and ways to change it. */
+/**
+ * Where [device] saves downloads, with the free space there and ways to change it, and with
+ * [choosesConflicts] what a download does when a file of its name is already there.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FolderGroup(
   device: InstanceEntry,
   config: DownloadConfig,
+  choosesConflicts: Boolean,
   onChange: (DownloadConfig) -> Unit,
 ) {
   val spacing = KetchTheme.spacing
@@ -289,7 +305,40 @@ private fun FolderGroup(
         }
       }
     }
+    // A document tree's provider names its files, so existing ones are never replaced there.
+    if (choosesConflicts && (folder == null || !isDocumentTree(folder))) {
+      ConflictRow(config, onChange)
+    }
   }
+}
+
+/** Whether a download is saved beside a file of its name or replaces it. */
+@Composable
+private fun ConflictRow(config: DownloadConfig, onChange: (DownloadConfig) -> Unit) {
+  SettingsRow(
+    title = stringResource(Res.string.settings_downloads_conflict),
+    description = stringResource(
+      when (config.fileConflict) {
+        FileConflict.RENAME -> Res.string.settings_downloads_conflict_rename_hint
+        FileConflict.OVERWRITE -> Res.string.settings_downloads_conflict_overwrite_hint
+      },
+    ),
+    trailing = {
+      KetchSegmented(
+        options = FileConflict.entries,
+        selected = config.fileConflict,
+        onSelect = { onChange(config.copy(fileConflict = it)) },
+        label = {
+          stringResource(
+            when (it) {
+              FileConflict.RENAME -> Res.string.settings_downloads_conflict_rename
+              FileConflict.OVERWRITE -> Res.string.settings_downloads_conflict_overwrite
+            },
+          )
+        },
+      )
+    },
+  )
 }
 
 /** The folder as a sunken pill, middle-ellipsized, with the [free] space at its end. */

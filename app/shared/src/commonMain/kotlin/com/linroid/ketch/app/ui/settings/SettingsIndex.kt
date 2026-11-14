@@ -21,6 +21,7 @@ import ketch.app.shared.generated.resources.settings_ai_providers
 import ketch.app.shared.generated.resources.settings_ai_test
 import ketch.app.shared.generated.resources.settings_ai_web_search
 import ketch.app.shared.generated.resources.settings_categories
+import ketch.app.shared.generated.resources.settings_downloads_conflict
 import ketch.app.shared.generated.resources.settings_downloads_folders
 import ketch.app.shared.generated.resources.settings_downloads_per_server
 import ketch.app.shared.generated.resources.settings_downloads_retries
@@ -83,6 +84,8 @@ import ketch.app.shared.generated.resources.settings_search_close_keywords
 import ketch.app.shared.generated.resources.settings_search_keep_awake_keywords
 import ketch.app.shared.generated.resources.settings_search_when_done_keywords
 import ketch.app.shared.generated.resources.settings_search_code_keywords
+import ketch.app.shared.generated.resources.settings_search_conflict
+import ketch.app.shared.generated.resources.settings_search_conflict_keywords
 import ketch.app.shared.generated.resources.settings_search_connections_keywords
 import ketch.app.shared.generated.resources.settings_search_density
 import ketch.app.shared.generated.resources.settings_search_density_keywords
@@ -440,6 +443,12 @@ internal val SettingsIndex: List<SettingsIndexEntry> = listOf(
     category = SettingsCategory.Downloads,
     title = Res.string.settings_downloads_save_to_row,
     keywords = Res.string.settings_search_save_to_keywords,
+  ),
+  SettingsIndexEntry(
+    category = SettingsCategory.Downloads,
+    title = Res.string.settings_downloads_conflict,
+    description = Res.string.settings_search_conflict.text(),
+    keywords = Res.string.settings_search_conflict_keywords,
   ),
   SettingsIndexEntry(
     category = SettingsCategory.Downloads,

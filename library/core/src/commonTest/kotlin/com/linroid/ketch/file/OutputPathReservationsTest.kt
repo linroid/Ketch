@@ -7,6 +7,7 @@ import okio.Path
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class OutputPathReservationsTest {
   @Test
@@ -52,6 +53,44 @@ class OutputPathReservationsTest {
 
     assertEquals((folder / "file (1).zip").toString(), path)
     OutputPathReservations.release(path)
+  }
+
+  @Test
+  fun reserveReplaceable_existingFile_reservesItsOwnName() = withFolder { folder ->
+    platformFileSystem.write(folder / "file.zip") {}
+
+    val path = OutputPathReservations.reserveReplaceable("$folder/file.zip")
+    val second = OutputPathReservations.reserveReplaceable("$folder/file.zip")
+
+    assertEquals((folder / "file.zip").toString(), path)
+    // Held by the first download now.
+    assertNull(second)
+    OutputPathReservations.release(checkNotNull(path))
+  }
+
+  @Test
+  fun reserveReplaceable_existingPartialFile_isRefused() = withFolder { folder ->
+    platformFileSystem.write(folder / "file.zip") {}
+    platformFileSystem.write(folder / "file.zip.ketch") {}
+
+    assertNull(OutputPathReservations.reserveReplaceable("$folder/file.zip"))
+  }
+
+  @Test
+  fun reserveReplaceable_nameOfAPartialFile_isRefused() = withFolder { folder ->
+    // It may be what a paused download of file.zip writes.
+    platformFileSystem.write(folder / "file.zip.ketch") {}
+
+    assertNull(OutputPathReservations.reserveReplaceable("$folder/file.zip.ketch"))
+  }
+
+  @Test
+  fun reserveReplaceable_folderOrNameTooLongForPartialFile_isRefused() = withFolder { folder ->
+    platformFileSystem.createDirectories(folder / "folder.zip")
+    val long = "a".repeat(248) + ".zip"
+
+    assertNull(OutputPathReservations.reserveReplaceable("$folder/folder.zip"))
+    assertNull(OutputPathReservations.reserveReplaceable("$folder/$long"))
   }
 
   @Test

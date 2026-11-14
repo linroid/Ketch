@@ -76,7 +76,7 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
 ### `library:api` (public API)
 - `com.linroid.ketch.api` -- `KetchApi` (`VERSION`/`REVISION` constants), `DownloadTask`,
   `DownloadRequest`, `DownloadState`, `DownloadProgress`, `DownloadConfig`, `DownloadCategory`,
-  `Destination`,
+  `Destination`, `FileConflict`,
   `Segment`, `KetchError`, `SpeedLimit`, `DownloadPriority`, `DownloadSchedule`,
   `DownloadCondition`, `KetchStatus` (`instanceId`: the device's identity, see
   [Device identity](#device-identity)), `NetworkInterfaces`, `NetworkInterfaceConfig`,
@@ -494,6 +494,21 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   once finished, reporting its URI as the output path until then; a provider without
   `FLAG_SUPPORTS_RENAME`, or one that changes the partial name, keeps the final name throughout,
   and a final rename that fails leaves the finished document under its partial name
+- Existing files (`FileConflict`, `KetchFeatures.FILE_CONFLICT`, `download.fileConflict`):
+  `DownloadConfig.fileConflict` (`RENAME` by default; wire `rename`/`overwrite`, unknown values
+  decode as `RENAME`), replaced per task by `DownloadRequest.fileConflict`, which
+  `DownloadConfig.forRequest` folds into the run's config, read as a download starts or resumes.
+  With `OVERWRITE`, `DownloadExecution.resolveDestPath` keeps a name Ketch chose although a file
+  has it (`replaceablePath`, `OutputPathReservations.reserveReplaceable`) and the finished,
+  verified partial file is moved over it (`OutputTarget.replace`, as for a file `Destination`),
+  so the file stays until then and when the download fails, pauses or is canceled or removed.
+  The name gets `name (n)` as with `RENAME` when a running download reserved it, its partial
+  file exists, another unfinished task saves there or in a folder of that name
+  (`Ketch.unfinishedOutputs`), it ends in `.ketch`, it is a folder, or it is too long for a
+  partial file, as the download would then write over the file from its first byte. Sources that
+  write their own files (torrents) and Android `content://` folders, whose provider names the
+  document and has no atomic replace, always rename. A `requestId` resubmission keeps the task's
+  own choice. Tests: `FileConflictTest`
 - Category folders: a request whose destination is `null` or a bare name is saved in the folder,
   inside the default directory, of the first of `DownloadConfig.categories` it matches
   (`DownloadCategory`: `extensions` or `mimeTypes`, either enough, and `hosts` with subdomains
@@ -1751,6 +1766,9 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   and host names are kept as strings (`HookConfig.eventSet` drops unknown events) and a
   `timeoutSeconds` that is not a number loads as the default; see
   [Automation hooks](#automation-hooks-hooks)
+- `[download] fileConflict` (`"rename"` or `"overwrite"`) is `DownloadConfig.fileConflict`,
+  edited in Settings → Downloads → Save to ("When a file already exists", `ConflictRow`) for
+  devices listing `download.fileConflict`, hidden while the folder is a document tree
 - `[[download.categories]]` tables hold `DownloadConfig.categories` (`folder`, `extensions`,
   `mimeTypes`, `hosts`), edited in Settings → Downloads (`ui/settings/CategorySettings.kt`, with
   `SuggestedCategory` presets named in the app's language and the field parsing in
@@ -2177,11 +2195,18 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `~/Library`, `AppData`; the apps and `ketch server` add their config or data directory, the
   desktop app its own install folder) and hidden entries such as `~/.ssh`, unless inside the
   download directory (`DestinationPathPolicy`'s `excluded` and `refuseHidden`, checked below
-  the root that holds a path, ignoring case). A new download still never replaces a file
+  the root that holds a path, ignoring case). A new download still never replaces a file,
+  unless files are overwritten (`FileConflict.OVERWRITE`), which the guard holds tighter than
+  saving: a request asking for it is refused without a token, as is a `PUT /api/config` switching
+  to it (403 `overwrite_rejected`, `OverwriteRejectedException`; a config that already overwrites
+  applies), and with a token in a folder outside the download directory and
+  `allowedDirectories`, where a request that only follows the config is pinned to `RENAME`
+  instead. A file path a caller names still gets a free name
 - `POST /api/tasks` takes `checksum` as text (`"sha256:<hex>"`; a malformed one is 400), and
   task views carry it in `request` and the verified one in `Completed.checksum`; a mismatch is a
   `checksum_mismatch` error. `RemoteKetch.download` refuses a checksum for servers without
-  `KetchFeatures.CHECKSUM`
+  `KetchFeatures.CHECKSUM`, and it and `updateConfig` an overwriting `fileConflict` for servers
+  without `KetchFeatures.FILE_CONFLICT`
 - `POST /api/tasks` answers a link no source handles with 415 `unsupported` ("No download source
   handles this URL"), as the resolve routes do, telling it by the `NoDownloadSourceException`
   cause of `Ketch.download`'s `IllegalArgumentException`; other refusals stay 400 `bad_request`
@@ -2319,6 +2344,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   instance's setting; `--proxy <url>`, `--proxy-bypass <hosts>` and `--no-proxy` (`ProxyOptions`)
   set `DownloadRequest.proxy` instead, which `ketch add` refuses for an instance without
   `KetchFeatures.PROXY`
+- `ketch <url>` and `ketch add` take `--overwrite` (`OVERWRITE_OPTION`,
+  `DownloadRequest.fileConflict`; not with `--list-files`); `ketch <url>` also follows
+  `[download] fileConflict` of the config file, and `ketch add` refuses the flag for an instance
+  without `KetchFeatures.FILE_CONFLICT`. MCP has no parameter for it
 - `ketch <url>` and `ketch add` take `--checksum <digest>` (`sha256:<hex>`, also `md5`, `sha1`,
   `sha512`, base64 or bare hex; `parseChecksumOption`), a malformed one exiting 2; `ketch add`
   refuses it for an instance without `KetchFeatures.CHECKSUM`, and task JSON carries `checksum`

@@ -402,6 +402,7 @@ these rather than on version numbers: older servers send fewer.
 | `CATEGORY_FOLDERS` | `download.categories` | `DownloadConfig.categories` |
 | `TRANSFER_TIMEOUTS` | `download.timeouts` | `idleTimeoutMs`, `minSpeed`, `unlimitedRetries` |
 | `CHECKSUM` | `download.checksum` | `DownloadRequest.checksum` |
+| `FILE_CONFLICT` | `download.fileConflict` | `DownloadConfig.fileConflict` and `DownloadRequest.fileConflict` |
 | `ACTIVE_CONNECTIONS` | `net.activeConnections` | `Interest.Connections` |
 | `SPEED_MODES` | `speed.modes` | `controller(SpeedModes)` and `Interest.SpeedMode` |
 | `FILE_SELECTION` | `download.fileSelection` | `selectFiles` (listed by sources that choose files) |
@@ -583,7 +584,9 @@ api.start() // connects, loads the tasks and keeps reconnecting
 - Calls the server refuses throw `RemoteApiException` with the HTTP status, the error code and
   message, and `Retry-After`, unless `KetchApi` documents another exception for the case.
 - It refuses requests that need features the server lacks, such as a proxy without `http.proxy`
-  or a checksum without `download.checksum`, instead of letting the server ignore them.
+  or a checksum without `download.checksum`, instead of letting the server ignore them. The same
+  goes for a request's `fileConflict` and a configuration that overwrites without
+  `download.fileConflict`.
 
 ## Configuration
 
@@ -607,8 +610,25 @@ DownloadConfig(
   maxConnectionsPerHost = 16,        // simultaneous downloads per host (0 = unlimited)
   proxy = Proxy.System,              // HTTP(S) proxy: System, Direct or Proxy.Manual(url)
   categories = emptyList(),          // folders inside defaultDirectory, by type or site
+  fileConflict = FileConflict.RENAME, // or OVERWRITE: replace a file of the download's name
 )
 ```
+
+`fileConflict` says what a download does when a file already has the name Ketch chose for it:
+
+- `FileConflict.RENAME`, the default, keeps the file and saves beside it as `name (1).ext`.
+- `FileConflict.OVERWRITE` replaces it once the download completes and is verified. Until then
+  the download writes `name.ext.ketch` and the existing file stays as it is, also when the
+  download fails, is paused or is canceled.
+- `DownloadRequest.fileConflict` replaces the setting for one download; `null` follows it.
+- A name another unfinished download saves to is never taken, and neither is a folder's or a name
+  too long for a partial file: such a download gets a free name, as with `RENAME`.
+- It applies to names Ketch chooses. A file `Destination` names its file and always replaces it.
+  Sources that write their own files, such as BitTorrent, and Android `content://` folders always
+  keep the existing file.
+- Instances list `FILE_CONFLICT`. Over the REST API, only callers with the token can ask for
+  `OVERWRITE`, and it only applies in the download directory and the server's
+  `allowedDirectories`; see the [CLI reference](../cli/README.md#save-folders).
 
 ### Changing settings at runtime
 
