@@ -50,6 +50,7 @@ import ketch.app.shared.generated.resources.downloads_failed_reschedule
 import ketch.app.shared.generated.resources.downloads_failed_resume
 import ketch.app.shared.generated.resources.downloads_failed_retry
 import ketch.app.shared.generated.resources.downloads_failed_reveal
+import ketch.app.shared.generated.resources.downloads_failed_check_files
 import ketch.app.shared.generated.resources.downloads_failed_seeding
 import ketch.app.shared.generated.resources.downloads_failed_speed_limit
 import ketch.app.shared.generated.resources.downloads_open_source_failed
@@ -86,7 +87,10 @@ internal enum class TaskCommand(val key: String, private val failure: StringReso
   /** Starts a torrent that waits for its files with every file. */
   DownloadAllFiles("download-all-files", Res.string.downloads_failed_files),
   StopSeeding("stop-seeding", Res.string.downloads_failed_seeding),
-  Seed("seed", Res.string.downloads_failed_seeding);
+  Seed("seed", Res.string.downloads_failed_seeding),
+
+  /** Checks a finished torrent's files again. */
+  CheckFiles("check-files", Res.string.downloads_failed_check_files);
 
   /**
    * The failure of this command on [what], a task's name or a number of downloads, on [device]:
@@ -156,7 +160,8 @@ internal class RowCommands(
     RowAction.CopyLink, RowAction.CopyError, RowAction.CopyDetails -> clipboard != null
     RowAction.OpenSourcePage -> sourcePage(row) != null
     RowAction.FindAnotherSource -> row.device.capabilities.canDiscover
-    RowAction.StopSeeding, RowAction.Seed -> state.torrentControllerOf(row.key.deviceId) != null
+    RowAction.StopSeeding, RowAction.Seed, RowAction.CheckFiles ->
+      state.torrentControllerOf(row.key.deviceId) != null
     else -> true
   }
 
@@ -205,6 +210,7 @@ internal class RowCommands(
       RowAction.DownloadAllFiles -> command(row, TaskCommand.DownloadAllFiles) { resume() }
       RowAction.StopSeeding -> setSeeding(row, seeding = false)
       RowAction.Seed -> setSeeding(row, seeding = true)
+      RowAction.CheckFiles -> checkFiles(row)
       RowAction.EditLink,
       RowAction.RetryWithOptions,
       RowAction.EnterCredentials -> state.openIntake(retryRequest(row))
@@ -252,6 +258,19 @@ internal class RowCommands(
       val current = revision ?: controller.snapshot(taskId)?.revision
         ?: throw IllegalStateException()
       controller.setSeeding(taskId, seeding, TorrentCommandContext(newCommandKey(), current))
+    }
+  }
+
+  /**
+   * Checks the files of [row]'s finished torrent again, through its device's
+   * [TorrentController], which downloads what is missing or changed.
+   */
+  fun checkFiles(row: TaskRow): Job {
+    val app = state
+    return command(row, TaskCommand.CheckFiles) {
+      val controller = app.torrentControllerOf(row.key.deviceId)
+        ?: throw UnsupportedOperationException()
+      controller.recheck(taskId)
     }
   }
 

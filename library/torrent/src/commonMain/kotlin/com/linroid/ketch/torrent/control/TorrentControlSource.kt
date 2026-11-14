@@ -106,6 +106,13 @@ internal interface TorrentControlSource {
     resolved: ResolvedSource?,
   ): List<TorrentTracker>? = null
 
+  /**
+   * Tells the source that the next run of [taskId] is a check of its files as they are now,
+   * which may have been replaced or deleted since the task wrote them, and whether it seeds
+   * once it completes ([seedAfter]) when the upload setting says so.
+   */
+  fun prepareRecheck(taskId: String, seedAfter: Boolean) {}
+
   /** What the task's session in this process is doing, or `null` when it has none. */
   suspend fun liveTorrent(taskId: String): LiveTorrent?
 

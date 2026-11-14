@@ -140,6 +140,7 @@
   <string name="action_row_choose_files">選擇檔案…</string>
   <string name="action_row_download_all_files">下載全部檔案</string>
   <string name="action_row_stop_seeding">停止做種</string>
+  <string name="action_row_check_files">檢查檔案</string>
   <string name="action_row_seed">做種</string>
   <plurals name="batch_pause">
     <item quantity="other">暫停 %1$d 個下載項目</item>

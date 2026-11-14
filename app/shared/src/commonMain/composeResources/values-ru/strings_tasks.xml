@@ -149,6 +149,7 @@
   <string name="action_row_choose_files">Выбрать файлы…</string>
   <string name="action_row_download_all_files">Скачать все файлы</string>
   <string name="action_row_stop_seeding">Остановить раздачу</string>
+  <string name="action_row_check_files">Проверить файлы</string>
   <string name="action_row_seed">Раздавать</string>
   <plurals name="batch_pause">
     <item quantity="one">Приостановить %1$d загрузку</item>

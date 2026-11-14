@@ -143,6 +143,7 @@
   <string name="action_row_choose_files">Elegir archivos…</string>
   <string name="action_row_download_all_files">Descargar todos los archivos</string>
   <string name="action_row_stop_seeding">Dejar de sembrar</string>
+  <string name="action_row_check_files">Comprobar archivos</string>
   <string name="action_row_seed">Sembrar</string>
   <plurals name="batch_pause">
     <item quantity="one">Pausar %1$d descarga</item>

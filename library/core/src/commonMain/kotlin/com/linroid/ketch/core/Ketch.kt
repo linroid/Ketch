@@ -666,6 +666,38 @@ class Ketch(
         if (saves(it)) it.copy(sourceState = state, updatedAt = Clock.System.now()) else it
       }
     }
+
+    override suspend fun reopen(task: DownloadTask): Boolean {
+      val handle = handleOf(task) ?: return false
+      return reopenCompleted(handle)
+    }
+  }
+
+  /**
+   * What [SourceHost.reopen] does for [handle]: once an execution that is ending is gone, the
+   * completed task is queued again as a resume, under its control lock, so no selection or
+   * sharing command sees it half reopened.
+   */
+  private suspend fun reopenCompleted(handle: RealDownloadTask): Boolean {
+    val taskId = handle.taskId
+    coordinator.awaitCompletion(taskId)
+    return handle.controlLock.withLock {
+      if (handle.mutableState.value !is DownloadState.Completed ||
+        handle.record.value.state != TaskState.COMPLETED || coordinator.isActive(taskId)
+      ) {
+        return@withLock false
+      }
+      // Queued even when the caller is cancelled once the record says so.
+      withContext(NonCancellable) {
+        handle.record.update {
+          it.copy(state = TaskState.QUEUED, completedAt = null, updatedAt = Clock.System.now())
+        }
+        queue.dequeue(taskId)
+        queue.enqueue(handle, preferResume = true)
+      }
+      log.i { "Reopened completed taskId=$taskId" }
+      true
+    }
   }
 
   /** [task] when it is a task of this instance. */

@@ -49,6 +49,14 @@ internal class TorrentV2PieceStore(
    * its checkpoint's, such as the one a task's source state mirrors.
    */
   private val legacySelections: List<Set<String>> = emptyList(),
+  /**
+   * Takes the folders and regular files already at the paths this store would create, and
+   * makes again the ones a checkpoint claims that are gone or were replaced, as a check of the
+   * task's files asks: they become this task's, are never trusted before a check proves their
+   * pieces, and are written over where they differ. Otherwise a path in the way, or a claim of
+   * a selected file that no longer holds, fails.
+   */
+  private val adoptExisting: Boolean = false,
 ) {
   private val log = KetchLogger("TorrentSession")
   private val verifier = TorrentPayloadVerifier(document)
@@ -123,8 +131,11 @@ internal class TorrentV2PieceStore(
     storageOperation {
       val destination = root ?: (fileSystem.canonicalize(checkNotNull(output.parent)) / output.name)
       prepareCreationLog(destination)
-      if (root == null) {
-        fileSystem.createDirectory(destination, mustCreate = true)
+      // Also a restored root whose claim no longer held, which an adopting store dropped.
+      if (root == null || destination !in owned) {
+        if (!adoptable(destination, directory = true)) {
+          fileSystem.createDirectory(destination, mustCreate = true)
+        }
         root = destination
         record(destination, directory = true)
       }
@@ -154,14 +165,20 @@ internal class TorrentV2PieceStore(
     for (component in file.components.dropLast(1)) {
       parent /= component
       if (parent !in owned || replaceMissing && forgetMissing(parent)) {
-        if (fileSystem.metadataOrNull(parent) != null) throw IOException(IN_THE_WAY)
-        fileSystem.createDirectory(parent, mustCreate = true)
+        if (!adoptable(parent, directory = true)) {
+          if (fileSystem.metadataOrNull(parent) != null) throw IOException(IN_THE_WAY)
+          fileSystem.createDirectory(parent, mustCreate = true)
+        }
         record(parent, directory = true)
       }
       validateOwned(parent, directory = true)
     }
     val path = parent / file.components.last()
-    val created = path !in owned || replaceMissing && forgetMissing(path)
+    val unowned = path !in owned || replaceMissing && forgetMissing(path)
+    // An adopted file is owned from here on, and checked like one this store had from before.
+    val adopted = unowned && adoptable(path, directory = false)
+    if (adopted) record(path, directory = false)
+    val created = unowned && !adopted
     if (created) {
       if (fileSystem.metadataOrNull(path) != null) throw IOException(IN_THE_WAY)
       fileSystem.openReadWrite(path, mustCreate = true).use { handle ->
@@ -177,6 +194,17 @@ internal class TorrentV2PieceStore(
     }
     validateOwned(path, directory = false)
     return created
+  }
+
+  /**
+   * Whether [path] holds a folder or regular file this store takes as its own ([adoptExisting]);
+   * never a symbolic link or another kind of entry, which stays in the way.
+   */
+  private fun adoptable(path: Path, directory: Boolean): Boolean {
+    if (!adoptExisting) return false
+    val metadata = fileSystem.metadataOrNull(path) ?: return false
+    if (metadata.symlinkTarget != null) return false
+    return if (directory) metadata.isDirectory else metadata.isRegularFile
   }
 
   /** An owned [path] that no longer exists, with every claim below it, stops being owned. */
@@ -637,8 +665,9 @@ internal class TorrentV2PieceStore(
 
   /**
    * The claims in [entries] that still hold. A claim that no longer holds fails, unless it is
-   * neither the root nor a selected file or one of its parents: such a claim, a file deselected
-   * and then deleted or replaced, is dropped with the claims below it.
+   * neither the root nor a selected file or one of its parents, or this store adopts what is in
+   * place ([adoptExisting]): such a claim, as of a file deselected and then deleted or replaced,
+   * is dropped with the claims below it.
    */
   private fun validateRecords(
     destination: Path,
@@ -662,7 +691,8 @@ internal class TorrentV2PieceStore(
       if (holds) {
         records[path] = Ownership(entry.identity, entry.directory)
       } else {
-        require(entry.components !in needed) { "Checkpoint ownership changed" }
+        // An adopting store makes a needed file again, or takes the one now in its place.
+        require(adoptExisting || entry.components !in needed) { "Checkpoint ownership changed" }
         dropped += entry.components
       }
     }

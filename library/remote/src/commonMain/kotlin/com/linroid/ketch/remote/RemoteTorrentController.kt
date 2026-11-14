@@ -30,6 +30,7 @@ import com.linroid.ketch.torrent.api.compareIncoming
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.resources.get
+import io.ktor.client.plugins.resources.post
 import io.ktor.client.plugins.resources.put
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
@@ -340,6 +341,13 @@ internal class RemoteTorrentController(
           metainfo = metainfo.takeIf { it },
         )
       )
+    }
+  }
+
+  override suspend fun recheck(taskId: String) {
+    requireCapability(TorrentCapability.RECHECK)
+    call<TorrentSnapshot>(notFoundIsNull = false) {
+      httpClient.post(Torrents.ById.Recheck(parent = Torrents.ById(id = taskId)))
     }
   }
 

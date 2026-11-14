@@ -106,6 +106,21 @@ interface TorrentController {
     )
 
   /**
+   * Checks the task's files against the torrent's hashes again and downloads what is missing or
+   * changed: a completed task runs again from what it has (it stops seeding meanwhile, and
+   * seeds again once it completes if it was meant to), and a downloading one starts over its
+   * check. A task that is paused, queued or failed is checked when it next starts, as every
+   * start checks the files, so the command changes nothing for it. Fails with
+   * [TorrentCommandError.NOT_FOUND] for unknown and non-torrent tasks and
+   * [TorrentCommandError.INVALID_STATE] for a canceled one. Advertised as
+   * [TorrentCapability.RECHECK].
+   */
+  suspend fun recheck(taskId: String): Unit = throw TorrentCommandException(
+    error = TorrentCommandError.UNSUPPORTED,
+    message = "Rechecking is unavailable",
+  )
+
+  /**
    * The task's own trackers in tier order and how each answers, or `null` for unknown and
    * non-torrent tasks: live while the torrent runs or seeds, and [TorrentTrackerState.IDLE]
    * otherwise. The trackers the backend adds to public torrents are not listed. Fails with

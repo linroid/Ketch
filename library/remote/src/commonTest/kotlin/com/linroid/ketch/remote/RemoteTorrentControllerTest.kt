@@ -186,6 +186,39 @@ class RemoteTorrentControllerTest {
   }
 
   @Test
+  fun recheck_postsToTheServer_andFailsClosedWithoutTheCapability() = runTest {
+    val methods = mutableListOf<HttpMethod>()
+    val fixture = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect", "recheck")))
+        ?: when (request.url.encodedPath) {
+          "/api/torrents/t1/recheck" -> {
+            methods += request.method
+            json(json.encodeToString(snapshot(5)))
+          }
+          "/api/torrents/gone/recheck" -> json(
+            json.encodeToString(ErrorResponse("not_found", "No torrent download gone")),
+            HttpStatusCode.NotFound,
+          )
+          else -> error("Unexpected request")
+        }
+    }
+    val older = fixture { request, _ ->
+      capabilities(request, TorrentCapabilities(names = setOf("inspect")))
+        ?: error("Unexpected request")
+    }
+    try {
+      fixture.controller.recheck("t1")
+      assertEquals(listOf(HttpMethod.Post), methods)
+      failure(TorrentCommandError.NOT_FOUND) { fixture.controller.recheck("gone") }
+      failure(TorrentCommandError.UNSUPPORTED) { older.controller.recheck("t1") }
+      assertEquals(listOf("/api/torrents/capabilities"), older.paths)
+    } finally {
+      fixture.client.close()
+      older.client.close()
+    }
+  }
+
+  @Test
   fun trackers_readTheServers_decodingUnknownStatesAsIdle() = runTest {
     val fixture = fixture { request, _ ->
       capabilities(request, TorrentCapabilities(names = setOf("inspect", "trackers")))

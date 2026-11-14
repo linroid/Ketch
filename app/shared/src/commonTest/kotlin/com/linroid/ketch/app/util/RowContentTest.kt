@@ -269,6 +269,11 @@ class RowContentTest {
     )
     assertEquals("Seeding · Saved on NAS-Basement", remoteContent.detail.load())
     assertTrue(RowAction.StopSeeding in taskActions(request, state, local).menu)
+    // A finished torrent's files can be checked again, also on another device.
+    val torrent = DownloadRequest("magnet:?xt=urn:btih:" + "a".repeat(40))
+    assertTrue(RowAction.CheckFiles in taskActions(torrent, state, local).menu)
+    assertTrue(RowAction.CheckFiles in taskActions(torrent, state, remote).menu)
+    assertFalse(RowAction.CheckFiles in taskActions(request, state, local).menu)
     assertFalse(
       RowAction.StopSeeding in taskActions(request, state.copy(sharing = false), local).menu
     )

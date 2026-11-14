@@ -40,7 +40,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.linroid.ketch.api.ControlKey
+import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.app.state.ListTestTask
+import com.linroid.ketch.torrent.api.TorrentCapabilities
+import com.linroid.ketch.torrent.api.TorrentController
+import com.linroid.ketch.torrent.api.TorrentSnapshot
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import com.linroid.ketch.app.components.KetchFileTypeChip
 import com.linroid.ketch.app.components.KetchFileTypeChipDefaults
 import com.linroid.ketch.app.components.KetchSegmented
@@ -153,6 +162,33 @@ class RowActionsSnapshots {
   }
 
   @Test
+  fun rowMenu_finishedTorrent_offersCheckFiles() {
+    val base = SampleData.downloads()
+    val torrent = ListTestTask(
+      taskId = "torrent-done",
+      state = DownloadState.Completed(
+        outputPath = "${SampleData.DOWNLOAD_DIR}/$TORRENT",
+        totalBytes = 4_800_000_000,
+        downloadTime = 12.minutes,
+      ),
+      request = DownloadRequest(
+        "magnet:?xt=urn:btih:4c7f3e2b9d1a8f6e5c0b7a3d2e1f9c8b7a6d5e4f&dn=$TORRENT"
+      ),
+      createdAt = SampleData.NOW - 1.hours,
+    )
+    for (theme in SnapshotTheme.entries) {
+      actionsSnapshot(
+        name = "row-actions-menu-torrent",
+        size = SnapshotSize.Desktop,
+        theme = theme,
+        data = SampleData(base.tasks + torrent),
+        embedded = { TorrentControlled(it) },
+        prepare = { openMenu(TORRENT, x = 420.dp) },
+      )
+    }
+  }
+
+  @Test
   fun rowMenu_phone_opensAsASheet() {
     for (theme in SnapshotTheme.entries) {
       actionsSnapshot("row-actions-menu-phone", SnapshotSize.Phone, theme, prepare = {
@@ -258,6 +294,24 @@ class RowActionsSnapshots {
   }
 }
 
+private const val TORRENT = "Field-Recordings-2026"
+
+/** [SampleData]'s device with torrent controls, as an engine with the torrent source has. */
+private class TorrentControlled(
+  data: SampleData,
+  private val sample: SampleKetchApi = SampleKetchApi(data),
+) : KetchApi by sample {
+  private val controller = object : TorrentController {
+    override suspend fun capabilities() = TorrentCapabilities(names = setOf("inspect", "recheck"))
+
+    override suspend fun snapshot(taskId: String): TorrentSnapshot? = null
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  override fun <T : Any> controller(key: ControlKey<T>): T? =
+    if (key == TorrentController) controller as T else null
+}
+
 private const val UBUNTU = "ubuntu-24.04-desktop-amd64.iso"
 private const val IMAGENET = "imagenet-part03.tar"
 private const val BLENDER = "blender-4.2-macos-arm64.dmg"
@@ -330,12 +384,14 @@ private fun actionsSnapshot(
   size: SnapshotSize,
   theme: SnapshotTheme,
   files: FileActions = SnapshotFiles(),
+  data: SampleData = SampleData.downloads(),
+  embedded: (SampleData) -> KetchApi = ::SampleKetchApi,
   prepare: DemoScope.() -> Unit = {},
   interact: suspend ActionsScene.() -> Unit = {},
 ): File {
   val phone = size.density != KetchDensity.Compact
   val mode = size.density.toMode()
-  return withSample(theme, mode) { env ->
+  return withSample(theme, mode, data = data, embedded = embedded) { env ->
     val controller = env.controller
     SnapshotHarness.capture(
       name = "$name-${theme.id}-${size.id}",

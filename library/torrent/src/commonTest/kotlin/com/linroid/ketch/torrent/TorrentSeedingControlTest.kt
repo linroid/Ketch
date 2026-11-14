@@ -40,6 +40,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -224,6 +225,117 @@ class TorrentSeedingControlTest {
     val bytes = torrentFileSystem.read(path) { readByteArray() }
     bytes[bytes.size / 2] = (bytes[bytes.size / 2] + 1).toByte()
     torrentFileSystem.write(path) { write(bytes) }
+  }
+
+  @Test
+  fun recheck_completedTaskWithAChangedFile_downloadsItAgain() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+    val first = task.awaitCompleted()
+    val file = output / "f0"
+    corrupt(file)
+    torrentFileSystem.delete(output / "f1")
+
+    assertNotNull(ketch.controller(TorrentController)).recheck(task.taskId)
+
+    // The run that checks it replaces the completed state, then completes anew.
+    awaitStage("the recheck to finish", task) {
+      task.state.first { it is DownloadState.Completed && it.completedAt != first.completedAt }
+    }
+    assertContentEquals(torrent.payloads[0], torrentFileSystem.read(file) { readByteArray() })
+    assertContentEquals(torrent.payloads[1],
+      torrentFileSystem.read(output / "f1") { readByteArray() })
+    assertEquals(TaskState.COMPLETED, store.load(task.taskId)?.state)
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun recheck_v2TaskWithAReplacedAndADeletedFile_takesThemAsTheyAre() = harness {
+    val store = MemoryTaskStore()
+    val record = v2Record("v2-check", v2Fixture, root / "v2").let {
+      it.copy(control = TaskControl(sharing = false))
+    }
+    store.save(record)
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.tasks.value.single()
+    val first = assertIs<DownloadState.Completed>(task.state.value)
+    // Restored from a backup: the same bytes in a new file, which is not the one Ketch wrote.
+    torrentFileSystem.delete(root / "v2" / "a")
+    torrentFileSystem.write(root / "v2" / "a") { write(v2Fixture.payloads[0]) }
+    val controller = assertNotNull(ketch.controller(TorrentController))
+
+    controller.recheck(task.taskId)
+
+    awaitStage("the recheck to finish", task) {
+      task.state.first { it is DownloadState.Completed && it.completedAt != first.completedAt }
+    }
+
+    // A deleted file is made again and waits for a peer, rather than failing the task.
+    torrentFileSystem.delete(root / "v2" / "b")
+    controller.recheck(task.taskId)
+    awaitStage("the download to start again", task) {
+      task.state.first { it is DownloadState.Downloading || it is DownloadState.Failed }
+    }
+    eventually("the missing file to be made again") {
+      torrentFileSystem.metadataOrNull(root / "v2" / "b") != null
+    }
+    assertIs<DownloadState.Downloading>(task.state.value)
+    task.pause()
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun recheck_taskItsUserStoppedSeeding_staysStopped() = harness {
+    val source = source()
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0))
+    val first = task.awaitCompleted()
+    task.awaitSeeding(true)
+    val controller = assertNotNull(ketch.controller(TorrentController))
+    controller.setSeeding(task.taskId, false, ketch.context(task.taskId, "stop"))
+    task.awaitSeeding(false)
+
+    controller.recheck(task.taskId)
+
+    awaitStage("the recheck to finish", task) {
+      task.state.first { it is DownloadState.Completed && it.completedAt != first.completedAt }
+    }
+    // The upload setting still seeds finished torrents, but this one was told to stop.
+    delay(300)
+    assertFalse(assertIs<DownloadState.Completed>(task.state.value).sharing)
+    assertNull(source.sessionOf(task.taskId))
+    assertEquals(false, store.intent(task.taskId))
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun recheck_seedingTask_checksThenSeedsAgain() = harness {
+    val source = source()
+    val ketch = ketch(source)
+    ketch.start()
+    val task = ketch.download(request(0))
+    val first = task.awaitCompleted()
+    task.awaitSeeding(true)
+    val before = assertNotNull(source.sessionOf(task.taskId))
+
+    assertNotNull(ketch.controller(TorrentController)).recheck(task.taskId)
+
+    awaitStage("the recheck to finish", task) {
+      task.state.first {
+        it is DownloadState.Completed && it.completedAt != first.completedAt && it.sharing
+      }
+    }
+    // A session of its own checked the files; the seeder it replaced was not taken over.
+    assertTrue(source.sessionOf(task.taskId) !== before)
+    source.stopSeeding(task.taskId)
+    source.assertNoLeaks()
   }
 
   @Test

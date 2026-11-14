@@ -182,6 +182,8 @@
   <string name="action_row_choose_files">Choose files…</string>
   <string name="action_row_download_all_files">Download all files</string>
   <string name="action_row_stop_seeding">Stop seeding</string>
+  <!-- Checks a finished torrent's files against its hashes again and downloads what is missing. -->
+  <string name="action_row_check_files">Check files</string>
   <string name="action_row_seed">Seed</string>
   <!-- Menu labels of actions on several selected downloads. %1$d is how many. -->
   <plurals name="batch_pause">

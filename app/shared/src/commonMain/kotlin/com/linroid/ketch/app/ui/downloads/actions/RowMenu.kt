@@ -627,6 +627,7 @@ internal val RowAction.icon: KetchIcon
     RowAction.DownloadAllFiles -> KetchIcon.Play
     RowAction.StopSeeding -> KetchIcon.Stop
     RowAction.Seed -> KetchIcon.Send
+    RowAction.CheckFiles -> KetchIcon.CheckCircle
     RowAction.StopAndDiscard -> KetchIcon.Stop
     RowAction.Remove -> KetchIcon.Trash
   }

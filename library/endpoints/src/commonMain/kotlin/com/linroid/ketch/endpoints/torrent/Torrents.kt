@@ -19,6 +19,7 @@ import kotlinx.serialization.Serializable
  * - `PUT /api/torrents/{id}/sequential` — download its pieces in order or not
  * - `GET /api/torrents/{id}/export`    — its magnet link and info hashes (`?metainfo=true` adds
  *   its `.torrent` file)
+ * - `POST /api/torrents/{id}/recheck`  — check its files again and download what is missing
  * - `GET /api/torrents/{id}/trackers`  — its own trackers and how each answers
  * - `GET /api/torrents/{id}/events`    — SSE stream of its snapshots
  */
@@ -82,6 +83,11 @@ data class Torrents(val parent: Api = Api()) {
     @Serializable
     @Resource("export")
     data class Export(val parent: ById, val metainfo: Boolean? = null)
+
+    /** Checks the task's files again; `POST` answers its snapshot. */
+    @Serializable
+    @Resource("recheck")
+    data class Recheck(val parent: ById)
 
     /** The task's own trackers in tier order, a list of `TorrentTracker`. */
     @Serializable

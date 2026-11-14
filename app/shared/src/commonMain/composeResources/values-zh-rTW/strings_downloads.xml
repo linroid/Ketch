@@ -227,6 +227,7 @@
   <string name="downloads_failed_reschedule">無法在 %2$s 上重新排程 %1$s</string>
   <string name="downloads_failed_files">無法在 %2$s 上變更 %1$s 的檔案</string>
   <string name="downloads_failed_seeding">無法在 %2$s 上變更 %1$s 的做種</string>
+  <string name="downloads_failed_check_files">無法在 %2$s 上檢查 %1$s 的檔案</string>
 
   <plurals name="downloads_batch_paused">
     <item quantity="other">已暫停 %1$d 個下載項目</item>
