@@ -100,6 +100,8 @@ fun main(args: Array<String>) {
       return
     }
     in INSTANCE_COMMANDS -> exitProcess(runInstance(remaining.first(), remaining.drop(1)))
+    // Its output is the file's path and magnet link, for scripts: no banner.
+    "create" -> exitProcess(runCreate(remaining.drop(1)))
     // Health checks run it every few seconds: one line, no banner.
     "health" -> exitProcess(runHealth(remaining.drop(1)))
   }
@@ -1441,6 +1443,10 @@ private fun printUsage() {
   println("  update [options]         Replace this binary with the latest")
   println("                           release; run `ketch update --help`")
   println("                           for options")
+  println()
+  println("Torrents:")
+  println("  create <path>            Make a .torrent file of a file or folder;")
+  println("                           run `ketch create --help` for options")
   println()
   println("Health:")
   println("  health [options]         Exit 0 once the local server is ready;")

@@ -67,7 +67,7 @@ app/
   web/        # Wasm browser app
   ios/        # Native iOS app (Xcode project, consumes shared module)
   browser-extension/  # Chromium/Firefox/Safari extension that sends downloads to Ketch (plain JS)
-cli/          # CLI: downloads, `server`, `mcp`, `health` and `ai-discover` (JVM; GraalVM native)
+cli/          # CLI: downloads, `server`, `mcp`, `create`, `health` and `ai-discover` (JVM; GraalVM)
 docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose files for NAS)
 ```
 
@@ -230,7 +230,8 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `Challenge` and `Authenticator` (Digest and Basic)
 
 ### `library:torrent`
-- `com.linroid.ketch.torrent` -- the public API, `TorrentDownloadSource` (implements
+- `com.linroid.ketch.torrent` -- the public API, `TorrentCreator` (`TorrentCreateOptions`,
+  `TorrentFormat`, `CreatedTorrent`), `TorrentDownloadSource` (implements
   `DownloadSource<TorrentSourceState>`; the state is opaque outside the module; `settings`, a
   `StateFlow<TorrentEngineSettings>` its setters, `applySettings` and the controller change, a
   change finishing under `NonCancellable` once started, and that hosts follow to save what remote
@@ -1280,6 +1281,22 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   the spec fields it reads, so no finished run stays reachable.
   Trackers hear `completed` only once every file is selected and complete; admission charges
   every file
+- Creation: `TorrentCreator.create(path, TorrentCreateOptions, onProgress)` (public, in
+  `TorrentCreator.kt`; internal `createTorrent` takes the file system) hashes a file or folder
+  in one pass on the disk dispatcher and returns a `CreatedTorrent` (metainfo bytes, info
+  hashes, magnet link, none when private). `TorrentFormat` `V1` (default), `V2` or `HYBRID`
+  (BEP 47 padding after every file but the last); the piece length is a power of two from
+  16 KiB to 16 MiB, picked for about 1024 pieces when 0; files are listed in v2 tree order
+  (components in byte order), symbolic links left out; trackers must be announceable
+  (`TrackerConfiguration.prepare`), a private torrent needs one, and at most 10,000 files and
+  4 MiB of metainfo. A v2 file of at most a piece has a tree only as tall as its blocks, a
+  longer one a piece layer whose last piece is completed with zero-hash subtrees.
+  `ketch create <path>` (`CreateTorrent.kt`: `--format`, `--tracker`, `--web-seed`,
+  `--private`, `--piece-length`, `--name`, `--comment`, `--source`, `-o`, `--overwrite`,
+  `--json`) saves `<name>.torrent` and prints its path and magnet link. Tests:
+  `TorrentCreatorTest` (identical bytes to the hand-written fixtures),
+  `CreatedTorrentInteropTest` (jvmTest: libtorrent opens each format and seeds the files),
+  `CreateTorrentTest`. Seeding a created torrent needs adopting existing files, not built yet
 - Recheck: `TorrentController.recheck(taskId)` (REST `POST /api/torrents/{id}/recheck`, which
   answers the snapshot; capability `recheck`). Every start of a torrent already checks its
   files, so the command acts by state (`KetchTorrentController`): a completed task stops its

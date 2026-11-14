@@ -108,9 +108,6 @@ object TorrentCreator {
    * special files are left out. [onProgress] is told how much of the content is hashed, at most
    * once per piece. Cancelling the caller stops it.
    *
-   * To seed the result, download its [CreatedTorrent.metainfo] into the folder that holds
-   * [path]: the files are found complete.
-   *
    * @throws IllegalArgumentException if [path] holds no content, more than 10,000 files or a
    *   name a torrent cannot carry, if an option is invalid, or if the content needs more
    *   metadata than a 4 MiB torrent file holds
