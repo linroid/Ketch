@@ -190,6 +190,7 @@ class Ketch(
     add(KetchFeatures.TRANSFER_TIMEOUTS)
     add(KetchFeatures.ACTIVE_CONNECTIONS)
     add(KetchFeatures.CHECKSUM)
+    add(KetchFeatures.FILE_CONFLICT)
     if (countries != null) add(KetchFeatures.COUNTRIES)
     if (speedModes != null) add(KetchFeatures.SPEED_MODES)
     additionalSources.forEach { addAll(it.features) }
@@ -218,7 +219,19 @@ class Ketch(
     globalLimiter = globalLimiter,
     dispatchers = dispatchers,
     connections = connectionRegistry::reporter,
+    unfinishedOutputs = ::unfinishedOutputs,
   )
+
+  /**
+   * Where the unfinished tasks other than [taskId] save: paused, failed or waiting, they hold no
+   * reservation, yet a download that overwrites existing files must leave theirs alone.
+   */
+  private fun unfinishedOutputs(taskId: String): List<String> =
+    _tasks.value.mapNotNull { task ->
+      val state = task.state.value
+      val finished = state is DownloadState.Completed || state is DownloadState.Canceled
+      task.outputPath.takeUnless { finished || task.taskId == taskId }
+    }
 
   private val queue = DownloadQueue(
     maxConcurrentDownloads = config.maxConcurrentDownloads,
@@ -320,6 +333,7 @@ class Ketch(
           schedule = request.schedule,
           selectedFileIds = request.selectedFileIds,
           awaitFileSelection = request.awaitFileSelection,
+          fileConflict = request.fileConflict,
           resolvedSource = null,
           conditions = emptyList(),
         ) == request.copy(resolvedSource = null, conditions = emptyList())) {

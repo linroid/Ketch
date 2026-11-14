@@ -140,6 +140,9 @@ internal object IntakeSheetDefaults {
   /** Width of the Options popover. */
   val OptionsWidth: Dp = 320.dp
 
+  /** Below this width a notice's choice goes under its text instead of beside it. */
+  val NoticeChoiceBesideWidth: Dp = 480.dp
+
   /** Space under the input's text beside its buttons, which centers one line on them. */
   val LineInset: Dp = 6.dp
 

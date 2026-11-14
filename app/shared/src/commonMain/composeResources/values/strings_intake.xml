@@ -233,6 +233,8 @@
   <string name="intake_reset_priority">Reset priority</string>
   <string name="intake_reset_start">Reset start</string>
   <string name="intake_reset_connections">Reset connections</string>
+  <!-- What the ✕ of the chip of a changed "If the file exists" choice does. -->
+  <string name="intake_reset_conflict">Use the device's setting</string>
   <!-- A chip that tells headers are sent while the Advanced section is closed. -->
   <plurals name="intake_headers_count">
     <item quantity="one">%1$d header</item>
@@ -289,6 +291,20 @@
   <!-- A field for a path on another device. %1$s is the device, such as "NAS-Basement". -->
   <string name="intake_folder_on">Folder on %1$s</string>
   <string name="intake_torrents_app_folder">Torrents save to the app folder: folders picked in Files only take links</string>
+  <!-- An option: what a download does when a file of its name is already in the folder. -->
+  <string name="intake_conflict">If the file exists</string>
+  <string name="intake_conflict_rename">Rename</string>
+  <string name="intake_conflict_overwrite">Overwrite</string>
+  <string name="intake_conflict_rename_caption">Saves beside it under a new name.</string>
+  <string name="intake_conflict_overwrite_caption">Replaces it once the download finishes.</string>
+  <!-- Chips of that option once it differs from the device's setting. -->
+  <string name="intake_option_overwrite">Overwrites existing files</string>
+  <string name="intake_option_rename">Keeps existing files</string>
+  <!-- Warnings under the options. %1$s is the file name, %2$s the name the download gets, such as "report (1).pdf". -->
+  <string name="intake_exists_rename">%1$s is already in this folder. This download will be saved as %2$s.</string>
+  <string name="intake_exists_overwrite">%1$s is already in this folder. This download replaces it once it finishes.</string>
+  <string name="intake_exists_rename_some">Some of these files are already in this folder. Those downloads will be saved under new names.</string>
+  <string name="intake_exists_overwrite_some">Some of these files are already in this folder. The downloads replace them once they finish.</string>
 
   <!-- The Advanced section: the file name and request headers. -->
   <string name="intake_advanced">Advanced</string>

@@ -8,6 +8,7 @@ import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.Segment
 import com.linroid.ketch.api.SpeedLimit
@@ -288,6 +289,230 @@ class DestinationGuardTest {
     }
 
   @Test
+  fun `POST without a token asking to overwrite is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch)
+
+    val response = client.createTask(null, fileConflict = FileConflict.OVERWRITE)
+
+    assertOverwriteRejected(response)
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `POST without a token follows a configuration that overwrites`() = testApplication {
+    val config = DownloadConfig(
+      defaultDirectory = downloads.path,
+      fileConflict = FileConflict.OVERWRITE,
+    )
+    val client = serve(createTestKetch(config))
+
+    val response = client.createTask(null)
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(null, task.request.fileConflict)
+  }
+
+  @Test
+  fun `POST with a token asking to overwrite in the download folder is accepted`() =
+    testApplication {
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+      )
+
+      val responses = listOf(
+        client.createTask(null, fileConflict = FileConflict.OVERWRITE),
+        client.createTask("${downloads.path}/sub/", fileConflict = FileConflict.OVERWRITE),
+      )
+
+      for (response in responses) {
+        assertEquals(HttpStatusCode.Created, response.status)
+        val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+        assertEquals(FileConflict.OVERWRITE, task.request.fileConflict)
+      }
+    }
+
+  @Test
+  fun `POST with a token asking to overwrite in an allowed folder is accepted`() =
+    testApplication {
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+        allowedDirectories = listOf(media.path),
+      )
+
+      val response = client.createTask("${media.path}/", fileConflict = FileConflict.OVERWRITE)
+
+      assertEquals(HttpStatusCode.Created, response.status)
+    }
+
+  @Test
+  fun `POST with a token asking to overwrite in another folder is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN)
+
+    val response = client.createTask("${outside.path}/", fileConflict = FileConflict.OVERWRITE)
+
+    assertOverwriteRejected(response)
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `POST with a token to another folder never follows a configuration that overwrites`() =
+    testApplication {
+      val config = DownloadConfig(
+        defaultDirectory = downloads.path,
+        fileConflict = FileConflict.OVERWRITE,
+      )
+      val client = serve(createTestKetch(config), apiToken = TOKEN)
+
+      val elsewhere = client.createTask("${outside.path}/")
+      val inside = client.createTask("${downloads.path}/sub/")
+
+      assertEquals(HttpStatusCode.Created, elsewhere.status)
+      assertEquals(
+        FileConflict.RENAME,
+        json.decodeFromString<TaskSnapshot>(elsewhere.bodyAsText()).request.fileConflict,
+      )
+      assertEquals(
+        null,
+        json.decodeFromString<TaskSnapshot>(inside.bodyAsText()).request.fileConflict,
+      )
+    }
+
+  @Test
+  fun `POST with a token to another folder keeps renaming once the configuration overwrites`() =
+    testApplication {
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+      )
+
+      val elsewhere = client.createTask("${outside.path}/")
+
+      // The task reads the configuration when it starts, which may be after it changed.
+      assertEquals(
+        FileConflict.RENAME,
+        json.decodeFromString<TaskSnapshot>(elsewhere.bodyAsText()).request.fileConflict,
+      )
+    }
+
+  @Test
+  fun `POST with a token asking to overwrite a named file in the download folder keeps its name`() =
+    testApplication {
+      File(downloads, "file.zip").writeText("keep")
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+      )
+
+      val response =
+        client.createTask("${downloads.path}/file.zip", fileConflict = FileConflict.OVERWRITE)
+
+      assertEquals(HttpStatusCode.Created, response.status)
+      val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+      assertEquals(File(downloads, "file.zip").path, task.request.destination?.value)
+      assertEquals(FileConflict.OVERWRITE, task.request.fileConflict)
+    }
+
+  @Test
+  fun `POST with a token asking to overwrite a named file elsewhere gets a free name`() =
+    testApplication {
+      File(outside, "file.zip").writeText("keep")
+      val client = serve(
+        createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+        apiToken = TOKEN,
+      )
+
+      val response =
+        client.createTask("${outside.path}/file.zip", fileConflict = FileConflict.OVERWRITE)
+
+      assertEquals(HttpStatusCode.Created, response.status)
+      val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+      assertEquals(File(outside, "file (1).zip").path, task.request.destination?.value)
+      assertEquals(FileConflict.RENAME, task.request.fileConflict)
+    }
+
+  @Test
+  fun `POST with a token asking to rename a named file gets a free name`() = testApplication {
+    File(downloads, "file.zip").writeText("keep")
+    val client = serve(
+      createTestKetch(DownloadConfig(defaultDirectory = downloads.path)),
+      apiToken = TOKEN,
+    )
+
+    val response =
+      client.createTask("${downloads.path}/file.zip", fileConflict = FileConflict.RENAME)
+
+    assertEquals(HttpStatusCode.Created, response.status)
+    val task = json.decodeFromString<TaskSnapshot>(response.bodyAsText())
+    assertEquals(File(downloads, "file (1).zip").path, task.request.destination?.value)
+  }
+
+  @Test
+  fun `POST without a token asking to overwrite a named file is refused`() = testApplication {
+    File(downloads, "file.zip").writeText("keep")
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch)
+
+    val response =
+      client.createTask("${downloads.path}/file.zip", fileConflict = FileConflict.OVERWRITE)
+
+    assertOverwriteRejected(response)
+    assertTrue(ketch.tasks.value.isEmpty())
+  }
+
+  @Test
+  fun `PUT config without a token switching to overwrite is refused`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch)
+
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(mapOf("fileConflict" to "overwrite"))
+    }
+
+    assertOverwriteRejected(response)
+    assertEquals(FileConflict.RENAME, ketch.status().config.fileConflict)
+  }
+
+  @Test
+  fun `PUT config without a token keeps a configuration that overwrites`() = testApplication {
+    val config = DownloadConfig(
+      defaultDirectory = downloads.path,
+      fileConflict = FileConflict.OVERWRITE,
+    )
+    val ketch = createTestKetch(config)
+    val client = serve(ketch)
+
+    // As a client older than the setting sends it: without the field.
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(mapOf("retryCount" to 5))
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(FileConflict.OVERWRITE, ketch.status().config.fileConflict)
+    assertEquals(5, ketch.status().config.retryCount)
+  }
+
+  @Test
+  fun `PUT config with a token switches to overwrite`() = testApplication {
+    val ketch = createTestKetch(DownloadConfig(defaultDirectory = downloads.path))
+    val client = serve(ketch, apiToken = TOKEN)
+
+    val response = client.put("/api/config") {
+      contentType(ContentType.Application.Json)
+      setBody(mapOf("fileConflict" to "overwrite"))
+    }
+
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals(FileConflict.OVERWRITE, ketch.status().config.fileConflict)
+  }
+
+  @Test
   fun `DELETE with deleteFiles of a task saved outside the folders is refused`() =
     testApplication {
       val task = SavedTask("${outside.path}/file.zip")
@@ -337,6 +562,7 @@ class DestinationGuardTest {
   private suspend fun HttpClient.createTask(
     destination: String?,
     requestId: String? = null,
+    fileConflict: FileConflict? = null,
   ): HttpResponse =
     post("/api/tasks") {
       contentType(ContentType.Application.Json)
@@ -345,6 +571,7 @@ class DestinationGuardTest {
           url = "https://example.com/file.zip",
           destination = destination?.let(::Destination),
           requestId = requestId,
+          fileConflict = fileConflict,
         )
       )
     }
@@ -352,6 +579,14 @@ class DestinationGuardTest {
   private suspend fun assertRejected(response: HttpResponse) {
     assertEquals(HttpStatusCode.Forbidden, response.status)
     assertEquals("path_rejected", json.decodeFromString<ErrorResponse>(response.bodyAsText()).error)
+  }
+
+  private suspend fun assertOverwriteRejected(response: HttpResponse) {
+    assertEquals(HttpStatusCode.Forbidden, response.status)
+    assertEquals(
+      "overwrite_rejected",
+      json.decodeFromString<ErrorResponse>(response.bodyAsText()).error,
+    )
   }
 
   /** A real test instance, for its status and download directory, that lists only [task]. */

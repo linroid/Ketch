@@ -153,6 +153,22 @@ class SettingsSnapshots {
   }
 
   @Test
+  fun downloadsPage_fileConflict_switchesToOverwrite() {
+    for (theme in SnapshotTheme.entries) {
+      windowSnapshot(
+        name = "settings-downloads-overwrite",
+        size = WindowSize,
+        theme = theme,
+        target = SettingsTarget(SettingsTarget.Page.Downloads),
+        interact = {
+          clickOnText("Overwrite")
+          settle()
+        },
+      )
+    }
+  }
+
+  @Test
   fun settingsWindow_genericOpen_reopensTheLastPage() {
     windowSnapshot(
       name = "settings-resume",

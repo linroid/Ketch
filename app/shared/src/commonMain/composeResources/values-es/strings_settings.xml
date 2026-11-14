@@ -395,6 +395,11 @@
   <string name="settings_downloads_change">Cambiar…</string>
   <string name="settings_downloads_enter_path">Escribir ruta…</string>
   <string name="settings_downloads_use_default">Usar la carpeta Descargas</string>
+  <string name="settings_downloads_conflict">Si el archivo ya existe</string>
+  <string name="settings_downloads_conflict_rename">Renombrar</string>
+  <string name="settings_downloads_conflict_overwrite">Sobrescribir</string>
+  <string name="settings_downloads_conflict_rename_hint">Guarda la descarga junto a él con otro nombre, como file (1).zip.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">Reemplaza el archivo cuando termina la descarga. Los torrents siempre lo conservan.</string>
   <string name="settings_downloads_folders">Carpetas en el panel de añadir</string>
   <string name="settings_downloads_folders_footer">Las carpetas fijadas aparecen primero al añadir una descarga.</string>
   <string name="settings_downloads_pinned">Fijada · %1$s</string>
@@ -784,6 +789,8 @@
   <string name="settings_search_checklist_keywords">primeros pasos, bienvenida, configuración</string>
   <string name="settings_search_welcome_keywords">bienvenida, primer inicio, introducción</string>
   <string name="settings_search_save_to_keywords">carpeta, directorio, ubicación, ruta, destino</string>
+  <string name="settings_search_conflict">Renombrar una descarga o reemplazar el archivo del mismo nombre</string>
+  <string name="settings_search_conflict_keywords">sobrescribir, reemplazar, renombrar, duplicado, archivo existente, mismo nombre, conflicto</string>
   <string name="settings_search_folders">Carpetas fijadas y recientes</string>
   <string name="settings_search_folders_keywords">favoritas, fijar, recientes</string>
   <string name="settings_search_categories">Ordenar descargas en carpetas por tipo o sitio</string>

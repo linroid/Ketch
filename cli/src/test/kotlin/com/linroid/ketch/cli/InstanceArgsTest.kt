@@ -7,8 +7,10 @@ import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.SpeedLimit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -89,6 +91,18 @@ class InstanceArgsTest {
     assertEquals(Checksum(ChecksumAlgorithm.SHA_256, hex), command.checksum)
     assertIs<InstanceArgs.Invalid>(
       parseInstanceArgs("add", listOf("--checksum", "sha256:12", "https://example.com/a.iso")),
+    )
+  }
+
+  @Test
+  fun `add takes overwrite and other commands do not`() {
+    val command = run("add", "--overwrite", "https://example.com/a.iso")
+
+    assertTrue(assertIs<InstanceCommand.Add>(command).overwrite)
+    assertFalse(assertIs<InstanceCommand.Add>(run("add", "https://example.com/a.iso")).overwrite)
+    assertEquals(
+      InstanceArgs.Invalid("unknown option '--overwrite'"),
+      parseInstanceArgs("list", listOf("--overwrite")),
     )
   }
 

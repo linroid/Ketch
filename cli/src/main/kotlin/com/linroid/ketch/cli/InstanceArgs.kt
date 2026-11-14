@@ -36,6 +36,8 @@ internal sealed interface InstanceCommand {
     val proxy: Proxy? = null,
     /** `--checksum`: the digest the file must have; `null` checks only a published one. */
     val checksum: Checksum? = null,
+    /** `--overwrite`: replace a file of the download's name instead of saving beside it. */
+    val overwrite: Boolean = false,
   ) : InstanceCommand
 
   /** `ketch list`: prints the tasks. */
@@ -98,6 +100,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
   var connections = 0
   var requestId: String? = null
   var checksum: Checksum? = null
+  var overwrite = false
   val headers = HeaderOptions()
   val proxy = ProxyOptions()
   val positional = mutableListOf<String>()
@@ -109,7 +112,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
     else -> targetOptions
   }
   val flags = when (command) {
-    "add" -> setOf("--json", NO_PROXY_OPTION)
+    "add" -> setOf("--json", NO_PROXY_OPTION, OVERWRITE_OPTION)
     "list" -> setOf("--json")
     "pause", "resume" -> setOf("--all")
     else -> emptySet()
@@ -152,6 +155,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
         "--json" -> json = true
         "--all" -> all = true
         NO_PROXY_OPTION -> proxy.noProxy()
+        OVERWRITE_OPTION -> overwrite = true
       }
       arg.length > 1 && arg.startsWith("-") -> return InstanceArgs.Invalid("unknown option '$arg'")
       else -> positional += arg
@@ -183,6 +187,7 @@ internal fun parseInstanceArgs(command: String, args: List<String>): InstanceArg
           return InstanceArgs.Invalid(it.message ?: "invalid proxy")
         },
         checksum = checksum,
+        overwrite = overwrite,
       )
     }
     "list" -> {

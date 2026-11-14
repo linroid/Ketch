@@ -1,5 +1,6 @@
 package com.linroid.ketch.core.file
 
+import okio.IOException
 import okio.Path.Companion.toPath
 
 /** Longest file name, in UTF-8 bytes, that common file systems accept. */
@@ -53,6 +54,26 @@ fun sanitizeFileName(name: String): String? {
  * result fits in [MAX_FILE_NAME_BYTES] UTF-8 bytes. An extension that leaves no room for the stem
  * is cut along with it.
  */
+/**
+ * The name a download saved as [fileName] in [directory] gets when it keeps existing files
+ * ([com.linroid.ketch.api.FileConflict.RENAME]), such as `name (1).ext`, when a file or folder of
+ * that name is already there; `null` when the name is free, and when it cannot be told: a
+ * [directory] that is a URI, such as an Android `content://` folder, or a name that would leave
+ * it. A guess for showing before a download is added: the download picks its name itself when
+ * it starts. It reads the file system, so call it off the main thread.
+ */
+fun renamedIfExists(directory: String, fileName: String): String? {
+  if (directory.contains("://")) return null
+  val name = sanitizeFileName(fileName) ?: return null
+  val path = resolveChildPath(directory.trimEnd('/', '\\'), name)
+  return try {
+    if (!OutputPathReservations.exists(path)) return null
+    OutputPathReservations.freePath(path).toPath().name
+  } catch (_: IOException) {
+    null
+  }
+}
+
 internal fun fitFileName(name: String, suffix: String = ""): String {
   val dotIndex = name.lastIndexOf('.')
   val keptExtension = if (dotIndex > 0) name.substring(dotIndex) else ""

@@ -174,6 +174,7 @@
   <string name="intake_reset_priority">Restablecer la prioridad</string>
   <string name="intake_reset_start">Restablecer el inicio</string>
   <string name="intake_reset_connections">Restablecer las conexiones</string>
+  <string name="intake_reset_conflict">Usar el ajuste del dispositivo</string>
   <plurals name="intake_headers_count">
     <item quantity="one">%1$d encabezado</item>
     <item quantity="other">%1$d encabezados</item>
@@ -218,6 +219,17 @@
   <string name="intake_choose_folder">Elegir carpeta…</string>
   <string name="intake_folder_on">Carpeta en %1$s</string>
   <string name="intake_torrents_app_folder">Los archivos descargados por torrent se guardan en la carpeta de la app. Las carpetas elegidas en Archivos solo se usan para descargas mediante enlaces convencionales</string>
+  <string name="intake_conflict">Si el archivo ya existe</string>
+  <string name="intake_conflict_rename">Renombrar</string>
+  <string name="intake_conflict_overwrite">Sobrescribir</string>
+  <string name="intake_conflict_rename_caption">Lo guarda junto a él con otro nombre.</string>
+  <string name="intake_conflict_overwrite_caption">Lo reemplaza cuando termina la descarga.</string>
+  <string name="intake_option_overwrite">Sobrescribe archivos existentes</string>
+  <string name="intake_option_rename">Conserva archivos existentes</string>
+  <string name="intake_exists_rename">%1$s ya está en esta carpeta. Esta descarga se guardará como %2$s.</string>
+  <string name="intake_exists_overwrite">%1$s ya está en esta carpeta. Esta descarga lo reemplazará cuando termine.</string>
+  <string name="intake_exists_rename_some">Algunos de estos archivos ya están en esta carpeta. Esas descargas se guardarán con otros nombres.</string>
+  <string name="intake_exists_overwrite_some">Algunos de estos archivos ya están en esta carpeta. Las descargas los reemplazarán cuando terminen.</string>
 
   <string name="intake_advanced">Avanzado</string>
   <string name="intake_hide">Ocultar</string>

@@ -5,6 +5,7 @@ import com.linroid.ketch.api.ChecksumAlgorithm
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadPriority
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.FileOrder
 import com.linroid.ketch.api.Proxy
 import com.linroid.ketch.api.ResolvedSource
@@ -49,6 +50,25 @@ class DownloadArgsTest {
       parseDownloadArgs(
         listOf("--list-files", "--checksum", "d41d8cd98f00b204e9800998ecf8427e", "magnet:?x"),
       ),
+    )
+  }
+
+  @Test
+  fun `overwrite sets the request to replace existing files`() {
+    val plain = assertIs<DownloadArgs.Download>(parseDownloadArgs(listOf("https://e.com/a.zip")))
+    val parsed = parseDownloadArgs(listOf("--overwrite", "https://e.com/a.zip"))
+
+    val download = assertIs<DownloadArgs.Download>(parsed)
+    assertEquals(FileConflict.OVERWRITE, download.toRequest(Destination("dir/")).fileConflict)
+    // Left to the configuration without the flag.
+    assertEquals(null, plain.toRequest(Destination("dir/")).fileConflict)
+  }
+
+  @Test
+  fun `overwrite with list-files is invalid`() {
+    assertEquals(
+      DownloadArgs.Invalid("--list-files and --overwrite cannot be used together"),
+      parseDownloadArgs(listOf("--list-files", "--overwrite", "magnet:?x")),
     )
   }
 

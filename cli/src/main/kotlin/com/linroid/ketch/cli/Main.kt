@@ -171,6 +171,7 @@ private fun runDownload(args: DownloadArgs.Download): Int {
   val config = DownloadConfig(
     maxConcurrentDownloads = args.maxConcurrent,
     proxy = fileConfig.download.proxy,
+    fileConflict = fileConfig.download.fileConflict,
   )
 
   val httpEngine = KtorHttpEngine.withNetworkInterfaces()
@@ -1389,6 +1390,9 @@ private fun printUsage() {
   println("                           sha256:<hex>, also md5, sha1, sha512;")
   println("                           without it, a digest the server")
   println("                           publishes is checked")
+  println("  --overwrite              Replace a file of the download's name")
+  println("                           once it completes, instead of saving")
+  println("                           beside it as name (1).ext")
   println()
   println("Running Ketch (the app, or `ketch server`):")
   println("  add <url> [destination]  Add a download; prints its task ID")
@@ -1511,6 +1515,9 @@ private fun printInstanceUsage(name: String, out: PrintStream) {
     out.println("                           same key adds the download once")
     out.println("  --checksum <digest>      Fail unless the file has this digest,")
     out.println("                           such as sha256:<hex>")
+    out.println("  --overwrite              Replace a file of the download's name")
+    out.println("                           once it completes, instead of saving")
+    out.println("                           beside it as name (1).ext")
   }
   if (name == "add" || name == "list") {
     out.println("  --json                   Print JSON instead")

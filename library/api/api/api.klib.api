@@ -105,6 +105,22 @@ final enum class com.linroid.ketch.api/DownloadPriority : kotlin/Enum<com.linroi
     }
 }
 
+final enum class com.linroid.ketch.api/FileConflict : kotlin/Enum<com.linroid.ketch.api/FileConflict> { // com.linroid.ketch.api/FileConflict|null[0]
+    enum entry OVERWRITE // com.linroid.ketch.api/FileConflict.OVERWRITE|null[0]
+    enum entry RENAME // com.linroid.ketch.api/FileConflict.RENAME|null[0]
+
+    final val entries // com.linroid.ketch.api/FileConflict.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.linroid.ketch.api/FileConflict> // com.linroid.ketch.api/FileConflict.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.linroid.ketch.api/FileConflict // com.linroid.ketch.api/FileConflict.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.linroid.ketch.api/FileConflict> // com.linroid.ketch.api/FileConflict.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.linroid.ketch.api/FileConflict.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.linroid.ketch.api/FileConflict> // com.linroid.ketch.api/FileConflict.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.linroid.ketch.api/FileConflict.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 final enum class com.linroid.ketch.api/FileOrder : kotlin/Enum<com.linroid.ketch.api/FileOrder> { // com.linroid.ketch.api/FileOrder|null[0]
     enum entry EXTENSION // com.linroid.ketch.api/FileOrder.EXTENSION|null[0]
     enum entry NAME // com.linroid.ketch.api/FileOrder.NAME|null[0]
@@ -728,7 +744,7 @@ final class com.linroid.ketch.api/DownloadCategory { // com.linroid.ketch.api/Do
 }
 
 final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/DownloadConfig|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/Proxy = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ...) // com.linroid.ketch.api/DownloadConfig.<init>|<init>(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.Proxy;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/Proxy = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ..., com.linroid.ketch.api/FileConflict = ...) // com.linroid.ketch.api/DownloadConfig.<init>|<init>(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.Proxy;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>;com.linroid.ketch.api.FileConflict){}[0]
 
     final val bufferSize // com.linroid.ketch.api/DownloadConfig.bufferSize|{}bufferSize[0]
         final fun <get-bufferSize>(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.bufferSize.<get-bufferSize>|<get-bufferSize>(){}[0]
@@ -736,6 +752,8 @@ final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/Down
         final fun <get-categories>(): kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> // com.linroid.ketch.api/DownloadConfig.categories.<get-categories>|<get-categories>(){}[0]
     final val defaultDirectory // com.linroid.ketch.api/DownloadConfig.defaultDirectory|{}defaultDirectory[0]
         final fun <get-defaultDirectory>(): kotlin/String? // com.linroid.ketch.api/DownloadConfig.defaultDirectory.<get-defaultDirectory>|<get-defaultDirectory>(){}[0]
+    final val fileConflict // com.linroid.ketch.api/DownloadConfig.fileConflict|{}fileConflict[0]
+        final fun <get-fileConflict>(): com.linroid.ketch.api/FileConflict // com.linroid.ketch.api/DownloadConfig.fileConflict.<get-fileConflict>|<get-fileConflict>(){}[0]
     final val idleTimeoutMs // com.linroid.ketch.api/DownloadConfig.idleTimeoutMs|{}idleTimeoutMs[0]
         final fun <get-idleTimeoutMs>(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.idleTimeoutMs.<get-idleTimeoutMs>|<get-idleTimeoutMs>(){}[0]
     final val maxConcurrentDownloads // com.linroid.ketch.api/DownloadConfig.maxConcurrentDownloads|{}maxConcurrentDownloads[0]
@@ -771,6 +789,7 @@ final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/Down
     final fun component14(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.component14|component14(){}[0]
     final fun component15(): com.linroid.ketch.api/Proxy // com.linroid.ketch.api/DownloadConfig.component15|component15(){}[0]
     final fun component16(): kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> // com.linroid.ketch.api/DownloadConfig.component16|component16(){}[0]
+    final fun component17(): com.linroid.ketch.api/FileConflict // com.linroid.ketch.api/DownloadConfig.component17|component17(){}[0]
     final fun component2(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // com.linroid.ketch.api/DownloadConfig.component4|component4(){}[0]
@@ -779,7 +798,7 @@ final class com.linroid.ketch.api/DownloadConfig { // com.linroid.ketch.api/Down
     final fun component7(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component7|component7(){}[0]
     final fun component8(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.linroid.ketch.api/DownloadConfig.component9|component9(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/Proxy = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ...): com.linroid.ketch.api/DownloadConfig // com.linroid.ketch.api/DownloadConfig.copy|copy(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.Proxy;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Int = ..., com.linroid.ketch.api/SpeedLimit = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., com.linroid.ketch.api/Proxy = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCategory> = ..., com.linroid.ketch.api/FileConflict = ...): com.linroid.ketch.api/DownloadConfig // com.linroid.ketch.api/DownloadConfig.copy|copy(kotlin.String?;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Int;com.linroid.ketch.api.SpeedLimit;kotlin.Int;kotlin.Int;kotlin.Int;com.linroid.ketch.api.Proxy;kotlin.collections.List<com.linroid.ketch.api.DownloadCategory>;com.linroid.ketch.api.FileConflict){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/DownloadConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/DownloadConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/DownloadConfig.toString|toString(){}[0]
@@ -842,7 +861,7 @@ final class com.linroid.ketch.api/DownloadProgress { // com.linroid.ketch.api/Do
 }
 
 final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/DownloadRequest|null[0]
-    constructor <init>(kotlin/String, com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/Proxy? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ...) // com.linroid.ketch.api/DownloadRequest.<init>|<init>(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.Proxy?;kotlin.Boolean;com.linroid.ketch.api.Checksum?){}[0]
+    constructor <init>(kotlin/String, com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/Proxy? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ..., com.linroid.ketch.api/FileConflict? = ...) // com.linroid.ketch.api/DownloadRequest.<init>|<init>(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.Proxy?;kotlin.Boolean;com.linroid.ketch.api.Checksum?;com.linroid.ketch.api.FileConflict?){}[0]
 
     final val awaitFileSelection // com.linroid.ketch.api/DownloadRequest.awaitFileSelection|{}awaitFileSelection[0]
         final fun <get-awaitFileSelection>(): kotlin/Boolean // com.linroid.ketch.api/DownloadRequest.awaitFileSelection.<get-awaitFileSelection>|<get-awaitFileSelection>(){}[0]
@@ -854,6 +873,8 @@ final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/Dow
         final fun <get-connections>(): kotlin/Int // com.linroid.ketch.api/DownloadRequest.connections.<get-connections>|<get-connections>(){}[0]
     final val destination // com.linroid.ketch.api/DownloadRequest.destination|{}destination[0]
         final fun <get-destination>(): com.linroid.ketch.api/Destination? // com.linroid.ketch.api/DownloadRequest.destination.<get-destination>|<get-destination>(){}[0]
+    final val fileConflict // com.linroid.ketch.api/DownloadRequest.fileConflict|{}fileConflict[0]
+        final fun <get-fileConflict>(): com.linroid.ketch.api/FileConflict? // com.linroid.ketch.api/DownloadRequest.fileConflict.<get-fileConflict>|<get-fileConflict>(){}[0]
     final val headers // com.linroid.ketch.api/DownloadRequest.headers|{}headers[0]
         final fun <get-headers>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.linroid.ketch.api/DownloadRequest.headers.<get-headers>|<get-headers>(){}[0]
     final val priority // com.linroid.ketch.api/DownloadRequest.priority|{}priority[0]
@@ -882,6 +903,7 @@ final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/Dow
     final fun component13(): com.linroid.ketch.api/Proxy? // com.linroid.ketch.api/DownloadRequest.component13|component13(){}[0]
     final fun component14(): kotlin/Boolean // com.linroid.ketch.api/DownloadRequest.component14|component14(){}[0]
     final fun component15(): com.linroid.ketch.api/Checksum? // com.linroid.ketch.api/DownloadRequest.component15|component15(){}[0]
+    final fun component16(): com.linroid.ketch.api/FileConflict? // com.linroid.ketch.api/DownloadRequest.component16|component16(){}[0]
     final fun component2(): com.linroid.ketch.api/Destination? // com.linroid.ketch.api/DownloadRequest.component2|component2(){}[0]
     final fun component3(): kotlin/Int // com.linroid.ketch.api/DownloadRequest.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.linroid.ketch.api/DownloadRequest.component4|component4(){}[0]
@@ -890,7 +912,7 @@ final class com.linroid.ketch.api/DownloadRequest { // com.linroid.ketch.api/Dow
     final fun component7(): com.linroid.ketch.api/DownloadPriority // com.linroid.ketch.api/DownloadRequest.component7|component7(){}[0]
     final fun component8(): com.linroid.ketch.api/DownloadSchedule // com.linroid.ketch.api/DownloadRequest.component8|component8(){}[0]
     final fun component9(): kotlin.collections/Set<kotlin/String> // com.linroid.ketch.api/DownloadRequest.component9|component9(){}[0]
-    final fun copy(kotlin/String = ..., com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/Proxy? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ...): com.linroid.ketch.api/DownloadRequest // com.linroid.ketch.api/DownloadRequest.copy|copy(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.Proxy?;kotlin.Boolean;com.linroid.ketch.api.Checksum?){}[0]
+    final fun copy(kotlin/String = ..., com.linroid.ketch.api/Destination? = ..., kotlin/Int = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ..., com.linroid.ketch.api/SpeedLimit = ..., com.linroid.ketch.api/DownloadPriority = ..., com.linroid.ketch.api/DownloadSchedule = ..., kotlin.collections/Set<kotlin/String> = ..., kotlin.collections/List<com.linroid.ketch.api/DownloadCondition> = ..., com.linroid.ketch.api/ResolvedSource? = ..., kotlin/String? = ..., com.linroid.ketch.api/Proxy? = ..., kotlin/Boolean = ..., com.linroid.ketch.api/Checksum? = ..., com.linroid.ketch.api/FileConflict? = ...): com.linroid.ketch.api/DownloadRequest // com.linroid.ketch.api/DownloadRequest.copy|copy(kotlin.String;com.linroid.ketch.api.Destination?;kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.Map<kotlin.String,kotlin.String>;com.linroid.ketch.api.SpeedLimit;com.linroid.ketch.api.DownloadPriority;com.linroid.ketch.api.DownloadSchedule;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<com.linroid.ketch.api.DownloadCondition>;com.linroid.ketch.api.ResolvedSource?;kotlin.String?;com.linroid.ketch.api.Proxy?;kotlin.Boolean;com.linroid.ketch.api.Checksum?;com.linroid.ketch.api.FileConflict?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.linroid.ketch.api/DownloadRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.linroid.ketch.api/DownloadRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.linroid.ketch.api/DownloadRequest.toString|toString(){}[0]
@@ -2310,6 +2332,8 @@ final object com.linroid.ketch.api/KetchFeatures { // com.linroid.ketch.api/Ketc
         final fun <get-CONFIG_PERSISTED>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.CONFIG_PERSISTED.<get-CONFIG_PERSISTED>|<get-CONFIG_PERSISTED>(){}[0]
     final const val COUNTRIES // com.linroid.ketch.api/KetchFeatures.COUNTRIES|{}COUNTRIES[0]
         final fun <get-COUNTRIES>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.COUNTRIES.<get-COUNTRIES>|<get-COUNTRIES>(){}[0]
+    final const val FILE_CONFLICT // com.linroid.ketch.api/KetchFeatures.FILE_CONFLICT|{}FILE_CONFLICT[0]
+        final fun <get-FILE_CONFLICT>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.FILE_CONFLICT.<get-FILE_CONFLICT>|<get-FILE_CONFLICT>(){}[0]
     final const val FILE_SELECTION // com.linroid.ketch.api/KetchFeatures.FILE_SELECTION|{}FILE_SELECTION[0]
         final fun <get-FILE_SELECTION>(): kotlin/String // com.linroid.ketch.api/KetchFeatures.FILE_SELECTION.<get-FILE_SELECTION>|<get-FILE_SELECTION>(){}[0]
     final const val FINITE_DASH // com.linroid.ketch.api/KetchFeatures.FINITE_DASH|{}FINITE_DASH[0]

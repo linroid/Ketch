@@ -395,6 +395,11 @@
   <string name="settings_downloads_change">Ändern…</string>
   <string name="settings_downloads_enter_path">Pfad eingeben…</string>
   <string name="settings_downloads_use_default">Downloads-Ordner verwenden</string>
+  <string name="settings_downloads_conflict">Wenn die Datei schon existiert</string>
+  <string name="settings_downloads_conflict_rename">Umbenennen</string>
+  <string name="settings_downloads_conflict_overwrite">Überschreiben</string>
+  <string name="settings_downloads_conflict_rename_hint">Speichert den Download daneben unter neuem Namen, etwa file (1).zip.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">Ersetzt die Datei, sobald der Download fertig ist. Torrents behalten sie immer.</string>
   <string name="settings_downloads_folders">Ordner im Hinzufügen-Fenster</string>
   <string name="settings_downloads_folders_footer">Angeheftete Ordner stehen beim Hinzufügen eines Downloads oben.</string>
   <string name="settings_downloads_pinned">Angeheftet · %1$s</string>
@@ -784,6 +789,8 @@
   <string name="settings_search_checklist_keywords">Erste Schritte, Einführung, Einrichtung</string>
   <string name="settings_search_welcome_keywords">Einführung, erster Start, Willkommen</string>
   <string name="settings_search_save_to_keywords">Ordner, Verzeichnis, Speicherort, Pfad, Ziel</string>
+  <string name="settings_search_conflict">Einen Download umbenennen oder die gleichnamige Datei ersetzen</string>
+  <string name="settings_search_conflict_keywords">überschreiben, ersetzen, umbenennen, Duplikat, vorhandene Datei, gleicher Name, Konflikt</string>
   <string name="settings_search_folders">Angeheftete und zuletzt verwendete Ordner</string>
   <string name="settings_search_folders_keywords">Favoriten, anheften, zuletzt</string>
   <string name="settings_search_categories">Downloads nach Typ oder Website in Ordner sortieren</string>

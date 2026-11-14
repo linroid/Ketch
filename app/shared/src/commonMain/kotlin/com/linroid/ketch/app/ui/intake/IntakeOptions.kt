@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -145,6 +146,14 @@ import ketch.app.shared.generated.resources.pulse_slow_lane
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import ketch.app.shared.generated.resources.intake_reset_conflict
+import ketch.app.shared.generated.resources.intake_conflict_rename_caption
+import ketch.app.shared.generated.resources.intake_conflict_rename
+import ketch.app.shared.generated.resources.intake_conflict_overwrite_caption
+import ketch.app.shared.generated.resources.intake_conflict_overwrite
+import ketch.app.shared.generated.resources.intake_conflict
+import androidx.compose.runtime.LaunchedEffect
+import com.linroid.ketch.api.FileConflict
 
 /**
  * The one line of options under the rows: where to save, and an Options pill that sums up the
@@ -171,6 +180,55 @@ internal fun OptionsRow(actions: IntakeActions) {
       icon = KetchIcon.Info,
     )
   }
+  ExistingFilesNotice(session)
+}
+
+/**
+ * Says what happens to a file that already has a download's name, beside the choice that
+ * decides it. The files are looked for again whenever a name or the folder changes.
+ */
+@Composable
+private fun ExistingFilesNotice(session: IntakeSession) {
+  val queries = session.existingQueries
+  LaunchedEffect(queries) { session.checkExisting() }
+  val notice = session.existingNotice ?: return
+  val spacing = KetchTheme.spacing
+  BoxWithConstraints(Modifier.fillMaxWidth()) {
+    if (maxWidth < IntakeSheetDefaults.NoticeChoiceBesideWidth) {
+      Column(verticalArrangement = Arrangement.spacedBy(spacing.s2)) {
+        NoticeLine(text = notice.resolve(), icon = KetchIcon.Warning, warning = true)
+        FileConflictChoice(session)
+      }
+    } else {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.s3),
+      ) {
+        Box(Modifier.weight(1f)) {
+          NoticeLine(text = notice.resolve(), icon = KetchIcon.Warning, warning = true)
+        }
+        FileConflictChoice(session)
+      }
+    }
+  }
+}
+
+/** Rename or Overwrite, for every download in the sheet. */
+@Composable
+private fun FileConflictChoice(session: IntakeSession) {
+  KetchSegmented(
+    options = FileConflict.entries,
+    selected = session.fileConflict,
+    onSelect = { session.fileConflict = it },
+    label = {
+      stringResource(
+        when (it) {
+          FileConflict.RENAME -> Res.string.intake_conflict_rename
+          FileConflict.OVERWRITE -> Res.string.intake_conflict_overwrite
+        },
+      )
+    },
+  )
 }
 
 /** How much one variant of the [OptionsRow] spells out, from the fullest to the most compact. */
@@ -316,6 +374,19 @@ internal fun OptionsPanel(session: IntakeSession, modifier: Modifier = Modifier)
       }
     }
     ConnectionsField(session)
+    if (session.offersFileConflict) {
+      OptionField(
+        label = stringResource(Res.string.intake_conflict),
+        caption = stringResource(
+          when (session.fileConflict) {
+            FileConflict.RENAME -> Res.string.intake_conflict_rename_caption
+            FileConflict.OVERWRITE -> Res.string.intake_conflict_overwrite_caption
+          },
+        ),
+      ) {
+        FileConflictChoice(session)
+      }
+    }
   }
 }
 
@@ -917,6 +988,7 @@ private fun resetLabel(option: IntakeOption): StringResource = when (option) {
   IntakeOption.Priority -> Res.string.intake_reset_priority
   IntakeOption.Start -> Res.string.intake_reset_start
   IntakeOption.Connections -> Res.string.intake_reset_connections
+  IntakeOption.FileConflict -> Res.string.intake_reset_conflict
 }
 
 private const val SECRET_LINES = 3

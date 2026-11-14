@@ -178,13 +178,14 @@ ketch --files 0,3 ./pack.torrent ~/Downloads/
 | `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated, such as `*.lan,10.0.0.0/8`; needs `--proxy` |
 | `--no-proxy` | Connect directly, whatever the configured or system proxy |
 | `--checksum <digest>` | Fail unless the finished file has this digest (see [Checksums](#checksums)) |
+| `--overwrite` | Replace a file that already has the download's name once the download completes, instead of saving beside it as `name (1).ext` (see [`fileConflict`](#download)) |
 | `--files <ids>` | Download only these files of a torrent or other multi-file download: comma-separated IDs from `--list-files`, exactly one when the choices are variants |
 | `--list-files` | List the files or variants of the URL with their IDs and sizes instead of downloading it |
 | `--sort <order>` | Order of `--list-files`: `name` (natural order, so 2 comes before 10), `size` or `type` (by file extension); default: the download's own order |
 | `--reverse` | Reverse the order of `--list-files` |
 
-Invalid options, such as `--sort` without `--list-files`, `--list-files` together with `--files`
-or `--checksum`, or `--proxy` together with `--no-proxy`, exit with status 2.
+Invalid options, such as `--sort` without `--list-files`, `--list-files` together with `--files`,
+`--checksum` or `--overwrite`, or `--proxy` together with `--no-proxy`, exit with status 2.
 
 ### Request headers
 
@@ -297,11 +298,12 @@ machine. Another device gets the path as it is; that server may limit downloads 
 | `--proxy-bypass <hosts>` | Hosts `--proxy` leaves out, comma-separated; needs `--proxy` |
 | `--no-proxy` | Connect directly, whatever the instance's proxy |
 | `--checksum <digest>` | Fail unless the finished file has this digest, such as `sha256:<hex>` |
+| `--overwrite` | Replace a file that already has the download's name once the download completes, instead of saving beside it; the instance may refuse it (see [Save folders](#save-folders)) |
 | `--idempotency-key <key>` | Running the command again with the same key adds the download only once |
 | `--json` | Print the task as JSON (see [Task JSON](#task-json)) instead of its ID |
 
-`--proxy`, `--no-proxy`, `--checksum` and `--idempotency-key` need a Ketch version that supports
-them; an older one is refused with a message to update it.
+`--proxy`, `--no-proxy`, `--checksum`, `--overwrite` and `--idempotency-key` need a Ketch version
+that supports them; an older one is refused with a message to update it.
 
 **Retries.** `ketch add` sends each download with a request ID, so when the connection fails, or
 Ketch answers with a server error, before the download is confirmed, it can send it again without
@@ -551,6 +553,16 @@ device, but never one where a new file could take over your account: system fold
 on macOS, `AppData` on Windows, the config directory, and hidden files and folders such as
 `~/.ssh`, unless they are inside the download folder. An existing file is still never
 overwritten. Set `--allowed-dirs` or `allowedDirectories` to keep clients to these folders too.
+
+The exception is a download that overwrites existing files: one sent with `"fileConflict":
+"overwrite"` (`ketch add --overwrite`), or any download once [`fileConflict`](#download) is
+`"overwrite"`. It replaces a file of the name Ketch chose, only in the download folder and the
+`allowedDirectories`; in another folder it is saved beside the file, and a task asking for it
+there is refused. Only clients with the token can ask for it, per task or by changing the setting
+with `PUT /api/config`: without a token both get `403 Forbidden` with an `overwrite_rejected`
+error, while a `fileConflict` you set in the config file applies. A file path a client names
+still gets a free name, unless the task asks to overwrite, with the token, in one of those
+folders: it then replaces that file.
 
 File names a client gives are cleaned like the names sites suggest: only the part after the last
 `/` or `\` is kept, and characters Windows forbids become `_`.
@@ -988,6 +1000,7 @@ list every key the CLI reads.
 | `maxConnectionsPerDownload` | int | `4` | Connections (segments) per HTTP or FTP download; above 0 |
 | `maxConcurrentDownloads` | int | `4` | Maximum simultaneous downloads (`0` = unlimited) |
 | `maxConnectionsPerHost` | int | `16` | Maximum simultaneous downloads from one host (`0` = unlimited) |
+| `fileConflict` | string | `"rename"` | When a file already has a download's name: `"rename"` saves beside it as `name (1).ext`, `"overwrite"` replaces it once the download completes. Torrents always keep the file |
 | `retryCount` | int | `3` | Automatic retries in a row, without progress, after a failure that may pass |
 | `unlimitedRetries` | bool | `false` | Retry such failures until the download is paused |
 | `retryDelayMs` | long | `1000` | Delay before the first retry, doubled for each further one |

@@ -174,6 +174,7 @@
   <string name="intake_reset_priority">Priorität zurücksetzen</string>
   <string name="intake_reset_start">Start zurücksetzen</string>
   <string name="intake_reset_connections">Verbindungen zurücksetzen</string>
+  <string name="intake_reset_conflict">Einstellung des Geräts verwenden</string>
   <plurals name="intake_headers_count">
     <item quantity="one">%1$d Header</item>
     <item quantity="other">%1$d Header</item>
@@ -218,6 +219,17 @@
   <string name="intake_choose_folder">Ordner wählen…</string>
   <string name="intake_folder_on">Ordner auf %1$s</string>
   <string name="intake_torrents_app_folder">Per Torrent heruntergeladene Dateien werden im App-Ordner gespeichert. In der Dateien-App gewählte Ordner gelten nur für Downloads über normale Links</string>
+  <string name="intake_conflict">Wenn die Datei schon existiert</string>
+  <string name="intake_conflict_rename">Umbenennen</string>
+  <string name="intake_conflict_overwrite">Überschreiben</string>
+  <string name="intake_conflict_rename_caption">Speichert daneben unter neuem Namen.</string>
+  <string name="intake_conflict_overwrite_caption">Ersetzt sie, sobald der Download fertig ist.</string>
+  <string name="intake_option_overwrite">Überschreibt vorhandene Dateien</string>
+  <string name="intake_option_rename">Behält vorhandene Dateien</string>
+  <string name="intake_exists_rename">%1$s ist schon in diesem Ordner. Dieser Download wird als %2$s gespeichert.</string>
+  <string name="intake_exists_overwrite">%1$s ist schon in diesem Ordner. Dieser Download ersetzt die Datei, sobald er fertig ist.</string>
+  <string name="intake_exists_rename_some">Einige dieser Dateien sind schon in diesem Ordner. Diese Downloads werden unter neuen Namen gespeichert.</string>
+  <string name="intake_exists_overwrite_some">Einige dieser Dateien sind schon in diesem Ordner. Die Downloads ersetzen sie, sobald sie fertig sind.</string>
 
   <string name="intake_advanced">Erweitert</string>
   <string name="intake_hide">Ausblenden</string>

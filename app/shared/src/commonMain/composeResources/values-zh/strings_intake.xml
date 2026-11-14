@@ -157,6 +157,7 @@
   <string name="intake_reset_priority">重置优先级</string>
   <string name="intake_reset_start">重置开始时间</string>
   <string name="intake_reset_connections">重置连接数</string>
+  <string name="intake_reset_conflict">使用设备的设置</string>
   <plurals name="intake_headers_count">
     <item quantity="other">%1$d 个请求头</item>
   </plurals>
@@ -198,6 +199,17 @@
   <string name="intake_choose_folder">选择文件夹…</string>
   <string name="intake_folder_on">%1$s 上的文件夹</string>
   <string name="intake_torrents_app_folder">通过种子下载的文件会保存在应用文件夹中；在“文件”中选择的文件夹仅用于普通链接下载</string>
+  <string name="intake_conflict">文件已存在时</string>
+  <string name="intake_conflict_rename">重命名</string>
+  <string name="intake_conflict_overwrite">覆盖</string>
+  <string name="intake_conflict_rename_caption">以新名称保存在旁边。</string>
+  <string name="intake_conflict_overwrite_caption">下载完成后替换它。</string>
+  <string name="intake_option_overwrite">覆盖已有文件</string>
+  <string name="intake_option_rename">保留已有文件</string>
+  <string name="intake_exists_rename">此文件夹中已有 %1$s。本次下载将保存为 %2$s。</string>
+  <string name="intake_exists_overwrite">此文件夹中已有 %1$s。下载完成后将替换它。</string>
+  <string name="intake_exists_rename_some">其中一些文件已在此文件夹中。这些下载将以新名称保存。</string>
+  <string name="intake_exists_overwrite_some">其中一些文件已在此文件夹中。下载完成后将替换它们。</string>
 
   <string name="intake_advanced">高级</string>
   <string name="intake_hide">隐藏</string>

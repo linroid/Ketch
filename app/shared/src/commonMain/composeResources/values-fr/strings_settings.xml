@@ -395,6 +395,11 @@
   <string name="settings_downloads_change">Modifier…</string>
   <string name="settings_downloads_enter_path">Saisir un chemin…</string>
   <string name="settings_downloads_use_default">Utiliser le dossier Téléchargements</string>
+  <string name="settings_downloads_conflict">Si le fichier existe déjà</string>
+  <string name="settings_downloads_conflict_rename">Renommer</string>
+  <string name="settings_downloads_conflict_overwrite">Remplacer</string>
+  <string name="settings_downloads_conflict_rename_hint">Enregistre le téléchargement à côté sous un autre nom, comme file (1).zip.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">Remplace le fichier une fois le téléchargement terminé. Les torrents le conservent toujours.</string>
   <string name="settings_downloads_folders">Dossiers du panneau d'ajout</string>
   <string name="settings_downloads_folders_footer">Les dossiers épinglés apparaissent en premier quand vous ajoutez un téléchargement.</string>
   <string name="settings_downloads_pinned">Épinglé · %1$s</string>
@@ -784,6 +789,8 @@
   <string name="settings_search_checklist_keywords">premiers pas, prise en main, configuration</string>
   <string name="settings_search_welcome_keywords">accueil, premier lancement, introduction</string>
   <string name="settings_search_save_to_keywords">dossier, répertoire, emplacement, chemin, destination</string>
+  <string name="settings_search_conflict">Renommer un téléchargement ou remplacer le fichier du même nom</string>
+  <string name="settings_search_conflict_keywords">écraser, remplacer, renommer, doublon, fichier existant, même nom, conflit</string>
   <string name="settings_search_folders">Dossiers épinglés et récents</string>
   <string name="settings_search_folders_keywords">favori, épingler, récent</string>
   <string name="settings_search_categories">Ranger les téléchargements dans des dossiers selon le type ou le site</string>

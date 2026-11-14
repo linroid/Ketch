@@ -10,6 +10,7 @@ import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadSchedule
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.FileSelectionMode
 import com.linroid.ketch.api.KetchApi
 import com.linroid.ketch.api.KetchError
@@ -961,6 +962,199 @@ class IntakeStateTest {
     assertFalse(session.startsOver)
     session.headers.referer = "https://b.example/"
     assertTrue(session.startsOver)
+  }
+
+  @Test
+  fun fileConflict_unchanged_followsTheDeviceAndStaysOutOfTheRequest() = runTest {
+    val api = IntakeTestApi(
+      features = KetchFeatures.ALL,
+      config = DownloadConfig(fileConflict = FileConflict.OVERWRITE),
+    )
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    assertTrue(session.offersFileConflict)
+    assertEquals(FileConflict.OVERWRITE, session.fileConflict)
+    assertFalse(session.fileConflictChanged)
+    assertTrue(session.optionValues.none { it.option == IntakeOption.FileConflict })
+    session.submit {}
+    runCurrent()
+
+    assertNull(api.base.requests.single().fileConflict)
+  }
+
+  @Test
+  fun fileConflict_changedInTheSheet_goesWithTheRequestUntilReset() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    session.fileConflict = FileConflict.OVERWRITE
+    val chip = session.optionValues.single { it.option == IntakeOption.FileConflict }
+    assertTrue(chip.changed)
+    assertEquals("Overwrites existing files", chip.text.load())
+    session.resetOption(IntakeOption.FileConflict)
+    assertEquals(FileConflict.RENAME, session.fileConflict)
+
+    session.fileConflict = FileConflict.OVERWRITE
+    session.submit {}
+    runCurrent()
+
+    assertEquals(FileConflict.OVERWRITE, api.base.requests.single().fileConflict)
+  }
+
+  @Test
+  fun fileConflict_chosenAsTheDeviceHasIt_isNotAChange() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+
+    session.fileConflict = FileConflict.RENAME
+    session.submit {}
+    runCurrent()
+
+    assertFalse(session.fileConflictChanged)
+    assertNull(api.base.requests.single().fileConflict)
+  }
+
+  // A file path is replaced as it is unless its request says what to do.
+  @Test
+  fun fileConflict_folderAndNameChosen_alwaysGoesWithTheRequest() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val seed = IntakeSeed(url = "https://files.example.com/get?id=7", fileName = "report.pdf")
+    val session = session(api, IntakeRequest(seeds = listOf(seed)))
+    runCurrent()
+    session.folder = "/Volumes/Data"
+
+    session.submit {}
+    runCurrent()
+
+    val request = api.base.requests.single()
+    assertEquals("/Volumes/Data/report.pdf", request.destination?.value)
+    assertEquals(FileConflict.RENAME, request.fileConflict)
+  }
+
+  @Test
+  fun fileConflict_whereItCannotApply_isNotOfferedNorSent() = runTest {
+    val old = IntakeTestApi(features = setOf(KetchFeatures.CHECKSUM))
+    val seed = IntakeSeed(url = "https://files.example.com/get?id=7", fileName = "report.pdf")
+    val onOld = session(old, IntakeRequest(seeds = listOf(seed)))
+    runCurrent()
+    onOld.folder = "/Volumes/Data"
+
+    assertFalse(onOld.offersFileConflict)
+    onOld.submit {}
+    runCurrent()
+    assertNull(old.base.requests.single().fileConflict)
+
+    val magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+    val torrents = IntakeTestApi(features = KetchFeatures.ALL, check = { url, _ -> torrent(url) })
+    assertFalse(session(torrents, IntakeRequest(magnet)).also { runCurrent() }.offersFileConflict)
+
+    val current = IntakeTestApi(features = KetchFeatures.ALL)
+    val inTree = session(current, IntakeRequest(links.first()))
+    runCurrent()
+    assertTrue(inTree.offersFileConflict)
+    inTree.folder = "content://com.android.externalstorage.documents/tree/primary%3AMovies"
+    inTree.fileConflict = FileConflict.OVERWRITE
+    assertFalse(inTree.offersFileConflict)
+    assertEquals(FileConflict.RENAME, inTree.fileConflict)
+    inTree.submit {}
+    runCurrent()
+    assertNull(current.base.requests.single().fileConflict)
+  }
+
+  @Test
+  fun existingNotice_fileOfTheNameExists_saysWhatTheChoiceDoes() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+    val asked = mutableListOf<Pair<String, String>>()
+    session.fileCheck = { folder, name ->
+      asked += folder to name
+      "archive-1 (1).zip".takeIf { name == "archive-1.zip" }
+    }
+
+    assertNull(session.existingNotice)
+    session.checkExisting()
+
+    assertEquals(listOf("/Users/me/Downloads" to "archive-1.zip"), asked)
+    assertEquals(
+      "archive-1.zip is already in this folder. This download will be saved as " +
+        "archive-1 (1).zip.",
+      session.existingNotice?.load(),
+    )
+    session.fileConflict = FileConflict.OVERWRITE
+    assertEquals(
+      "archive-1.zip is already in this folder. This download replaces it once it finishes.",
+      session.existingNotice?.load(),
+    )
+  }
+
+  @Test
+  fun existingNotice_severalFilesExist_sumsThemUp() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.take(3).joinToString("\n")))
+    runCurrent()
+    session.fileCheck = { _, name -> "renamed".takeIf { name != "archive-3.zip" } }
+
+    session.checkExisting()
+
+    assertEquals(2, session.existingFiles.size)
+    assertEquals(
+      "Some of these files are already in this folder. Those downloads will be saved under " +
+        "new names.",
+      session.existingNotice?.load(),
+    )
+  }
+
+  @Test
+  fun existingQueries_followTheChosenFolderAndTheCategoryFolder() = runTest {
+    val video = DownloadCategory(folder = "Media/Video", extensions = listOf("mp4"))
+    val api = IntakeTestApi(
+      features = KetchFeatures.ALL,
+      config = DownloadConfig(categories = listOf(video)),
+    )
+    val seeds = listOf(IntakeSeed("https://example.com/talk.mp4"))
+    val session = session(api, IntakeRequest(seeds = seeds))
+    runCurrent()
+
+    assertEquals(
+      listOf("/Users/me/Downloads/Media/Video" to "talk.mp4"),
+      session.existingQueries,
+    )
+    session.folder = "/Volumes/Data"
+    assertEquals(listOf("/Volumes/Data" to "talk.mp4"), session.existingQueries)
+  }
+
+  // Found for a folder the sheet has left: the answer came too late to be shown.
+  @Test
+  fun checkExisting_folderChangedMeanwhile_dropsTheAnswer() = runTest {
+    val api = IntakeTestApi(features = KetchFeatures.ALL)
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+    session.fileCheck = { _, _ ->
+      session.folder = "/Volumes/Data"
+      "archive-1 (1).zip"
+    }
+
+    session.checkExisting()
+
+    assertTrue(session.existingFiles.isEmpty())
+    assertNull(session.existingNotice)
+  }
+
+  @Test
+  fun existingQueries_deviceThatCannotChoose_asksNothing() = runTest {
+    val api = IntakeTestApi(features = setOf(KetchFeatures.CHECKSUM))
+    val session = session(api, IntakeRequest(links.first()))
+    runCurrent()
+    session.fileCheck = { _, _ -> "archive-1 (1).zip" }
+
+    session.checkExisting()
+
+    assertTrue(session.existingQueries.isEmpty())
+    assertNull(session.existingNotice)
   }
 
   @Test

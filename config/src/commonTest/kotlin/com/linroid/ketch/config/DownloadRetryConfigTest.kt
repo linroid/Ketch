@@ -1,8 +1,10 @@
 package com.linroid.ketch.config
 
 import com.linroid.ketch.api.DownloadConfig
+import com.linroid.ketch.api.FileConflict
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DownloadRetryConfigTest {
 
@@ -40,5 +42,27 @@ class DownloadRetryConfigTest {
       ),
       decoded.download,
     )
+  }
+
+  @Test
+  fun `fileConflict is written as text and read back`() {
+    val config = KetchConfig(download = DownloadConfig(fileConflict = FileConflict.OVERWRITE))
+
+    val text = ConfigStore.encode(config)
+
+    assertTrue("fileConflict = \"overwrite\"" in text, text)
+    assertEquals(config.download, ConfigStore.decode(text).download)
+  }
+
+  @Test
+  fun `a fileConflict this version does not know loads as rename`() {
+    val decoded = ConfigStore.toml.decodeFromString(
+      KetchConfig.serializer(),
+      """
+      |[download]
+      |fileConflict = "ask"
+      """.trimMargin(),
+    )
+    assertEquals(FileConflict.RENAME, decoded.download.fileConflict)
   }
 }

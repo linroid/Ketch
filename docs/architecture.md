@@ -223,7 +223,8 @@ DownloadRequest
   |            match. Names from a server, a link or a FileNameResolver pass through
   |            sanitizeFileName and must stay inside the folder; a file Destination is used as it
   |            is. OutputPathReservations holds every running download's path, so two downloads
-  |            never share a file, and the name is deduplicated as `name (n).ext`.
+  |            never share a file, and the name is deduplicated as `name (n).ext`; with
+  |            FileConflict.OVERWRITE an existing file's name is kept, to replace it at the end.
   v
 [5. Plan]      For HTTP and FTP, SegmentCalculator splits the file into one segment per effective
   |            connection; one segment without range support. Content of unknown size gets no
@@ -246,7 +247,8 @@ DownloadRequest
   v
 [8. Complete]  The partial file is flushed, its checksum verified if there is one, then closed and
                moved to its final name (an existing file there is kept and the download takes
-               `name (n).ext`; a file Destination is replaced). The task becomes Completed with
+               `name (n).ext`; a file Destination, or any file with FileConflict.OVERWRITE, is
+               replaced). The task becomes Completed with
                its path, size and download time (summed over runs, excluding queued and paused
                time). A retryable error retries with backoff from the saved progress; anything
                else, or too many retries, ends in Failed.
@@ -428,7 +430,10 @@ lists the routes.
   `defaultDirectory` of `PUT /api/config` and `deleteFiles=true`. Anything else is
   `403 path_rejected`. With a token and no list they may choose any folder but
   `protectedDirectories` (system folders, the user's application data, the app's own data) and
-  hidden entries, outside the download directory; a new download never replaces a file.
+  hidden entries, outside the download directory; a new download never replaces a file, unless
+  files are overwritten (`fileConflict`), which only callers with the token can ask for
+  (`403 overwrite_rejected` otherwise) and which only applies in the download directory and
+  `allowedDirectories`.
 - **Request bodies**: JSON only (`415` otherwise), at most 1 MiB, or 32 MiB for a new task and
   16 MiB for uploaded content (`413` beyond).
 - **Host check**: without a token, requests must name this machine in `Host` (loopback, an

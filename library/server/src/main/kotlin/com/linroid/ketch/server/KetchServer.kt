@@ -206,6 +206,13 @@ import kotlin.coroutines.cancellation.CancellationException
  * [protectedDirectories] and hidden entries such as `~/.ssh` are refused the same way, unless
  * they lie in the download directory. A new download still never replaces an existing file.
  *
+ * The exception is a download that overwrites existing files (`fileConflict` `overwrite`, of a
+ * request or of the configuration): it replaces a file of the name Ketch chose, only in the
+ * download directory and [allowedDirectories]; in other folders it is saved beside the file.
+ * Only callers with the [apiToken] can ask for it, per task or with `PUT /api/config`: without
+ * one both get `403 Forbidden` with an `overwrite_rejected` `ErrorResponse`, as does a task
+ * asking for it in another folder, while a configuration that already overwrites applies.
+ *
  * ## Request bodies
  *
  * JSON bodies must be `application/json` (`415` otherwise) and are read up to 1 MiB, or 32 MiB
@@ -328,6 +335,7 @@ class KetchServer(
     ketch,
     allowedDirectories,
     confined = apiToken == null || allowedDirectories.isNotEmpty(),
+    authenticated = apiToken != null,
     protectedDirectories = protectedDirectories,
   )
   private val throttle = AuthThrottle()
@@ -481,6 +489,13 @@ class KetchServer(
         call.respond(
           HttpStatusCode.Forbidden,
           ErrorResponse("path_rejected", cause.message ?: "Path is not allowed"),
+        )
+      }
+      exception<OverwriteRejectedException> { call, cause ->
+        log.w { "Refused to replace existing files: ${cause.message}" }
+        call.respond(
+          HttpStatusCode.Forbidden,
+          ErrorResponse("overwrite_rejected", cause.message ?: "Existing files are kept"),
         )
       }
       exception<PayloadTooLargeException> { call, cause ->

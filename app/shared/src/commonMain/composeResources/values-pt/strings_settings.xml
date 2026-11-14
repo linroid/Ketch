@@ -395,6 +395,11 @@
   <string name="settings_downloads_change">Alterar…</string>
   <string name="settings_downloads_enter_path">Inserir caminho…</string>
   <string name="settings_downloads_use_default">Usar a pasta de downloads</string>
+  <string name="settings_downloads_conflict">Se o arquivo já existir</string>
+  <string name="settings_downloads_conflict_rename">Renomear</string>
+  <string name="settings_downloads_conflict_overwrite">Substituir</string>
+  <string name="settings_downloads_conflict_rename_hint">Salva o download ao lado dele com outro nome, como file (1).zip.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">Substitui o arquivo quando o download termina. Torrents sempre o mantêm.</string>
   <string name="settings_downloads_folders">Pastas no painel de adicionar</string>
   <string name="settings_downloads_folders_footer">As pastas fixadas aparecem primeiro quando você adiciona um download.</string>
   <string name="settings_downloads_pinned">Fixada · %1$s</string>
@@ -784,6 +789,8 @@
   <string name="settings_search_checklist_keywords">primeiros passos, introdução, configuração inicial</string>
   <string name="settings_search_welcome_keywords">boas-vindas, primeira execução, introdução</string>
   <string name="settings_search_save_to_keywords">pasta, diretório, local, caminho, destino</string>
+  <string name="settings_search_conflict">Renomear um download ou substituir o arquivo de mesmo nome</string>
+  <string name="settings_search_conflict_keywords">sobrescrever, substituir, renomear, duplicado, arquivo existente, mesmo nome, conflito</string>
   <string name="settings_search_folders">Pastas fixadas e recentes</string>
   <string name="settings_search_folders_keywords">favorita, fixar, recente</string>
   <string name="settings_search_categories">Organizar downloads em pastas por tipo ou site</string>

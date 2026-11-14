@@ -46,6 +46,12 @@ object KetchFeatures {
   /** [DownloadRequest.checksum] and digests servers publish are verified. */
   const val CHECKSUM: String = "download.checksum"
 
+  /**
+   * [DownloadConfig.fileConflict] and [DownloadRequest.fileConflict] choose whether a download
+   * replaces an existing file of its name.
+   */
+  const val FILE_CONFLICT: String = "download.fileConflict"
+
   /** [Interest.Connections] reports live connections. */
   const val ACTIVE_CONNECTIONS: String = "net.activeConnections"
 
@@ -69,6 +75,6 @@ object KetchFeatures {
   val ALL: Set<String> = setOf(
     AUTO_CONNECTIONS, QUEUE_POSITION, REQUEST_ID, PROXY, FINITE_MEDIA, FINITE_HLS, FINITE_DASH,
     CATEGORY_FOLDERS, TRANSFER_TIMEOUTS, FILE_SELECTION, AWAIT_FILE_SELECTION, ACTIVE_CONNECTIONS,
-    CHECKSUM, COUNTRIES, METALINK, SPEED_MODES,
+    CHECKSUM, COUNTRIES, METALINK, SPEED_MODES, FILE_CONFLICT,
   )
 }

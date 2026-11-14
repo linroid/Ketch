@@ -157,6 +157,7 @@
   <string name="intake_reset_priority">우선순위 초기화</string>
   <string name="intake_reset_start">시작 시간 초기화</string>
   <string name="intake_reset_connections">연결 초기화</string>
+  <string name="intake_reset_conflict">기기 설정 사용</string>
   <plurals name="intake_headers_count">
     <item quantity="other">헤더 %1$d개</item>
   </plurals>
@@ -198,6 +199,17 @@
   <string name="intake_choose_folder">폴더 선택…</string>
   <string name="intake_folder_on">%1$s의 폴더</string>
   <string name="intake_torrents_app_folder">토렌트로 다운로드한 파일은 앱 폴더에 저장됩니다. 파일 앱에서 선택한 폴더는 일반 링크로 다운로드할 때만 사용됩니다</string>
+  <string name="intake_conflict">같은 이름의 파일이 있을 때</string>
+  <string name="intake_conflict_rename">이름 변경</string>
+  <string name="intake_conflict_overwrite">덮어쓰기</string>
+  <string name="intake_conflict_rename_caption">새 이름으로 함께 저장합니다.</string>
+  <string name="intake_conflict_overwrite_caption">다운로드가 끝나면 대체합니다.</string>
+  <string name="intake_option_overwrite">기존 파일 덮어쓰기</string>
+  <string name="intake_option_rename">기존 파일 유지</string>
+  <string name="intake_exists_rename">%1$s 파일이 이미 이 폴더에 있습니다. 이 다운로드는 %2$s(으)로 저장됩니다.</string>
+  <string name="intake_exists_overwrite">%1$s 파일이 이미 이 폴더에 있습니다. 다운로드가 끝나면 대체됩니다.</string>
+  <string name="intake_exists_rename_some">일부 파일이 이미 이 폴더에 있습니다. 해당 다운로드는 새 이름으로 저장됩니다.</string>
+  <string name="intake_exists_overwrite_some">일부 파일이 이미 이 폴더에 있습니다. 다운로드가 끝나면 대체됩니다.</string>
 
   <string name="intake_advanced">고급</string>
   <string name="intake_hide">숨기기</string>

@@ -5,6 +5,7 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadProgress
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchError
 import com.linroid.ketch.api.PauseReason
 import com.linroid.ketch.api.SpeedLimit
@@ -47,6 +48,8 @@ import kotlinx.coroutines.withContext
  * @param clock stamps when downloads complete
  * @param connections the reporter of a task's live connections
  * @param openFile opens the output file of a source that does not write its own files
+ * @param unfinishedOutputs where the unfinished tasks other than the one named save, which a
+ *   download never replaces ([FileConflict.OVERWRITE])
  */
 internal class DownloadCoordinator(
   private val sourceResolver: SourceResolver,
@@ -58,6 +61,7 @@ internal class DownloadCoordinator(
   private val connections: (taskId: String) -> ConnectionReporter = { ConnectionReporter.None },
   private val openFile: (path: String, ioDispatcher: CoroutineDispatcher) -> FileAccessor =
     ::createFileAccessor,
+  private val unfinishedOutputs: (taskId: String) -> List<String> = { emptyList() },
 ) {
   // A supervisor, so one execution that fails does not cancel the others.
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatchers.network)
@@ -470,6 +474,7 @@ internal class DownloadCoordinator(
       clock = clock,
       openFile = openFile,
       connections = connections(handle.taskId),
+      unfinishedOutputs = { unfinishedOutputs(handle.taskId) },
     )
   }
 
@@ -582,6 +587,13 @@ internal fun TaskRecord.withDestination(destination: Destination?): TaskRecord {
   )
 }
 
-/** This configuration as [request] downloads with it: with its own proxy, if it has one. */
-internal fun DownloadConfig.forRequest(request: DownloadRequest): DownloadConfig =
-  request.proxy?.let { copy(proxy = it) } ?: this
+/**
+ * This configuration as [request] downloads with it: with its own proxy and its own
+ * [FileConflict], if it has them.
+ */
+internal fun DownloadConfig.forRequest(request: DownloadRequest): DownloadConfig {
+  val proxy = request.proxy ?: proxy
+  val fileConflict = request.fileConflict ?: fileConflict
+  if (proxy == this.proxy && fileConflict == this.fileConflict) return this
+  return copy(proxy = proxy, fileConflict = fileConflict)
+}

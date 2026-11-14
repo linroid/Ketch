@@ -411,6 +411,11 @@
   <string name="settings_downloads_change">Изменить…</string>
   <string name="settings_downloads_enter_path">Ввести путь…</string>
   <string name="settings_downloads_use_default">Использовать папку «Загрузки»</string>
+  <string name="settings_downloads_conflict">Если файл уже существует</string>
+  <string name="settings_downloads_conflict_rename">Переименовать</string>
+  <string name="settings_downloads_conflict_overwrite">Перезаписать</string>
+  <string name="settings_downloads_conflict_rename_hint">Сохраняет загрузку рядом под новым именем, например file (1).zip.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">Заменяет файл, когда загрузка завершится. Торренты всегда сохраняют его.</string>
   <string name="settings_downloads_folders">Папки в окне добавления</string>
   <string name="settings_downloads_folders_footer">Закреплённые папки показываются первыми при добавлении загрузки.</string>
   <string name="settings_downloads_pinned">Закреплена · %1$s</string>
@@ -824,6 +829,8 @@
   <string name="settings_search_checklist_keywords">начало работы, знакомство, настройка</string>
   <string name="settings_search_welcome_keywords">знакомство, первый запуск, приветствие</string>
   <string name="settings_search_save_to_keywords">папка, каталог, расположение, путь, место сохранения</string>
+  <string name="settings_search_conflict">Переименовать загрузку или заменить файл с тем же именем</string>
+  <string name="settings_search_conflict_keywords">перезаписать, заменить, переименовать, дубликат, существующий файл, то же имя, конфликт</string>
   <string name="settings_search_folders">Закреплённые и недавние папки</string>
   <string name="settings_search_folders_keywords">избранное, закрепить, недавние</string>
   <string name="settings_search_categories">Раскладывать загрузки по папкам по типу или сайту</string>

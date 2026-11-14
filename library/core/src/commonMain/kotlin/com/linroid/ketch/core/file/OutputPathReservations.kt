@@ -18,6 +18,9 @@ import okio.Path.Companion.toPath
  */
 @OptIn(ExperimentalAtomicApi::class)
 internal object OutputPathReservations {
+  /** Whether a file or folder is at [path]. */
+  fun exists(path: String): Boolean = platformFileSystem.exists(path.toPath())
+
   // Normalized path to the number of downloads holding it: a file destination is used as it is,
   // by as many downloads as name it.
   private val reserved = AtomicReference(emptyMap<String, Int>())
@@ -37,6 +40,27 @@ internal object OutputPathReservations {
       val current = reserved.load()
       val path = firstFree(candidate.toPath(), current)
       val next = keys(path).fold(current) { map, key -> map + (key to (map[key] ?: 0) + 1) }
+      if (reserved.compareAndSet(current, next)) return path.toString()
+    }
+  }
+
+  /**
+   * Reserves and returns [candidate] for a download that replaces the file there once it
+   * completes, or returns `null`, reserving nothing, when it must not: another download reserved
+   * the path, its partial file exists (an unfinished download's), it has no partial name to be
+   * written under until then ([partialPathFor]), it is named as a partial file itself, which may
+   * be a paused download's, or it is not a file, as a folder.
+   */
+  fun reserveReplaceable(candidate: String): String? {
+    val path = candidate.toPath()
+    if (path.name.endsWith(PARTIAL_FILE_SUFFIX)) return null
+    val partial = partialPathFor(path)?.toPath() ?: return null
+    while (true) {
+      val current = reserved.load()
+      val keys = keys(path)
+      if (keys.any { it in current } || platformFileSystem.exists(partial)) return null
+      if (platformFileSystem.metadataOrNull(path)?.isRegularFile == false) return null
+      val next = keys.fold(current) { map, key -> map + (key to (map[key] ?: 0) + 1) }
       if (reserved.compareAndSet(current, next)) return path.toString()
     }
   }

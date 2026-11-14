@@ -174,6 +174,7 @@
   <string name="intake_reset_priority">Réinitialiser la priorité</string>
   <string name="intake_reset_start">Réinitialiser le démarrage</string>
   <string name="intake_reset_connections">Réinitialiser les connexions</string>
+  <string name="intake_reset_conflict">Utiliser le réglage de l'appareil</string>
   <plurals name="intake_headers_count">
     <item quantity="one">%1$d en-tête</item>
     <item quantity="other">%1$d en-têtes</item>
@@ -218,6 +219,17 @@
   <string name="intake_choose_folder">Choisir un dossier…</string>
   <string name="intake_folder_on">Dossier sur %1$s</string>
   <string name="intake_torrents_app_folder">Les fichiers téléchargés par torrent sont enregistrés dans le dossier de l'app. Les dossiers choisis dans Fichiers servent uniquement aux téléchargements par lien classique</string>
+  <string name="intake_conflict">Si le fichier existe déjà</string>
+  <string name="intake_conflict_rename">Renommer</string>
+  <string name="intake_conflict_overwrite">Remplacer</string>
+  <string name="intake_conflict_rename_caption">L'enregistre à côté sous un autre nom.</string>
+  <string name="intake_conflict_overwrite_caption">Le remplace une fois le téléchargement terminé.</string>
+  <string name="intake_option_overwrite">Remplace les fichiers existants</string>
+  <string name="intake_option_rename">Conserve les fichiers existants</string>
+  <string name="intake_exists_rename">%1$s est déjà dans ce dossier. Ce téléchargement sera enregistré sous le nom %2$s.</string>
+  <string name="intake_exists_overwrite">%1$s est déjà dans ce dossier. Ce téléchargement le remplacera une fois terminé.</string>
+  <string name="intake_exists_rename_some">Certains de ces fichiers sont déjà dans ce dossier. Ces téléchargements seront enregistrés sous d'autres noms.</string>
+  <string name="intake_exists_overwrite_some">Certains de ces fichiers sont déjà dans ce dossier. Les téléchargements les remplaceront une fois terminés.</string>
 
   <string name="intake_advanced">Avancé</string>
   <string name="intake_hide">Masquer</string>

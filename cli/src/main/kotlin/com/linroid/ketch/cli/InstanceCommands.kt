@@ -2,6 +2,7 @@ package com.linroid.ketch.cli
 
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.api.KetchApi
@@ -97,6 +98,9 @@ private suspend fun add(
   if (command.checksum != null && KetchFeatures.CHECKSUM !in attachment.status.features) {
     throw CliFailure("${endpoint.label} doesn't support $CHECKSUM_OPTION; update it.")
   }
+  if (command.overwrite && KetchFeatures.FILE_CONFLICT !in attachment.status.features) {
+    throw CliFailure("${endpoint.label} doesn't support $OVERWRITE_OPTION; update it.")
+  }
   val request = try {
     DownloadRequest(
       url = command.url,
@@ -110,6 +114,7 @@ private suspend fun add(
       requestId = command.requestId ?: Uuid.random().toString().takeIf { supportsRequestIds },
       proxy = command.proxy,
       checksum = command.checksum,
+      fileConflict = FileConflict.OVERWRITE.takeIf { command.overwrite },
     )
   } catch (e: IllegalArgumentException) {
     throw CliFailure(e.message ?: "Invalid download")

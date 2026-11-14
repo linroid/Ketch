@@ -526,6 +526,12 @@
   <string name="settings_downloads_change">Change…</string>
   <string name="settings_downloads_enter_path">Enter path…</string>
   <string name="settings_downloads_use_default">Use the Downloads folder</string>
+  <!-- A setting: what a download does when a file of its name is already in the folder. -->
+  <string name="settings_downloads_conflict">When a file already exists</string>
+  <string name="settings_downloads_conflict_rename">Rename</string>
+  <string name="settings_downloads_conflict_overwrite">Overwrite</string>
+  <string name="settings_downloads_conflict_rename_hint">Saves the download beside it under a new name, such as file (1).zip.</string>
+  <string name="settings_downloads_conflict_overwrite_hint">Replaces the file once the download finishes. Torrents always keep it.</string>
   <string name="settings_downloads_folders">Folders in the add sheet</string>
   <string name="settings_downloads_folders_footer">Pinned folders come first when you add a download.</string>
   <!-- %1$s is the folder's path. -->
@@ -1029,6 +1035,8 @@
   <string name="settings_search_checklist_keywords">getting started, onboarding, setup</string>
   <string name="settings_search_welcome_keywords">onboarding, first run, intro</string>
   <string name="settings_search_save_to_keywords">folder, directory, location, path, destination</string>
+  <string name="settings_search_conflict">Rename a download or replace the file of the same name</string>
+  <string name="settings_search_conflict_keywords">overwrite, replace, rename, duplicate, existing file, same name, conflict</string>
   <string name="settings_search_folders">Pinned and recent folders</string>
   <string name="settings_search_folders_keywords">favorite, pin, recent</string>
   <string name="settings_search_categories">Sort downloads into folders by type or site</string>

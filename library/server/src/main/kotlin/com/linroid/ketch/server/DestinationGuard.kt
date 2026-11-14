@@ -5,7 +5,11 @@ import com.linroid.ketch.api.DownloadConfig
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
 import com.linroid.ketch.api.DownloadTask
+import com.linroid.ketch.api.FileConflict
 import com.linroid.ketch.api.KetchApi
+import com.linroid.ketch.api.isDirectory
+import com.linroid.ketch.api.isFile
+import com.linroid.ketch.api.isName
 import com.linroid.ketch.core.file.DestinationPathPolicy
 import com.linroid.ketch.core.file.PathRejectedException
 import java.io.File
@@ -19,11 +23,14 @@ import java.io.File
  * Otherwise they may choose any folder, as owners pick folders on their other devices, except
  * places where a new file can take over the account: [protectedDirectories] and hidden entries,
  * such as `~/.ssh`, unless they lie in the download directory or [allowedDirectories]. Either
- * way a new download never replaces an existing file.
+ * way a new download never replaces an existing file, unless existing files are overwritten
+ * ([FileConflict.OVERWRITE]), which callers can only ask for when [authenticated], and which
+ * only applies inside the download directory and [allowedDirectories] ([newDownload]).
  *
  * The download directory is read for every request, as it can change while the server runs.
  *
  * @param confined whether callers are kept to the download directory and [allowedDirectories]
+ * @param authenticated whether callers proved they hold the API token
  * @param protectedDirectories folders refused when not [confined]
  * @param fileSystemRoots the file system roots callers may choose from when not [confined]
  */
@@ -31,6 +38,7 @@ internal class DestinationGuard(
   private val ketch: KetchApi,
   private val allowedDirectories: List<String>,
   private val confined: Boolean,
+  private val authenticated: Boolean,
   private val protectedDirectories: List<String> = emptyList(),
   private val fileSystemRoots: List<String> = File.listRoots().map { it.path },
 ) {
@@ -43,12 +51,55 @@ internal class DestinationGuard(
    * that task got, when it names the same place: the task's download may have created the file
    * since, which would give a new submission another name and make the two differ.
    *
+   * Replacing existing files ([FileConflict.OVERWRITE]) lets a caller destroy what is there, so
+   * it is held tighter than saving new files. A request that asks for it itself is refused
+   * unless the caller is [authenticated], and unless it saves in the download directory or
+   * [allowedDirectories]: elsewhere callers may add files, as owners do on their other devices,
+   * but never replace one. A request that only follows [DownloadConfig.fileConflict], which the
+   * owner set, is made to save beside existing files ([FileConflict.RENAME]) in such a folder
+   * instead of being refused, also while the configuration renames, as a queued or scheduled
+   * task reads it only when it starts. A file the caller names is given a free name as before,
+   * unless the request asks to replace it and it lies in the download directory or
+   * [allowedDirectories]: it then keeps its name, and the engine replaces the file once the
+   * download completes, never one another download writes. Asked for elsewhere, the file gets
+   * a free name and the request is made to rename.
+   *
    * @throws PathRejectedException if the destination lies outside the folders
+   * @throws OverwriteRejectedException if the request may not replace existing files
    */
   suspend fun newDownload(request: DownloadRequest): DownloadRequest {
+    val status = ketch.status()
+    val directory = status.system.downloadDirectory
+    val asked = request.fileConflict == FileConflict.OVERWRITE
+    if (asked && !authenticated) {
+      throw OverwriteRejectedException("Replacing existing files needs the API token")
+    }
+    // A file the caller names keeps its name only for a request that may replace it.
+    val named = if (asked) placed(request, directory, keepFileName = true) else null
+    if (named != null && replaceableIn(named.destination, directory)) return named
+    val placed = placed(request, directory, keepFileName = false)
+    if (replaceableIn(placed.destination, directory)) return placed
+    if (asked && placed.destination?.isFile() != true) {
+      throw OverwriteRejectedException(
+        "Existing files are only replaced in the download folder and the allowed folders",
+      )
+    }
+    // Whatever the configuration says now: a task reads it when it starts, which may be after
+    // the owner switched to overwriting.
+    return placed.copy(fileConflict = FileConflict.RENAME)
+  }
+
+  /**
+   * [request] with its destination [confined][DestinationPathPolicy.confine]; with
+   * [keepFileName], a file path keeps its name although a file is there.
+   */
+  private fun placed(
+    request: DownloadRequest,
+    directory: String,
+    keepFileName: Boolean,
+  ): DownloadRequest {
     val destination = request.destination
     if (destination == null || passesAsUri(destination.value)) return request
-    val directory = ketch.status().system.downloadDirectory
     val policy = policy(directory)
     val previous = request.requestId?.let { id ->
       ketch.tasks.value.find { it.request.requestId == id }?.request?.destination
@@ -56,8 +107,24 @@ internal class DestinationGuard(
     if (previous != null && policy.confinesTo(destination, directory, previous)) {
       return request.copy(destination = previous)
     }
-    val confined = policy.confine(destination, directory)
+    val confined = policy.confine(destination, directory, keepFileName)
     return if (confined == destination) request else request.copy(destination = confined)
+  }
+
+  /**
+   * Whether a download saved to [destination], already confined, may replace a file there: it
+   * goes to the download [directory] (no destination, or a bare name), or to a folder inside it
+   * or [allowedDirectories], or is a file in such a folder. A URI never has files replaced, so
+   * it needs no check.
+   */
+  private fun replaceableIn(destination: Destination?, directory: String): Boolean {
+    if (destination == null || destination.isName() || "://" in destination.value) return true
+    val folder = if (destination.isDirectory()) {
+      destination.value
+    } else {
+      File(destination.value).parent ?: return false
+    }
+    return DestinationPathPolicy(allowedDirectories + directory).contains(folder)
   }
 
   /**
@@ -76,10 +143,19 @@ internal class DestinationGuard(
    * platform's default folder, by leaving [DownloadConfig.defaultDirectory] unset, needs that
    * folder to be inside too.
    *
+   * Callers that are not [authenticated] cannot switch [DownloadConfig.fileConflict] to
+   * [FileConflict.OVERWRITE]; one the owner set stays.
+   *
    * @throws PathRejectedException if [config] moves it elsewhere
+   * @throws OverwriteRejectedException if [config] starts replacing existing files unasked
    */
   suspend fun checkConfig(config: DownloadConfig) {
     val status = ketch.status()
+    if (!authenticated && config.fileConflict == FileConflict.OVERWRITE &&
+      status.config.fileConflict != FileConflict.OVERWRITE
+    ) {
+      throw OverwriteRejectedException("Replacing existing files needs the API token")
+    }
     if (config.defaultDirectory == status.config.defaultDirectory) return
     val target = config.defaultDirectory
       ?: status.system.defaultDownloadDirectory
@@ -127,3 +203,9 @@ internal class DestinationGuard(
     const val CONTENT_URI_PREFIX = "content://"
   }
 }
+
+/**
+ * Thrown when an API caller asks for downloads to replace existing files
+ * ([FileConflict.OVERWRITE]) where the server does not let callers do so.
+ */
+internal class OverwriteRejectedException(message: String) : IllegalArgumentException(message)
