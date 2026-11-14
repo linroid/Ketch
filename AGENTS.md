@@ -459,6 +459,17 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   (`ServerInfo.url`, after redirects) when that name has an extension, as browsers do (a
   `/download?id=5` link redirecting to `app.dmg`), else after the requested URL when its name
   has one (`asset.zip` served from an opaque storage key): `DefaultFileNameResolver.fromUrls`
+- A web page in place of a file: `HttpDownloadSource.resolve` fails with a `KetchError.SourceError`
+  (`WebPageAnswer.DETAIL`, not retried) when a link named like a file (`WebPageAnswer`'s
+  `FILE_EXTENSIONS`: video, audio, archives, installers, documents, images) is answered as
+  `text/html` or `application/xhtml+xml` without `Content-Disposition`, redirected or not, and its
+  first 1024 bytes, read with a `GET` of their own it then ends, are markup (`isMarkup`), as a
+  file host answers an expired link or one without its browser's cookies with its landing page.
+  So previews (`KetchApi.resolve`) and downloads that resolve as they start fail saying so
+  rather than save the page under the file's name; a file the server only labels as HTML still
+  downloads. A request naming its file (a file or name `Destination`) skips the check
+  (`DownloadExecution.resolveFresh`), as does one carrying a `resolvedSource`. Tests:
+  `WebPageAnswerTest`, `WebPageAnswerIntegrationTest` (`library:ktor` jvmTest, a real server)
 - Names from a server (`Content-Disposition`), a URL or an FTP path pass through
   `sanitizeFileName()` (last `/` or `\` segment, no control, bidi or Windows-reserved characters
   or device names, at most 255 UTF-8 bytes, `null` when nothing is left), in the sources and again

@@ -289,12 +289,25 @@ internal class DownloadExecution(
       log.d {
         "Resolved source '${source.type}' for taskId=$taskId: url=${redactUrl(request.url)}"
       }
-      resolvedUrl = downloadWithRetry {
-        source.resolve(ResolveInput.Url(request.url, request.headers), config)
-      }
+      resolvedUrl = downloadWithRetry { resolveFresh(source) }
     }
 
     runDownload(source) { prepareFresh(source, resolvedUrl, fromStored = stored != null) }
+  }
+
+  /**
+   * Resolves the request's link with [source]. A link named like a file that an HTTP server
+   * answers with a web page fails here ([WebPageAnswer]), unless the request names the file it
+   * saves, a file or a name [Destination]: whoever chose the name gets what the link serves.
+   */
+  private suspend fun resolveFresh(source: DownloadSource<*>): ResolvedSource {
+    val input = ResolveInput.Url(request.url, request.headers)
+    val named = request.destination?.let { it.isFile() || it.isName() } == true
+    return if (named && source is HttpDownloadSource) {
+      source.resolve(input, config, acceptWebPage = true)
+    } else {
+      source.resolve(input, config)
+    }
   }
 
   /**
