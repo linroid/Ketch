@@ -90,6 +90,19 @@ internal interface TorrentControlSource {
     remove: List<String>,
   ): List<List<String>>? = null
 
+  /**
+   * Moves what the stopped task [taskId] saved at [from] to [to] and answers [sourceState]
+   * saving there, for a run that checks the files where they are now.
+   *
+   * @throws com.linroid.ketch.api.KetchError.Disk when the files cannot be moved
+   */
+  suspend fun relocate(
+    taskId: String,
+    from: String,
+    to: String,
+    sourceState: SourceState?,
+  ): SourceState? = throw UnsupportedOperationException("Moving files is unavailable")
+
   /** [state], as a task saved it, announcing to [tiers] in place of the torrent's trackers. */
   fun withTrackers(state: SourceState, tiers: List<List<String>>): SourceState = state
 

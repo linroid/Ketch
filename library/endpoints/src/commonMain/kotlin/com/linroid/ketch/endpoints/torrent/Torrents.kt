@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
  *   its `.torrent` file)
  * - `GET /api/torrents/{id}/priority`, `PUT` — the files it downloads before its others
  * - `POST /api/torrents/{id}/recheck`  — check its files again and download what is missing
+ * - `PUT /api/torrents/{id}/location`  — moves its files into another folder
  * - `GET /api/torrents/{id}/trackers`  — its own trackers and how each answers
  * - `PUT /api/torrents/{id}/trackers`  — adds and removes trackers (`TorrentTrackerEdit`)
  * - `GET /api/torrents/{id}/events`    — SSE stream of its snapshots
@@ -95,6 +96,11 @@ data class Torrents(val parent: Api = Api()) {
     @Serializable
     @Resource("recheck")
     data class Recheck(val parent: ById)
+
+    /** Moves the task's files into another folder: `PUT` with a `TorrentRelocateRequest`. */
+    @Serializable
+    @Resource("location")
+    data class Location(val parent: ById)
 
     /**
      * The task's own trackers in tier order, a list of `TorrentTracker`; `PUT` with a

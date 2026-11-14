@@ -38,6 +38,11 @@ data class TorrentSourceState internal constructor(
    * see [TorrentDownloadSource.editTrackers]. `null` for the torrent's.
    */
   internal val trackerTiers: List<List<String>>? = null,
+  /**
+   * Whether the task's files were moved to where it saves now; see
+   * [TorrentDownloadSource.relocate]. Its sessions take the files they find there as its own.
+   */
+  internal val relocated: Boolean = false,
 ) {
   init {
     require(version in 1..3) { "Unsupported torrent resume version" }

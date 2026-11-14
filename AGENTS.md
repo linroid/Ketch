@@ -1362,6 +1362,31 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   metainfo's usable trackers, else a magnet's. Trackers Ketch adds to public torrents are never
   listed. The inspector's Trackers tab (`TrackersTab`, `trackerView`), offered for torrents on
   devices with the capability, asks again every 3 s while it shows
+- Moving files: `TorrentController.relocate(taskId, directory)` (REST
+  `PUT /api/torrents/{id}/location` with a `TorrentRelocateRequest`, answering the snapshot;
+  capability `relocate`) moves what a task saved into another folder under the name it has. The
+  controller pauses a downloading or queued task and stops a seeder, then `SourceHost.relocate`
+  (core, under the task's control lock, with no execution active) reserves `<directory>/<name>`,
+  refusing a relative folder, the folder the task is in, one inside its files, a name that is
+  taken or another unfinished task's output, runs the source's move and saves the new
+  `outputPath` and source state in one record write, also in a `Completed` state.
+  `TorrentDownloadSource.relocate` moves the tree (`moveTorrentTree`: a rename, else between
+  volumes a copy that is deleted again when it fails, then the original deleted), deletes the
+  bookkeeping beside the old place (the v1 `.ketch-<hash>-<task>` folder, the v2 creation log)
+  and answers the state with the new `savePath`, no checkpoint and `relocated`, so the next run
+  checks the files where they are and takes them as the task's own: v2 and hybrid stores through
+  `adoptExisting`, and v1 stores through `TorrentPieceStore(adoptExisting)`, which records the
+  selected files in place and their folders as owned as it initializes (also for a task added
+  to use files already there). The task then goes on: resumed, or reopened to be checked and
+  seed again (`prepareRecheck`, `SourceHost.reopen`); a paused one is checked when it next
+  starts. Payload counters start again with the new checkpoint, and pieces kept for skipped
+  files in the v1 sidecar are downloaded again when their files are chosen. The server lets a
+  caller move only files it may delete, into a folder and to a path (`<directory>/<name>`) it
+  may save at (`DestinationGuard.checkMove`, 403 `path_rejected`). A copy between volumes whose
+  original cannot be deleted afterwards still counts as moved, with a warning, and a moved task
+  removed with its files before it runs again takes them as its own first (`v1Store` and
+  `v2Store` with `adopt`). The
+  apps have no control for it yet
 - Editing trackers: `TorrentController.editTrackers(taskId, TorrentTrackerEdit(add, remove))`
   (REST `PUT /api/torrents/{id}/trackers`, answering the list; capability `tracker-edit`) removes
   the trackers at the endpoints `remove` names and appends each announce URL of `add` as a tier

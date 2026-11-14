@@ -58,6 +58,7 @@ import com.linroid.ketch.core.engine.decodeState
 import com.linroid.ketch.core.engine.unknownFilesMessage
 import com.linroid.ketch.core.file.DefaultFileNameResolver
 import com.linroid.ketch.core.file.FileNameResolver
+import com.linroid.ketch.core.file.OutputPathReservations
 import com.linroid.ketch.core.file.requireDownloadDirectory
 import com.linroid.ketch.core.geo.CountryLookup
 import com.linroid.ketch.core.speed.SpeedModeKeeper
@@ -106,6 +107,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import okio.Path.Companion.toPath
 import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -679,6 +681,12 @@ class Ketch(
       }
     }
 
+    override suspend fun relocate(
+      task: DownloadTask,
+      directory: String,
+      move: suspend (from: String, to: String, state: SourceState?) -> SourceState?,
+    ): String = relocateTask(requireHandle(task), directory, move)
+
     override suspend fun reopen(task: DownloadTask): Boolean {
       val handle = handleOf(task) ?: return false
       return reopenCompleted(handle)
@@ -709,6 +717,58 @@ class Ketch(
       }
       log.i { "Reopened completed taskId=$taskId" }
       true
+    }
+  }
+
+  /** What [SourceHost.relocate] does for [handle]. */
+  private suspend fun relocateTask(
+    handle: RealDownloadTask,
+    directory: String,
+    move: suspend (from: String, to: String, state: SourceState?) -> SourceState?,
+  ): String {
+    val taskId = handle.taskId
+    coordinator.awaitCompletion(taskId)
+    return handle.controlLock.withLock {
+      val record = handle.record.value
+      val from = record.outputPath
+      check(from != null && record.state != TaskState.CANCELED && !coordinator.isActive(taskId)) {
+        "The download has nothing to move, or is running"
+      }
+      check("://" !in from && "://" !in directory) { "Document folders cannot be moved between" }
+      val source = from.toPath().normalized()
+      val folder = directory.toPath().normalized()
+      require(folder.isAbsolute) { "The folder to move to must be an absolute path" }
+      val target = folder / source.name
+      require(target != source) { "The download is in that folder already" }
+      require(generateSequence(folder) { it.parent }.none { it == source }) {
+        "A download cannot be moved into itself"
+      }
+      val to = target.toString()
+      val taken = unfinishedOutputs(taskId).any { other ->
+        "://" !in other && other.toPath().normalized().let { owned ->
+          owned == target || generateSequence(owned.parent) { it.parent }.any { it == target } ||
+            generateSequence(target.parent) { it.parent }.any { it == owned }
+        }
+      }
+      require(!taken && OutputPathReservations.reserveUnique(to).also { reserved ->
+        if (reserved != to) OutputPathReservations.release(reserved)
+      } == to) { "The folder already has something of that name" }
+      try {
+        // Saved even when the caller is cancelled once the files are at their new place.
+        withContext(NonCancellable) {
+          val state = move(from, to, record.sourceState)
+          handle.record.update {
+            it.copy(outputPath = to, sourceState = state, updatedAt = Clock.System.now())
+          }
+          (handle.mutableState.value as? DownloadState.Completed)?.let { completed ->
+            handle.mutableState.value = completed.copy(outputPath = to)
+          }
+        }
+      } finally {
+        OutputPathReservations.release(to)
+      }
+      log.i { "Moved the files of taskId=$taskId" }
+      to
     }
   }
 

@@ -65,6 +65,7 @@ import com.linroid.ketch.torrent.metainfo.V2InfoHash
 import com.linroid.ketch.torrent.net.ResponseTooLargeException
 import com.linroid.ketch.torrent.net.TorrentHttp
 import com.linroid.ketch.torrent.storage.TorrentCheckpoint
+import com.linroid.ketch.torrent.storage.moveTorrentTree
 import com.linroid.ketch.torrent.storage.TorrentPieceStore
 import com.linroid.ketch.torrent.storage.TorrentStorageException
 import com.linroid.ketch.torrent.storage.TorrentV2Checkpoint
@@ -108,7 +109,9 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.KSerializer
+import okio.FileSystem
 import okio.IOException
+import okio.Path
 import okio.Path.Companion.toPath
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
@@ -301,6 +304,13 @@ class TorrentDownloadSource(
 
     override fun withTrackers(state: SourceState, tiers: List<List<String>>) =
       source.withTrackers(state, tiers)
+
+    override suspend fun relocate(
+      taskId: String,
+      from: String,
+      to: String,
+      sourceState: SourceState?,
+    ) = source.relocate(taskId, from, to, sourceState)
     override val restoresSeeding: Boolean get() = source.restoresSeeding
     override val sharingResumes: StateFlow<Long> get() = source.sharingResumes
 
@@ -380,6 +390,7 @@ class TorrentDownloadSource(
       add(TorrentCapability.FILE_PRIORITY.wireName)
       add(TorrentCapability.IP_FILTER.wireName)
       add(TorrentCapability.TRACKER_EDIT.wireName)
+      add(TorrentCapability.RELOCATE.wireName)
       if (lsdSupported) add(TorrentCapability.LOCAL_DISCOVERY.wireName)
       // Sharing follows the live upload setting, paused or not.
       if (uploadPolicy.load() == TorrentUploadPolicy.SEED_AFTER_COMPLETION) {
@@ -452,6 +463,67 @@ class TorrentDownloadSource(
   /** What [TorrentControlSource.withSequential] answers. */
   internal fun withSequential(state: SourceState, sequential: Boolean): SourceState =
     changed(state) { it.copy(sequential = sequential) }
+
+  /**
+   * Whether a run of [context] that continues from [previous] takes the files at its paths as
+   * the task's own: a check of its files takes them as they are now, replaced or gone, Ketch
+   * gave the run a path that may hold files only because the request asked for it, and a task
+   * whose files were moved finds them where they were moved to.
+   */
+  private fun adopts(context: DownloadContext, previous: TorrentSourceState?): Boolean =
+    context.taskId in rechecks.value || previous?.relocated == true ||
+      context.request.fileConflict == FileConflict.OVERWRITE
+
+  /**
+   * What [TorrentControlSource.relocate] does: moves what the stopped task [taskId] saved at
+   * [from] to [to] and deletes the bookkeeping it kept beside [from], which describes the files
+   * where they were. Returns [sourceState] saving at [to] without its checkpoint, so the next
+   * run checks the files where they are now and takes them as the task's own.
+   *
+   * @throws KetchError.Disk when the files cannot be moved; they then stay at [from]
+   */
+  internal suspend fun relocate(
+    taskId: String,
+    from: String,
+    to: String,
+    sourceState: SourceState?,
+  ): SourceState? {
+    check(tasks.session(taskId) == null && !tasks.isReserved(taskId)) {
+      "Stop the torrent before moving its files"
+    }
+    val state = sourceState?.let { decodeState(it) }
+    withContext(TorrentDispatchers.disk) {
+      val files = torrentSystemFileSystem
+      val source = from.toPath()
+      val target = to.toPath()
+      try {
+        target.parent?.let { files.createDirectories(it) }
+        // A task that created nothing yet has nothing to move.
+        if (files.metadataOrNull(source) != null && !moveTorrentTree(files, source, target)) {
+          // The task saves at its new place all the same: the copy there is whole.
+          log.w { "Moved taskId=$taskId, but could not delete all of what it left behind" }
+        }
+      } catch (e: IOException) {
+        throw KetchError.Disk(e)
+      }
+      val beside = source.parent ?: return@withContext
+      val kept = listOfNotNull(
+        state?.takeIf { it.version != 3 }?.let { beside / ".ketch-${it.infoHash}-$taskId" },
+        v2CreationLog(source, taskId),
+      )
+      for (path in kept) {
+        try {
+          files.deleteRecursively(path, mustExist = false)
+        } catch (e: IOException) {
+          log.w { "Kept old bookkeeping of taskId=$taskId: ${e.describeCauses()}" }
+        }
+      }
+    }
+    stateMutex.withLock { states.remove(taskId) }
+    seedStates.update { it - taskId }
+    log.i { "Moved the files of torrent taskId=$taskId" }
+    return state?.let { encodeState(it.copy(savePath = to, resumeData = "", relocated = true)) }
+  }
 
   /** What [TorrentControlSource.withTrackers] answers. */
   internal fun withTrackers(state: SourceState, tiers: List<List<String>>): SourceState =
@@ -1816,7 +1888,8 @@ class TorrentDownloadSource(
     val state = TorrentSourceState(hash, total, previous?.resumeData ?: "", selected, output,
       previous?.metainfo.orEmpty(), version = 2, privacy = privacy,
       sequential = previous?.sequential == true,
-      priorityFileIds = previous?.priorityFileIds.orEmpty(), trackerTiers = trackers)
+      priorityFileIds = previous?.priorityFileIds.orEmpty(), trackerTiers = trackers,
+      relocated = previous?.relocated == true)
     log.i {
       "Starting torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1827,7 +1900,8 @@ class TorrentDownloadSource(
         selected.mapTo(LinkedHashSet()) { it.toInt() },
         context.url.takeIf { it.startsWith("magnet:", true) },
         previous?.resumeData?.takeIf { it.isNotEmpty() }?.let(::decodeBase64), context.throttle,
-        privacy = privacy, connections = context.connections))
+        privacy = privacy, connections = context.connections,
+        adoptExisting = adopts(context, previous)))
     }
   }
 
@@ -1854,7 +1928,8 @@ class TorrentDownloadSource(
     val state = TorrentSourceState(hash, total, previous?.resumeData.orEmpty(), selected, output,
       previous?.metainfo.orEmpty(), version = 3, privacy = privacy,
       sequential = previous?.sequential == true,
-      priorityFileIds = previous?.priorityFileIds.orEmpty(), trackerTiers = trackers)
+      priorityFileIds = previous?.priorityFileIds.orEmpty(), trackerTiers = trackers,
+      relocated = previous?.relocated == true)
     log.i {
       "Starting v2 torrent taskId=${context.taskId} (${logHash(hash)}): " +
         "files=${selected.size}/${table.files.size}, totalBytes=$total, output=$output, " +
@@ -1873,8 +1948,7 @@ class TorrentDownloadSource(
         connections = context.connections,
         // A check of the task's files takes them as they are now, replaced or gone, and Ketch
         // gave the run a path that may hold files only because the request asked for it.
-        adoptExisting = context.taskId in rechecks.value ||
-          context.request.fileConflict == FileConflict.OVERWRITE,
+        adoptExisting = adopts(context, previous),
       ))
     }
   }
@@ -2440,7 +2514,7 @@ class TorrentDownloadSource(
         engine.load()?.removeTorrent(state.infoHash, deleteFiles = true)
       }
       tasks.release(context.taskId)
-      val store = v1Store(context, state) ?: return
+      val store = v1Store(context, state, adopt = true) ?: return
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }
     } catch (e: CancellationException) { throw e
@@ -2472,10 +2546,15 @@ class TorrentDownloadSource(
     }
   }
 
-  /** [state]'s v1 store with the files it owns recovered, or null when nothing was saved. */
+  /**
+   * [state]'s v1 store with the files it owns recovered, or null when nothing was saved. With
+   * [adopt], a task whose files were moved and that has not run since takes the files at its
+   * new place as its own first, as its next run would have: nothing else records that they are.
+   */
   private suspend fun v1Store(
     context: DownloadContext,
     state: TorrentSourceState,
+    adopt: Boolean = false,
   ): TorrentPieceStore? {
     val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }
       ?.let { TorrentCheckpoint.decode(decodeBase64(it)) }
@@ -2484,15 +2563,17 @@ class TorrentDownloadSource(
       ?: return null
     val output = context.outputPath ?: checkpoint?.output ?: state.savePath
     if (output.isEmpty()) return null
+    val adopting = adopt && state.relocated && checkpoint == null
     val store = TorrentPieceStore(metadata, output.toPath(),
-      state.selectedFileIds.map { it.toInt() }.toSet(), context.taskId)
+      state.selectedFileIds.map { it.toInt() }.toSet(), context.taskId,
+      adoptExisting = adopting)
     checkpoint?.let { store.restore(it) }
-    store.recoverOwnership()
+    if (adopting) store.initialize() else store.recoverOwnership()
     return store
   }
 
   private suspend fun cleanupV2(context: DownloadContext, state: TorrentSourceState) {
-    val store = v2Store(context, state)
+    val store = v2Store(context, state, adopt = true)
     try {
       store.cleanup()
       stateMutex.withLock { states.remove(context.taskId) }
@@ -2503,6 +2584,7 @@ class TorrentDownloadSource(
   private suspend fun v2Store(
     context: DownloadContext,
     state: TorrentSourceState,
+    adopt: Boolean = false,
   ): TorrentV2PieceStore {
     check(!tasks.isReserved(context.taskId)) { "Join the torrent download before cleanup" }
     val metainfo = requireNotNull(metainfoOf(context.preResolved, state)) { "No saved metainfo" }
@@ -2517,6 +2599,7 @@ class TorrentDownloadSource(
     val checkpoint = state.resumeData.takeIf { it.isNotEmpty() }?.let {
       requireNotNull(TorrentV2Checkpoint.decode(decodeBase64(it)))
     }
+    val adopting = adopt && state.relocated && checkpoint == null
     // The creation log may be bound to any selection the task ran with: the checkpoint's, the
     // one the state mirrors, or the record's.
     val store = TorrentV2PieceStore(document, absolute, selected, context.taskId,
@@ -2524,10 +2607,14 @@ class TorrentDownloadSource(
       Semaphore(config.maxOpenPayloadFiles),
       creationLogPath = v2CreationLog(absolute, context.taskId),
       legacySelections = listOfNotNull(checkpoint?.selected, state.selectedFileIds,
-        context.request.selectedFileIds).filter { it.isNotEmpty() })
+        context.request.selectedFileIds).filter { it.isNotEmpty() },
+      // A task whose files were moved and that has not run since owns them only once a store
+      // takes them, as its next run would have.
+      adoptExisting = adopting)
     try {
       checkpoint?.let { store.restore(it) }
       store.recoverOwnership()
+      if (adopting) store.initialize()
     } catch (e: Throwable) {
       store.close()
       throw e

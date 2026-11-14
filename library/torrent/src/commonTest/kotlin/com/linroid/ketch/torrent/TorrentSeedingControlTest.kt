@@ -3,6 +3,7 @@ package com.linroid.ketch.torrent
 import com.linroid.ketch.api.Destination
 import com.linroid.ketch.api.DownloadRequest
 import com.linroid.ketch.api.DownloadState
+import com.linroid.ketch.api.SpeedLimit
 import com.linroid.ketch.api.DownloadTask
 import com.linroid.ketch.core.Ketch
 import com.linroid.ketch.core.engine.HttpEngine
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path
+import okio.Path.Companion.toPath
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
@@ -292,6 +294,146 @@ class TorrentSeedingControlTest {
     }
     assertIs<DownloadState.Downloading>(task.state.value)
     task.pause()
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun relocate_completedV1Task_movesItsFilesChecksThemAndOwnsThemThere() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val store = MemoryTaskStore()
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.download(request(0, 1))
+    val first = task.awaitCompleted()
+    val controller = assertNotNull(ketch.controller(TorrentController))
+    val folder = root / "moved"
+
+    controller.relocate(task.taskId, folder.toString())
+
+    awaitStage("the check after the move", task) {
+      task.state.first { it is DownloadState.Completed && it.completedAt != first.completedAt }
+    }
+    val moved = folder / output.name
+    assertEquals(moved.toString(), task.outputPath)
+    assertEquals(moved.toString(), assertIs<DownloadState.Completed>(task.state.value).outputPath)
+    assertEquals(moved.toString(), store.load(task.taskId)?.outputPath)
+    assertContentEquals(torrent.payloads[0],
+      torrentFileSystem.read(moved / "f0") { readByteArray() })
+    assertContentEquals(torrent.payloads[1],
+      torrentFileSystem.read(moved / "f1") { readByteArray() })
+    // Nothing stays where the files were, the task's hidden bookkeeping included.
+    assertNull(torrentFileSystem.metadataOrNull(output))
+    assertTrue(torrentFileSystem.list(root).none { it.name.startsWith(".ketch-") })
+
+    // Where it is already, inside itself and onto something of its name are all refused.
+    torrentFileSystem.createDirectories(root / "taken" / output.name)
+    for (refused in listOf(folder, moved / "inner", root / "taken")) {
+      val error = assertFailsWith<TorrentCommandException> {
+        controller.relocate(task.taskId, refused.toString())
+      }
+      assertEquals(TorrentCommandError.INVALID_INPUT, error.error)
+    }
+    assertEquals(moved.toString(), task.outputPath)
+    awaitStage("the task to be completed still", task) {
+      task.state.first { it is DownloadState.Completed }
+    }
+
+    // The files are the task's own where they are now: removing it with its files deletes them.
+    task.remove(deleteFiles = true)
+    eventually("the moved files to be deleted") {
+      torrentFileSystem.metadataOrNull(moved / "f0") == null
+    }
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun relocate_completedV2Task_movesItsFilesAndOwnsThemThere() = harness {
+    val store = MemoryTaskStore()
+    val record = v2Record("v2-move", v2Fixture, root / "v2").let {
+      it.copy(control = TaskControl(sharing = false))
+    }
+    store.save(record)
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val ketch = ketch(source, store)
+    ketch.start()
+    val task = ketch.tasks.value.single()
+    val first = assertIs<DownloadState.Completed>(task.state.value)
+    val controller = assertNotNull(ketch.controller(TorrentController))
+    val folder = root / "elsewhere"
+
+    controller.relocate(task.taskId, folder.toString())
+
+    awaitStage("the check after the move", task) {
+      task.state.first { it is DownloadState.Completed && it.completedAt != first.completedAt }
+    }
+    val moved = folder / "v2"
+    assertEquals(moved.toString(), task.outputPath)
+    assertContentEquals(v2Fixture.payloads[0],
+      torrentFileSystem.read(moved / "a") { readByteArray() })
+    assertNull(torrentFileSystem.metadataOrNull(root / "v2"))
+    assertTrue(torrentFileSystem.list(root).none { it.name.startsWith(".ketch-") })
+    assertTrue(source.decodeState(assertNotNull(store.load(task.taskId)?.sourceState)).relocated)
+
+    task.remove(deleteFiles = true)
+    eventually("the moved files to be deleted") {
+      torrentFileSystem.metadataOrNull(moved / "a") == null
+    }
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun relocate_taskRemovedWithItsFilesBeforeItRunsAgain_deletesThemAtTheNewPlace() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val store = MemoryTaskStore()
+    // Moved while they were not running, as a paused task is: nothing has checked them since.
+    val v1 = v1Record("v1-moved", MultiFileTorrent(listOf(40_000, 30_000)), root / "one",
+      sharing = false)
+    val v2 = v2Record("v2-moved", v2Fixture, root / "two")
+      .let { it.copy(control = TaskControl(sharing = false)) }
+    for (record in listOf(v1, v2)) {
+      val from = checkNotNull(record.outputPath)
+      val to = (root / "moved" / from.toPath().name).toString()
+      val state = source.relocate(record.taskId, from, to, record.sourceState)
+      store.save(record.copy(outputPath = to, sourceState = state))
+    }
+    val ketch = ketch(source, store)
+    ketch.start()
+    assertTrue(torrentFileSystem.exists(root / "moved" / "one" / "f0"))
+    assertTrue(torrentFileSystem.exists(root / "moved" / "two" / "a"))
+
+    for (task in ketch.tasks.value) task.remove(deleteFiles = true)
+
+    eventually("the moved files to be deleted") {
+      torrentFileSystem.metadataOrNull(root / "moved" / "one" / "f0") == null &&
+        torrentFileSystem.metadataOrNull(root / "moved" / "two" / "a") == null
+    }
+    source.assertNoLeaks()
+  }
+
+  @Test
+  fun relocate_downloadingTask_goesOnAtTheNewPlace() = harness {
+    val source = source(TorrentUploadPolicy.DISABLED)
+    val ketch = ketch(source)
+    ketch.start()
+    // Slow enough to still be downloading when it is moved.
+    val task = ketch.download(request(0, 1).copy(speedLimit = SpeedLimit.of(2048)))
+    eventually("the download to be under way") {
+      task.outputPath != null && task.state.value is DownloadState.Downloading &&
+        torrentFileSystem.metadataOrNull(output / "f0") != null
+    }
+    val folder = root / "later"
+
+    assertNotNull(ketch.controller(TorrentController)).relocate(task.taskId, folder.toString())
+
+    task.setSpeedLimit(SpeedLimit.Unlimited)
+    task.awaitCompleted()
+    val moved = folder / output.name
+    assertEquals(moved.toString(), task.outputPath)
+    assertContentEquals(torrent.payloads[0],
+      torrentFileSystem.read(moved / "f0") { readByteArray() })
+    assertContentEquals(torrent.payloads[1],
+      torrentFileSystem.read(moved / "f1") { readByteArray() })
+    assertNull(torrentFileSystem.metadataOrNull(output))
     source.assertNoLeaks()
   }
 

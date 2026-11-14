@@ -4,6 +4,7 @@ import com.linroid.ketch.api.Interest
 import com.linroid.ketch.api.log.KetchLogger
 import com.linroid.ketch.endpoints.model.ErrorResponse
 import com.linroid.ketch.endpoints.torrent.TorrentPriorityRequest
+import com.linroid.ketch.endpoints.torrent.TorrentRelocateRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSeedingRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSequentialRequest
 import com.linroid.ketch.endpoints.torrent.TorrentSelectionRequest
@@ -368,6 +369,16 @@ internal class RemoteTorrentController(
     requireCapability(TorrentCapability.RECHECK)
     call<TorrentSnapshot>(notFoundIsNull = false) {
       httpClient.post(Torrents.ById.Recheck(parent = Torrents.ById(id = taskId)))
+    }
+  }
+
+  override suspend fun relocate(taskId: String, directory: String) {
+    requireCapability(TorrentCapability.RELOCATE)
+    call<TorrentSnapshot>(notFoundIsNull = false) {
+      httpClient.put(Torrents.ById.Location(parent = Torrents.ById(id = taskId))) {
+        contentType(ContentType.Application.Json)
+        setBody(TorrentRelocateRequest(directory))
+      }
     }
   }
 

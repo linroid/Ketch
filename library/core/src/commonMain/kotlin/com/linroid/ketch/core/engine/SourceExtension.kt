@@ -141,4 +141,22 @@ interface SourceHost {
    * task is the caller's to stop first.
    */
   suspend fun reopen(task: DownloadTask): Boolean = false
+
+  /**
+   * Moves what [task] saved into the folder [directory], under the name it has: [move] gets the
+   * path it saves at, the path beside [directory] reserved for it and its saved source state,
+   * moves the files and answers the source state to save with the new path. Runs under the
+   * task's control lock, so nothing selects, shares or reopens it meanwhile. Returns the new
+   * path.
+   *
+   * @throws IllegalStateException for a task that runs, was canceled or saved nowhere yet, or
+   *   that saves to a document URI
+   * @throws IllegalArgumentException when [directory] is where the task is already, lies inside
+   *   what it saved, or the name is taken there, by a file or by another download
+   */
+  suspend fun relocate(
+    task: DownloadTask,
+    directory: String,
+    move: suspend (from: String, to: String, state: SourceState?) -> SourceState?,
+  ): String = throw IllegalStateException("This download cannot be moved")
 }

@@ -74,6 +74,12 @@ internal class TorrentPieceStore(
   private val fileSystem: FileSystem = torrentFileSystem,
   private val storageSlots: Semaphore = Semaphore(32),
   seedOnly: Boolean = false,
+  /**
+   * Takes the selected files already at their paths, and the folders holding them, as this
+   * task's own, as a task whose files were moved there or that was added to use them needs:
+   * cleanup deletes only what the task owns.
+   */
+  private val adoptExisting: Boolean = false,
 ) {
   /**
    * Only seeds: while the selection is complete, a wanted piece that cannot be read back, or no
@@ -256,6 +262,13 @@ internal class TorrentPieceStore(
             it.flush()
           }
           restamp(index)
+        } else if (adoptExisting) {
+          recordOwned(path, directory = false)
+          var folder = path.parent
+          while (folder != null && generateSequence(folder) { it.parent }.any { it == output }) {
+            recordOwned(folder, directory = true)
+            folder = folder.parent
+          }
         }
       }
       // Files of an earlier selection stay in place while this task still owns them.
