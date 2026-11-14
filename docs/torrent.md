@@ -320,6 +320,10 @@ complete. Seeding stops when:
 - the same torrent is added as another task;
 - Ketch quits.
 
+When every slot is taken, a finished torrent that is meant to seed waits. It starts, oldest
+first, as soon as you stop a seeder or one reaches a seed goal, so with a goal set a backlog of
+torrents seeds in turn.
+
 A seeder stopped by the mode, by paused uploads, by a waiting download or by quitting seeds again
 later; one you stop, that reached a goal, or whose chosen files changed on disk, does not. In a v1 torrent, a file
 you removed that changed only sets aside the pieces it shares with the others (see

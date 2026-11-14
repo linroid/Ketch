@@ -1375,6 +1375,11 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `sequential`, `TorrentSnapshot.sequential`), saved in `TorrentSourceState.sequential`, read live
   by `TorrentPieceScheduler` and the v2 loop (`TorrentV2RarityPicker.lowest`); the inspector's
   `SequentialControl` switches it. It orders pieces; file priorities choose which files first
+- Seed queue: tasks meant to seed that found no free slot (`SeedingOutcome.NO_SLOT`, their
+  intent kept) start, oldest completion first, as soon as a seeder is told to stop or reaches a
+  seed goal (`TorrentControls.seedWaiting`, from the Stop command's `seedingStopped`), not only
+  at the next start or when sharing comes back on; one walk at a time (`walk`). With seed goals
+  and `maxActiveTorrents` this seeds a backlog in turn
 - Seed goals: `TorrentEngineSettings.seedRatioPercent` and `seedTimeMinutes` (`[torrent]`, 0 for
   none; capability `seed-goals`). A seeder's watcher (`watchSeeder`) checks `seedGoalReached` every
   10 s while it seeds, against all it uploaded (saved counters included) and the time since this

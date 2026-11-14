@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okio.ByteString.Companion.toByteString
 import kotlin.time.Duration
 
@@ -49,6 +51,9 @@ internal class TorrentControls(
    */
   private val stops = MutableStateFlow<Map<String, Long>>(emptyMap())
 
+  /** One walk over the tasks that wait to seed at a time; see [restoreSeeding]. */
+  private val walk = Mutex()
+
   /** The torrent controller of this source's tasks. */
   val controller: KetchTorrentController = KetchTorrentController(
     source = source,
@@ -65,6 +70,8 @@ internal class TorrentControls(
     },
     seedingStopped = { taskId ->
       stops.update { it + (taskId to (it[taskId] ?: 0) + 1) }
+      // Its slot is free: the next task that waits to seed takes it.
+      seedWaiting()
     },
   )
 
@@ -115,6 +122,16 @@ internal class TorrentControls(
     val seen = stops.value
     syncSeeding(task, source.seedingTaskIds.value, seen)
     if (source.takeDeferredSharing(task.taskId)) deferSharing(task, seen[task.taskId])
+  }
+
+  /**
+   * Seeds the tasks that wait to, as [restoreSeeding] does, now that a slot is free: once a
+   * seeder was told to stop or reached its goal. Not on every completion, which Ketch also
+   * reports for restored tasks and for each change of what a completed task shows.
+   */
+  private fun seedWaiting() {
+    if (!source.restoresSeeding) return
+    host.scope.launch { restoreSeeding() }
   }
 
   override suspend fun selectionChanged(task: DownloadTask, fileIds: Set<String>) {
@@ -181,18 +198,21 @@ internal class TorrentControls(
   /**
    * Seeds the completed tasks meant to seed, oldest completion first, when the source restores
    * seeding: as Ketch starts, the tasks that seeded when it last stopped, and again each time
-   * sharing comes back on. Each checks its files first and only takes a free slot. The walk stops
+   * sharing comes back on, and those still waiting each time a slot may have freed
+   * ([seedWaiting]). Each checks its files first and only takes a free slot. The walk stops
    * at the first that finds no slot, seeding switched off or uploads paused, keeping the intents.
    */
-  private suspend fun restoreSeeding() {
-    if (!source.restoresSeeding) return
+  private suspend fun restoreSeeding() = walk.withLock {
+    if (!source.restoresSeeding) return@withLock
     val candidates = host.tasks.value.mapNotNull { task ->
       host.record(task)?.takeIf {
         it.state == TaskState.COMPLETED && it.control?.sharing == true &&
           it.sourceType == sourceType
       }?.let { task to it }
     }.sortedBy { (_, record) -> record.completedAt }.map { it.first }
-    if (candidates.isEmpty()) return
+      // Those seeding already need no walk, which a freed slot starts again and again.
+      .filter { it.taskId !in source.seedingTaskIds.value }
+    if (candidates.isEmpty()) return@withLock
     log.i { "Restoring seeding of ${candidates.size} task(s) from $sourceType" }
     for (task in candidates) {
       val taskId = task.taskId
@@ -207,7 +227,7 @@ internal class TorrentControls(
         SeedingOutcome.SEEDING -> log.i { "Restored seeding of taskId=$taskId" }
         SeedingOutcome.NO_SLOT, SeedingOutcome.POLICY_OFF, SeedingOutcome.UPLOADS_PAUSED -> {
           log.i { "Stopped restoring seeding at taskId=$taskId: $outcome" }
-          return
+          return@withLock
         }
         SeedingOutcome.CHANGED_ON_DISK -> {}
         SeedingOutcome.ALREADY_ACTIVE, SeedingOutcome.UNSUPPORTED, SeedingOutcome.FAILED ->
