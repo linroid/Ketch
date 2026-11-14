@@ -168,6 +168,7 @@ class TorrentDownloadSource(
   private val utpEnabled = AtomicBoolean(config.utpEnabled)
   private val portMapping = AtomicBoolean(config.portMapping)
   private val localDiscovery = AtomicBoolean(config.localDiscovery)
+  private val blockedAddresses = AtomicReference(config.blockedAddresses)
   // What [settings] reports; changed only by changeSettings, under settingsMutex.
   private val settingsState = MutableStateFlow(config.engineSettings())
   private val settingsMutex = Mutex()
@@ -642,7 +643,7 @@ class TorrentDownloadSource(
     uploadPolicy = engineUploadPolicy(), uploadRateLimit = uploadRateLimit.load(),
     encryption = encryption.load(), utpEnabled = utpEnabled.load(),
     portMapping = portMapping.load(), localDiscovery = localDiscovery.load(),
-    blockedAddresses = settingsState.value.blockedAddresses)
+    blockedAddresses = blockedAddresses.load())
 
   /**
    * The settings every torrent runs with, which `ketch.controller(TorrentController)` reads and
@@ -683,7 +684,11 @@ class TorrentDownloadSource(
       if (after.portMapping != before.portMapping) storePortMapping(after.portMapping)
       if (after.localDiscovery != before.localDiscovery) storeLocalDiscovery(after.localDiscovery)
       if (after.blockedAddresses != before.blockedAddresses) {
-        engineMutex.withLock { engine.load()?.setBlockedAddresses(after.blockedAddresses) }
+        // Stored under the lock an engine starts under, so one starting now runs this list.
+        engineMutex.withLock {
+          blockedAddresses.store(after.blockedAddresses)
+          engine.load()?.setBlockedAddresses(after.blockedAddresses)
+        }
       }
       if (after.trackers != before.trackers) storeAdditionalTrackers(after.trackers)
       if (after.subscribedTrackerLists != before.subscribedTrackerLists) {

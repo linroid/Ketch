@@ -39,22 +39,37 @@ fun isBlockedAddress(entry: String): Boolean {
   return addressBits(entry) != null
 }
 
-/** 32 for an IPv4 literal, 128 for what reads as an IPv6 one, `null` for anything else. */
+/** 32 for an IPv4 literal, 128 for an IPv6 one, `null` for anything else. */
 private fun addressBits(text: String): Int? {
-  if (':' in text) {
-    val groups = text.split(':')
-    val hex = groups.all { group ->
-      group.length <= 4 && group.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
-    }
-    // At most one "::", which stands for the groups left out.
-    val shortened = "::" in text
-    val valid = hex && groups.size in 3..8 && "::" !in text.replaceFirst("::", ":") &&
-      (groups.size == 8 || shortened) && (shortened || groups.none { it.isEmpty() })
-    return if (valid) 128 else null
+  if (':' !in text) return if (isIpv4(text)) 32 else null
+  // An IPv4 tail, as in `::ffff:192.0.2.1`, stands for the last two groups.
+  val tail = text.substringAfterLast(':')
+  val head = if ('.' in tail) {
+    if (!isIpv4(tail)) return null
+    text.substringBeforeLast(':') + ":0:0"
+  } else {
+    text
   }
+  val halves = head.split("::")
+  if (halves.size > 2) return null
+  fun groups(part: String): Int? {
+    if (part.isEmpty()) return 0
+    val groups = part.split(':')
+    val hex = groups.all { group ->
+      group.length in 1..4 && group.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+    }
+    return if (hex) groups.size else null
+  }
+  val first = groups(halves[0]) ?: return null
+  val last = if (halves.size == 2) groups(halves[1]) ?: return null else 0
+  // "::" stands for at least one group left out; without it all eight are written.
+  val valid = if (halves.size == 2) first + last <= 7 else first == 8
+  return if (valid) 128 else null
+}
+
+private fun isIpv4(text: String): Boolean {
   val parts = text.split('.')
-  val valid = parts.size == 4 && parts.all { part ->
+  return parts.size == 4 && parts.all { part ->
     part.length in 1..3 && part.all(Char::isDigit) && part.toInt() <= 255
   }
-  return if (valid) 32 else null
 }

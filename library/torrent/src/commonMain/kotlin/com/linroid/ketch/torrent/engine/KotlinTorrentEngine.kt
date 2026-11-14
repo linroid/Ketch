@@ -280,7 +280,7 @@ internal class KotlinTorrentEngine(
   init {
     ipFilter.store(ipFilterOf(config.blockedAddresses))
     // Every dial of a peer, over TCP or uTP, for payload or metadata, goes through this network.
-    network.blocked = { host -> ipFilter.load().blocks(host) }
+    network.filter = ipFilter::load
   }
   // Handshakes still to name their torrent: a quarter of the budget (8 to 64), never more than
   // half, so dials always find slots, even under a budget of one.

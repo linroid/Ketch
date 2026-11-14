@@ -1380,8 +1380,10 @@ docker/       # Docker image of `ketch server` (Dockerfile, entrypoint, compose 
   `updateSettings`, which refuses entries that are none with `INVALID_INPUT`) lists addresses,
   CIDR blocks and ranges, IPv4 or IPv6, at most 10,000 (`TorrentIpFilter`; an IPv4-mapped
   address is its IPv4 one; config entries that are none are ignored with a counted warning,
-  never logged). The engine refuses dials at `TorrentPeerEncryption.blocked`, which every peer
-  and metadata dial passes, TCP or uTP, and closes blocked incoming connections in
+  never logged). The engine refuses dials in `TorrentPeerEncryption.dial` (`filter`), which
+  every peer and metadata dial passes, TCP or uTP: a peer listed by host name, as an HTTP
+  tracker may, is resolved there while a filter is set and dialed at the first address that is
+  not blocked. It closes blocked incoming connections in
   `dispatchIncoming` before their handshake; trackers and DHT nodes are not filtered. Settings
   → BitTorrent → Blocked addresses (`BlockedAddressesGroup`, `addBlockedAddresses`,
   `isBlockedAddress`) shows for devices with the capability. Tests: `TorrentIpFilterTest`,
